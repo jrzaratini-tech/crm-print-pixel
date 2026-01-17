@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SISTEMA CORE v4.0 - PORTÁTIL</title>
+    <style id="custom-theme">
+        :root { 
+            --primary: #2c3e50; 
+            --accent: #3498db; 
+            --bg: #f4f4f4; 
+            --admin-color: #e74c3c; 
+            --sidebar-width: 250px;
+        }
+    </style>
+    <style>
+        * { box-sizing: border-box; }
+        body, html { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; height: 100vh; overflow: hidden; background: var(--bg); }
+        
+        #shell { display: flex; height: 100%; width: 100%; }
+        
+        #sidebar { 
+            width: var(--sidebar-width); 
+            min-width: var(--sidebar-width);
+            background: var(--primary); 
+            color: white; 
+            display: flex; 
+            flex-direction: column; 
+            height: 100%;
+            z-index: 100;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        #sidebar-header {
+            padding: 20px;
+            border-bottom: 2px solid var(--accent);
+            text-align: center;
+            background: rgba(0,0,0,0.1);
+        }
+
+        #menu { 
+            flex-grow: 1; 
+            padding: 10px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #menu button { 
+            display: block; 
+            width: 100%; 
+            padding: 12px 15px; 
+            margin-bottom: 8px;
+            background: rgba(255,255,255,0.05); 
+            border: 1px solid rgba(255,255,255,0.1);
+            color: white; 
+            text-align: left; 
+            cursor: pointer;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #menu button i { 
+            width: 20px;
+            text-align: center;
+        }
+
+        #menu button:hover { background: var(--accent); border-color: var(--accent); transform: translateX(3px); }
+        #menu button.hidden { display: none; }
+        #menu button.active { background: var(--accent); border-color: var(--accent); font-weight: bold; }
+
+        #content-area { 
+            flex-grow: 1; 
+            height: 100%;
+            border: none;
+            background: white;
+            transition: all 0.3s;
+        }
+
+        /* ADMIN ZONE */
+        .admin-active #sidebar { border-right: 6px solid var(--admin-color); }
+        #admin-zone { 
+            display: none; 
+            margin: 10px; 
+            padding: 10px; 
+            background: rgba(0, 0, 0, 0.2); 
+            border-radius: 8px;
+            border: 1px dashed var(--admin-color);
+        }
+        .btn-admin-item { 
+            background: var(--admin-color) !important; 
+            font-weight: bold;
+        }
+        .btn-admin-item:hover { filter: brightness(1.2); }
+
+        #lock-btn { 
+            background: rgba(255,255,255,0.1); 
+            color: #ecf0f1; 
+            border: none; 
+            padding: 15px; 
+            cursor: pointer; 
+            width: 100%; 
+            font-size: 0.8rem; 
+            font-weight: bold;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin-top: auto;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        #lock-btn:hover { background: var(--admin-color); }
+        
+        /* STATUS BAR */
+        .status-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--primary);
+            color: white;
+            padding: 8px 15px;
+            font-size: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            border-top: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .status-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .status-badge {
+            background: rgba(255,255,255,0.1);
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: bold;
+        }
+        
+        .status-badge.portable {
+            background: #27ae60;
+            color: white;
+        }
+        
+        .status-badge.sqlite {
+            background: #3498db;
+            color: white;
+        }
+        
+        #save-indicator {
+            color: #27ae60;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        #save-indicator.show {
+            opacity: 1;
+        }
+        
+        /* LOADING OVERLAY */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(44, 62, 80, 0.95);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+            color: white;
+            transition: opacity 0.3s;
+        }
+        
+        .loading-spinner {
+            border: 5px solid rgba(255,255,255,0.1);
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .loading-message {
+            text-align: center;
+            max-width: 300px;
+        }
+        
+        /* NOTIFICATION */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            z-index: 1001;
+            transform: translateX(150%);
+            transition: transform 0.3s;
+            max-width: 300px;
+        }
+        
+        .notification.show {
+            transform: translateX(0);
+        }
+        
+        .notification.success {
+            border-left: 4px solid #27ae60;
+        }
+        
+        .notification.error {
+            border-left: 4px solid #e74c3c;
+        }
+        
+        .notification.info {
+            border-left: 4px solid #3498db;
+        }
+        
+        .notification-icon {
+            font-size: 20px;
+        }
+        
+        /* PORTABLE BANNER */
+        #portable-banner {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            background: rgba(44, 62, 80, 0.9);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body id="main-body">
+
+    <!-- LOADING SCREEN -->
+    <div id="loading-overlay" class="loading-overlay">
+        <div class="loading-spinner"></div>
+        <div class="loading-message">
+            <h2>SISTEMA CORE v4.0</h2>
+            <p>Inicializando modo portátil...</p>
+            <p id="loading-detail">Carregando banco de dados</p>
+        </div>
+    </div>
+
+    <!-- NOTIFICATION SYSTEM -->
+    <div id="notification-area"></div>
+
+    <div id="shell">
+        <aside id="sidebar">
+            <div id="sidebar-header">
+                <strong style="font-size: 1.2rem;">CORE</strong><br>
+                <small style="opacity: 0.6;">v4.0 PORTÁTIL</small>
+            </div>
+            
+            <nav id="menu">
+                <!-- APENAS O DASHBOARD INICIALMENTE -->
+                <button id="nav_dash" onclick="nav('pages/dashboard.html')" class="active">
+                    <i class="fas fa-chart-bar"></i><span>Dashboard</span>
+                </button>
+                
+                <!-- DIVIDER -->
+                <div style="height: 1px; background: rgba(255,255,255,0.1); margin: 15px 0;"></div>
+                
+                <!-- CUSTOM PAGES WILL APPEAR HERE -->
+                <div id="custom-pages-area"></div>
+                
+                <!-- ADMIN ZONE -->
+                <div id="admin-zone">
+                    <button class="btn-admin-item" onclick="nav('admin/admin-lancamentos.html')">
+                        <i class="fas fa-database"></i><span>Gerenciar Dados</span>
+                    </button>
+                    <button class="btn-admin-item" onclick="nav('admin/admin-config.html')">
+                        <i class="fas fa-cogs"></i><span>Configurações</span>
+                    </button>
+                    <button class="btn-admin-item" onclick="nav('admin/admin-fabrica.html')">
+                        <i class="fas fa-industry"></i><span>Fábrica</span>
+                    </button>
+                </div>
+            </nav>
+            
+            <button id="lock-btn" onclick="toggleAdmin()">
+                <i class="fas fa-lock"></i><span>MODO ADMIN</span>
+            </button>
+        </aside>
+
+        <iframe id="content-area" name="main_frame" src="about:blank" title="Sistema CORE"></iframe>
+    </div>
+    
+    <!-- STATUS BAR -->
+    <div class="status-bar">
+        <div class="status-left">
+            <div class="status-item">
+                <i class="fas fa-usb-drive"></i>
+                <span>Modo Pen Drive</span>
+                <span class="status-badge portable">PORTÁTIL</span>
+            </div>
+            <div class="status-item">
+                <i class="fas fa-database"></i>
+                <span>Banco: LocalStorage</span>
+                <span class="status-badge sqlite">LOCAL</span>
+            </div>
+            <div class="status-item">
+                <i class="fas fa-save"></i>
+                <span id="save-indicator">Salvo</span>
+            </div>
+        </div>
+        <div class="status-right">
+            <span id="current-page">Dashboard</span>
+            <span id="data-status"> | Dados: 0 registros</span>
+        </div>
+    </div>
+    
+    <!-- PORTABLE BANNER -->
+    <div id="portable-banner" style="display: none;">
+        <i class="fas fa-usb-drive"></i>
+        <span>Modo Pen Drive Ativo</span>
+        <div id="core-save-status" style="display: none;">
+            <i class="fas fa-save"></i>
+        </div>
+    </div>
+
+    <!-- SISTEMA DE BANCO DE DADOS SIMPLIFICADO -->
+    <script>
+        class DatabaseManager {
+            constructor() {
+                this.initialized = false;
+                this.isPortable = window.location.protocol === 'file:' || 
+                                 localStorage.getItem('core_portable_mode') === 'true';
+            }
+
+            async init() {
+                try {
+                    updateLoadingMessage('Inicializando banco de dados...');
+                    
+                    console.log('💾 Usando localStorage simplificado');
+                    await this.initLocalStorage();
+                    
+                    this.initialized = true;
+                    updateLoadingMessage('Banco de dados pronto!');
+                    
+                    return true;
+                } catch (error) {
+                    console.error('❌ Erro ao inicializar banco:', error);
+                    updateLoadingMessage('Erro no banco de dados');
+                    
+                    try {
+                        localStorage.setItem('system_events', '[]');
+                        localStorage.setItem('system_settings', '{}');
+                        this.initialized = true;
+                        console.log('✅ Sistema inicializado em modo de emergência');
+                        return true;
+                    } catch (e) {
+                        console.error('❌ Falha total no sistema de dados:', e);
+                        return false;
+                    }
+                }
+            }
+
+            async initLocalStorage() {
+                console.log('📦 Inicializando localStorage...');
+                
+                if (!localStorage.getItem('system_events')) {
+                    localStorage.setItem('system_events', JSON.stringify([]));
+                }
+                
+                if (!localStorage.getItem('system_settings')) {
+                    localStorage.setItem('system_settings', JSON.stringify({
+                        primary: '#2c3e50',
+                        accent: '#3498db',
+                        menu_config: []
+                    }));
+                }
+                
+                console.log('✅ localStorage inicializado');
+                return true;
+            }
+
+            async saveEvent(event) {
+                if (!this.initialized) await this.init();
+                
+                try {
+                    const events = JSON.parse(localStorage.getItem('system_events') || '[]');
+                    events.push(event);
+                    localStorage.setItem('system_events', JSON.stringify(events));
+                    
+                    triggerSaveIndicator();
+                    await this.updateDataStatus();
+                    
+                    return event;
+                } catch (error) {
+                    console.error('❌ Erro ao salvar evento:', error);
+                    return null;
+                }
+            }
+
+            async getEvents(schema = null) {
+                if (!this.initialized) await this.init();
+                
+                try {
+                    const events = JSON.parse(localStorage.getItem('system_events') || '[]');
+                    
+                    if (schema) {
+                        return events.filter(e => e.schema === schema && !e.deleted);
+                    }
+                    
+                    return events.filter(e => !e.deleted);
+                } catch (error) {
+                    console.error('❌ Erro ao buscar eventos:', error);
+                    return [];
+                }
+            }
+
+            async deleteEvent(eventId) {
+                if (!this.initialized) await this.init();
+                
+                try {
+                    const events = JSON.parse(localStorage.getItem('system_events') || '[]');
+                    const eventIndex = events.findIndex(e => e.id === eventId);
+                    
+                    if (eventIndex !== -1) {
+                        events[eventIndex].deleted = true;
+                        localStorage.setItem('system_events', JSON.stringify(events));
+                        
+                        triggerSaveIndicator();
+                        await this.updateDataStatus();
+                        
+                        return true;
+                    }
+                    
+                    return false;
+                } catch (error) {
+                    console.error('❌ Erro ao deletar evento:', error);
+                    return false;
+                }
+            }
+
+            async restoreEvent(eventId) {
+                if (!this.initialized) await this.init();
+                
+                try {
+                    const events = JSON.parse(localStorage.getItem('system_events') || '[]');
+                    const eventIndex = events.findIndex(e => e.id === eventId);
+                    
+                    if (eventIndex !== -1) {
+                        events[eventIndex].deleted = false;
+                        localStorage.setItem('system_events', JSON.stringify(events));
+                        
+                        triggerSaveIndicator();
+                        await this.updateDataStatus();
+                        
+                        return true;
+                    }
+                    
+                    return false;
+                } catch (error) {
+                    console.error('❌ Erro ao restaurar evento:', error);
+                    return false;
+                }
+            }
+
+            async getSettings() {
+                if (!this.initialized) await this.init();
+                
+                try {
+                    return JSON.parse(localStorage.getItem('system_settings') || '{}');
+                } catch (error) {
+                    console.error('❌ Erro ao buscar configurações:', error);
+                    return {};
+                }
+            }
+
+            async saveSetting(key, value) {
+                if (!this.initialized) await this.init();
+                
+                try {
+                    const settings = JSON.parse(localStorage.getItem('system_settings') || '{}');
+                    settings[key] = value;
+                    localStorage.setItem('system_settings', JSON.stringify(settings));
+                    
+                    triggerSaveIndicator();
+                    return true;
+                } catch (error) {
+                    console.error('❌ Erro ao salvar configuração:', error);
+                    return false;
+                }
+            }
+
+            async exportData() {
+                if (!this.initialized) await this.init();
+                
+                try {
+                    const data = {
+                        system_events: JSON.parse(localStorage.getItem('system_events') || '[]'),
+                        system_settings: JSON.parse(localStorage.getItem('system_settings') || '{}'),
+                        timestamp: new Date().toISOString(),
+                        version: '4.0'
+                    };
+                    
+                    return {
+                        data: JSON.stringify(data, null, 2),
+                        filename: `core_export_${new Date().toISOString().split('T')[0]}.json`
+                    };
+                } catch (error) {
+                    console.error('❌ Erro ao exportar dados:', error);
+                    return {
+                        data: '{}',
+                        filename: 'error.json'
+                    };
+                }
+            }
+
+            async importData(jsonData) {
+                if (!this.initialized) await this.init();
+                
+                try {
+                    const data = JSON.parse(jsonData);
+                    
+                    if (data.system_events) {
+                        localStorage.setItem('system_events', JSON.stringify(data.system_events));
+                    }
+                    
+                    if (data.system_settings) {
+                        localStorage.setItem('system_settings', JSON.stringify(data.system_settings));
+                    }
+                    
+                    triggerSaveIndicator();
+                    return { success: true, message: 'Dados importados com sucesso!' };
+                } catch (error) {
+                    return { success: false, message: 'Erro ao importar dados: ' + error.message };
+                }
+            }
+
+            async getStats() {
+                if (!this.initialized) await this.init();
+                
+                try {
+                    const events = JSON.parse(localStorage.getItem('system_events') || '[]');
+                    const activeEvents = events.filter(e => !e.deleted);
+                    
+                    return {
+                        total: events.length,
+                        active: activeEvents.length,
+                        deleted: events.length - activeEvents.length
+                    };
+                } catch (error) {
+                    console.error('❌ Erro ao obter estatísticas:', error);
+                    return { total: 0, active: 0, deleted: 0 };
+                }
+            }
+
+            async updateDataStatus() {
+                try {
+                    const stats = await this.getStats();
+                    const count = stats.active;
+                    document.getElementById('data-status').textContent = ` | Dados: ${count} registros`;
+                } catch (error) {
+                    console.error('❌ Erro ao atualizar status:', error);
+                }
+            }
+
+            showNotification(message, type = 'info') {
+                const notification = document.createElement('div');
+                notification.className = `notification ${type}`;
+                notification.innerHTML = `
+                    <div class="notification-icon">
+                        ${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}
+                    </div>
+                    <div>${message}</div>
+                `;
+                
+                document.getElementById('notification-area').appendChild(notification);
+                
+                setTimeout(() => notification.classList.add('show'), 100);
+                setTimeout(() => {
+                    notification.classList.remove('show');
+                    setTimeout(() => notification.remove(), 300);
+                }, 3000);
+            }
+        }
+    </script>
+
+    <script>
+        let isAdmin = false;
+        let currentPage = 'dashboard';
+        let dbManager = new DatabaseManager();
+        let systemSettings = {};
+        let autoSaveTimer = null;
+
+        async function initializeSystem() {
+            try {
+                updateLoadingMessage('Inicializando banco de dados...');
+                
+                const dbSuccess = await dbManager.init();
+                if (!dbSuccess) {
+                    throw new Error('Falha ao inicializar banco de dados');
+                }
+                
+                updateLoadingMessage('Carregando configurações...');
+                await loadSystemSettings();
+                
+                updateLoadingMessage('Configurando interface...');
+                applyVisualSettings();
+                
+                updateLoadingMessage('Configurando menu...');
+                await setupDynamicMenu();
+                
+                updateLoadingMessage('Inicializando páginas...');
+                
+                if (dbManager.isPortable) {
+                    document.getElementById('portable-banner').style.display = 'flex';
+                }
+                
+                setupAutoSave();
+                
+                setTimeout(() => {
+                    updateLoadingMessage('Carregando Dashboard...');
+                    nav('pages/dashboard.html');
+                    
+                    setTimeout(() => {
+                        document.getElementById('loading-overlay').style.opacity = '0';
+                        setTimeout(() => {
+                            document.getElementById('loading-overlay').style.display = 'none';
+                        }, 300);
+                    }, 2000);
+                }, 1000);
+                
+                console.log('🚀 Sistema CORE v4.0 PORTÁTIL inicializado com sucesso!');
+                
+            } catch (error) {
+                console.error('❌ Erro na inicialização:', error);
+                updateLoadingMessage(`Erro: ${error.message}`);
+                
+                setTimeout(() => {
+                    document.getElementById('loading-overlay').innerHTML = `
+                        <div style="text-align: center; padding: 20px;">
+                            <h2 style="color: #e74c3c;">⚠️ ERRO DE INICIALIZAÇÃO</h2>
+                            <p>${error.message}</p>
+                            <p style="font-size: 14px; margin-top: 20px;">Tentando carregar dashboard direto...</p>
+                        </div>
+                    `;
+                    
+                    setTimeout(() => {
+                        document.getElementById('loading-overlay').style.display = 'none';
+                        nav('pages/dashboard.html');
+                        dbManager.showNotification('Sistema carregado em modo de emergência', 'error');
+                    }, 3000);
+                }, 2000);
+            }
+        }
+
+        async function loadSystemSettings() {
+            systemSettings = await dbManager.getSettings();
+            
+            if (!systemSettings.menu_config) {
+                systemSettings.menu_config = [];
+                await dbManager.saveSetting('menu_config', systemSettings.menu_config);
+            }
+            
+            console.log('⚙️ Configurações carregadas:', systemSettings);
+        }
+
+        function applyVisualSettings() {
+            if (systemSettings.primary) {
+                document.documentElement.style.setProperty('--primary', systemSettings.primary);
+            }
+            
+            if (systemSettings.accent) {
+                document.documentElement.style.setProperty('--accent', systemSettings.accent);
+            }
+            
+            if (systemSettings.theme === 'dark') {
+                document.documentElement.style.setProperty('--bg', '#1a1a1a');
+            }
+        }
+
+        async function setupDynamicMenu() {
+            const menuArea = document.getElementById('custom-pages-area');
+            const config = systemSettings.menu_config || [];
+            
+            menuArea.innerHTML = '';
+            
+            const activePages = config
+                .filter(item => !item.deleted && !item.hidden)
+                .sort((a, b) => (a.pos || 0) - (b.pos || 0));
+            
+            activePages.forEach(item => {
+                const button = document.createElement('button');
+                button.id = item.id;
+                
+                let icon = 'fa-file';
+                if (item.type === 'READ') icon = 'fa-chart-bar';
+                if (item.type === 'WRITE') icon = 'fa-edit';
+                if (item.type === 'NEUTRAL') icon = 'fa-eye';
+                
+                button.innerHTML = `<i class="fas ${icon}"></i><span>${item.name}</span>`;
+                button.onclick = () => nav(item.file);
+                
+                menuArea.appendChild(button);
+            });
+            
+            await dbManager.updateDataStatus();
+        }
+
+        function setupAutoSave() {
+            autoSaveTimer = setInterval(async () => {
+                if (dbManager.initialized) {
+                    triggerSaveIndicator();
+                    console.log('💾 Auto-save executado');
+                }
+            }, 30000);
+        }
+
+        function nav(url) {
+            const iframe = document.getElementById('content-area');
+            iframe.src = url;
+            
+            document.querySelectorAll('#menu button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            const pageName = getPageNameFromUrl(url);
+            document.getElementById('current-page').textContent = pageName;
+            currentPage = pageName.toLowerCase();
+            
+            console.log(`🌐 Navegando para: ${url}`);
+        }
+
+        function getPageNameFromUrl(url) {
+            const parts = url.split('/').pop().split('.')[0];
+            return parts
+                .split('-')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ');
+        }
+
+        function showNotification(message, type = 'info') {
+            dbManager.showNotification(message, type);
+        }
+
+        function updateLoadingMessage(message) {
+            const element = document.getElementById('loading-detail');
+            if (element) {
+                element.textContent = message;
+            }
+        }
+
+        function triggerSaveIndicator() {
+            const indicator = document.getElementById('save-indicator');
+            indicator.classList.add('show');
+            
+            setTimeout(() => {
+                indicator.classList.remove('show');
+            }, 1000);
+            
+            const bannerStatus = document.getElementById('core-save-status');
+            if (bannerStatus) {
+                bannerStatus.style.display = 'inline';
+                bannerStatus.style.color = '#27ae60';
+                
+                setTimeout(() => {
+                    bannerStatus.style.display = 'none';
+                }, 1000);
+            }
+        }
+
+        function toggleAdmin() {
+            if (!isAdmin) {
+                const pin = prompt("DIGITE O PIN ADMIN (v4.0):");
+                
+                if (pin === "3377") {
+                    isAdmin = true;
+                    document.getElementById('main-body').classList.add('admin-active');
+                    document.getElementById('admin-zone').style.display = 'block';
+                    
+                    const lockBtn = document.getElementById('lock-btn');
+                    lockBtn.innerHTML = '<i class="fas fa-unlock"></i><span>SAIR ADMIN</span>';
+                    
+                    showNotification('🔓 Modo Administrador ATIVADO', 'success');
+                    console.log("🔓 Modo Admin ATIVADO");
+                } else {
+                    showNotification('❌ PIN incorreto!', 'error');
+                }
+            } else {
+                isAdmin = false;
+                document.getElementById('main-body').classList.remove('admin-active');
+                document.getElementById('admin-zone').style.display = 'none';
+                
+                const lockBtn = document.getElementById('lock-btn');
+                lockBtn.innerHTML = '<i class="fas fa-lock"></i><span>MODO ADMIN</span>';
+                
+                showNotification('🔐 Modo Administrador DESATIVADO', 'info');
+                console.log("🔐 Modo Admin DESATIVADO");
+            }
+        }
+
+        window.addEventListener("message", async (event) => {
+            console.log('📨 Mensagem recebida:', event.data.type);
+            
+            if (event.data.type === "REGISTER_NEW_PAGE") {
+                const newPage = event.data.payload;
+                
+                console.log('📄 Tentando registrar nova página:', newPage);
+                
+                if (!newPage || !newPage.name || !newPage.file) {
+                    showNotification('❌ Dados da página incompletos!', 'error');
+                    return;
+                }
+                
+                const existingPage = systemSettings.menu_config.find(
+                    page => page.name === newPage.name || page.file === newPage.file
+                );
+                
+                if (existingPage) {
+                    existingPage.name = newPage.name;
+                    existingPage.type = newPage.type;
+                    existingPage.hidden = false;
+                    existingPage.deleted = false;
+                } else {
+                    const newPageId = "nav_cust_" + Date.now();
+                    const newPageConfig = {
+                        id: newPageId,
+                        name: newPage.name,
+                        file: newPage.file,
+                        type: newPage.type,
+                        pos: (systemSettings.menu_config.length + 1) * 10,
+                        hidden: false,
+                        deleted: false
+                    };
+                    
+                    systemSettings.menu_config.push(newPageConfig);
+                }
+                
+                await dbManager.saveSetting('menu_config', systemSettings.menu_config);
+                await setupDynamicMenu();
+                
+                showNotification(`✅ Página "${newPage.name}" registrada com sucesso!`, 'success');
+                
+                if (event.source && event.source.postMessage) {
+                    event.source.postMessage({ 
+                        type: "PAGE_REGISTERED",
+                        pageId: existingPage ? existingPage.id : "nav_cust_" + Date.now(),
+                        message: "Página registrada com sucesso!"
+                    }, "*");
+                }
+            }
+            
+            if (event.data.type === "COMMIT") {
+                const novoEvento = {
+                    id: "EVT-" + Date.now() + "-" + Math.random().toString(36).substr(2, 4),
+                    schema: event.data.schema,
+                    payload: event.data.payload,
+                    source: event.data.source || "unknown",
+                    created_at: new Date().toISOString(),
+                    deleted: false
+                };
+                
+                await dbManager.saveEvent(novoEvento);
+                console.log("✅ Evento Registrado:", novoEvento);
+                
+                const iframe = document.getElementById('content-area');
+                if (iframe && iframe.contentWindow) {
+                    iframe.contentWindow.postMessage({ 
+                        type: "COMMIT_CONFIRMATION",
+                        event: novoEvento
+                    }, "*");
+                }
+                
+                showNotification(`✅ ${event.data.schema} salvo com sucesso!`, 'success');
+            }
+            
+            if (event.data.type === "QUERY_REQUEST") {
+                console.log("📥 QUERY_REQUEST recebido de:", event.data.source);
+                const activeData = await dbManager.getEvents();
+                
+                if (event.source && event.source.postMessage) {
+                    event.source.postMessage({ 
+                        type: "QUERY_RESPONSE", 
+                        data: activeData,
+                        source: "core-system"
+                    }, "*");
+                    console.log("📤 QUERY_RESPONSE enviado com", activeData.length, "registros");
+                }
+            }
+            
+            if (event.data.type === "DELETE_EVENT") {
+                const success = await dbManager.deleteEvent(event.data.id);
+                
+                if (event.source && event.source.postMessage) {
+                    event.source.postMessage({ 
+                        type: "DELETE_CONFIRMATION",
+                        id: event.data.id,
+                        success: success
+                    }, "*");
+                }
+                
+                if (success) {
+                    showNotification('🗑️ Registro anulado com sucesso', 'info');
+                } else {
+                    showNotification('❌ Erro ao anular registro', 'error');
+                }
+            }
+            
+            if (event.data.type === "RESTORE_EVENT") {
+                const success = await dbManager.restoreEvent(event.data.id);
+                
+                if (event.source && event.source.postMessage) {
+                    event.source.postMessage({ 
+                        type: "RESTORE_CONFIRMATION",
+                        id: event.data.id,
+                        success: success
+                    }, "*");
+                }
+                
+                if (success) {
+                    showNotification('✅ Registro restaurado com sucesso', 'success');
+                } else {
+                    showNotification('❌ Erro ao restaurar registro', 'error');
+                }
+            }
+            
+            if (event.data.type === "UPDATE_SETTINGS") {
+                const newSettings = event.data.payload;
+                
+                for (const [key, value] of Object.entries(newSettings)) {
+                    await dbManager.saveSetting(key, value);
+                    systemSettings[key] = value;
+                }
+                
+                applyVisualSettings();
+                await setupDynamicMenu();
+                
+                showNotification('⚙️ Configurações atualizadas!', 'success');
+            }
+            
+            if (event.data.type === "ADMIN_STATUS_REQUEST") {
+                if (event.source && event.source.postMessage) {
+                    event.source.postMessage({ 
+                        type: "ADMIN_STATUS_RESPONSE",
+                        isAdmin: isAdmin
+                    }, "*");
+                }
+            }
+            
+            if (event.data.type === "GET_SETTINGS_REQUEST") {
+                const settings = await dbManager.getSettings();
+                
+                if (event.source && event.source.postMessage) {
+                    event.source.postMessage({ 
+                        type: "GET_SETTINGS_RESPONSE",
+                        settings: settings
+                    }, "*");
+                }
+            }
+            
+            if (event.data.type === "EXPORT_REQUEST") {
+                const exportResult = await dbManager.exportData();
+                
+                if (event.source && event.source.postMessage) {
+                    event.source.postMessage({ 
+                        type: "EXPORT_RESPONSE",
+                        data: exportResult.data,
+                        filename: exportResult.filename
+                    }, "*");
+                }
+            }
+            
+            if (event.data.type === "IMPORT_REQUEST") {
+                const importResult = await dbManager.importData(event.data.jsonData);
+                
+                if (event.source && event.source.postMessage) {
+                    event.source.postMessage({ 
+                        type: "IMPORT_RESPONSE",
+                        success: importResult.success,
+                        message: importResult.message
+                    }, "*");
+                }
+                
+                if (importResult.success) {
+                    await loadSystemSettings();
+                    await setupDynamicMenu();
+                    showNotification('📥 Dados importados com sucesso!', 'success');
+                }
+            }
+            
+            if (event.data.type === "STATS_REQUEST") {
+                const stats = await dbManager.getStats();
+                
+                if (event.source && event.source.postMessage) {
+                    event.source.postMessage({ 
+                        type: "STATS_RESPONSE",
+                        stats: stats
+                    }, "*");
+                }
+            }
+            
+            if (event.data.type === "NAVIGATE_TO_DASHBOARD") {
+                nav('pages/dashboard.html');
+            }
+            
+            if (event.data.type === "RELOAD_SYSTEM") {
+                showNotification('🔄 Recarregando sistema...', 'info');
+                setTimeout(() => {
+                    location.reload();
+                }, 1000);
+            }
+            
+            if (event.data.type === "TRIGGER_EXPORT") {
+                const exportResult = await dbManager.exportData();
+                
+                if (event.source && event.source.postMessage) {
+                    event.source.postMessage({ 
+                        type: "EXPORT_RESPONSE",
+                        data: exportResult.data,
+                        filename: exportResult.filename
+                    }, "*");
+                }
+            }
+        });
+
+        function showSystemInfo() {
+            const info = `
+SISTEMA CORE v4.0 - PORTÁTIL
+=============================
+Modo: ${dbManager.isPortable ? 'Pen Drive' : 'Online'}
+Status: ${dbManager.initialized ? '✅ Ativo' : '❌ Inativo'}
+
+Uso do Storage: ${Math.round((JSON.stringify(localStorage).length / 1024) * 100) / 100} KB
+Páginas Registradas: ${systemSettings.menu_config?.length || 0}
+Admin Ativo: ${isAdmin ? 'SIM' : 'NÃO'}
+            `;
+            
+            alert(info);
+        }
+
+        function emergencyBackup() {
+            const data = {
+                system_events: localStorage.getItem('system_events'),
+                system_settings: localStorage.getItem('system_settings'),
+                timestamp: new Date().toISOString()
+            };
+            
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `core_emergency_backup_${Date.now()}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showNotification('🆘 Backup de emergência criado!', 'success');
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 's') {
+                e.preventDefault();
+                triggerSaveIndicator();
+                showNotification('💾 Salvamento manual executado', 'info');
+            }
+            
+            if (e.ctrlKey && e.key === 'i') {
+                e.preventDefault();
+                showSystemInfo();
+            }
+            
+            if (e.ctrlKey && e.key === 'b') {
+                e.preventDefault();
+                emergencyBackup();
+            }
+            
+            if (e.ctrlKey && e.key === 'e') {
+                e.preventDefault();
+                const iframe = document.getElementById('content-area');
+                if (iframe && iframe.contentWindow) {
+                    iframe.contentWindow.postMessage({ 
+                        type: "TRIGGER_EXPORT"
+                    }, "*");
+                }
+            }
+            
+            if (e.ctrlKey && e.key === 'a') {
+                e.preventDefault();
+                toggleAdmin();
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 DOM Carregado - Iniciando sistema...');
+            setTimeout(() => {
+                initializeSystem();
+            }, 500);
+        });
+
+        window.coreSystem = {
+            nav: nav,
+            toggleAdmin: toggleAdmin,
+            showNotification: showNotification,
+            dbManager: dbManager,
+            getSettings: () => systemSettings,
+            isAdmin: () => isAdmin,
+            reloadSystem: () => {
+                showNotification('🔄 Recarregando sistema...', 'info');
+                setTimeout(() => location.reload(), 1000);
+            }
+        };
+    </script>
+</body>
+</html>

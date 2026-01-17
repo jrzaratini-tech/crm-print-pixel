@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrintPixel - Nova Despesa</title>
+    
+    <!-- BIBLIOTECAS EXTERNAS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ============================================
+           VARIÁVEIS DE CORES E ESTILOS
+           ============================================ */
+        :root {
+            --primary-color: #1a237e;
+            --secondary-color: #283593;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --info-color: #3b82f6;
+            --light-bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border-color: #e2e8f0;
+            --hover-bg: #f1f5f9;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+        }
+        
+        /* ============================================
+           RESET E CONFIGURAÇÕES GERAIS
+           ============================================ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        
+        body {
+            background-color: var(--light-bg);
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        /* ============================================
+           HEADER
+           ============================================ */
+        .page-header {
+            background: var(--card-bg);
+            padding: 24px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            margin-bottom: 24px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .header-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--danger-color) 0%, #ef4444 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+        }
+        
+        .header-text h1 {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: var(--danger-color);
+        }
+        
+        .header-text p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 400;
+        }
+        
+        /* ============================================
+           FORMULÁRIO
+           ============================================ */
+        .form-container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        .form-card {
+            background: var(--card-bg);
+            border-radius: var(--radius-lg);
+            padding: 32px;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
+            margin-bottom: 24px;
+        }
+        
+        .form-section {
+            margin-bottom: 32px;
+        }
+        
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .section-title i {
+            color: var(--primary-color);
+        }
+        
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .form-group.full-width {
+            grid-column: 1 / -1;
+        }
+        
+        label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .required::after {
+            content: " *";
+            color: var(--danger-color);
+        }
+        
+        input, select, textarea {
+            padding: 12px 16px;
+            border: 1.5px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            font-size: 15px;
+            transition: all 0.2s;
+            background-color: var(--card-bg);
+            color: var(--text-primary);
+        }
+        
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(26, 35, 126, 0.1);
+        }
+        
+        input[type="date"] {
+            padding: 11px 16px;
+        }
+        
+        input[type="file"] {
+            padding: 10px;
+            border: 2px dashed var(--border-color);
+            background: var(--light-bg);
+            cursor: pointer;
+        }
+        
+        input[type="file"]:hover {
+            border-color: var(--primary-color);
+        }
+        
+        .radio-group {
+            display: flex;
+            gap: 20px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .radio-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .radio-option input {
+            width: 18px;
+            height: 18px;
+        }
+        
+        .radio-option label {
+            margin-bottom: 0;
+            font-weight: 500;
+        }
+        
+        .checkbox-group {
+            display: flex;
+            gap: 16px;
+            margin-top: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .checkbox-option {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .checkbox-option input {
+            width: 18px;
+            height: 18px;
+        }
+        
+        .checkbox-option label {
+            margin-bottom: 0;
+            font-weight: 500;
+        }
+        
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+        
+        .status-pago {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-pendente {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .file-preview {
+            margin-top: 12px;
+            padding: 12px;
+            background: var(--light-bg);
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+        }
+        
+        .file-preview img {
+            max-width: 100%;
+            max-height: 200px;
+            border-radius: var(--radius-sm);
+            margin-top: 8px;
+        }
+        
+        .file-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 8px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        
+        .total-section {
+            margin-top: 24px;
+            padding: 20px;
+            background: var(--light-bg);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+        }
+        
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .total-row:last-child {
+            border-bottom: none;
+            font-weight: 700;
+            font-size: 18px;
+            color: var(--danger-color);
+        }
+        
+        /* ============================================
+           CATEGORIAS
+           ============================================ */
+        .categoria-select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1.5px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            font-size: 15px;
+            background-color: var(--card-bg);
+            color: var(--text-primary);
+            cursor: pointer;
+        }
+        
+        .categoria-select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(26, 35, 126, 0.1);
+        }
+        
+        .outra-categoria-input {
+            margin-top: 12px;
+            padding: 12px 16px;
+            border: 1.5px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            font-size: 15px;
+            width: 100%;
+            display: none;
+        }
+        
+        .outra-categoria-input.active {
+            display: block;
+        }
+        
+        /* ============================================
+           BOTÕES DE AÇÃO
+           ============================================ */
+        .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 16px;
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .btn-cancel {
+            padding: 14px 28px;
+            background: var(--text-secondary);
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 15px;
+            transition: all 0.2s;
+        }
+        
+        .btn-cancel:hover {
+            background: #4a5568;
+            transform: translateY(-2px);
+        }
+        
+        .btn-save {
+            padding: 14px 28px;
+            background: var(--danger-color);
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 15px;
+            transition: all 0.2s;
+            position: relative;
+        }
+        
+        .btn-save:hover {
+            background: #dc2626;
+            transform: translateY(-2px);
+        }
+        
+        .btn-save:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .btn-save.saving {
+            background: var(--warning-color);
+        }
+        
+        .btn-save.success {
+            background: var(--success-color);
+        }
+        
+        /* ============================================
+           MENSAGEM DE CONFIRMAÇÃO
+           ============================================ */
+        .confirmation-message {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--success-color);
+            color: white;
+            padding: 16px 24px;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-lg);
+            z-index: 1000;
+            display: none;
+            align-items: center;
+            gap: 12px;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        .confirmation-message.show {
+            display: flex;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        /* ============================================
+           RESPONSIVIDADE
+           ============================================ */
+        @media (max-width: 768px) {
+            body {
+                padding: 16px;
+            }
+            
+            .form-card {
+                padding: 20px;
+            }
+            
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .form-actions {
+                flex-direction: column;
+            }
+            
+            .radio-group, .checkbox-group {
+                flex-direction: column;
+                gap: 12px;
+            }
+            
+            .confirmation-message {
+                top: 10px;
+                right: 10px;
+                left: 10px;
+            }
+        }
+        
+        /* ============================================
+           ANIMAÇÕES
+           ============================================ */
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+    </style>
+</head>
+<body data-page-id="nova_despesa" data-page-type="WRITE">
+    <!-- ============================================
+         HEADER
+         ============================================ -->
+    <header class="page-header">
+        <div class="header-content">
+            <div class="header-title">
+                <div class="header-icon">
+                    <i class="fas fa-money-bill-wave"></i>
+                </div>
+                <div class="header-text">
+                    <h1>Registro de Despesa</h1>
+                    <p>Registre todas as despesas da empresa com detalhes completos</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ============================================
+         FORMULÁRIO PRINCIPAL
+         ============================================ -->
+    <div class="form-container">
+        <form id="despesaForm" class="form-card fade-in">
+            <!-- SEÇÃO: INFORMAÇÕES BÁSICAS -->
+            <div class="form-section">
+                <h2 class="section-title">
+                    <i class="fas fa-info-circle"></i>
+                    Informações Básicas
+                </h2>
+                
+                <div class="form-grid">
+                    <!-- FORNECEDOR -->
+                    <div class="form-group">
+                        <label for="fornecedor" class="required">Fornecedor</label>
+                        <input type="text" id="fornecedor" name="fornecedor" data-bind="despesa.fornecedor" placeholder="Nome do fornecedor" required>
+                    </div>
+                    
+                    <!-- DESCRIÇÃO -->
+                    <div class="form-group">
+                        <label for="descricao" class="required">Descrição da Despesa</label>
+                        <input type="text" id="descricao" name="descricao" data-bind="despesa.descricao" placeholder="Ex: Compra de material gráfico" required>
+                    </div>
+                    
+                    <!-- CAMPO DE TELEFONE -->
+                    <div class="form-group">
+                        <label for="telefone">Telefone do Fornecedor</label>
+                        <input type="tel" id="telefone" name="telefone" data-bind="despesa.telefone" placeholder="Ex: 912345678">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="nifFornecedor">NIF do Fornecedor</label>
+                        <input type="text" id="nifFornecedor" name="nifFornecedor" data-bind="despesa.nifFornecedor" placeholder="Número de identificação fiscal">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- SEÇÃO: DATAS -->
+            <div class="form-section">
+                <h2 class="section-title">
+                    <i class="fas fa-calendar-alt"></i>
+                    Datas
+                </h2>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="dataCompra" class="required">Data da Compra</label>
+                        <input type="date" id="dataCompra" name="dataCompra" data-bind="despesa.dataCompra" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="dataVencimento" class="required">Data de Vencimento</label>
+                        <input type="date" id="dataVencimento" name="dataVencimento" data-bind="despesa.dataVencimento" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="dataPagamento">Data do Pagamento</label>
+                        <input type="date" id="dataPagamento" name="dataPagamento" data-bind="despesa.dataPagamento">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- SEÇÃO: VALORES -->
+            <div class="form-section">
+                <h2 class="section-title">
+                    <i class="fas fa-euro-sign"></i>
+                    Valores
+                </h2>
+                
+                <div class="form-grid">
+                    <!-- VALOR BRUTO (SEM IVA) -->
+                    <div class="form-group">
+                        <label for="valorBruto" class="required">Valor Bruto (sem IVA)</label>
+                        <input type="number" id="valorBruto" name="valorBruto" data-bind="despesa.valorBruto" min="0" step="0.01" placeholder="0.00" required>
+                    </div>
+                    
+                    <!-- OPÇÃO DE IVA -->
+                    <div class="form-group">
+                        <label>IVA</label>
+                        <div class="radio-group">
+                            <div class="radio-option">
+                                <input type="radio" id="ivaSim" name="ivaOption" value="comIVA" data-bind="despesa.comIVA" checked>
+                                <label for="ivaSim">Com IVA (23%)</label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" id="ivaNao" name="ivaOption" value="isento" data-bind="despesa.comIVA">
+                                <label for="ivaNao">Isento</label>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- STATUS DO PAGAMENTO -->
+                    <div class="form-group">
+                        <label>Status do Pagamento</label>
+                        <div class="radio-group">
+                            <div class="radio-option">
+                                <input type="radio" id="statusPago" name="statusPagamento" value="pago" data-bind="despesa.statusPagamento" checked>
+                                <label for="statusPago"><span class="status-badge status-pago">Pago</span></label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" id="statusPendente" name="statusPagamento" value="pendente" data-bind="despesa.statusPagamento">
+                                <label for="statusPendente"><span class="status-badge status-pendente">A Pagar</span></label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- RESUMO DOS VALORES CALCULADOS -->
+                <div class="total-section">
+                    <div class="total-row">
+                        <span>Valor Bruto (sem IVA):</span>
+                        <span id="valorBrutoDisplay">€0.00</span>
+                    </div>
+                    <div class="total-row">
+                        <span>IVA (23%):</span>
+                        <span id="valorIVADisplay">€0.00</span>
+                    </div>
+                    <div class="total-row">
+                        <span>TOTAL (com IVA):</span>
+                        <span id="valorTotalDisplay">€0.00</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- SEÇÃO: CATEGORIA -->
+            <div class="form-section">
+                <h2 class="section-title">
+                    <i class="fas fa-tags"></i>
+                    Categoria
+                </h2>
+                
+                <div class="form-group">
+                    <label for="categoria" class="required">Selecione uma Categoria</label>
+                    <select id="categoria" name="categoria" class="categoria-select" data-bind="despesa.categoria" required>
+                        <option value="">Selecione uma categoria...</option>
+                        <option value="COMBUSTIVEL">COMBUSTÍVEL</option>
+                        <option value="ALUGUEL">ALUGUEL</option>
+                        <option value="AGUA">ÁGUA</option>
+                        <option value="LUZ">LUZ</option>
+                        <option value="TELEFONE FIXO">TELEFONE FIXO</option>
+                        <option value="WHATSAPP">WHATSAPP</option>
+                        <option value="CAFÉ">CAFÉ</option>
+                        <option value="ESCRITORIO">ESCRITÓRIO</option>
+                        <option value="COMUNICAÇÃO">COMUNICAÇÃO</option>
+                        <option value="FINANÇAS">FINANÇAS</option>
+                        <option value="DIMATUR">DIMATUR</option>
+                        <option value="DAGOL">DAGOL</option>
+                        <option value="POLEGADA LED">POLEGADA LED</option>
+                        <option value="LEREY MERLYN">LEREY MERLYN</option>
+                        <option value="PHOTTER ZONE">PHOTTER ZONE</option>
+                        <option value="MACRO">MACRO</option>
+                        <option value="CTT">CTT</option>
+                        <option value="WEDDT">WEDDT</option>
+                        <option value="TRANSPORTE">TRANSPORTE</option>
+                        <option value="MANUTENÇÃO MAQUINAS">MANUTENÇÃO MÁQUINAS</option>
+                        <option value="OUTROS">OUTROS</option>
+                    </select>
+                    
+                    <input type="text" id="outraCategoriaInput" class="outra-categoria-input" data-bind="despesa.outraCategoria" placeholder="Especifique outra categoria...">
+                </div>
+            </div>
+            
+            <!-- SEÇÃO: FORMA DE PAGAMENTO -->
+            <div class="form-section">
+                <h2 class="section-title">
+                    <i class="fas fa-credit-card"></i>
+                    Forma de Pagamento
+                </h2>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="formaPagamento" class="required">Método de Pagamento</label>
+                        <select id="formaPagamento" name="formaPagamento" class="categoria-select" data-bind="despesa.formaPagamento" required>
+                            <option value="">Selecione a forma de pagamento...</option>
+                            <option value="dinheiro">Dinheiro</option>
+                            <option value="mbway">MBWay</option>
+                            <option value="transferencia">Transferência Bancária</option>
+                            <option value="cartao">Cartão de Crédito/Débito</option>
+                            <option value="cheque">Cheque</option>
+                            <option value="outro">Outro</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="outroPagamento">Especificar Outro</label>
+                        <input type="text" id="outroPagamento" name="outroPagamento" data-bind="despesa.outroPagamento" placeholder="Especifique a forma de pagamento">
+                    </div>
+                </div>
+            </div>
+            
+            <!-- SEÇÃO: ANEXOS E OBSERVAÇÕES -->
+            <div class="form-section">
+                <h2 class="section-title">
+                    <i class="fas fa-paperclip"></i>
+                    Anexos e Observações
+                </h2>
+                
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label for="observacoes">Observações</label>
+                        <textarea id="observacoes" name="observacoes" data-bind="despesa.observacoes" rows="4" placeholder="Observações sobre a despesa..."></textarea>
+                    </div>
+                    
+                    <div class="form-group full-width">
+                        <label for="notaFiscal">Anexar Nota Fiscal/Fatura</label>
+                        <input type="file" id="notaFiscal" name="notaFiscal" accept="image/*,.pdf,.doc,.docx">
+                        <div class="file-preview" id="filePreview" style="display: none;">
+                            <div id="fileName"></div>
+                            <div class="file-info" id="fileInfo"></div>
+                            <img id="fileImage" style="display: none;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- BOTÕES DE AÇÃO -->
+            <div class="form-actions">
+                <button type="button" class="btn-cancel" id="cancelBtn">
+                    <i class="fas fa-times"></i>
+                    Cancelar
+                </button>
+                <button type="button" class="btn-save" id="saveBtn" data-action="commit">
+                    <i class="fas fa-save"></i>
+                    Salvar Despesa
+                </button>
+            </div>
+            
+            <!-- CAMPOS OCULTOS PARA VALORES CALCULADOS -->
+            <input type="hidden" id="valorTotalHidden" data-bind="despesa.valorTotal">
+            <input type="hidden" id="valorIVAHidden" data-bind="despesa.valorIVA">
+        </form>
+    </div>
+
+    <!-- MENSAGEM DE CONFIRMAÇÃO -->
+    <div class="confirmation-message" id="confirmationMessage">
+        <i class="fas fa-check-circle"></i>
+        <div>
+            <strong>Despesa salva com sucesso!</strong>
+            <div style="font-size: 14px; opacity: 0.9;">A despesa foi registrada no sistema.</div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // SISTEMA DE REGISTRO DE DESPESAS
+        // ============================================
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('💰 Sistema de Despesas carregado');
+            
+            // Elementos do DOM
+            const despesaForm = document.getElementById('despesaForm');
+            const saveBtn = document.getElementById('saveBtn');
+            const cancelBtn = document.getElementById('cancelBtn');
+            const categoriaSelect = document.getElementById('categoria');
+            const outraCategoriaInput = document.getElementById('outraCategoriaInput');
+            const formaPagamentoSelect = document.getElementById('formaPagamento');
+            const outroPagamentoInput = document.getElementById('outroPagamento');
+            const notaFiscalInput = document.getElementById('notaFiscal');
+            const filePreview = document.getElementById('filePreview');
+            const confirmationMessage = document.getElementById('confirmationMessage');
+            
+            // Elementos para cálculo
+            const valorBrutoInput = document.getElementById('valorBruto');
+            const ivaSimRadio = document.getElementById('ivaSim');
+            const ivaNaoRadio = document.getElementById('ivaNao');
+            const valorBrutoDisplay = document.getElementById('valorBrutoDisplay');
+            const valorIVADisplay = document.getElementById('valorIVADisplay');
+            const valorTotalDisplay = document.getElementById('valorTotalDisplay');
+            
+            // Campos ocultos para valores calculados
+            const valorTotalHidden = document.getElementById('valorTotalHidden');
+            const valorIVAHidden = document.getElementById('valorIVAHidden');
+            
+            // Estado da aplicação
+            let notaFiscalBase64 = '';
+            
+            // ============================================
+            // FUNÇÕES DE INICIALIZAÇÃO
+            // ============================================
+            
+            // Inicializar sistema
+            function inicializar() {
+                configurarEventListeners();
+                calcularTotais();
+                configurarDatasPadrao();
+                
+                // Desabilitar campo "Outro" inicialmente
+                outroPagamentoInput.disabled = true;
+                
+                console.log('✅ Sistema de despesas inicializado');
+            }
+            
+            // Configurar datas padrão
+            function configurarDatasPadrao() {
+                const hoje = new Date();
+                const amanha = new Date(hoje);
+                amanha.setDate(amanha.getDate() + 1);
+                
+                document.getElementById('dataCompra').valueAsDate = hoje;
+                document.getElementById('dataVencimento').valueAsDate = amanha;
+                document.getElementById('dataPagamento').valueAsDate = hoje;
+            }
+            
+            // Calcular totais
+            function calcularTotais() {
+                const valorBruto = parseFloat(valorBrutoInput.value) || 0;
+                
+                // Se tem IVA, calcular o valor com IVA (23%)
+                if (ivaSimRadio.checked) {
+                    const valorComIVA = valorBruto * 1.23;
+                    const valorIVA = valorComIVA - valorBruto;
+                    
+                    // Atualizar displays
+                    valorBrutoDisplay.textContent = formatarMoeda(valorBruto);
+                    valorIVADisplay.textContent = formatarMoeda(valorIVA);
+                    valorTotalDisplay.textContent = formatarMoeda(valorComIVA);
+                    
+                    // Atualizar campos ocultos (serão usados pelo engine.js)
+                    valorTotalHidden.value = valorComIVA.toFixed(2);
+                    valorIVAHidden.value = valorIVA.toFixed(2);
+                } else {
+                    // Se isento de IVA
+                    valorBrutoDisplay.textContent = formatarMoeda(valorBruto);
+                    valorIVADisplay.textContent = '€0.00';
+                    valorTotalDisplay.textContent = formatarMoeda(valorBruto);
+                    
+                    // Atualizar campos ocultos
+                    valorTotalHidden.value = valorBruto.toFixed(2);
+                    valorIVAHidden.value = '0.00';
+                }
+            }
+            
+            // Formatar moeda
+            function formatarMoeda(valor) {
+                return '€' + valor.toFixed(2).replace('.', ',');
+            }
+            
+            // Processar anexo de nota fiscal
+            function processarNotaFiscal(file) {
+                if (!file) {
+                    notaFiscalBase64 = '';
+                    filePreview.style.display = 'none';
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onloadend = function() {
+                    notaFiscalBase64 = reader.result;
+                    
+                    // Mostrar preview
+                    filePreview.style.display = 'block';
+                    document.getElementById('fileName').textContent = file.name;
+                    document.getElementById('fileInfo').textContent = 
+                        `Tipo: ${file.type} • Tamanho: ${(file.size / 1024).toFixed(2)}KB`;
+                    
+                    // Se for imagem, mostrar preview
+                    if (file.type.startsWith('image/')) {
+                        const fileImage = document.getElementById('fileImage');
+                        fileImage.src = reader.result;
+                        fileImage.style.display = 'block';
+                    } else {
+                        document.getElementById('fileImage').style.display = 'none';
+                    }
+                };
+                
+                reader.readAsDataURL(file);
+            }
+            
+            // Validar formulário
+            function validarFormulario() {
+                const camposObrigatorios = ['fornecedor', 'descricao', 'dataCompra', 'dataVencimento', 'valorBruto', 'categoria', 'formaPagamento'];
+                
+                for (const campoId of camposObrigatorios) {
+                    const campo = document.getElementById(campoId);
+                    if (!campo.value.trim()) {
+                        mostrarErro(`Por favor, preencha o campo: ${campo.previousElementSibling?.textContent || campoId}`);
+                        campo.focus();
+                        return false;
+                    }
+                }
+                
+                // Validação especial para categoria "Outros"
+                if (categoriaSelect.value === 'OUTROS' && !outraCategoriaInput.value.trim()) {
+                    mostrarErro('Por favor, especifique a categoria "Outros".');
+                    outraCategoriaInput.focus();
+                    return false;
+                }
+                
+                // Validação especial para forma de pagamento "Outro"
+                if (formaPagamentoSelect.value === 'outro' && !outroPagamentoInput.value.trim()) {
+                    mostrarErro('Por favor, especifique a forma de pagamento "Outro".');
+                    outroPagamentoInput.focus();
+                    return false;
+                }
+                
+                // Validação de valor bruto
+                const valorBruto = parseFloat(document.getElementById('valorBruto').value);
+                if (isNaN(valorBruto) || valorBruto <= 0) {
+                    mostrarErro('Por favor, insira um valor bruto válido (maior que 0).');
+                    document.getElementById('valorBruto').focus();
+                    return false;
+                }
+                
+                return true;
+            }
+            
+            // Mostrar mensagem de erro
+            function mostrarErro(mensagem) {
+                alert(mensagem);
+            }
+            
+            // Mostrar mensagem de confirmação
+            function mostrarConfirmacao() {
+                confirmationMessage.classList.add('show');
+                
+                // Esconder após 3 segundos
+                setTimeout(() => {
+                    confirmationMessage.classList.remove('show');
+                }, 3000);
+            }
+            
+            // Limpar formulário
+            function limparFormulario() {
+                despesaForm.reset();
+                notaFiscalBase64 = '';
+                filePreview.style.display = 'none';
+                outraCategoriaInput.classList.remove('active');
+                outraCategoriaInput.value = '';
+                outroPagamentoInput.disabled = true;
+                outroPagamentoInput.value = '';
+                calcularTotais();
+                configurarDatasPadrao();
+                
+                console.log('🔄 Formulário limpo para nova despesa');
+            }
+            
+            // ============================================
+            // CONFIGURAÇÃO DE EVENT LISTENERS
+            // ============================================
+            
+            function configurarEventListeners() {
+                // Cálculo de totais
+                valorBrutoInput.addEventListener('input', calcularTotais);
+                ivaSimRadio.addEventListener('change', calcularTotais);
+                ivaNaoRadio.addEventListener('change', calcularTotais);
+                
+                // Nota fiscal
+                notaFiscalInput.addEventListener('change', (e) => {
+                    processarNotaFiscal(e.target.files[0]);
+                });
+                
+                // Categoria "Outros"
+                categoriaSelect.addEventListener('change', (e) => {
+                    if (e.target.value === 'OUTROS') {
+                        outraCategoriaInput.classList.add('active');
+                        outraCategoriaInput.required = true;
+                    } else {
+                        outraCategoriaInput.classList.remove('active');
+                        outraCategoriaInput.required = false;
+                        outraCategoriaInput.value = '';
+                    }
+                });
+                
+                // Forma de pagamento "Outro"
+                formaPagamentoSelect.addEventListener('change', (e) => {
+                    if (e.target.value === 'outro') {
+                        outroPagamentoInput.disabled = false;
+                        outroPagamentoInput.required = true;
+                    } else {
+                        outroPagamentoInput.disabled = true;
+                        outroPagamentoInput.required = false;
+                        outroPagamentoInput.value = '';
+                    }
+                });
+                
+                // Botão cancelar
+                cancelBtn.addEventListener('click', () => {
+                    if (confirm('Tem certeza que deseja cancelar? Todos os dados serão perdidos.')) {
+                        limparFormulario();
+                    }
+                });
+                
+                // Data de pagamento condicional
+                document.querySelectorAll('input[name="statusPagamento"]').forEach(radio => {
+                    radio.addEventListener('change', (e) => {
+                        const dataPagamentoInput = document.getElementById('dataPagamento');
+                        if (e.target.value === 'pago') {
+                            dataPagamentoInput.required = true;
+                            dataPagamentoInput.disabled = false;
+                            dataPagamentoInput.valueAsDate = new Date();
+                        } else {
+                            dataPagamentoInput.required = false;
+                            dataPagamentoInput.disabled = true;
+                            dataPagamentoInput.value = '';
+                        }
+                    });
+                });
+                
+                // Botão salvar - AGORA SOMENTE VALIDAÇÃO, O ENGINE.JS FAZ O COMMIT
+                saveBtn.addEventListener('click', function(e) {
+                    // Apenas validação, o engine.js irá capturar o data-action="commit"
+                    if (!validarFormulario()) {
+                        e.preventDefault();
+                        return;
+                    }
+                    
+                    // O engine.js irá mostrar a confirmação após o salvamento
+                });
+                
+                // Prevenir envio padrão do formulário
+                despesaForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                });
+            }
+            
+            // ============================================
+            // INICIALIZAÇÃO
+            // ============================================
+            
+            inicializar();
+            
+            // Escutar mensagens do engine.js quando a despesa for salva
+            window.addEventListener('message', function(event) {
+                if (event.data.type === 'COMMIT_SUCCESS') {
+                    console.log('✅ Despesa salva com sucesso via engine.js');
+                    mostrarConfirmacao();
+                    
+                    // Após 2 segundos, perguntar se quer registrar outra
+                    setTimeout(() => {
+                        const resposta = confirm('Despesa salva com sucesso! Deseja registrar outra despesa?');
+                        
+                        if (resposta) {
+                            limparFormulario();
+                        } else {
+                            // Voltar para dashboard
+                            window.parent.postMessage({ type: 'NAVIGATE_TO', page: 'dashboard' }, '*');
+                        }
+                    }, 2000);
+                }
+            });
+        });
+    </script>
+    
+    <!-- CONEXÃO COM O CORE -->
+    <script src="../core/engine.js"></script>
+</body>
+</html>

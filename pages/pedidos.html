@@ -1,0 +1,1456 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrintPixel - Gestão de Pedidos</title>
+    
+    <!-- BIBLIOTECAS EXTERNAS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ============================================
+           VARIÁVEIS DE CORES E ESTILOS
+           ============================================ */
+        :root {
+            --primary-color: #1a237e;
+            --secondary-color: #283593;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --info-color: #3b82f6;
+            --light-bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border-color: #e2e8f0;
+            --hover-bg: #f1f5f9;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+        }
+        
+        /* ============================================
+           RESET E CONFIGURAÇÕES GERAIS
+           ============================================ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        
+        body {
+            background-color: var(--light-bg);
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        /* ============================================
+           HEADER SIMPLIFICADO
+           ============================================ */
+        .page-header {
+            background: var(--card-bg);
+            padding: 24px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            margin-bottom: 24px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .header-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+        }
+        
+        .header-text h1 {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: var(--primary-color);
+        }
+        
+        .header-text p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 400;
+        }
+        
+        /* ============================================
+           CONTADORES SIMPLES
+           ============================================ */
+        .counters-section {
+            margin-bottom: 24px;
+        }
+        
+        .counters-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+        
+        @media (max-width: 768px) {
+            .counters-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .counter-card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
+            text-align: center;
+            transition: transform 0.2s;
+        }
+        
+        .counter-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .counter-card.pendente {
+            border-top: 4px solid var(--warning-color);
+        }
+        
+        .counter-card.processamento {
+            border-top: 4px solid var(--info-color);
+        }
+        
+        .counter-card.concluido {
+            border-top: 4px solid var(--success-color);
+        }
+        
+        .counter-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            margin: 0 auto 12px;
+        }
+        
+        .counter-card.pendente .counter-icon {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .counter-card.processamento .counter-icon {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .counter-card.concluido .counter-icon {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .counter-value {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        
+        .counter-card.pendente .counter-value {
+            color: var(--warning-color);
+        }
+        
+        .counter-card.processamento .counter-value {
+            color: var(--info-color);
+        }
+        
+        .counter-card.concluido .counter-value {
+            color: var(--success-color);
+        }
+        
+        .counter-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        
+        /* ============================================
+           CONTROLES E FILTROS
+           ============================================ */
+        .controls-section {
+            margin-bottom: 24px;
+        }
+        
+        .filters-container {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        
+        .filter-group {
+            display: flex;
+            gap: 8px;
+            background: var(--card-bg);
+            padding: 8px 12px;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
+        }
+        
+        .filter-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 20px;
+            background: transparent;
+            color: var(--text-secondary);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .filter-btn:hover {
+            background: var(--hover-bg);
+        }
+        
+        .filter-btn.active {
+            background: var(--primary-color);
+            color: white;
+        }
+        
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+        
+        .status-pendente {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .status-processamento {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .status-concluido {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .search-box {
+            flex: 1;
+            max-width: 400px;
+            position: relative;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 12px 20px 12px 44px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background: var(--card-bg);
+            font-size: 14px;
+            transition: all 0.2s;
+            box-shadow: var(--shadow-sm);
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(26, 35, 126, 0.1);
+        }
+        
+        .search-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+        }
+        
+        /* ============================================
+           LISTA DE PEDIDOS
+           ============================================ */
+        .pedidos-container {
+            margin-bottom: 32px;
+        }
+        
+        .pedidos-grid {
+            display: grid;
+            gap: 20px;
+        }
+        
+        .pedido-card {
+            background: var(--card-bg);
+            border-radius: var(--radius-md);
+            padding: 20px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .pedido-card:hover {
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+        }
+        
+        .pedido-card::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 4px;
+            height: 100%;
+        }
+        
+        .pedido-card.pendente::before {
+            background: var(--warning-color);
+        }
+        
+        .pedido-card.processamento::before {
+            background: var(--info-color);
+        }
+        
+        .pedido-card.concluido::before {
+            background: var(--success-color);
+        }
+        
+        .pedido-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 16px;
+        }
+        
+        .pedido-info {
+            flex: 1;
+        }
+        
+        .pedido-cliente {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: var(--text-primary);
+        }
+        
+        .pedido-empresa {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+        
+        .pedido-meta {
+            display: flex;
+            gap: 16px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        
+        .pedido-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .pedido-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .action-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--card-bg);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        
+        .action-btn:hover {
+            background: var(--hover-bg);
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+        
+        .action-btn.expand {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            color: white;
+        }
+        
+        .pedido-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+            margin-bottom: 16px;
+        }
+        
+        .produtos-list {
+            flex: 2;
+        }
+        
+        .produtos-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            color: var(--text-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .produto-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .produto-item:last-child {
+            border-bottom: none;
+        }
+        
+        .produto-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .produto-nome {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+        
+        .produto-detalhes {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        
+        .produto-observacao {
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-style: italic;
+            margin-top: 2px;
+            padding-left: 8px;
+            border-left: 2px solid var(--border-color);
+        }
+        
+        .produto-valor {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+        
+        .pedido-resumo {
+            flex: 1;
+        }
+        
+        .resumo-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .resumo-item:last-child {
+            border-bottom: none;
+        }
+        
+        .resumo-total {
+            font-weight: 700;
+            font-size: 18px;
+            color: var(--text-primary);
+        }
+        
+        .pedido-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .pedido-observacoes {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-style: italic;
+            flex: 1;
+            margin-right: 16px;
+        }
+        
+        .pedido-status {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .status-select {
+            padding: 6px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background: var(--card-bg);
+            color: var(--text-primary);
+            font-size: 13px;
+            cursor: pointer;
+        }
+        
+        /* ============================================
+           MODAL DE DETALHES
+           ============================================ */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal-container {
+            background: var(--card-bg);
+            border-radius: var(--radius-lg);
+            width: 90%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-lg);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+        
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .modal-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+        
+        .modal-close {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            border: none;
+            background: var(--hover-bg);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        
+        .modal-close:hover {
+            background: var(--danger-color);
+            color: white;
+        }
+        
+        .modal-content {
+            padding: 24px;
+        }
+        
+        .modal-section {
+            margin-bottom: 32px;
+        }
+        
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--border-color);
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+        }
+        
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .info-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .info-value {
+            font-size: 15px;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        
+        .produtos-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+        }
+        
+        .produtos-table th {
+            background: var(--hover-bg);
+            padding: 12px 16px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .produtos-table td {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 14px;
+            vertical-align: top;
+        }
+        
+        .produto-observacao-cell {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-style: italic;
+            padding-left: 8px;
+            border-left: 2px solid var(--border-color);
+            margin-top: 4px;
+        }
+        
+        .total-section {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 24px;
+        }
+        
+        .total-box {
+            width: 300px;
+            background: var(--light-bg);
+            padding: 20px;
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+        }
+        
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .total-row:last-child {
+            border-bottom: none;
+            font-weight: 700;
+            font-size: 18px;
+        }
+        
+        /* ============================================
+           MENSAGEM DE VAZIO
+           ============================================ */
+        .empty-state {
+            text-align: center;
+            padding: 80px 32px;
+            color: var(--text-secondary);
+        }
+        
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: 24px;
+            color: var(--border-color);
+        }
+        
+        .empty-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .empty-text {
+            font-size: 14px;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        
+        /* ============================================
+           RESPONSIVIDADE
+           ============================================ */
+        @media (max-width: 1024px) {
+            .pedido-content {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            body {
+                padding: 16px;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                gap: 16px;
+                text-align: center;
+            }
+            
+            .header-title {
+                justify-content: center;
+            }
+            
+            .filters-container {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .search-box {
+                max-width: none;
+            }
+            
+            .pedido-header {
+                flex-direction: column;
+                gap: 12px;
+            }
+            
+            .pedido-actions {
+                align-self: flex-end;
+            }
+            
+            .pedido-footer {
+                flex-direction: column;
+                gap: 12px;
+                align-items: stretch;
+            }
+            
+            .pedido-observacoes {
+                margin-right: 0;
+                margin-bottom: 12px;
+            }
+        }
+        
+        /* ============================================
+           ANIMAÇÕES
+           ============================================ */
+        .fade-in {
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        .slide-up {
+            animation: slideUp 0.3s ease-out;
+        }
+        
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+    </style>
+</head>
+<body data-page-id="gestao_pedidos" data-page-type="READ">
+    <!-- ============================================
+         HEADER SIMPLIFICADO
+         ============================================ -->
+    <header class="page-header">
+        <div class="header-content">
+            <div class="header-title">
+                <div class="header-icon">
+                    <i class="fas fa-clipboard-list"></i>
+                </div>
+                <div class="header-text">
+                    <h1>Gestão de Pedidos</h1>
+                    <p>Visualize e gerencie todos os pedidos do sistema</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- ============================================
+         CONTADORES SIMPLES
+         ============================================ -->
+    <section class="counters-section">
+        <div class="counters-grid">
+            <div class="counter-card pendente">
+                <div class="counter-icon">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="counter-value" data-bind="pedidos.pendentes">0</div>
+                <div class="counter-label">Pendentes</div>
+            </div>
+            
+            <div class="counter-card processamento">
+                <div class="counter-icon">
+                    <i class="fas fa-cogs"></i>
+                </div>
+                <div class="counter-value" data-bind="pedidos.processamento">0</div>
+                <div class="counter-label">Em Processo</div>
+            </div>
+            
+            <div class="counter-card concluido">
+                <div class="counter-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="counter-value" data-bind="pedidos.concluidos">0</div>
+                <div class="counter-label">Concluídos</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================
+         CONTROLES E FILTROS
+         ============================================ -->
+    <section class="controls-section">
+        <div class="filters-container">
+            <div class="filter-group">
+                <button class="filter-btn active" data-filter="all">
+                    <i class="fas fa-layer-group"></i>
+                    Todos
+                </button>
+                <button class="filter-btn" data-filter="pendente">
+                    <span class="status-badge status-pendente">●</span>
+                    Pendentes
+                </button>
+                <button class="filter-btn" data-filter="processamento">
+                    <span class="status-badge status-processamento">●</span>
+                    Em Processo
+                </button>
+                <button class="filter-btn" data-filter="concluido">
+                    <span class="status-badge status-concluido">●</span>
+                    Concluídos
+                </button>
+            </div>
+            
+            <div class="search-box">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" class="search-input" id="searchInput" placeholder="Buscar cliente, empresa ou número...">
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================
+         LISTA DE PEDIDOS
+         ============================================ -->
+    <section class="pedidos-container">
+        <div class="pedidos-grid" id="pedidosGrid">
+            <!-- Os pedidos serão carregados dinamicamente aqui -->
+        </div>
+        
+        <!-- Estado vazio -->
+        <div class="empty-state" id="emptyState" style="display: none;">
+            <div class="empty-icon">
+                <i class="fas fa-clipboard"></i>
+            </div>
+            <h3 class="empty-title">Nenhum pedido encontrado</h3>
+            <p class="empty-text">Não há pedidos correspondentes aos filtros atuais. Tente ajustar os filtros ou adicione um novo pedido.</p>
+        </div>
+    </section>
+
+    <!-- ============================================
+         MODAL DE DETALHES
+         ============================================ -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 class="modal-title">Detalhes do Pedido</h2>
+                <button class="modal-close" id="modalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-content" id="modalContent">
+                <!-- Conteúdo do modal será preenchido dinamicamente -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // SISTEMA DE GESTÃO DE PEDIDOS
+        // ============================================
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('📋 Página de Gestão de Pedidos carregada');
+            
+            // Elementos do DOM
+            const pedidosGrid = document.getElementById('pedidosGrid');
+            const emptyState = document.getElementById('emptyState');
+            const searchInput = document.getElementById('searchInput');
+            const filterButtons = document.querySelectorAll('.filter-btn');
+            const modalOverlay = document.getElementById('modalOverlay');
+            const modalClose = document.getElementById('modalClose');
+            const modalContent = document.getElementById('modalContent');
+            
+            // Estado da aplicação
+            let todosPedidos = [];
+            let filtroAtual = 'all';
+            let termoBusca = '';
+            
+            // ============================================
+            // FUNÇÕES PRINCIPAIS
+            // ============================================
+            
+            // Carregar pedidos do sistema
+            function carregarPedidos() {
+                console.log('🔄 Carregando pedidos do Core...');
+                window.parent.postMessage({ 
+                    type: "QUERY_REQUEST",
+                    source: 'gestao_pedidos'
+                }, "*");
+            }
+            
+            // Processar pedidos recebidos
+            function processarPedidos(pedidos) {
+                todosPedidos = pedidos
+                    .filter(p => p.schema === 'pedido' && !p.deleted)
+                    .map(p => ({
+                        ...p,
+                        payload: {
+                            ...p.payload,
+                            id: p.id,
+                            createdAt: p.created_at,
+                            status: p.payload.status || 'pendente',
+                            produtos: p.payload.produtos || []
+                        }
+                    }))
+                    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                
+                console.log(`✅ ${todosPedidos.length} pedidos carregados`);
+                atualizarContadores();
+                aplicarFiltrosEBusca();
+            }
+            
+            // Atualizar contadores
+            function atualizarContadores() {
+                const contadores = {
+                    pendentes: todosPedidos.filter(p => p.payload.status === 'pendente').length,
+                    processamento: todosPedidos.filter(p => p.payload.status === 'processamento').length,
+                    concluidos: todosPedidos.filter(p => p.payload.status === 'concluido').length
+                };
+                
+                // Atualizar elementos com data-bind
+                Object.entries(contadores).forEach(([tipo, valor]) => {
+                    const elementos = document.querySelectorAll(`[data-bind="pedidos.${tipo}"]`);
+                    elementos.forEach(el => {
+                        el.textContent = valor;
+                    });
+                });
+            }
+            
+            // Aplicar filtros e busca
+            function aplicarFiltrosEBusca() {
+                let pedidosFiltrados = todosPedidos;
+                
+                // Aplicar filtro de status
+                if (filtroAtual !== 'all') {
+                    pedidosFiltrados = pedidosFiltrados.filter(p => 
+                        p.payload.status === filtroAtual
+                    );
+                }
+                
+                // Aplicar busca
+                if (termoBusca.trim() !== '') {
+                    const busca = termoBusca.toLowerCase();
+                    pedidosFiltrados = pedidosFiltrados.filter(p => {
+                        const cliente = (p.payload.cliente || '').toLowerCase();
+                        const empresa = (p.payload.empresa || '').toLowerCase();
+                        const numero = (p.payload.numero || '').toLowerCase();
+                        
+                        return cliente.includes(busca) || 
+                               empresa.includes(busca) || 
+                               numero.includes(busca);
+                    });
+                }
+                
+                // Renderizar pedidos
+                renderizarPedidos(pedidosFiltrados);
+                
+                // Mostrar/ocultar estado vazio
+                if (pedidosFiltrados.length === 0) {
+                    emptyState.style.display = 'block';
+                    pedidosGrid.style.display = 'none';
+                } else {
+                    emptyState.style.display = 'none';
+                    pedidosGrid.style.display = 'grid';
+                }
+            }
+            
+            // Renderizar lista de pedidos
+            function renderizarPedidos(pedidos) {
+                pedidosGrid.innerHTML = '';
+                
+                pedidos.forEach(pedido => {
+                    const card = criarCardPedido(pedido);
+                    pedidosGrid.appendChild(card);
+                });
+                
+                // Adicionar animação de entrada
+                const cards = document.querySelectorAll('.pedido-card');
+                cards.forEach((card, index) => {
+                    card.style.animationDelay = `${index * 0.05}s`;
+                    card.classList.add('slide-up');
+                });
+            }
+            
+            // Criar card de pedido
+            function criarCardPedido(pedido) {
+                const payload = pedido.payload;
+                const produtos = payload.produtos || [];
+                const total = parseFloat(payload.total) || 0;
+                const iva = parseFloat(payload.iva) || 0;
+                const subtotal = parseFloat(payload.subtotal) || total - iva;
+                
+                const card = document.createElement('div');
+                card.className = `pedido-card ${payload.status}`;
+                card.dataset.id = pedido.id;
+                
+                // Formatadores
+                const formatarData = (dataStr) => {
+                    if (!dataStr) return 'N/A';
+                    const data = new Date(dataStr);
+                    return data.toLocaleDateString('pt-BR');
+                };
+                
+                const formatarMoeda = (valor) => {
+                    return `€${parseFloat(valor).toFixed(2)}`;
+                };
+                
+                card.innerHTML = `
+                    <div class="pedido-header">
+                        <div class="pedido-info">
+                            <div class="pedido-cliente">${payload.cliente || 'Cliente não informado'}</div>
+                            <div class="pedido-empresa">${payload.empresa || 'Empresa não informada'}</div>
+                            <div class="pedido-meta">
+                                <div class="pedido-meta-item">
+                                    <i class="fas fa-hashtag"></i>
+                                    <span>${payload.numero || 'N/A'}</span>
+                                </div>
+                                <div class="pedido-meta-item">
+                                    <i class="fas fa-calendar"></i>
+                                    <span>${formatarData(payload.dataFechamento)}</span>
+                                </div>
+                                <div class="pedido-meta-item">
+                                    <i class="fas fa-truck"></i>
+                                    <span>${formatarData(payload.dataEntrega)}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="pedido-actions">
+                            <button class="action-btn expand" title="Ver detalhes">
+                                <i class="fas fa-expand"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="pedido-content">
+                        <div class="produtos-list">
+                            <div class="produtos-title">Produtos (${produtos.length})</div>
+                            ${produtos.slice(0, 3).map(prod => `
+                                <div class="produto-item">
+                                    <div class="produto-info">
+                                        <div class="produto-nome">${prod.nome || 'Produto'}</div>
+                                        <div class="produto-detalhes">
+                                            ${prod.tamanho ? prod.tamanho + ' • ' : ''}
+                                            ${prod.quantidade || 1}x • ${formatarMoeda(prod.valor || 0)}
+                                        </div>
+                                        ${prod.observacoes ? `
+                                            <div class="produto-observacao">${prod.observacoes}</div>
+                                        ` : ''}
+                                    </div>
+                                    <div class="produto-valor">${formatarMoeda((prod.valor || 0) * (prod.quantidade || 1))}</div>
+                                </div>
+                            `).join('')}
+                            ${produtos.length > 3 ? `
+                                <div class="produto-item">
+                                    <div class="produto-info">
+                                        <div class="produto-nome">+ ${produtos.length - 3} outros produtos</div>
+                                    </div>
+                                </div>
+                            ` : ''}
+                        </div>
+                        
+                        <div class="pedido-resumo">
+                            <div class="resumo-item">
+                                <span>Subtotal:</span>
+                                <span>${formatarMoeda(subtotal)}</span>
+                            </div>
+                            <div class="resumo-item">
+                                <span>IVA (23%):</span>
+                                <span>${formatarMoeda(iva)}</span>
+                            </div>
+                            <div class="resumo-item resumo-total">
+                                <span>Total:</span>
+                                <span>${formatarMoeda(total)}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="pedido-footer">
+                        <div class="pedido-observacoes">
+                            ${payload.observacoes ? `📝 ${payload.observacoes.substring(0, 100)}${payload.observacoes.length > 100 ? '...' : ''}` : 'Sem observações gerais'}
+                        </div>
+                        <div class="pedido-status">
+                            <select class="status-select" data-id="${pedido.id}">
+                                <option value="pendente" ${payload.status === 'pendente' ? 'selected' : ''}>Pendente</option>
+                                <option value="processamento" ${payload.status === 'processamento' ? 'selected' : ''}>Em Processamento</option>
+                                <option value="concluido" ${payload.status === 'concluido' ? 'selected' : ''}>Concluído</option>
+                            </select>
+                        </div>
+                    </div>
+                `;
+                
+                // Adicionar event listeners
+                const expandBtn = card.querySelector('.action-btn.expand');
+                const statusSelect = card.querySelector('.status-select');
+                
+                expandBtn.addEventListener('click', () => abrirModalDetalhes(pedido));
+                statusSelect.addEventListener('change', (e) => atualizarStatusPedido(pedido.id, e.target.value));
+                
+                return card;
+            }
+            
+            // Abrir modal com detalhes do pedido
+            function abrirModalDetalhes(pedido) {
+                const payload = pedido.payload;
+                const produtos = payload.produtos || [];
+                const total = parseFloat(payload.total) || 0;
+                const iva = parseFloat(payload.iva) || 0;
+                const subtotal = parseFloat(payload.subtotal) || total - iva;
+                const entrada = parseFloat(payload.entrada) || 0;
+                const instalacao = parseFloat(payload.instalacao) || 0;
+                
+                // Formatadores
+                const formatarData = (dataStr) => {
+                    if (!dataStr) return 'Não informado';
+                    const data = new Date(dataStr);
+                    return data.toLocaleDateString('pt-BR') + ' ' + data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                };
+                
+                const formatarMoeda = (valor) => {
+                    return `€${parseFloat(valor).toFixed(2)}`;
+                };
+                
+                const getStatusInfo = (status) => {
+                    switch(status) {
+                        case 'pendente': return { texto: 'Pendente', classe: 'status-pendente' };
+                        case 'processamento': return { texto: 'Em Processamento', classe: 'status-processamento' };
+                        case 'concluido': return { texto: 'Concluído', classe: 'status-concluido' };
+                        default: return { texto: status, classe: '' };
+                    }
+                };
+                
+                const statusInfo = getStatusInfo(payload.status);
+                
+                modalContent.innerHTML = `
+                    <div class="modal-section">
+                        <h3 class="section-title">Informações do Pedido</h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <div class="info-label">Número do Pedido</div>
+                                <div class="info-value">${payload.numero || 'N/A'}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Número da Fatura</div>
+                                <div class="info-value">${payload.fatura || 'N/A'}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Status</div>
+                                <div class="info-value">
+                                    <span class="status-badge ${statusInfo.classe}">${statusInfo.texto}</span>
+                                </div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Data de Registro</div>
+                                <div class="info-value">${formatarData(payload.createdAt)}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="modal-section">
+                        <h3 class="section-title">Informações do Cliente</h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <div class="info-label">Cliente</div>
+                                <div class="info-value">${payload.cliente || 'Não informado'}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Empresa</div>
+                                <div class="info-value">${payload.empresa || 'Não informada'}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">NIF</div>
+                                <div class="info-value">${payload.nif || 'Não informado'}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Morada</div>
+                                <div class="info-value">${payload.morada || 'Não informada'}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Telemóvel</div>
+                                <div class="info-value">${payload.telemovel || 'Não informado'}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Atendente</div>
+                                <div class="info-value">${payload.atendente || 'Não informado'}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="modal-section">
+                        <h3 class="section-title">Datas</h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <div class="info-label">Data do Fechamento</div>
+                                <div class="info-value">${formatarData(payload.dataFechamento)}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Data da Entrega</div>
+                                <div class="info-value">${formatarData(payload.dataEntrega)}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Data da Entrada</div>
+                                <div class="info-value">${formatarData(payload.dataEntrada)}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="modal-section">
+                        <h3 class="section-title">Produtos (${produtos.length})</h3>
+                        <table class="produtos-table">
+                            <thead>
+                                <tr>
+                                    <th>Produto</th>
+                                    <th>Tamanho</th>
+                                    <th>Quantidade</th>
+                                    <th>Valor Unitário</th>
+                                    <th>Total</th>
+                                    <th>Observações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${produtos.map(prod => `
+                                    <tr>
+                                        <td>${prod.nome || 'Produto'}</td>
+                                        <td>${prod.tamanho || 'N/A'}</td>
+                                        <td>${prod.quantidade || 1}</td>
+                                        <td>${formatarMoeda(prod.valor || 0)}</td>
+                                        <td>${formatarMoeda((prod.valor || 0) * (prod.quantidade || 1))}</td>
+                                        <td>
+                                            ${prod.observacoes || ''}
+                                            ${prod.observacoes ? `
+                                                <div class="produto-observacao-cell">${prod.observacoes}</div>
+                                            ` : ''}
+                                        </td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="modal-section">
+                        <h3 class="section-title">Resumo Financeiro</h3>
+                        <div class="total-section">
+                            <div class="total-box">
+                                <div class="total-row">
+                                    <span>Subtotal Produtos:</span>
+                                    <span>${formatarMoeda(subtotal - instalacao)}</span>
+                                </div>
+                                <div class="total-row">
+                                    <span>Instalação/Deslocamento:</span>
+                                    <span>${formatarMoeda(instalacao)}</span>
+                                </div>
+                                <div class="total-row">
+                                    <span>Subtotal:</span>
+                                    <span>${formatarMoeda(subtotal)}</span>
+                                </div>
+                                <div class="total-row">
+                                    <span>IVA (${payload.comIVA === 'sim' ? '23%' : 'Isento'}):</span>
+                                    <span>${formatarMoeda(iva)}</span>
+                                </div>
+                                <div class="total-row">
+                                    <span>Entrada:</span>
+                                    <span>${formatarMoeda(entrada)}</span>
+                                </div>
+                                <div class="total-row">
+                                    <span>Valor Restante:</span>
+                                    <span>${formatarMoeda(total - entrada)}</span>
+                                </div>
+                                <div class="total-row">
+                                    <span>TOTAL:</span>
+                                    <span>${formatarMoeda(total)}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    ${payload.observacoes ? `
+                        <div class="modal-section">
+                            <h3 class="section-title">Observações Gerais</h3>
+                            <div style="padding: 16px; background: var(--light-bg); border-radius: var(--radius-md);">
+                                ${payload.observacoes}
+                            </div>
+                        </div>
+                    ` : ''}
+                `;
+                
+                modalOverlay.classList.add('active');
+            }
+            
+            // Atualizar status do pedido
+            function atualizarStatusPedido(pedidoId, novoStatus) {
+                const pedido = todosPedidos.find(p => p.id === pedidoId);
+                if (!pedido) return;
+                
+                // Criar evento de atualização
+                const eventoAtualizacao = {
+                    type: "UPDATE_EVENT",
+                    id: pedidoId,
+                    updates: { status: novoStatus },
+                    source: 'gestao_pedidos'
+                };
+                
+                // Enviar para o Core
+                window.parent.postMessage(eventoAtualizacao, "*");
+                
+                // Atualizar localmente
+                pedido.payload.status = novoStatus;
+                
+                // Feedback visual
+                const card = document.querySelector(`.pedido-card[data-id="${pedidoId}"]`);
+                if (card) {
+                    card.className = `pedido-card ${novoStatus}`;
+                    
+                    // Animação de confirmação
+                    const statusSelect = card.querySelector('.status-select');
+                    statusSelect.style.backgroundColor = '#10b981';
+                    statusSelect.style.color = 'white';
+                    
+                    setTimeout(() => {
+                        statusSelect.style.backgroundColor = '';
+                        statusSelect.style.color = '';
+                    }, 1000);
+                }
+                
+                atualizarContadores();
+                console.log(`✅ Status do pedido ${pedidoId} atualizado para: ${novoStatus}`);
+            }
+            
+            // ============================================
+            // EVENT LISTENERS
+            // ============================================
+            
+            // Filtrar pedidos por status
+            filterButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    filterButtons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    filtroAtual = btn.dataset.filter;
+                    aplicarFiltrosEBusca();
+                });
+            });
+            
+            // Buscar pedidos
+            searchInput.addEventListener('input', (e) => {
+                termoBusca = e.target.value.toLowerCase();
+                aplicarFiltrosEBusca();
+            });
+            
+            // Fechar modal
+            modalClose.addEventListener('click', () => {
+                modalOverlay.classList.remove('active');
+            });
+            
+            modalOverlay.addEventListener('click', (e) => {
+                if (e.target === modalOverlay) {
+                    modalOverlay.classList.remove('active');
+                }
+            });
+            
+            // Escutar mensagens do Core
+            window.addEventListener("message", function(event) {
+                if (event.data.type === "QUERY_RESPONSE") {
+                    processarPedidos(event.data.data || []);
+                }
+            });
+            
+            // ============================================
+            // INICIALIZAÇÃO
+            // ============================================
+            
+            carregarPedidos();
+            
+            // Atualizar automaticamente a cada 30 segundos
+            setInterval(carregarPedidos, 30000);
+            
+            console.log('✅ Sistema de gestão de pedidos inicializado');
+        });
+    </script>
+    
+    <!-- CONEXÃO COM O CORE -->
+    <script src="../core/engine.js"></script>
+</body>
+</html>

@@ -1,0 +1,1592 @@
+[file name]: despesas.html
+[file content begin]
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrintPixel - Gestão de Despesas</title>
+    
+    <!-- BIBLIOTECAS EXTERNAS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ============================================
+           VARIÁVEIS DE CORES E ESTILOS
+           ============================================ */
+        :root {
+            --primary-color: #1a237e;
+            --secondary-color: #283593;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --info-color: #3b82f6;
+            --light-bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border-color: #e2e8f0;
+            --hover-bg: #f1f5f9;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+        }
+        
+        /* ============================================
+           RESET E CONFIGURAÇÕES GERAIS
+           ============================================ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        
+        body {
+            background-color: var(--light-bg);
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        /* ============================================
+           HEADER
+           ============================================ */
+        .page-header {
+            background: var(--card-bg);
+            padding: 24px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            margin-bottom: 24px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .header-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--danger-color) 0%, #ef4444 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+        }
+        
+        .header-text h1 {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: var(--danger-color);
+        }
+        
+        .header-text p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 400;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .btn-download {
+            padding: 12px 24px;
+            background: var(--success-color);
+            color: white;
+            border: none;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        
+        .btn-download:hover {
+            background: #0da271;
+            transform: translateY(-2px);
+        }
+        
+        /* ============================================
+           CONTADORES
+           ============================================ */
+        .counters-section {
+            margin-bottom: 24px;
+        }
+        
+        .counters-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+        }
+        
+        @media (max-width: 768px) {
+            .counters-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .counter-card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
+            text-align: center;
+            transition: transform 0.2s;
+        }
+        
+        .counter-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .counter-card.pagas {
+            border-top: 4px solid var(--success-color);
+        }
+        
+        .counter-card.pendentes {
+            border-top: 4px solid var(--warning-color);
+        }
+        
+        .counter-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            margin: 0 auto 12px;
+        }
+        
+        .counter-card.pagas .counter-icon {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .counter-card.pendentes .counter-icon {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .counter-value {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        
+        .counter-card.pagas .counter-value {
+            color: var(--success-color);
+        }
+        
+        .counter-card.pendentes .counter-value {
+            color: var(--warning-color);
+        }
+        
+        .counter-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        
+        /* ============================================
+           FILTROS AVANÇADOS
+           ============================================ */
+        .filters-section {
+            background: var(--card-bg);
+            padding: 24px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            margin-bottom: 24px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+        
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .filter-label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .filter-input {
+            padding: 10px 12px;
+            border: 1.5px solid var(--border-color);
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            background: var(--card-bg);
+            color: var(--text-primary);
+        }
+        
+        .filter-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+        }
+        
+        .filter-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .btn-filter {
+            padding: 10px 20px;
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        
+        .btn-filter-clear {
+            background: var(--text-secondary);
+            color: white;
+        }
+        
+        .btn-filter-apply {
+            background: var(--primary-color);
+            color: white;
+        }
+        
+        /* ============================================
+           LISTA DE DESPESAS
+           ============================================ */
+        .despesas-container {
+            margin-bottom: 32px;
+        }
+        
+        .despesas-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .despesa-item {
+            background: var(--card-bg);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+        }
+        
+        .despesa-item:hover {
+            box-shadow: var(--shadow-md);
+            transform: translateY(-2px);
+            background: var(--hover-bg);
+        }
+        
+        .despesa-item::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 4px;
+            height: 100%;
+        }
+        
+        .despesa-item.paga::before {
+            background: var(--success-color);
+        }
+        
+        .despesa-item.pendente::before {
+            background: var(--warning-color);
+        }
+        
+        .despesa-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
+        }
+        
+        .despesa-info {
+            flex: 1;
+        }
+        
+        .despesa-descricao {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: var(--text-primary);
+        }
+        
+        .despesa-fornecedor {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+        }
+        
+        .despesa-meta {
+            display: flex;
+            gap: 16px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            flex-wrap: wrap;
+        }
+        
+        .despesa-meta-item {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .categoria-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+            margin-right: 8px;
+        }
+        
+        .despesa-valor {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--danger-color);
+            text-align: right;
+            min-width: 120px;
+        }
+        
+        .despesa-extra {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .despesa-observacoes {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-style: italic;
+            flex: 1;
+        }
+        
+        .despesa-anexos {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .anexo-badge {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            background: var(--light-bg);
+            border-radius: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        
+        /* ============================================
+           MODAL DE DETALHES
+           ============================================ */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal-container {
+            background: var(--card-bg);
+            border-radius: var(--radius-lg);
+            width: 90%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-lg);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+        
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .modal-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            background: var(--card-bg);
+            z-index: 10;
+        }
+        
+        .modal-title {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--danger-color);
+        }
+        
+        .modal-close {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            border: none;
+            background: var(--hover-bg);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        
+        .modal-close:hover {
+            background: var(--danger-color);
+            color: white;
+        }
+        
+        .modal-content {
+            padding: 24px;
+        }
+        
+        .modal-section {
+            margin-bottom: 24px;
+        }
+        
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--border-color);
+        }
+        
+        .info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+        }
+        
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .info-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .info-value {
+            font-size: 15px;
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+        
+        .valores-container {
+            max-width: 400px;
+            margin: 20px 0;
+        }
+        
+        .valor-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .valor-item:last-child {
+            border-bottom: none;
+            font-weight: 700;
+            font-size: 18px;
+            color: var(--danger-color);
+        }
+        
+        .nota-fiscal-container {
+            margin-top: 16px;
+            padding: 16px;
+            background: var(--light-bg);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+        }
+        
+        .nota-fiscal-img {
+            max-width: 100%;
+            max-height: 500px;
+            border-radius: var(--radius-sm);
+            margin-top: 12px;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+        
+        .nota-fiscal-img:hover {
+            transform: scale(1.02);
+        }
+        
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .btn-modal {
+            padding: 10px 20px;
+            border: none;
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-weight: 500;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        
+        .btn-modal.download {
+            background: var(--success-color);
+            color: white;
+        }
+        
+        .btn-modal.download:hover {
+            background: #0da271;
+        }
+        
+        .btn-modal.edit {
+            background: var(--primary-color);
+            color: white;
+        }
+        
+        .btn-modal.edit:hover {
+            background: var(--secondary-color);
+        }
+        
+        /* ============================================
+           MENSAGEM DE VAZIO
+           ============================================ */
+        .empty-state {
+            text-align: center;
+            padding: 80px 32px;
+            color: var(--text-secondary);
+        }
+        
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: 24px;
+            color: var(--border-color);
+        }
+        
+        .empty-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .empty-text {
+            font-size: 14px;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        
+        /* ============================================
+           MODAL DE VISUALIZAÇÃO DE IMAGEM
+           ============================================ */
+        .image-viewer-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        
+        .image-viewer-overlay.active {
+            display: flex;
+        }
+        
+        .image-viewer-container {
+            position: relative;
+            max-width: 90%;
+            max-height: 90%;
+        }
+        
+        .image-viewer-img {
+            max-width: 100%;
+            max-height: 90vh;
+            border-radius: var(--radius-sm);
+        }
+        
+        .image-viewer-close {
+            position: absolute;
+            top: -40px;
+            right: 0;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+        
+        /* ============================================
+           RESPONSIVIDADE
+           ============================================ */
+        @media (max-width: 768px) {
+            body {
+                padding: 16px;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                gap: 16px;
+                text-align: center;
+            }
+            
+            .header-title {
+                justify-content: center;
+            }
+            
+            .header-actions {
+                width: 100%;
+                justify-content: center;
+            }
+            
+            .despesa-header {
+                flex-direction: column;
+                gap: 12px;
+                align-items: flex-start;
+            }
+            
+            .despesa-valor {
+                text-align: left;
+                min-width: auto;
+            }
+            
+            .despesa-extra {
+                flex-direction: column;
+                gap: 12px;
+                align-items: flex-start;
+            }
+            
+            .modal-container {
+                width: 95%;
+                margin: 16px;
+            }
+        }
+    </style>
+</head>
+<body data-page-id="gestao_despesas" data-page-type="READ">
+    <!-- ============================================
+         HEADER
+         ============================================ -->
+    <header class="page-header">
+        <div class="header-content">
+            <div class="header-title">
+                <div class="header-icon">
+                    <i class="fas fa-money-bill-wave"></i>
+                </div>
+                <div class="header-text">
+                    <h1>Gestão de Despesas</h1>
+                    <p>Controle e análise de todas as despesas da empresa</p>
+                </div>
+            </div>
+            
+            <div class="header-actions">
+                <button class="btn-download" id="downloadBtn">
+                    <i class="fas fa-file-archive"></i>
+                    Download Notas Mensais
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- ============================================
+         CONTADORES
+         ============================================ -->
+    <section class="counters-section">
+        <div class="counters-grid">
+            <div class="counter-card pagas">
+                <div class="counter-icon">
+                    <i class="fas fa-check-circle"></i>
+                </div>
+                <div class="counter-value" data-bind="despesas.pagas">0</div>
+                <div class="counter-label">Despesas Pagas</div>
+            </div>
+            
+            <div class="counter-card pendentes">
+                <div class="counter-icon">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="counter-value" data-bind="despesas.pendentes">0</div>
+                <div class="counter-label">Despesas a Pagar</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================
+         FILTROS AVANÇADOS
+         ============================================ -->
+    <section class="filters-section">
+        <div class="filters-grid">
+            <div class="filter-group">
+                <label class="filter-label">
+                    <i class="fas fa-filter"></i>
+                    Status
+                </label>
+                <select class="filter-input" id="filterStatus">
+                    <option value="all">Todos os Status</option>
+                    <option value="pago">Pagas</option>
+                    <option value="pendente">A Pagar</option>
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label class="filter-label">
+                    <i class="fas fa-building"></i>
+                    Fornecedor
+                </label>
+                <select class="filter-input" id="filterFornecedor">
+                    <option value="all">Todos os Fornecedores</option>
+                    <!-- Fornecedores serão carregados dinamicamente -->
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label class="filter-label">
+                    <i class="fas fa-tags"></i>
+                    Categoria
+                </label>
+                <select class="filter-input" id="filterCategoria">
+                    <option value="all">Todas as Categorias</option>
+                    <!-- Categorias serão carregadas dinamicamente -->
+                </select>
+            </div>
+            
+            <div class="filter-group">
+                <label class="filter-label">
+                    <i class="fas fa-calendar"></i>
+                    Mês
+                </label>
+                <select class="filter-input" id="filterMes">
+                    <option value="all">Todos os Meses</option>
+                    <option value="01">Janeiro</option>
+                    <option value="02">Fevereiro</option>
+                    <option value="03">Março</option>
+                    <option value="04">Abril</option>
+                    <option value="05">Maio</option>
+                    <option value="06">Junho</option>
+                    <option value="07">Julho</option>
+                    <option value="08">Agosto</option>
+                    <option value="09">Setembro</option>
+                    <option value="10">Outubro</option>
+                    <option value="11">Novembro</option>
+                    <option value="12">Dezembro</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="filter-actions">
+            <button class="btn-filter btn-filter-clear" id="clearFilters">
+                <i class="fas fa-broom"></i>
+                Limpar Filtros
+            </button>
+            <button class="btn-filter btn-filter-apply" id="applyFilters">
+                <i class="fas fa-search"></i>
+                Aplicar Filtros
+            </button>
+        </div>
+    </section>
+
+    <!-- ============================================
+         LISTA DE DESPESAS
+         ============================================ -->
+    <section class="despesas-container">
+        <div class="despesas-list" id="despesasList">
+            <!-- As despesas serão carregadas dinamicamente aqui -->
+        </div>
+        
+        <!-- Estado vazio -->
+        <div class="empty-state" id="emptyState" style="display: none;">
+            <div class="empty-icon">
+                <i class="fas fa-file-invoice-dollar"></i>
+            </div>
+            <h3 class="empty-title">Nenhuma despesa encontrada</h3>
+            <p class="empty-text">Não há despesas correspondentes aos filtros atuais. Tente ajustar os filtros.</p>
+        </div>
+    </section>
+
+    <!-- ============================================
+         MODAL DE DETALHES
+         ============================================ -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 class="modal-title" id="modalTitle">Detalhes da Despesa</h2>
+                <button class="modal-close" id="modalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-content" id="modalContent">
+                <!-- Conteúdo do modal será preenchido dinamicamente -->
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================
+         MODAL DE VISUALIZAÇÃO DE IMAGEM
+         ============================================ -->
+    <div class="image-viewer-overlay" id="imageViewerOverlay">
+        <div class="image-viewer-container">
+            <img id="imageViewerImg" class="image-viewer-img" alt="Nota Fiscal">
+            <button class="image-viewer-close" id="imageViewerClose">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // SISTEMA DE GESTÃO DE DESPESAS - CORRIGIDO
+        // ============================================
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('💰 Sistema de Gestão de Despesas carregado');
+            
+            // Elementos do DOM
+            const despesasList = document.getElementById('despesasList');
+            const emptyState = document.getElementById('emptyState');
+            const modalOverlay = document.getElementById('modalOverlay');
+            const modalClose = document.getElementById('modalClose');
+            const modalContent = document.getElementById('modalContent');
+            const modalTitle = document.getElementById('modalTitle');
+            const downloadBtn = document.getElementById('downloadBtn');
+            const imageViewerOverlay = document.getElementById('imageViewerOverlay');
+            const imageViewerImg = document.getElementById('imageViewerImg');
+            const imageViewerClose = document.getElementById('imageViewerClose');
+            
+            // Filtros
+            const filterStatus = document.getElementById('filterStatus');
+            const filterFornecedor = document.getElementById('filterFornecedor');
+            const filterCategoria = document.getElementById('filterCategoria');
+            const filterMes = document.getElementById('filterMes');
+            const clearFiltersBtn = document.getElementById('clearFilters');
+            const applyFiltersBtn = document.getElementById('applyFilters');
+            
+            // Estado da aplicação
+            let todasDespesas = [];
+            let fornecedores = [];
+            let categorias = [];
+            let despesaSelecionada = null;
+            let filtrosAtivos = {
+                status: 'all',
+                fornecedor: 'all',
+                categoria: 'all',
+                mes: 'all'
+            };
+            
+            // ============================================
+            // FUNÇÕES PRINCIPAIS - CORRIGIDAS
+            // ============================================
+            
+            // Inicializar sistema
+            function inicializar() {
+                carregarDespesas();
+                configurarEventListeners();
+                console.log('✅ Sistema de gestão de despesas inicializado');
+            }
+            
+            // Carregar despesas do sistema
+            function carregarDespesas() {
+                console.log('🔄 Carregando despesas do Core...');
+                window.parent.postMessage({ 
+                    type: "QUERY_REQUEST",
+                    source: 'gestao_despesas',
+                    schema: 'despesa'
+                }, "*");
+            }
+            
+            // Processar despesas recebidas - CORRIGIDO
+            function processarDespesas(despesas) {
+                todasDespesas = despesas
+                    .filter(d => d.schema === 'despesa' && !d.deleted)
+                    .map(d => ({
+                        ...d,
+                        payload: {
+                            ...d.payload,
+                            id: d.id,
+                            createdAt: d.created_at,
+                            statusPagamento: d.payload.statusPagamento || 'pendente',
+                            // Garantir que o valor total esteja presente
+                            total: d.payload.valorTotal || d.payload.total || 0
+                        }
+                    }))
+                    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                
+                console.log(`✅ ${todasDespesas.length} despesas carregadas`);
+                
+                // Atualizar contadores de despesas para o dashboard
+                atualizarContadoresDashboard();
+                
+                // Extrair fornecedores e categorias únicas
+                extrairFiltrosUnicos();
+                atualizarContadores();
+                aplicarFiltros();
+            }
+            
+            // Atualizar contadores do dashboard - NOVA FUNÇÃO
+            function atualizarContadoresDashboard() {
+                // Contar despesas pagas e pendentes
+                const despesasPagas = todasDespesas.filter(d => d.payload.statusPagamento === 'pago').length;
+                const despesasPendentes = todasDespesas.filter(d => d.payload.statusPagamento === 'pendente').length;
+                
+                // Enviar para o dashboard via postMessage
+                window.parent.postMessage({
+                    type: "DASHBOARD_UPDATE",
+                    data: {
+                        despesas: {
+                            pagas: despesasPagas,
+                            pendentes: despesasPendentes
+                        }
+                    }
+                }, "*");
+            }
+            
+            // Extrair fornecedores e categorias únicas
+            function extrairFiltrosUnicos() {
+                fornecedores = [...new Set(todasDespesas.map(d => d.payload.fornecedor).filter(Boolean))];
+                categorias = [...new Set(todasDespesas.map(d => d.payload.categoria).filter(Boolean))];
+                
+                // Atualizar selects de filtro
+                atualizarSelectFiltro(filterFornecedor, fornecedores);
+                atualizarSelectFiltro(filterCategoria, categorias);
+            }
+            
+            // Atualizar select de filtro
+            function atualizarSelectFiltro(select, valores) {
+                const valorAtual = select.value;
+                
+                while (select.options.length > 1) {
+                    select.remove(1);
+                }
+                
+                valores.forEach(valor => {
+                    const option = document.createElement('option');
+                    option.value = valor;
+                    option.textContent = valor;
+                    select.appendChild(option);
+                });
+                
+                if (valorAtual !== 'all') {
+                    const optionExists = Array.from(select.options).some(opt => opt.value === valorAtual);
+                    if (optionExists) {
+                        select.value = valorAtual;
+                    }
+                }
+            }
+            
+            // Atualizar contadores
+            function atualizarContadores() {
+                const despesasPagas = todasDespesas.filter(d => d.payload.statusPagamento === 'pago').length;
+                const despesasPendentes = todasDespesas.filter(d => d.payload.statusPagamento === 'pendente').length;
+                
+                document.querySelectorAll('[data-bind="despesas.pagas"]').forEach(el => {
+                    el.textContent = despesasPagas;
+                });
+                
+                document.querySelectorAll('[data-bind="despesas.pendentes"]').forEach(el => {
+                    el.textContent = despesasPendentes;
+                });
+            }
+            
+            // Aplicar filtros
+            function aplicarFiltros() {
+                let despesasFiltradas = todasDespesas;
+                
+                // Filtrar por status
+                if (filtrosAtivos.status !== 'all') {
+                    despesasFiltradas = despesasFiltradas.filter(d => 
+                        d.payload.statusPagamento === filtrosAtivos.status
+                    );
+                }
+                
+                // Filtrar por fornecedor
+                if (filtrosAtivos.fornecedor !== 'all') {
+                    despesasFiltradas = despesasFiltradas.filter(d => 
+                        d.payload.fornecedor === filtrosAtivos.fornecedor
+                    );
+                }
+                
+                // Filtrar por categoria
+                if (filtrosAtivos.categoria !== 'all') {
+                    despesasFiltradas = despesasFiltradas.filter(d => 
+                        d.payload.categoria === filtrosAtivos.categoria
+                    );
+                }
+                
+                // Filtrar por mês
+                if (filtrosAtivos.mes !== 'all') {
+                    despesasFiltradas = despesasFiltradas.filter(d => {
+                        if (!d.payload.dataCompra) return false;
+                        const dataCompra = new Date(d.payload.dataCompra);
+                        const mes = (dataCompra.getMonth() + 1).toString().padStart(2, '0');
+                        return mes === filtrosAtivos.mes;
+                    });
+                }
+                
+                // Renderizar despesas filtradas
+                renderizarDespesas(despesasFiltradas);
+                
+                // Mostrar/ocultar estado vazio
+                if (despesasFiltradas.length === 0) {
+                    emptyState.style.display = 'block';
+                    despesasList.style.display = 'none';
+                } else {
+                    emptyState.style.display = 'none';
+                    despesasList.style.display = 'flex';
+                }
+            }
+            
+            // Renderizar lista de despesas
+            function renderizarDespesas(despesas) {
+                despesasList.innerHTML = '';
+                
+                despesas.forEach((despesa, index) => {
+                    const item = criarItemDespesa(despesa);
+                    despesasList.appendChild(item);
+                    
+                    // Adicionar animação de entrada
+                    item.style.animationDelay = `${index * 0.05}s`;
+                });
+            }
+            
+            // Criar item de despesa para lista - CORRIGIDO
+            function criarItemDespesa(despesa) {
+                const payload = despesa.payload;
+                const total = parseFloat(payload.total || payload.valorTotal || 0);
+                const status = payload.statusPagamento || 'pendente';
+                const hasAnexo = !!payload.notaFiscal;
+                
+                const formatarData = (dataStr) => {
+                    if (!dataStr) return 'N/A';
+                    const data = new Date(dataStr);
+                    return data.toLocaleDateString('pt-BR');
+                };
+                
+                const formatarMoeda = (valor) => {
+                    return `€${parseFloat(valor).toFixed(2).replace('.', ',')}`;
+                };
+                
+                const item = document.createElement('div');
+                item.className = `despesa-item ${status}`;
+                item.dataset.id = despesa.id;
+                
+                item.innerHTML = `
+                    <div class="despesa-header">
+                        <div class="despesa-info">
+                            <div class="despesa-descricao">${payload.descricao || 'Despesa sem descrição'}</div>
+                            <div class="despesa-fornecedor">
+                                <i class="fas fa-building"></i>
+                                ${payload.fornecedor || 'Fornecedor não informado'}
+                                ${payload.categoria ? `
+                                    <span class="categoria-badge" style="background-color: #3b82f620; color: #3b82f6;">
+                                        ${payload.categoria}
+                                    </span>
+                                ` : ''}
+                            </div>
+                            <div class="despesa-meta">
+                                <div class="despesa-meta-item">
+                                    <i class="fas fa-calendar"></i>
+                                    <span>${formatarData(payload.dataCompra || payload.createdAt)}</span>
+                                </div>
+                                <div class="despesa-meta-item">
+                                    <i class="fas fa-clock"></i>
+                                    <span>Venc: ${formatarData(payload.dataVencimento)}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="despesa-valor">
+                            ${formatarMoeda(total)}
+                        </div>
+                    </div>
+                    <div class="despesa-extra">
+                        <div class="despesa-observacoes">
+                            ${payload.observacoes ? `📝 ${payload.observacoes.substring(0, 60)}${payload.observacoes.length > 60 ? '...' : ''}` : ''}
+                        </div>
+                        <div class="despesa-anexos">
+                            ${hasAnexo ? `
+                                <span class="anexo-badge">
+                                    <i class="fas fa-paperclip"></i>
+                                    Com anexo
+                                </span>
+                            ` : ''}
+                            <span class="anexo-badge">
+                                <i class="fas fa-${status === 'pago' ? 'check-circle' : 'clock'}"></i>
+                                ${status === 'pago' ? 'Paga' : 'A Pagar'}
+                            </span>
+                        </div>
+                    </div>
+                `;
+                
+                item.addEventListener('click', () => abrirModalDetalhes(despesa));
+                
+                return item;
+            }
+            
+            // Abrir modal com detalhes da despesa - CORRIGIDO
+            function abrirModalDetalhes(despesa) {
+                despesaSelecionada = despesa;
+                const payload = despesa.payload;
+                const total = parseFloat(payload.total || payload.valorTotal || 0);
+                const valorBruto = parseFloat(payload.valorBruto) || 0;
+                const valorIVA = parseFloat(payload.valorIVA) || 0;
+                const status = payload.statusPagamento || 'pendente';
+                const hasAnexo = !!payload.notaFiscal;
+                
+                const formatarData = (dataStr) => {
+                    if (!dataStr) return 'Não informado';
+                    const data = new Date(dataStr);
+                    return data.toLocaleDateString('pt-BR');
+                };
+                
+                const formatarDataCompleta = (dataStr) => {
+                    if (!dataStr) return 'Não informado';
+                    const data = new Date(dataStr);
+                    return data.toLocaleDateString('pt-BR') + ' ' + data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                };
+                
+                const formatarMoeda = (valor) => {
+                    return `€${parseFloat(valor).toFixed(2).replace('.', ',')}`;
+                };
+                
+                modalTitle.textContent = `Despesa: ${payload.descricao || 'Sem descrição'}`;
+                
+                modalContent.innerHTML = `
+                    <div class="modal-section">
+                        <h3 class="section-title">Informações Gerais</h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <div class="info-label">Descrição</div>
+                                <div class="info-value">${payload.descricao || 'Não informado'}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Fornecedor</div>
+                                <div class="info-value">${payload.fornecedor || 'Não informado'}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Telefone</div>
+                                <div class="info-value">${payload.telefone || 'Não informado'}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">NIF</div>
+                                <div class="info-value">${payload.nifFornecedor || 'Não informado'}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Categoria</div>
+                                <div class="info-value">
+                                    <span class="categoria-badge" style="background-color: #3b82f620; color: #3b82f6; padding: 4px 12px;">
+                                        ${payload.categoria || 'Sem categoria'}
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Status</div>
+                                <div class="info-value">
+                                    ${status === 'pago' ? 
+                                        '<span class="categoria-badge" style="background-color: #10b98120; color: #10b981;">Paga</span>' : 
+                                        '<span class="categoria-badge" style="background-color: #f59e0b20; color: #f59e0b;">A Pagar</span>'}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="modal-section">
+                        <h3 class="section-title">Datas</h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <div class="info-label">Data da Compra</div>
+                                <div class="info-value">${formatarData(payload.dataCompra)}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Data de Vencimento</div>
+                                <div class="info-value">${formatarData(payload.dataVencimento)}</div>
+                            </div>
+                            ${payload.dataPagamento ? `
+                                <div class="info-item">
+                                    <div class="info-label">Data do Pagamento</div>
+                                    <div class="info-value">${formatarData(payload.dataPagamento)}</div>
+                                </div>
+                            ` : ''}
+                            <div class="info-item">
+                                <div class="info-label">Registrado em</div>
+                                <div class="info-value">${formatarDataCompleta(payload.createdAt)}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="modal-section">
+                        <h3 class="section-title">Valores</h3>
+                        <div class="valores-container">
+                            <div class="valor-item">
+                                <span>Valor Bruto:</span>
+                                <span>${formatarMoeda(valorBruto)}</span>
+                            </div>
+                            <div class="valor-item">
+                                <span>IVA (${payload.comIVA === 'comIVA' ? '23%' : 'Isento'}):</span>
+                                <span>${formatarMoeda(valorIVA)}</span>
+                            </div>
+                            <div class="valor-item">
+                                <span>TOTAL:</span>
+                                <span>${formatarMoeda(total)}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="modal-section">
+                        <h3 class="section-title">Forma de Pagamento</h3>
+                        <div class="info-grid">
+                            <div class="info-item">
+                                <div class="info-label">Método</div>
+                                <div class="info-value">${payload.formaPagamento || payload.metodosPagamento || 'Não informado'}</div>
+                            </div>
+                            ${payload.outroPagamento ? `
+                                <div class="info-item">
+                                    <div class="info-label">Detalhes</div>
+                                    <div class="info-value">${payload.outroPagamento}</div>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                    
+                    ${payload.observacoes ? `
+                        <div class="modal-section">
+                            <h3 class="section-title">Observações</h3>
+                            <div style="padding: 16px; background: var(--light-bg); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                                ${payload.observacoes}
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    ${hasAnexo ? `
+                        <div class="modal-section">
+                            <h3 class="section-title">Nota Fiscal/Anexo</h3>
+                            <div class="nota-fiscal-container">
+                                <p>Documento anexado à despesa:</p>
+                                ${payload.notaFiscal.startsWith('data:image/') ? 
+                                    `<img src="${payload.notaFiscal}" class="nota-fiscal-img" alt="Nota Fiscal" onclick="visualizarImagem('${payload.notaFiscal}')">` :
+                                    `
+                                    <div style="margin-top: 12px;">
+                                        <p><i class="fas fa-file-pdf"></i> Documento anexado (formato: ${payload.notaFiscal.substring(0, 30)}...)</p>
+                                        <button class="btn-modal download" onclick="downloadAnexo('${despesa.id}', '${payload.descricao || 'despesa'}')" style="margin-top: 10px;">
+                                            <i class="fas fa-download"></i>
+                                            Baixar Documento
+                                        </button>
+                                    </div>
+                                    `}
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    <div class="modal-actions">
+                        ${hasAnexo ? `
+                            <button class="btn-modal download" onclick="downloadAnexoIndividual('${despesa.id}', '${payload.descricao || 'despesa'}')">
+                                <i class="fas fa-download"></i>
+                                Baixar Anexo
+                            </button>
+                        ` : ''}
+                        <button class="btn-modal edit" onclick="editarDespesa('${despesa.id}')">
+                            <i class="fas fa-edit"></i>
+                            Editar Despesa
+                        </button>
+                    </div>
+                `;
+                
+                modalOverlay.classList.add('active');
+            }
+            
+            // Visualizar imagem em tela cheia
+            window.visualizarImagem = function(base64Data) {
+                if (!base64Data) return;
+                
+                imageViewerImg.src = base64Data;
+                imageViewerOverlay.classList.add('active');
+            };
+            
+            // Download de anexo individual
+            window.downloadAnexoIndividual = function(despesaId, descricao) {
+                const despesa = todasDespesas.find(d => d.id === despesaId);
+                if (!despesa || !despesa.payload.notaFiscal) {
+                    alert('Nenhum anexo disponível para download.');
+                    return;
+                }
+                
+                const base64Data = despesa.payload.notaFiscal;
+                const descricaoFormatada = descricao.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+                
+                if (base64Data.startsWith('data:image/')) {
+                    // É uma imagem
+                    const link = document.createElement('a');
+                    link.href = base64Data;
+                    link.download = `nota_fiscal_${descricaoFormatada}_${despesaId.substring(0, 8)}.png`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                } else {
+                    // É outro tipo de documento
+                    try {
+                        const byteString = atob(base64Data.split(',')[1]);
+                        const mimeString = base64Data.split(',')[0].split(':')[1].split(';')[0];
+                        const ab = new ArrayBuffer(byteString.length);
+                        const ia = new Uint8Array(ab);
+                        
+                        for (let i = 0; i < byteString.length; i++) {
+                            ia[i] = byteString.charCodeAt(i);
+                        }
+                        
+                        const blob = new Blob([ab], { type: mimeString });
+                        const link = document.createElement('a');
+                        link.href = URL.createObjectURL(blob);
+                        
+                        // Determinar extensão baseada no tipo MIME
+                        let extensao = '.bin';
+                        if (mimeString.includes('pdf')) extensao = '.pdf';
+                        else if (mimeString.includes('word')) extensao = '.docx';
+                        else if (mimeString.includes('msword')) extensao = '.doc';
+                        
+                        link.download = `documento_${descricaoFormatada}_${despesaId.substring(0, 8)}${extensao}`;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(link.href);
+                    } catch (error) {
+                        console.error('Erro ao processar documento:', error);
+                        alert('Erro ao processar o documento para download.');
+                    }
+                }
+            };
+            
+            // Download de anexo (função auxiliar)
+            window.downloadAnexo = window.downloadAnexoIndividual;
+            
+            // Editar despesa
+            window.editarDespesa = function(despesaId) {
+                console.log(`📝 Editando despesa: ${despesaId}`);
+                modalOverlay.classList.remove('active');
+                alert(`Funcionalidade de edição para despesa ${despesaId} será implementada em breve.`);
+            };
+            
+            // Gerar download ZIP das notas mensais
+            async function gerarDownloadMensal() {
+                console.log('🗂️ Gerando download mensal...');
+                
+                // Obter o mês selecionado
+                const mesSelecionado = filtrosAtivos.mes !== 'all' ? filtrosAtivos.mes : new Date().getMonth() + 1;
+                
+                // Filtrar despesas do mês
+                const despesasMes = todasDespesas.filter(d => {
+                    if (!d.payload.dataCompra) return false;
+                    const dataCompra = new Date(d.payload.dataCompra);
+                    const mes = (dataCompra.getMonth() + 1).toString().padStart(2, '0');
+                    return mes === mesSelecionado.toString().padStart(2, '0');
+                });
+                
+                if (despesasMes.length === 0) {
+                    alert('Nenhuma despesa encontrada para o mês selecionado.');
+                    return;
+                }
+                
+                // Contar despesas com anexos
+                const despesasComAnexo = despesasMes.filter(d => d.payload.notaFiscal);
+                
+                if (despesasComAnexo.length === 0) {
+                    alert('Nenhuma despesa com anexos encontrada para o mês selecionado.');
+                    return;
+                }
+                
+                // Mostrar loading
+                downloadBtn.disabled = true;
+                downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Preparando download...';
+                
+                try {
+                    // Para cada despesa com anexo, criar link de download
+                    setTimeout(() => {
+                        let contador = 0;
+                        despesasComAnexo.forEach((despesa, index) => {
+                            setTimeout(() => {
+                                window.downloadAnexoIndividual(despesa.id, despesa.payload.descricao || `despesa_${index + 1}`);
+                                contador++;
+                                
+                                if (contador === despesasComAnexo.length) {
+                                    // Restaurar botão
+                                    setTimeout(() => {
+                                        downloadBtn.disabled = false;
+                                        downloadBtn.innerHTML = '<i class="fas fa-file-archive"></i> Download Notas Mensais';
+                                    }, 1000);
+                                }
+                            }, index * 500);
+                        });
+                    }, 1000);
+                    
+                } catch (error) {
+                    console.error('Erro ao gerar download:', error);
+                    alert('Erro ao preparar o download. Por favor, tente novamente.');
+                    
+                    downloadBtn.disabled = false;
+                    downloadBtn.innerHTML = '<i class="fas fa-file-archive"></i> Download Notas Mensais';
+                }
+            }
+            
+            // ============================================
+            // CONFIGURAÇÃO DE EVENT LISTENERS
+            // ============================================
+            
+            function configurarEventListeners() {
+                // Aplicar filtros
+                applyFiltersBtn.addEventListener('click', function() {
+                    filtrosAtivos = {
+                        status: filterStatus.value,
+                        fornecedor: filterFornecedor.value,
+                        categoria: filterCategoria.value,
+                        mes: filterMes.value
+                    };
+                    
+                    aplicarFiltros();
+                });
+                
+                // Limpar filtros
+                clearFiltersBtn.addEventListener('click', function() {
+                    filterStatus.value = 'all';
+                    filterFornecedor.value = 'all';
+                    filterCategoria.value = 'all';
+                    filterMes.value = 'all';
+                    
+                    filtrosAtivos = {
+                        status: 'all',
+                        fornecedor: 'all',
+                        categoria: 'all',
+                        mes: 'all'
+                    };
+                    
+                    aplicarFiltros();
+                });
+                
+                // Download mensal
+                downloadBtn.addEventListener('click', gerarDownloadMensal);
+                
+                // Fechar modais
+                modalClose.addEventListener('click', () => {
+                    modalOverlay.classList.remove('active');
+                });
+                
+                modalOverlay.addEventListener('click', (e) => {
+                    if (e.target === modalOverlay) {
+                        modalOverlay.classList.remove('active');
+                    }
+                });
+                
+                imageViewerClose.addEventListener('click', () => {
+                    imageViewerOverlay.classList.remove('active');
+                });
+                
+                imageViewerOverlay.addEventListener('click', (e) => {
+                    if (e.target === imageViewerOverlay) {
+                        imageViewerOverlay.classList.remove('active');
+                    }
+                });
+                
+                // Escutar mensagens do Core
+                window.addEventListener("message", function(event) {
+                    if (event.data.type === "QUERY_RESPONSE") {
+                        processarDespesas(event.data.data || []);
+                    }
+                });
+            }
+            
+            // ============================================
+            // INICIALIZAÇÃO
+            // ============================================
+            
+            inicializar();
+        });
+    </script>
+    
+    <!-- CONEXÃO COM O CORE -->
+    <script src="../core/engine.js"></script>
+</body>
+</html>
+[file content end]
