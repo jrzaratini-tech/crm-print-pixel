@@ -268,10 +268,61 @@
             border: 1px solid rgba(255,255,255,0.1);
         }
         
+        /* MOBILE MENU TOGGLE */
+        .mobile-menu-toggle {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1001;
+            background: var(--primary);
+            color: white;
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            transition: all 0.3s;
+        }
+        
+        .mobile-menu-toggle:hover {
+            background: var(--accent);
+            transform: scale(1.05);
+        }
+        
+        .mobile-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 99;
+            backdrop-filter: blur(4px);
+        }
+        
+        .mobile-overlay.active {
+            display: block;
+        }
+        
         /* RESPONSIVE DESIGN */
         @media (max-width: 768px) {
             #sidebar {
-                width: 200px;
+                position: fixed;
+                left: -100%;
+                top: 0;
+                height: 100vh;
+                width: 280px;
+                z-index: 100;
+                transition: left 0.3s ease;
+                box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+            }
+            
+            #sidebar.mobile-open {
+                left: 0;
             }
             
             #content-area {
@@ -355,6 +406,14 @@
 
     <!-- NOTIFICATION SYSTEM -->
     <div id="notification-area"></div>
+
+    <!-- MOBILE MENU TOGGLE -->
+    <button class="mobile-menu-toggle" id="mobileMenuToggle" onclick="toggleMobileMenu()">
+        <i class="fas fa-bars"></i>
+    </button>
+    
+    <!-- MOBILE OVERLAY -->
+    <div class="mobile-overlay" id="mobileOverlay" onclick="closeMobileMenu()"></div>
 
     <div id="shell">
         <aside id="sidebar">
@@ -825,6 +884,11 @@
             const iframe = document.getElementById('content-area');
             iframe.src = url;
             
+            // Close mobile menu if open
+            if (window.innerWidth <= 768) {
+                closeMobileMenu();
+            }
+            
             document.querySelectorAll('#menu button').forEach(btn => {
                 btn.classList.remove('active');
             });
@@ -834,6 +898,31 @@
             currentPage = pageName.toLowerCase();
             
             console.log(`🌐 Navegando para: ${url}`);
+        }
+
+        // MOBILE MENU FUNCTIONS
+        function toggleMobileMenu() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('mobileOverlay');
+            const toggleBtn = document.getElementById('mobileMenuToggle');
+            
+            if (sidebar.classList.contains('mobile-open')) {
+                closeMobileMenu();
+            } else {
+                sidebar.classList.add('mobile-open');
+                overlay.classList.add('active');
+                toggleBtn.innerHTML = '<i class="fas fa-times"></i>';
+            }
+        }
+
+        function closeMobileMenu() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('mobileOverlay');
+            const toggleBtn = document.getElementById('mobileMenuToggle');
+            
+            sidebar.classList.remove('mobile-open');
+            overlay.classList.remove('active');
+            toggleBtn.innerHTML = '<i class="fas fa-bars"></i>';
         }
 
         function getPageNameFromUrl(url) {
