@@ -956,30 +956,83 @@
             
             // Carregar pedidos do sistema
             function carregarPedidos() {
-                console.log('🔄 Carregando pedidos do Core...');
-                window.parent.postMessage({ 
-                    type: "QUERY_REQUEST",
-                    source: 'gestao_pedidos'
-                }, "*");
+                console.log('🔄 Carregando pedidos do Firebase...');
+                
+                // Usar API do servidor online
+                fetch('/api/database/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        schema: 'pedido'
+                    })
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success && result.events) {
+                        console.log('✅ Pedidos recebidos do Firebase:', result.events);
+                        processarPedidos(result.events);
+                    } else {
+                        console.error('❌ Nenhum pedido recebido do Firebase');
+                        processarPedidos([]);
+                    }
+                })
+                .catch(error => {
+                    console.error('❌ Erro ao buscar pedidos do Firebase:', error);
+                    // Fallback: tentar comunicação via postMessage
+                    window.parent.postMessage({ 
+                        type: "QUERY_REQUEST",
+                        source: 'gestao_pedidos'
+                    }, "*");
+                });
             }
             
             // Processar pedidos recebidos
             function processarPedidos(pedidos) {
+                console.log('📦 Pedidos brutos recebidos:', pedidos);
+                
                 todosPedidos = pedidos
-                    .filter(p => p.schema === 'pedido' && !p.deleted)
-                    .map(p => ({
-                        ...p,
-                        payload: {
-                            ...p.payload,
-                            id: p.id,
-                            createdAt: p.created_at,
-                            status: p.payload.status || 'pendente',
-                            produtos: p.payload.produtos || []
+                    .filter(p => {
+                        const isValid = p.schema === 'pedido' && !p.deleted;
+                        console.log(`🔍 Pedido ${p.id}: schema=${p.schema}, deleted=${p.deleted}, válido=${isValid}`);
+                        return isValid;
+                    })
+                    .map(p => {
+                        // Garantir que o payload seja um objeto válido
+                        let payload = p.payload;
+                        if (typeof payload === 'string') {
+                            try {
+                                payload = JSON.parse(payload);
+                            } catch (e) {
+                                console.warn('⚠️ Payload não é JSON válido:', payload);
+                                payload = {};
+                            }
+                        } else if (payload && typeof payload === 'object' && payload.toString && payload.toString().includes('System.Object')) {
+                            // Converter objeto PowerShell para objeto JavaScript
+                            const newObj = {};
+                            for (const key in payload) {
+                                if (payload.hasOwnProperty(key)) {
+                                    newObj[key] = payload[key];
+                                }
+                            }
+                            payload = newObj;
                         }
-                    }))
+                        
+                        return {
+                            ...p,
+                            payload: {
+                                ...payload,
+                                id: p.id,
+                                createdAt: p.created_at,
+                                status: payload.status || 'pendente',
+                                produtos: Array.isArray(payload.produtos) ? payload.produtos : []
+                            }
+                        };
+                    })
                     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
                 
-                console.log(`✅ ${todosPedidos.length} pedidos carregados`);
+                console.log(`✅ ${todosPedidos.length} pedidos processados:`, todosPedidos);
                 atualizarContadores();
                 aplicarFiltrosEBusca();
             }
@@ -1443,14 +1496,14 @@
             
             carregarPedidos();
             
-            // Atualizar automaticamente a cada 30 segundos
-            setInterval(carregarPedidos, 30000);
+            // Auto-refresh a cada 5 segundos
+            setInterval(carregarPedidos, 5000);
             
             console.log('✅ Sistema de gestão de pedidos inicializado');
+            
+            // Prevenir que o engine.js interfira com nosso sistema
+            window.engineJsHandled = true;
         });
     </script>
-    
-    <!-- CONEXÃO COM O CORE -->
-    <script src="../core/engine.js"></script>
 </body>
 </html>

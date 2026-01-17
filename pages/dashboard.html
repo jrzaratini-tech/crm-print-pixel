@@ -318,6 +318,7 @@
             font-size: 24px;
             background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
             -webkit-background-clip: text;
+            background-clip: text;
             -webkit-text-fill-color: transparent;
         }
         
@@ -446,100 +447,36 @@
             color: var(--text-secondary);
         }
         
+                
         /* ============================================
-           OPERATIONAL SECTION
-           ============================================ */
-        .operational-section {
-            margin-top: 40px;
-        }
-        
-        .operational-cards {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-            gap: 25px;
-        }
-        
-        .operational-card {
-            background: var(--card-bg);
-            border-radius: var(--radius-md);
-            padding: 25px;
-            box-shadow: var(--shadow-md);
-            border-top: 4px solid var(--primary-color);
-        }
-        
-        .operational-card.efficiency { border-top-color: var(--success-color); }
-        .operational-card.deadlines { border-top-color: var(--info-color); }
-        .operational-card.quality { border-top-color: var(--warning-color); }
-        
-        .operational-title {
-            font-size: 16px;
-            font-weight: 600;
-            color: var(--primary-color);
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .operational-value {
-            font-size: 32px;
-            font-weight: 700;
-            margin-bottom: 10px;
-        }
-        
-        .operational-value.hidden {
-            filter: blur(8px);
-            user-select: none;
-        }
-        
-        .operational-value.efficiency { color: var(--success-color); }
-        .operational-value.deadlines { color: var(--info-color); }
-        .operational-value.quality { color: var(--warning-color); }
-        
-        .operational-desc {
-            font-size: 14px;
-            color: var(--text-secondary);
-            line-height: 1.5;
-        }
-        
-        /* ============================================
-           FOOTER
+           FOOTER SIMPLIFICADO
            ============================================ */
         .dashboard-footer {
             text-align: center;
-            padding: 25px;
+            padding: 20px;
             color: var(--text-secondary);
             font-size: 14px;
-            margin-top: 50px;
+            margin-top: 40px;
             border-top: 1px solid var(--border-color);
         }
         
-        .footer-links {
-            display: flex;
-            justify-content: center;
-            gap: 25px;
-            margin-top: 15px;
-            flex-wrap: wrap;
-        }
-        
-        .footer-link {
-            color: var(--primary-color);
-            text-decoration: none;
-            font-weight: 500;
-            transition: color 0.3s;
-        }
-        
-        .footer-link:hover {
-            color: var(--secondary-color);
-            text-decoration: underline;
-        }
-        
         /* ============================================
-           RESPONSIVIDADE
+           RESPONSIVIDADE TOTAL
            ============================================ */
+        @media (max-width: 1400px) {
+            .dashboard-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .dashboard-charts-container {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
         @media (max-width: 1200px) {
             .dashboard-grid {
                 grid-template-columns: repeat(2, 1fr);
+                gap: 20px;
             }
             
             .dashboard-charts-container {
@@ -549,35 +486,86 @@
             .operational-cards {
                 grid-template-columns: repeat(2, 1fr);
             }
+            
+            .main-content {
+                padding: 30px;
+            }
         }
         
-        @media (max-width: 900px) {
+        @media (max-width: 992px) {
+            .dashboard-header {
+                padding: 20px 30px;
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .header-left {
+                width: 100%;
+                justify-content: center;
+                text-align: center;
+            }
+            
+            .header-right {
+                width: 100%;
+                flex-direction: column;
+                gap: 15px;
+                align-items: center;
+            }
+            
+            .period-filter {
+                width: 100%;
+                max-width: 300px;
+                justify-content: center;
+            }
+            
             .dashboard-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(2, 1fr);
+                gap: 18px;
+            }
+            
+            .metric-card {
+                padding: 20px;
+            }
+            
+            .metric-value {
+                font-size: 36px;
             }
         }
         
         @media (max-width: 768px) {
             .dashboard-header {
-                flex-direction: column;
-                gap: 20px;
-                padding: 20px 25px;
-                text-align: center;
+                padding: 15px 20px;
             }
             
-            .header-left, .header-right {
-                width: 100%;
-                flex-direction: column;
-                gap: 15px;
+            .logo-text h1 {
+                font-size: 22px;
             }
             
-            .period-filter {
-                flex-direction: column;
-                width: 100%;
+            .logo-text span {
+                font-size: 12px;
             }
             
             .main-content {
-                padding: 25px;
+                padding: 20px;
+            }
+            
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+                gap: 15px;
+            }
+            
+            .metric-card {
+                padding: 18px;
+            }
+            
+            .metric-value {
+                font-size: 32px;
+            }
+            
+            .metric-icon {
+                width: 48px;
+                height: 48px;
+                font-size: 20px;
             }
             
             .dashboard-charts-container {
@@ -585,7 +573,11 @@
             }
             
             .dashboard-chart-box {
-                padding: 20px;
+                padding: 18px;
+            }
+            
+            .dashboard-chart-wrapper {
+                height: 280px;
             }
             
             .operational-cards {
@@ -594,21 +586,142 @@
             
             .equilibrium-stats {
                 flex-direction: column;
-                gap: 15px;
+                gap: 12px;
+            }
+            
+            .equilibrium-stat-value {
+                font-size: 28px;
+            }
+            
+            .section-title {
+                font-size: 20px;
+            }
+        }
+        
+        @media (max-width: 576px) {
+            .dashboard-header {
+                padding: 12px 15px;
+            }
+            
+            .logo-icon {
+                width: 48px;
+                height: 48px;
+                font-size: 24px;
+            }
+            
+            .logo-text h1 {
+                font-size: 18px;
+            }
+            
+            .logo-text span {
+                font-size: 11px;
+            }
+            
+            .main-content {
+                padding: 15px;
+            }
+            
+            .metric-card {
+                padding: 15px;
+            }
+            
+            .metric-header {
+                flex-direction: column;
+                gap: 10px;
+                align-items: flex-start;
+            }
+            
+            .metric-value {
+                font-size: 28px;
+            }
+            
+            .metric-title {
+                font-size: 13px;
+            }
+            
+            .metric-change {
+                font-size: 13px;
+            }
+            
+            .dashboard-chart-box {
+                padding: 15px;
+            }
+            
+            .dashboard-chart-wrapper {
+                height: 250px;
+            }
+            
+            .chart-title {
+                font-size: 16px;
+            }
+            
+            .chart-subtitle {
+                font-size: 12px;
+            }
+            
+            .equilibrium-card {
+                padding: 20px;
+            }
+            
+            .equilibrium-title {
+                font-size: 18px;
+            }
+            
+            .equilibrium-stat-value {
+                font-size: 24px;
+            }
+            
+            .equilibrium-stat-label {
+                font-size: 12px;
+            }
+            
+            .operational-card {
+                padding: 18px;
+            }
+            
+            .operational-title {
+                font-size: 14px;
+            }
+            
+            .operational-value {
+                font-size: 28px;
+            }
+            
+            .operational-desc {
+                font-size: 13px;
+            }
+            
+            .section-title {
+                font-size: 18px;
             }
         }
         
         @media (max-width: 480px) {
             .metric-value {
-                font-size: 36px;
+                font-size: 24px;
             }
             
             .dashboard-chart-wrapper {
-                height: 280px;
+                height: 220px;
             }
             
             .equilibrium-stat-value {
-                font-size: 28px;
+                font-size: 20px;
+            }
+            
+            .operational-value {
+                font-size: 24px;
+            }
+            
+            .date-info {
+                font-size: 13px;
+                padding: 8px 16px;
+            }
+            
+            .privacy-toggle {
+                width: 40px;
+                height: 40px;
+                font-size: 16px;
             }
         }
         
@@ -779,7 +892,8 @@
                 </div>
                 <div class="progress-labels">
                     <span>€0</span>
-                    <span data-bind="equilibrio.meta">Meta: €10.000,00</span>
+                    <span id="diasUteisInfo">Carregando...</span>
+                    <span>Meta: €10.000</span>
                 </div>
             </div>
         </div>
@@ -858,64 +972,15 @@
             </div>
         </div>
 
-        <!-- SEÇÃO DE RESUMO OPERACIONAL -->
-        <div class="operational-section">
-            <div class="section-title">
-                <i class="fas fa-cogs"></i>
-                Indicadores Operacionais
-            </div>
-            
-            <div class="operational-cards">
-                <div class="operational-card efficiency">
-                    <div class="operational-title">
-                        <i class="fas fa-bolt"></i>
-                        Eficiência de Produção
-                    </div>
-                    <div class="operational-value efficiency" data-bind="indicadores.eficiencia">0%</div>
-                    <div class="operational-desc">
-                        Taxa de aproveitamento de materiais e eficiência no processo produtivo
-                    </div>
-                </div>
-                
-                <div class="operational-card deadlines">
-                    <div class="operational-title">
-                        <i class="fas fa-calendar-check"></i>
-                        Cumprimento de Prazos
-                    </div>
-                    <div class="operational-value deadlines" data-bind="indicadores.prazos">0%</div>
-                    <div class="operational-desc">
-                        Percentual de pedidos entregues dentro do prazo estabelecido
-                    </div>
-                </div>
-                
-                <div class="operational-card quality">
-                    <div class="operational-title">
-                        <i class="fas fa-medal"></i>
-                        Satisfação do Cliente
-                    </div>
-                    <div class="operational-value quality" data-bind="indicadores.satisfacao">0%</div>
-                    <div class="operational-desc">
-                        Índice de satisfação medido através de feedback pós-entrega
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- FOOTER -->
+        <!-- FOOTER SIMPLIFICADO -->
         <div class="dashboard-footer">
-            <p>PrintPixel Dashboard &copy; 2024 - Sistema de Gestão Gráfica</p>
-            <div class="footer-links">
-                <a href="#" class="footer-link">Relatórios</a>
-                <a href="#" class="footer-link">Exportar Dados</a>
-                <a href="#" class="footer-link">Configurações</a>
-                <a href="#" class="footer-link">Suporte</a>
-            </div>
+            <p>PrintPixel Dashboard &copy; 2026 - Sistema de Gestão Online</p>
         </div>
     </div>
 
     <script>
         // ============================================
-        // SISTEMA DE DASHBOARD - CORRIGIDO
+        // SISTEMA DE DASHBOARD - VERSÃO ONLINE
         // ============================================
         
         document.addEventListener('DOMContentLoaded', function() {
@@ -1017,13 +1082,37 @@
                 solicitarDadosAoCore();
             }
             
-            // Solicitar dados ao Core
+            // Solicitar dados via API Firebase
             function solicitarDadosAoCore() {
-                console.log('🔄 Solicitando dados ao Core...');
-                window.parent.postMessage({ 
-                    type: "QUERY_REQUEST",
-                    source: 'dashboard'
-                }, "*");
+                console.log('🔄 Solicitando dados do Firebase...');
+                
+                // Usar API do servidor online
+                fetch('/api/database/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        schema: 'all'
+                    })
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success && result.events) {
+                        console.log('✅ Dados recebidos do Firebase:', result.events);
+                        processarDadosCore(result.events);
+                    } else {
+                        console.error('❌ Nenhum dado recebido do Firebase');
+                    }
+                })
+                .catch(error => {
+                    console.error('❌ Erro ao buscar dados do Firebase:', error);
+                    // Fallback: tentar comunicação via postMessage
+                    window.parent.postMessage({ 
+                        type: "QUERY_REQUEST",
+                        source: 'dashboard'
+                    }, "*");
+                });
             }
             
             // Processar dados recebidos do Core - CORRIGIDO
@@ -1056,8 +1145,7 @@
                 const ultimoDia = new Date(ano, mes + 1, 0).getDate();
                 
                 for (let dia = 1; dia <= ultimoDia; dia++) {
-                    const dataTeste = new Date(ano, mes, dia);
-                    const diaSemana = dataTeste.getDay(); // 0 = domingo, 1 = segunda, ..., 6 = sábado
+                    const diaSemana = new Date(ano, mes, dia).getDay();
                     
                     // Segunda a sexta são dias úteis (1-5)
                     if (diaSemana >= 1 && diaSemana <= 5) {
@@ -1069,6 +1157,43 @@
                 const metaDiariaReal = diasUteis > 0 ? metaMensal / diasUteis : 0;
                 
                 return metaDiariaReal;
+            }
+            
+            // CORREÇÃO 3: Calcular total de dias úteis no mês
+            function calcularDiasUteisNoMes() {
+                const dataAtual = new Date();
+                const ano = dataAtual.getFullYear();
+                const mes = dataAtual.getMonth();
+                
+                let diasUteis = 0;
+                const ultimoDia = new Date(ano, mes + 1, 0).getDate();
+                
+                for (let dia = 1; dia <= ultimoDia; dia++) {
+                    const diaSemana = new Date(ano, mes, dia).getDay();
+                    if (diaSemana >= 1 && diaSemana <= 5) {
+                        diasUteis++;
+                    }
+                }
+                
+                return diasUteis;
+            }
+            
+            // CORREÇÃO 4: Calcular dias úteis passados (incluindo hoje se for útil)
+            function calcularDiasUteisPassados(diaAtual) {
+                const dataAtual = new Date();
+                const ano = dataAtual.getFullYear();
+                const mes = dataAtual.getMonth();
+                
+                let diasUteisPassados = 0;
+                
+                for (let dia = 1; dia <= diaAtual; dia++) {
+                    const diaSemana = new Date(ano, mes, dia).getDay();
+                    if (diaSemana >= 1 && diaSemana <= 5) {
+                        diasUteisPassados++;
+                    }
+                }
+                
+                return diasUteisPassados;
             }
             
             // CORREÇÃO 2: Processar dados do Core para o dashboard - FOCADO EM DESPESAS
@@ -1304,6 +1429,18 @@
                 // CORREÇÃO 1: Calcular meta diária REAL
                 const metaDiariaReal = calcularMetaDiariaReal(diaAtual, metaMensal);
                 
+                // CORREÇÃO 2: Calcular dias úteis do mês para informação
+                const diasUteisTotal = calcularDiasUteisNoMes();
+                const diasUteisPassados = calcularDiasUteisPassados(diaAtual);
+                
+                // DEBUG: Verificar cálculos
+                console.log('🔍 DEBUG - Cálculos de dias úteis:');
+                console.log('  Dia atual:', diaAtual);
+                console.log('  Dias úteis total:', diasUteisTotal);
+                console.log('  Dias úteis passados:', diasUteisPassados);
+                console.log('  Meta mensal:', metaMensal);
+                console.log('  Meta diária calculada:', metaDiariaReal);
+                
                 // Calcular variação das despesas
                 let variacaoDespesas = 0;
                 if (despesasMesAnterior > 0 && totalDespesas > 0) {
@@ -1419,13 +1556,8 @@
                         meta: metaMensal,
                         percentual: percentualEquilibrio.toFixed(1),
                         metaDiaria: metaDiariaReal, // USANDO META DIÁRIA REAL CALCULADA
-                        diasUteis: 0, // Removido pois não é mais necessário exibir
-                        diasUteisPassados: 0 // Removido pois não é mais necessário exibir
-                    },
-                    indicadores: {
-                        eficiencia: pedidosConcluidos > 0 ? '92' : '0',
-                        prazos: pedidosConcluidos > 0 ? '87' : '0',
-                        satisfacao: pedidosConcluidos > 0 ? '94' : '0'
+                        diasUteis: diasUteisTotal, // Total de dias úteis no mês
+                        diasUteisPassados: diasUteisPassados // Dias úteis já passados
                     },
                     vendasPorCategoria: topVendasCategorias,
                     despesasPorCategoria: topDespesasCategorias,
@@ -1493,31 +1625,49 @@
                 document.querySelector('[data-bind="equilibrio.meta"]').textContent = formatarMoeda(dados.equilibrio.meta);
                 document.querySelector('[data-bind="equilibrio.percentual"]').textContent = `${dados.equilibrio.percentual}%`;
                 
-                // CORREÇÃO 1: Atualizar meta diária REAL
+                // CORREÇÃO 1: Atualizar meta diária REAL com informações detalhadas
                 const elementoMetaDiaria = document.querySelector('[data-bind="equilibrio.metaDiaria"]');
                 if (elementoMetaDiaria) {
-                    elementoMetaDiaria.textContent = formatarMoeda(dados.equilibrio.metaDiaria);
-                    console.log('✅ Meta diária REAL calculada:', formatarMoeda(dados.equilibrio.metaDiaria));
+                    const valorFormatado = formatarMoeda(dados.equilibrio.metaDiaria);
+                    elementoMetaDiaria.textContent = valorFormatado;
+                    
+                    // Forçar atualização visual (combate cache)
+                    elementoMetaDiaria.style.display = 'none';
+                    setTimeout(() => {
+                        elementoMetaDiaria.style.display = 'block';
+                    }, 10);
+                    
+                    console.log('✅ Meta diária REAL calculada:', valorFormatado);
+                    console.log('📅 Dias úteis no mês:', dados.equilibrio.diasUteis);
+                    console.log('📅 Dias úteis passados:', dados.equilibrio.diasUteisPassados);
+                    console.log('🔢 Valor bruto da meta diária:', dados.equilibrio.metaDiaria);
+                    
+                    // Adicionar tooltip ou informação adicional
+                    elementoMetaDiaria.title = `Meta baseada em ${dados.equilibrio.diasUteis} dias úteis no mês (${dados.equilibrio.diasUteisPassados} já passados)`;
+                } else {
+                    console.error('❌ Elemento meta diária não encontrado!');
                 }
                 
                 // Atualizar barra de progresso
                 const progressBar = document.getElementById('equilibriumProgress');
                 progressBar.style.width = `${dados.equilibrio.percentual}%`;
                 
-                // Atualizar indicadores
-                document.querySelector('[data-bind="indicadores.eficiencia"]').textContent = `${dados.indicadores.eficiencia}%`;
-                document.querySelector('[data-bind="indicadores.prazos"]').textContent = `${dados.indicadores.prazos}%`;
-                document.querySelector('[data-bind="indicadores.satisfacao"]').textContent = `${dados.indicadores.satisfacao}%`;
-                
                 // Aplicar privacidade se necessário
                 if (isPrivate) {
                     aplicarModoPrivacidade(true);
                 }
                 
-                // Atualizar label da meta
+                // Atualizar label da meta com informações de dias úteis
                 const metaLabel = document.querySelector('.progress-labels span:last-child');
                 if (metaLabel) {
                     metaLabel.textContent = `Meta: ${formatarMoeda(dados.equilibrio.meta)}`;
+                }
+                
+                // CORREÇÃO 2: Atualizar informações de dias úteis
+                const diasUteisInfo = document.getElementById('diasUteisInfo');
+                if (diasUteisInfo) {
+                    diasUteisInfo.textContent = `${dados.equilibrio.diasUteisPassados}/${dados.equilibrio.diasUteis} dias úteis`;
+                    diasUteisInfo.title = `${dados.equilibrio.diasUteisPassados} dias úteis passados de ${dados.equilibrio.diasUteis} totais no mês`;
                 }
             }
             

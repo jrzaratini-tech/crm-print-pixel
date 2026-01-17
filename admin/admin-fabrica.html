@@ -1,60 +1,58 @@
-[file name]: admin-fabrica.html
-[file content begin]
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fábrica de Páginas | CORE v4.0</title>
+    <title>Fábrica de Páginas CORE v4.0</title>
     <style>
         :root {
-            --bg-body: #f0f2f5;
-            --surface: #ffffff;
             --primary: #2563eb;
             --primary-dark: #1e40af;
-            --text-main: #1e293b;
-            --text-sec: #64748b;
-            --border: #e2e8f0;
             --success: #10b981;
+            --warning: #f59e0b;
             --danger: #ef4444;
+            --border: #e5e7eb;
+            --text-main: #1f2937;
+            --text-sec: #6b7280;
+            --bg-light: #f9fafb;
         }
 
-        * { box-sizing: border-box; outline: none; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-body);
-            color: var(--text-main);
-            margin: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
             padding: 20px;
-            line-height: 1.5;
         }
 
         .container {
-            max-width: 900px;
+            max-width: 1000px;
             margin: 0 auto;
-            background: var(--surface);
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.15);
             overflow: hidden;
         }
 
         .header {
-            padding: 24px;
-            border-bottom: 1px solid var(--border);
-            background: linear-gradient(to right, #f8fafc, #ffffff);
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
         }
 
         .header h1 {
-            margin: 0;
-            font-size: 1.5rem;
-            color: var(--text-main);
-            display: flex;
-            align-items: center;
-            gap: 12px;
+            font-size: 2rem;
+            margin-bottom: 10px;
         }
 
-        .content { padding: 32px; }
+        .header p {
+            opacity: 0.9;
+            font-size: 1.1rem;
+        }
+
+        .content { padding: 40px; }
 
         .form-grid {
             display: grid;
@@ -211,6 +209,7 @@
             <svg class="icon" viewBox="0 0 24 24"><path d="M22 13v-2h-2.2c-.4-3.5-3.1-6.2-6.6-6.6V2l-2-2-2 2v2.2C5.7 4.6 2.9 7.3 2.5 10.8H0v2h2.2c.4 3.5 3.1 6.2 6.6 6.6v2.2l2 2 2-2v-2.2c3.5-.4 6.2-3.1 6.6-6.6H22zM11 16c-2.8 0-5-2.2-5-5s2.2-5 5-5 5 2.2 5 5-2.2 5-5 5z"/></svg>
             Fábrica de Páginas CORE v4.0
         </h1>
+        <p>Crie novas páginas para o sistema modular</p>
     </div>
 
     <div class="content">
@@ -252,12 +251,12 @@
         </div>
 
         <div class="instructions">
-            <h3>⚠️ IMPORTANTE: Como funciona o salvamento no Pen Drive</h3>
+            <h3>⚠️ IMPORTANTE: Como funciona o salvamento no Firebase</h3>
             <ol>
                 <li>A página será registrada no <strong>sistema principal</strong> (index.html)</li>
-                <li>Os dados são salvos no <strong>localStorage</strong> do navegador</li>
-                <li>Para transferir entre PCs: <strong>faça BACKUP</strong> em Configurações → Gerenciamento de Dados</li>
-                <li>No novo PC: <strong>RESTAURE o backup</strong> para ter todas as páginas</li>
+                <li>Os dados são salvos no <strong>Firebase online</strong></li>
+                <li>Funciona de qualquer lugar do mundo</li>
+                <li>Para criar: gere o prompt, crie o HTML, salve em pages/, depois registre aqui</li>
             </ol>
         </div>
 
@@ -342,9 +341,9 @@
         const pageId = data.file.replace(/-/g, '_');
         const example = data.type === 'WRITE' 
             ? '<input type="text" data-bind="venda.cliente" placeholder="Nome do cliente">\n<button type="button" data-action="commit">Salvar</button>'
-            : '<div data-bind="vendas.total">€0,00</div>';
+            : '<div data-bind="vendas.total">R$ 0,00</div>';
 
-        const prompt = `Crie um arquivo HTML para o "Sistema CORE v4.0".
+        const prompt = `Crie um arquivo HTML para o "Sistema CORE v5.0".
 Nome do arquivo: ${data.file}.html
 Tipo: ${data.type}
 
@@ -357,30 +356,22 @@ REGRAS RÍGIDAS:
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${data.name}</title>
     <style>
-        /* CSS Moderno aqui */
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            padding: 20px;
-            background: #f4f4f4;
+        body { font-family: 'Segoe UI', sans-serif; padding: 20px; background: #f8fafc; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 12px; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-weight: 600; margin-bottom: 8px; }
+        .form-group input, .form-group select, .form-group textarea { 
+            width: 100%; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; 
         }
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        }
+        .btn { padding: 12px 24px; background: #2563eb; color: white; border: none; border-radius: 8px; cursor: pointer; }
     </style>
     ${data.type === 'READ' ? '<script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>' : ''}
 </head>
 <body data-page-id="${pageId}" data-page-type="${data.type}">
-    
     <div class="container">
         <h2>${data.name}</h2>
         ${example}
     </div>
-
     <script src="../core/engine.js"><\/script>
 </body>
 </html>
@@ -396,18 +387,18 @@ REGRAS RÍGIDAS:
         showStatus('Prompt gerado! Copie e envie para a IA.', 'success');
     }
 
-    // Ação 2: Registrar no Sistema (CORREÇÃO PRINCIPAL)
+    // Ação 2: Registrar no Sistema
     function registerPage() {
         const data = validate();
         if (!data) return;
 
         // Criar objeto da página NO FORMATO DO SISTEMA PRINCIPAL
         const newPage = {
-            id: 'nav_cust_' + Date.now(),  // ID no formato que o sistema espera
+            id: 'nav_cust_' + Date.now(),
             name: data.name,
             file: 'pages/' + data.file + '.html',
             type: data.type,
-            pos: 100,  // Posição inicial
+            pos: 100,
             hidden: false,
             deleted: false
         };
@@ -423,9 +414,8 @@ REGRAS RÍGIDAS:
             
             showStatus(`Página "${data.name}" enviada para registro no sistema principal.`, 'success');
             
-            // Adicionar instrução para recarregar o menu
             setTimeout(() => {
-                showStatus('✅ Página registrada! Para ver no menu, feche e abra a Fábrica ou recarregue o sistema.', 'warning');
+                showStatus('✅ Página registrada! Para ver no menu, recarregue o sistema.', 'warning');
             }, 1000);
             
         } catch (error) {
@@ -433,7 +423,7 @@ REGRAS RÍGIDAS:
             showStatus('Erro na comunicação. Verifique se está no sistema principal.', 'error');
         }
 
-        // MÉTODO DE FALLBACK: Tentar salvar diretamente (para emergência)
+        // MÉTODO DE FALLBACK: Tentar salvar diretamente
         setTimeout(() => {
             tryFallbackRegistration(newPage);
         }, 500);
@@ -442,32 +432,25 @@ REGRAS RÍGIDAS:
     // Método de fallback para garantir o salvamento
     function tryFallbackRegistration(page) {
         try {
-            // Tentar acessar o localStorage do sistema principal
             const systemSettingsStr = localStorage.getItem('system_settings');
             
             if (systemSettingsStr) {
                 const systemSettings = JSON.parse(systemSettingsStr);
                 
-                // Inicializar menu_config se não existir
                 if (!systemSettings.menu_config) {
                     systemSettings.menu_config = [];
                 }
                 
-                // Verificar se já existe
                 const exists = systemSettings.menu_config.some(p => 
                     p.name === page.name || p.file === page.file
                 );
                 
                 if (!exists) {
-                    // Adicionar nova página
                     systemSettings.menu_config.push(page);
-                    
-                    // Salvar de volta
                     localStorage.setItem('system_settings', JSON.stringify(systemSettings));
                     
                     console.log('✅ Página registrada via fallback:', page);
                     
-                    // Notificar usuário
                     setTimeout(() => {
                         showStatus('✅ Página salva no sistema! Reinicie o sistema para ver no menu.', 'success');
                     }, 2000);
@@ -503,4 +486,3 @@ REGRAS RÍGIDAS:
 
 </body>
 </html>
-[file content end]

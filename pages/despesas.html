@@ -973,12 +973,37 @@
             
             // Carregar despesas do sistema
             function carregarDespesas() {
-                console.log('🔄 Carregando despesas do Core...');
-                window.parent.postMessage({ 
-                    type: "QUERY_REQUEST",
-                    source: 'gestao_despesas',
-                    schema: 'despesa'
-                }, "*");
+                console.log('🔄 Carregando despesas do Firebase...');
+                
+                // Usar API do servidor online
+                fetch('/api/database/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        schema: 'despesa'
+                    })
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success && result.events) {
+                        console.log('✅ Despesas recebidas do Firebase:', result.events);
+                        processarDespesas(result.events);
+                    } else {
+                        console.error('❌ Nenhuma despesa recebida do Firebase');
+                        processarDespesas([]);
+                    }
+                })
+                .catch(error => {
+                    console.error('❌ Erro ao buscar despesas do Firebase:', error);
+                    // Fallback: tentar comunicação via postMessage
+                    window.parent.postMessage({ 
+                        type: "QUERY_REQUEST",
+                        source: 'gestao_despesas',
+                        schema: 'despesa'
+                    }, "*");
+                });
             }
             
             // Processar despesas recebidas - CORRIGIDO
@@ -1582,6 +1607,9 @@
             // ============================================
             
             inicializar();
+            
+            // Auto-refresh a cada 5 segundos
+            setInterval(carregarDespesas, 5000);
         });
     </script>
     
@@ -1589,4 +1617,3 @@
     <script src="../core/engine.js"></script>
 </body>
 </html>
-[file content end]

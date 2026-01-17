@@ -72,11 +72,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     if (response.ok) {
                         const result = await response.json();
-                        console.log('✅ Dados salvos no Pen Drive:', result);
+                        console.log('✅ Dados salvos no Firebase:', result);
                         
                         // Feedback visual
                         commitBtn.style.backgroundColor = "#27ae60";
-                        commitBtn.textContent = "✓ Salvo no Pen Drive!";
+                        commitBtn.textContent = "✓ Salvo Online!";
                         commitBtn.disabled = true;
                         
                         setTimeout(() => {
@@ -92,11 +92,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         limparFormulario(inputs);
                         
                     } else {
-                        throw new Error('Falha ao salvar no Pen Drive');
+                        throw new Error('Falha ao salvar no Firebase');
                     }
                 } catch (error) {
-                    console.error('❌ Erro ao salvar no Pen Drive:', error);
-                    alert('❌ Erro ao salvar dados no Pen Drive!');
+                    console.error('❌ Erro ao salvar no Firebase:', error);
+                    alert('❌ Erro ao salvar dados online!');
                 }
             } else {
                 console.error('❌ Erro: Schema não identificado ou payload vazio');
@@ -110,16 +110,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- MODO LEITURA (READ) ---
     if (pageType === "READ") {
-        console.log("📊 Página READ detectada - Configurando sistema de dados do Pen Drive");
+        console.log("📊 Página READ detectada - Configurando sistema de dados do Firebase");
         
         // Função para solicitar dados
         const solicitarDados = async () => {
-            console.log("🔄 Solicitando dados do Pen Drive...");
+            console.log("🔄 Solicitando dados do Firebase...");
             try {
-                const events = await window.db.getEvents();
-                atualizarInterface(events);
+                // Solicitar dados via API
+                const response = await fetch('/api/database/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        schema: pageId.includes('pedido') ? 'pedido' : 
+                               pageId.includes('despesa') ? 'despesa' : 'all'
+                    })
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    const events = result.events || [];
+                    atualizarInterface(events);
+                } else {
+                    console.error('❌ Erro ao buscar dados do Firebase');
+                }
             } catch (error) {
-                console.error('❌ Erro ao carregar dados do Pen Drive:', error);
+                console.error('❌ Erro ao carregar dados do Firebase:', error);
             }
         };
 
@@ -269,32 +286,49 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function processarPedidoCompleto(inputs) {
-        const payload = {
-            cliente: '',
-            produtos: [],
-            total: 0,
-            observacoes: ''
-        };
+        const payload = {};
         
         inputs.forEach(input => {
             const bindPath = input.getAttribute('data-bind').split('.');
             
             if (bindPath[0] === 'pedido') {
-                if (bindPath[1] === 'cliente') {
-                    payload.cliente = input.value;
-                } else if (bindPath[1] === 'observacoes') {
-                    payload.observacoes = input.value;
-                } else if (bindPath[1] === 'total') {
-                    payload.total = parseFloat(input.value) || 0;
+                const field = bindPath[1];
+                
+                // Suporte para diferentes tipos de input
+                if (input.type === 'checkbox') {
+                    payload[field] = input.checked;
+                } else if (input.type === 'radio') {
+                    if (input.checked) payload[field] = input.value;
+                } else if (input.type === 'number') {
+                    payload[field] = parseFloat(input.value) || 0;
+                } else if (input.type === 'date') {
+                    payload[field] = input.value;
+                } else {
+                    payload[field] = input.value;
                 }
             } else if (bindPath[0] === 'produto') {
-                const index = bindPath[1];
-                if (!payload.produtos[index]) {
-                    payload.produtos[index] = {};
+                // Para produtos com índice (ex: pedido.produtos.0.nome)
+                const parts = bindPath[1].split('.');
+                if (parts[0] === 'produtos' && parts[1]) {
+                    const index = parseInt(parts[1]);
+                    const field = parts[2];
+                    
+                    if (!payload.produtos) payload.produtos = [];
+                    if (!payload.produtos[index]) payload.produtos[index] = {};
+                    
+                    if (input.type === 'number') {
+                        payload.produtos[index][field] = parseFloat(input.value) || 0;
+                    } else {
+                        payload.produtos[index][field] = input.value;
+                    }
                 }
-                payload.produtos[index][bindPath[2]] = input.value;
             }
         });
+        
+        // Adicionar data de registro se não existir
+        if (!payload.dataRegistro) {
+            payload.dataRegistro = new Date().toISOString();
+        }
         
         return payload;
     }
@@ -302,6 +336,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // Inicializar sistema de mensagens
     window.addEventListener('load', () => {
         console.log('🔧 Engine v5.0 inicializada com sucesso!');
-        console.log('💾 Pronta para salvar no Pen Drive');
+        console.log('🔥 Pronta para salvar no Firebase Online');
     });
 });

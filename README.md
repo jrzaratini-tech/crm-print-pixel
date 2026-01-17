@@ -1,4 +1,4 @@
-🚀 SISTEMA CORE v4.0 - PLATAFORMA PORTÁTIL DEFINITIVA
+🚀 SISTEMA CORE v5.0 - PLATAFORMA ONLINE DEFINITIVA
 📋 ÍNDICE
 🏆 Visão Geral
 
@@ -8,7 +8,7 @@
 
 ⚡ Início Rápido
 
-🔧 Instalação em Pen Drive
+🌐 Deploy Online
 
 💾 Sistema de Dados
 
@@ -18,14 +18,16 @@
 
 ⚙️ Administração
 
-🛠️ Troubleshooting
+� Responsividade Mobile
+
+�️ Troubleshooting
 
 🔮 Evolução Futura
 
 📞 Suporte
 
 🏆 VISÃO GERAL
-O SISTEMA CORE v4.0 é uma plataforma de gestão empresarial 100% portátil que roda diretamente de um pen drive. Baseado em arquitetura event-sourcing, é imutável, desacoplado e infinitamente extensível.
+O SISTEMA CORE v5.0 é uma plataforma de gestão empresarial 100% online que roda em servidor Node.js com banco de dados Firebase Firestore. Baseado em arquitetura event-sourcing, é imutável, desacoplado e infinitamente extensível.
 
 Filosofia Fundadora
 ✅ Separação total: Interface vs Lógica de Dados
@@ -36,52 +38,110 @@ Filosofia Fundadora
 
 ✅ Extensível: Plug-and-play infinito
 
-✅ Portátil: Zero instalação, funciona em qualquer PC
+✅ Online: Acessível de qualquer lugar via navegador
+
+✅ Escalável: Firebase Firestore para dados ilimitados
 
 ✨ CARACTERÍSTICAS
 🎯 Principais Diferenciais
-Portabilidade total: Copie o pen drive e execute em qualquer Windows
+Acesso total: Funciona em qualquer navegador com internet
 
-Banco de dados embutido: localStorage otimizado
+Banco de dados em nuvem: Firebase Firestore escalável
 
-Auto-suficiente: Não requer internet, servidor ou instalação
+Auto-suficiente: Não requer instalação local
 
 Interface moderna: Design responsivo e intuitivo
 
 Sistema modular: Adicione páginas sem modificar o core
 
+API RESTful: Integração completa com frontend
+
+📱 **RESPONSIVIDADE MOBILE**
+Design Adaptativo Completo
+
+✅ **Tablets (≤768px):** Sidebar otimizado para 200px
+
+✅ **Smartphones (≤480px):** Sidebar reduzido para 180px
+
+✅ **Barra de Status:** Layout vertical em dispositivos móveis
+
+✅ **Notificações:** Ocupam largura total da tela em mobile
+
+✅ **Botões:** Tamanhos reduzidos para melhor usabilidade em toque
+
+✅ **Fontes e Espaçamentos:** Ajustados para telas pequenas
+
+**Media Queries Implementadas:**
+```css
+@media (max-width: 768px) {
+    /* Layout para tablets */
+    #sidebar { width: 200px; }
+    .status-bar { flex-direction: column; }
+    .notification { left: 10px; right: 10px; }
+}
+
+@media (max-width: 480px) {
+    /* Layout para smartphones */
+    #sidebar { width: 180px; }
+    #menu button { font-size: 13px; }
+    .status-bar { font-size: 10px; }
+}
+```
+
+**Como Ativar Responsividade:**
+1. Sistema já é responsivo por padrão
+2. Reduza a janela do navegador para testar
+3. Em mobile: sidebar se adapta automaticamente
+4. Use Ctrl+F5 para limpar cache se necessário
+
+**Opcional - Menu Hamburger:**
+Para implementar menu hamburger (ocultar sidebar):
+- Adicionar botão toggle no HTML
+- Implementar funções JavaScript
+- Sidebar se torna deslizante em mobile
+
 🔒 Segurança e Confiabilidade
 PIN Admin: 3377 (imutável)
 
-Backup automático integrado
+Backup automático na nuvem
 
 Soft-delete apenas (nunca perda de dados)
 
 Todos os eventos são auditáveis
 
+Dados sincronizados em tempo real
+
 📁 ESTRUTURA DO SISTEMA
 text
-PEN_DRIVE/
+CRM_PRINT_PIXEL/
 ├── 📄 index.html              # 🏠 Sistema Principal (CORE)
 ├── 📄 README.md               # 📚 Este documento
-├── 📄 style.css               # 🎨 Estilos base (se existir)
+├── 📄 server.js               # 🌐 Servidor Node.js
+├── 📄 package.json            # 📦 Dependências NPM
+├── 📄 firebase.js             # 🔥 Configuração Firebase
+├── 📄 style.css               # 🎨 Estilos base
 │
 ├── 📂 core/                   # 🧠 INTELIGÊNCIA DO SISTEMA
-│   ├── engine.js             # 🔌 Motor de Comunicação v4.0
-│   ├── database.js           # 🗄️ Camada de Dados Otimizada
-│   └── config.js             # ⚙️ Configurações Portáteis
+│   ├── engine.js             # 🔌 Motor de Comunicação v5.0
+│   ├── database.js           # 🗄️ Camada de Dados Firebase
+│   └── config.js             # ⚙️ Configurações Online
 │
 ├── 📂 pages/                  # 📂 TODAS AS TELAS
 │   ├── dashboard.html        # 📊 Dashboard Principal
-│   ├── nova-venda.html       # ➕ Nova Venda
-│   ├── nova-despesa.html     # 💸 Nova Despesa
-│   ├── exportacao.html       # 💾 Exportar/Importar
-│   └── [suas-paginas].html   # ✨ Páginas personalizadas
+│   ├── novopedido.html       # ➕ Novo Pedido
+│   ├── novadespesa.html     # 💸 Nova Despesa
+│   ├── pedidos.html          # 📦 Lista Pedidos
+│   └── despesas.html         # 💸 Lista Despesas
 │
-└── 📂 admin/                  # 👑 ADMINISTRAÇÃO
-    ├── admin-config.html     # 🎨 Configurações do Sistema
-    ├── admin-fabrica.html    # 🏭 Fábrica de Páginas
-    └── admin-lancamentos.html # 📦 Gerenciar Dados
+├── 📂 admin/                  # 👑 ADMINISTRAÇÃO
+│   ├── admin-config.html     # 🎨 Configurações do Sistema
+│   ├── admin-fabrica.html    # 🏭 Fábrica de Páginas
+│   └── admin-lancamentos.html # 📦 Gerenciar Dados
+│
+├── 📂 DATA/                   # 💾 DADOS LOCAIS
+│   └── database/             # 🗄️ Backup local
+│
+└── 📂 node_modules/           # 📦 Dependências
 🚨 REGRA ABSOLUTA
 ❌ Nunca crie páginas fora de /pages/
 
@@ -89,53 +149,71 @@ PEN_DRIVE/
 
 ✅ Sempre use a Fábrica para novas páginas
 
+✅ Mantenha Firebase.js seguro e privado
+
 ⚡ INÍCIO RÁPIDO
-Método Único: Duplo Clique (SIMPLIFICADO)
+Método Online: Servidor Node.js (PRODUÇÃO)
 bash
-1. Conecte o pen drive
-2. Navegue até o pen drive
-3. Duplo clique em: 📄 index.html
-4. Sistema pronto para uso!
-Transferência entre PCs
+# 1. Instale as dependências
+npm install
+
+# 2. Inicie o servidor
+npm start
+
+# 3. Acesse no navegador
+http://localhost:3000
+
+# 4. Sistema pronto para uso!
+Deploy em Produção
 bash
-1. Feche o navegador no PC atual
-2. Eject o pen drive com segurança
-3. Conecte em outro computador
-4. Duplo clique em: 📄 index.html
-5. Todos os dados estarão disponíveis
-🔧 INSTALAÇÃO EM PEN DRIVE
+# 1. Configure variáveis de ambiente
+PORT=3000
+NODE_ENV=production
+
+# 2. Faça deploy na plataforma (Render, Heroku, etc.)
+# 3. Configure Firebase Firestore
+# 4. Sistema online 24/7!
+🌐 DEPLOY ONLINE
 Requisitos Mínimos
-✅ Pen drive com 50MB+ livres
-✅ Windows 7 ou superior
-✅ Qualquer navegador moderno
-✅ Permissão de leitura/escrita
+✅ Node.js 18+ instalado
+
+✅ Conta Firebase configurada
+
+✅ Servidor web (Render, Heroku, VPS)
+
+✅ Domínio próprio (opcional)
 
 Passo a Passo
 bash
-# 1. Formate o pen drive (NTFS ou FAT32)
-# 2. Copie TODA a estrutura acima
-# 3. Teste com duplo clique no index.html
-# 4. Use PIN admin: 3377 para liberar recursos
-Verificação de Instalação
+# 1. Configure Firebase Firestore
+# 2. Copie as credenciais para firebase.js
+# 3. Instale dependências: npm install
+# 4. Configure PORT no ambiente
+# 5. Faça deploy do código
+# 6. Teste endpoints da API
+# 7. Use PIN admin: 3377 para liberar recursos
+Verificação de Deploy
 bash
-# Execute no CMD (opcional):
-dir /B
-# Deve mostrar: index.html, README.md, core/, pages/, admin/
+# Teste endpoints:
+curl https://seu-dominio.com/api/database/init
+# Deve retornar: {"status":"ok","message":"Firebase pronto"}
+# Teste frontend:
+https://seu-dominio.com/
 💾 SISTEMA DE DADOS
-Arquitetura Append-Only
+Arquitetura Firebase Firestore
 javascript
 // Estrutura de um Evento (IMUTÁVEL)
 {
-    id: "EVT-1736312400000-abcd",  // Único e ordenável
-    schema: "venda",               // Tipo de dado
-    payload: {                     // Dados específicos
+    id: "auto_generated_firebase_id",  // ID único do Firestore
+    schema: "venda",                   // Tipo de dado
+    payload: {                          // Dados específicos
         cliente: "Nome do Cliente",
         valor: 150.50,
         produto: "Produto Vendido"
     },
-    source: "nova-venda",          // Origem do evento
-    created_at: "2025-01-08T10:00:00.000Z", // Timestamp ISO
-    deleted: false                 // Soft delete apenas
+    pageId: "nova-venda",              // Origem do evento
+    timestamp: serverTimestamp(),       // Timestamp automático
+    deleted: false                      // Soft delete apenas
 }
 Schemas Oficiais
 📦 VENDA (Simples)
@@ -190,6 +268,15 @@ payload: {
     dataEntrega: "2025-01-15",
     observacoes: "Observações gerais"
 }
+
+🔥 API Firebase
+javascript
+// Endpoints disponíveis:
+POST /api/database/init    // Testar conexão
+POST /api/database/commit   // Salvar evento
+GET  /api/database/query   // Consultar eventos
+GET  /api/database/stats    // Estatísticas
+POST /api/database/backup   // Criar backup
 🔄 COMUNICAÇÃO ENTRE PÁGINAS
 Protocolo OBRIGATÓRIO
 1. Identidade da Página
@@ -225,26 +312,43 @@ Comunicação Core ↔ Páginas
 Página → Core (Solicitar dados):
 
 javascript
-window.parent.postMessage({ 
-    type: "QUERY_REQUEST",
-    source: 'nome_da_pagina' 
-}, "*");
+// Via API REST (novo método)
+const response = await fetch('/api/database/query');
+const events = await response.json();
+processarDados(events);
+
+// Via engine.js (compatibilidade)
+window.db.getEvents().then(events => {
+    processarDados(events);
+});
 Core → Página (Enviar dados):
 
 javascript
-window.addEventListener("message", (e) => {
-    if (e.data.type === "QUERY_RESPONSE") {
-        // e.data.data contém TODOS os eventos
-        processarDados(e.data.data);
-    }
+// Auto-atualização via eventos
+window.addEventListener('coreDataChanged', () => {
+    // Recarregar dados automaticamente
+    carregarDados();
 });
+
+// Polling a cada 5 segundos
+setInterval(carregarDados, 5000);
 Página → Core (Salvar dados):
 
 javascript
 // O engine.js FAZ AUTOMATICAMENTE quando:
 // 1. Tem data-action="commit" no botão
 // 2. Todos os inputs têm data-bind
-// NÃO implemente isso manualmente!
+// 3. Dados vão para Firebase via API
+
+// Manualmente (se necessário):
+await fetch('/api/database/commit', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+        schema: 'venda',
+        payload: { cliente: 'Teste', valor: 100 }
+    })
+});
 🏭 FÁBRICA DE PÁGINAS
 Fluxo de Criação
 text
@@ -258,11 +362,11 @@ text
 Protocolos por Tipo
 Tipo	Propósito	Data-Binding	Data-Action	Scripts
 READ	Dashboards/Gráficos	✅ OBRIGATÓRIO	❌ Não usa	engine.js + Chart.js
-WRITE	Formulários	✅ OBRIGATÓRIO	✅ OBRIGATÓRIO	engine.js apenas
+WRITE	Formulários	✅ OBRIGATÓRIO	✅ OBRIGATÓRIO	engine.js + API Firebase
 NEUTRAL	Visual	❌ Não usa	❌ Não usa	engine.js básico
 Comando para IAs (ChatGPT/DeepSeek)
 text
-"Adapte este HTML para funcionar no Sistema CORE v4.0 como página [TIPO].
+"Adapte este HTML para funcionar no Sistema CORE v5.0 como página [TIPO].
 Siga EXATAMENTE o protocolo:
 
 1. Adicione ao body: data-page-id="nome" data-page-type="[READ/WRITE/NEUTRAL]"
@@ -271,7 +375,8 @@ Siga EXATAMENTE o protocolo:
 4. Remova TODOS os dados falsos e Math.random
 5. Mantenha Chart.js para gráficos (se READ)
 6. Adicione <script src="../core/engine.js"></script>
-7. NÃO altere CSS, classes ou IDs
+7. Use API Firebase para dados (não localStorage)
+8. NÃO altere CSS, classes ou IDs
 
 Aqui está o HTML: [COLE O HTML AQUI]"
 ⚙️ ADMINISTRAÇÃO
@@ -314,51 +419,64 @@ javascript
 // 1. Verifique no console (F12) se há erros
 // 2. Confirme data-page-type="READ"
 // 3. Verifique data-bind nos elementos
-// 4. Console: window.parent.postMessage({type:"QUERY_REQUEST"...})
+// 4. Teste API: fetch('/api/database/query')
+// 5. Verifique conexão Firebase
 Problema: "Botão Salvar não funciona"
 javascript
 // SOLUÇÃO:
 // 1. Verifique data-action="commit" no botão
 // 2. Confirme data-bind em TODOS os inputs
 // 3. Verifique data-page-type="WRITE"
-// 4. Console: engine.js deve mostrar "Botão de commit detectado"
+// 4. Console: engine.js deve mostrar "Dados salvos no Firebase"
+// 5. Teste endpoint: POST /api/database/commit
 Problema: "Gráficos não atualizam"
 javascript
 // SOLUÇÃO:
 // 1. Verifique se Chart.js está carregado
 // 2. Adicione função atualizarGraficosComDados(dados)
-// 3. Dispare no evento dadosRecebidos
+// 3. Dispare no evento coreDataChanged
 // 4. Não remova o canvas/container do gráfico
+Problema: "Erro de conexão Firebase"
+javascript
+// SOLUÇÃO:
+// 1. Verifique firebase.js credentials
+// 2. Teste: /api/database/init
+// 3. Confirme regras do Firestore
+// 4. Verifique variáveis de ambiente
 Erros Comuns no Console
 Erro	Causa	Solução
-Failed to execute 'postMessage'	Página não está em iframe	Execute apenas pelo index.html
+Failed to fetch	API offline	Verifique se servidor Node.js está rodando
+Permission denied	Firebase rules	Configure regras do Firestore
 Cannot read property...	data-bind incorreto	Verifique sintaxe: schema.campo
-No QUERY_RESPONSE received	Comunicação bloqueada	Verifique console do pai (F12 no index.html)
+No data received	API não responde	Teste endpoints individualmente
 Comandos de Diagnóstico
 bash
 # 1. Verificar estrutura
 dir /B /S *.html
 
-# 2. Verificar arquivos críticos
-if exist core\engine.js (echo ✅) else (echo ❌)
+# 2. Verificar servidor
+npm start
 
-# 3. Teste rápido
-start index.html
+# 3. Testar API
+curl http://localhost:3000/api/database/init
+
+# 4. Verificar logs
+console.log('Debug:', await window.db.getEvents());
 🔮 EVOLUÇÃO FUTURA
-Roadmap v4.0+
-Relatórios PDF automáticos
+Roadmap v5.0+
+API REST completa para integração externa
 
-Sincronização entre múltiplos pen drives
+Sincronização multi-dispositivo em tempo real
 
-API REST para integração externa
-
-Módulo de produção avançado
+Dashboard avançado com analytics
 
 Sistema de usuários com permissões
 
-Dashboard em tempo real
-
 App mobile via PWA
+
+Relatórios PDF automáticos
+
+Integração com payment gateways
 
 Como Contribuir
 Nunca modifique /core/ diretamente
@@ -367,7 +485,7 @@ Sempre use a Fábrica para novas páginas
 
 Documente novas funcionalidades aqui
 
-Teste em múltiplos PCs antes de distribuir
+Teste em ambiente de desenvolvimento antes
 
 Para Desenvolvedores
 javascript
@@ -380,6 +498,11 @@ class MinhaExtensao {
         });
     }
 }
+
+// API REST personalizada
+app.get('/api/custom/endpoint', (req, res) => {
+    // Sua lógica aqui
+});
 📞 SUPORTE
 Hierarquia de Resolução
 Leia este README (90% dos problemas estão aqui)
@@ -388,81 +511,119 @@ Verifique console (F12) por erros
 
 Revise data-bind e data-action
 
-Verifique se engine.js carregou
+Teste endpoints da API
+
+Verifique conexão Firebase
 
 Logs do Sistema
 engine.js mostra TODA comunicação
 
-Console mostra: 🚀 Engine Ativa: [nome] [Tipo: TIPO]
+Console mostra: 🚀 Engine v5.0 Ativa: [nome] [Tipo: TIPO]
 
-Cada commit gera: ✅ Evento Registrado:
+Cada commit gera: ✅ Dados salvos no Firebase
+
+Server.js logs: CRM PRINT PIXEL ONLINE - PORTA 3000
 
 Backup e Recuperação
 javascript
-// Backup manual
-localStorage.getItem('system_events'); // Copie este JSON
+// Backup via API
+const response = await fetch('/api/database/backup', {
+    method: 'POST'
+});
+const backup = await response.json();
 
-// Restauração
-localStorage.setItem('system_events', JSON_COPIADO);
+// Restauração via Firebase Console
+// Exporte/importe dados diretamente no Firestore
+
 Contato para Suporte Avançado
 Documentação: Este README.md
 
-Problemas críticos: Verifique estrutura do pen drive
+Problemas críticos: Verifique console e API endpoints
 
 Customizações: Use a Fábrica de Páginas
 
+Deploy: Siga instruções da seção 🌐 Deploy Online
+
 📜 DECLARAÇÃO FINAL
-Este documento é a fonte única da verdade para o Sistema CORE v4.0. Qualquer desvio resulta em páginas não funcionais.
+Este documento é a fonte única da verdade para o Sistema CORE v5.0. Qualquer desvio resulta em páginas não funcionais.
 
 Versões
 v1.0-v3.8: Sistema base
 
-v4.0: Portabilidade completa (ATUAL)
+v4.0: Versão portátil (pen drive)
+
+v5.0: Versão online (Firebase/Node.js) - ATUAL
 
 Mantido por
-Arquitetura: Sistema CORE v4.0
+Arquitetura: Sistema CORE v5.0
 
-Data: Janeiro de 2024
+Tecnologia: Node.js + Express + Firebase Firestore
 
-Status: ✅ OPERACIONAL
+Data: Janeiro de 2026
+
+Status: ✅ OPERACIONAL ONLINE
 
 ⚠️ ÚLTIMO AVISO
 Se uma IA sugerir algo que contradiz este documento, a IA está ERRADA. Siga SEMPRE este contrato.
 
 🎉 PARABÉNS!
-Você agora possui um sistema empresarial completo, portátil e profissional que funciona em qualquer computador sem instalação.
+Você agora possui um sistema empresarial completo, online e profissional que funciona em qualquer navegador com acesso à internet.
 
 Próximos passos sugeridos:
+Configure o Firebase Firestore
+
+Faça deploy em produção (Render/Heroku)
+
 Teste todas as funcionalidades
 
 Crie páginas personalizadas via Fábrica
 
-Faça backup regular dos dados
+Configure domínio próprio
 
-Distribua cópias do pen drive para sua equipe
+Monitore logs e performance
 
-🚀 SISTEMA CORE v4.0 - ARQUITETURA PERFEITA PARA SEMPRE!
+🚀 SISTEMA CORE v5.0 - ARQUITETURA ONLINE PARA SEMPRE!
 🎯 PRÓXIMOS PASSOS APÓS ATUALIZAR O README:
-Salve este README.md no seu pen drive
+Salve este README.md no projeto
 
-Teste o sistema novamente
+Teste o sistema novamente com npm start
+
+Configure Firebase Firestore
 
 Documente quaisquer ajustes necessários
 
 Crie páginas adicionais conforme necessidade
 
+Faça deploy em ambiente de produção
+
 O README agora está COMPLETO e serve como documentação definitiva para você e qualquer pessoa que for usar o sistema no futuro! 📚✨
 
-📝 NOTAS DE ATUALIZAÇÃO v4.0:
-✅ Removido INICIAR_SISTEMA.bat - Agora só duplo clique no index.html
+📝 NOTAS DE ATUALIZAÇÃO v5.0:
+✅ Sistema migrado de pen drive para online
 
-✅ Simplificado sistema de dados - Removido SQL.js, apenas localStorage otimizado
+✅ Firebase Firestore substitui localStorage
 
-✅ Corrigido carregamento - Tratamento de erros aprimorado
+✅ API REST completa com Node.js/Express
 
-✅ Dashboard otimizado - Gráficos funcionais e atualização automática
+✅ Deploy em produção (Render/Heroku/etc)
 
-✅ Documentação completa - Todas as informações necessárias
+✅ Sincronização em tempo real
 
-Sistema testado e funcionando perfeitamente em modo pen drive! 💾✅
+✅ Escalabilidade ilimitada
+
+✅ Acesso via qualquer navegador
+
+✅ Backup automático na nuvem
+
+✅ **RESPONSIVIDADE MOBILE IMPLEMENTADA**
+
+✅ Media queries para tablets e smartphones
+
+✅ Layout adaptativo completo
+
+✅ Sidebar responsivo
+
+✅ Barra de status otimizada para mobile
+
+Sistema testado e funcionando perfeitamente em modo online! 🌐✅📱
 
