@@ -267,6 +267,77 @@
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255,255,255,0.1);
         }
+        
+        /* RESPONSIVE DESIGN */
+        @media (max-width: 768px) {
+            #sidebar {
+                width: 200px;
+            }
+            
+            #content-area {
+                margin-left: 0;
+            }
+            
+            .status-bar {
+                padding: 6px 10px;
+                font-size: 11px;
+                flex-direction: column;
+                gap: 5px;
+                padding-bottom: 8px;
+            }
+            
+            .status-left {
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 10px;
+            }
+            
+            .status-right {
+                font-size: 10px;
+                text-align: center;
+            }
+            
+            .notification {
+                top: 70px;
+                right: 10px;
+                left: 10px;
+                max-width: none;
+            }
+            
+            #portable-banner {
+                bottom: 60px;
+                right: 10px;
+                left: 10px;
+                border-radius: 12px;
+                justify-content: center;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            #sidebar {
+                width: 180px;
+            }
+            
+            #menu button {
+                padding: 10px 12px;
+                font-size: 13px;
+            }
+            
+            #menu button i {
+                width: 18px;
+                font-size: 14px;
+            }
+            
+            .status-bar {
+                padding: 5px 8px;
+                font-size: 10px;
+            }
+            
+            .notification {
+                top: 65px;
+                padding: 12px 15px;
+            }
+        }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
