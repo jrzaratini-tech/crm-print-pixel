@@ -146,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Auto-refresh a cada 5 segundos
-        setInterval(solicizarDados, 5000);
+        setInterval(solicitarDados, 5000);
         
         // Carregar dados iniciais
         solicitarDados();
