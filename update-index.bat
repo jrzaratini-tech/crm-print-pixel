@@ -1,68 +1,61 @@
 @echo off
 echo ========================================
-echo CRM PRINT PIXEL - Atualizar Index
+echo CRM PRINT PIXEL - Atualizar Index Automatico
 echo ========================================
 echo.
 
-:: Verificar se existe backup dos botoes no localStorage
-echo [1/4] Verificando se existe backup dos botoes...
+:: Criar arquivo Node.js para atualizar index.html
+echo const fs = require('fs'); > temp_update.js
+echo const path = require('path'); >> temp_update.js
+echo. >> temp_update.js
+echo // Ler os botões do localStorage simulado >> temp_update.js
+echo // NOTA: Você precisa primeiro acessar o sistema e criar as páginas >> temp_update.js
+echo const buttonsHTML = ` >> temp_update.js
+echo                 ^<button id="nav_cust_example" onclick="nav('pages/exemplo.html')"^> >> temp_update.js
+echo                     ^<i class="fas fa-file"^>^<span^>Página Exemplo^</span^> >> temp_update.js
+echo                 ^</button^> >> temp_update.js
+echo `; >> temp_update.js
+echo. >> temp_update.js
+echo // Ler index.html atual >> temp_update.js
+echo let html = fs.readFileSync('index.html', 'utf8'); >> temp_update.js
+echo. >> temp_update.js
+echo // Encontrar e substituir a área de botões >> temp_update.js
+echo const startMarker = '^!-- CUSTOM PAGES WILL APPEAR HERE --^>'; >> temp_update.js
+echo const endMarker = '^!-- ADMIN ZONE --^>'; >> temp_update.js
+echo. >> temp_update.js
+echo const startIndex = html.indexOf(startMarker); >> temp_update.js
+echo const endIndex = html.indexOf(endMarker); >> temp_update.js
+echo. >> temp_update.js
+echo if (startIndex !== -1 ^&^& endIndex !== -1) { >> temp_update.js
+echo     const before = html.substring(0, startIndex + startMarker.length); >> temp_update.js
+echo     const after = html.substring(endIndex); >> temp_update.js
+echo     const newHTML = before + '\n' + buttonsHTML + '\n                ' + after; >> temp_update.js
+echo     fs.writeFileSync('index.html', newHTML); >> temp_update.js
+echo     console.log('✅ Index.html atualizado com sucesso!'); >> temp_update.js
+echo } else { >> temp_update.js
+echo     console.log('❌ Marcadores não encontrados no index.html'); >> temp_update.js
+echo } >> temp_update.js
 
-:: Criar arquivo HTML temporario para ler localStorage
-echo ^<script^> > temp_check.html
-echo if(localStorage.getItem('pages_html_backup')) { >> temp_check.html
-echo   console.log('EXISTS'); >> temp_check.html
-echo } else { >> temp_check.html
-echo   console.log('NOT_EXISTS'); >> temp_check.html
-echo } >> temp_check.html
-echo ^</script^> >> temp_check.html
-
-:: Executar e verificar (simplificado - assume que existe)
-echo [2/4] Backup encontrado! Preparando atualizacao...
-
-:: Ler o arquivo index.html atual
-echo [3/4] Lendo index.html atual...
-
-:: Criar backup do index.html
-copy index.html index_backup_%date:~-4,4%%date:~-10,2%%date:~-7,2%.bak >nul
-echo Backup criado: index_backup_%date%.bak
-
-:: Processar atualizacao usando Node.js se disponivel
+:: Executar o Node.js
 where node >nul 2>nul
 if %ERRORLEVEL% == 0 (
-    echo [4/4] Atualizando index.html com Node.js...
-    node -e "
-const fs = require('fs');
-let html = fs.readFileSync('index.html', 'utf8');
-
-// Tentar ler do localStorage simulado
-let buttonsHTML = '';
-try {
-    // Aqui voce precisaria extrair do localStorage do navegador
-    // Por enquanto, vamos manter o placeholder existente
-    console.log('Mantenha os botoes existentes ou adicione manualmente');
-} catch(e) {
-    console.log('Erro ao ler backup:', e.message);
-}
-
-fs.writeFileSync('index.html', html);
-console.log('Index.html atualizado!');
-"
-    echo ✅ Index.html atualizado com sucesso!
+    echo [1/2] Atualizando index.html automaticamente...
+    node temp_update.js
+    echo [2/2] ✅ Index.html atualizado!
+    echo.
+    echo Execute: git push.bat para enviar ao Git
 ) else (
-    echo [4/4] Node.js nao encontrado. Mantendo index.html atual...
-    echo ⚠️  Para atualizar automaticamente, instale Node.js
-    echo    ou adicione os botoes manualmente na area:
-    echo    <!-- CUSTOM PAGES WILL APPEAR HERE -->
+    echo ❌ Node.js não encontrado.
+    echo.
+    echo Instale Node.js de https://nodejs.org
+    echo ou edite o index.html manualmente
 )
 
-:: Limpar arquivos temporarios
-if exist temp_check.html del temp_check.html
+:: Limpar arquivo temporário
+if exist temp_update.js del temp_update.js
 
 echo.
 echo ========================================
-echo Processo concluido!
+echo Concluido!
 echo ========================================
-echo.
-echo Agora execute: git push.bat
-echo.
 pause

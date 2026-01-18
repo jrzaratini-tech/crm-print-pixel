@@ -873,19 +873,20 @@
 `;
                 });
                 
-                // Criar arquivo com os botões para serem incluídos manualmente
-                const blob = new Blob([buttonsHTML], { type: 'text/html' });
+                // Criar arquivo com os botões para download
+                const blob = new Blob([buttonsHTML], { type: 'text/plain' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'botoes_para_index.html';
+                a.download = 'botoes-para-index.txt';
+                a.style.display = 'none';
                 document.body.appendChild(a);
                 a.click();
                 document.body.removeChild(a);
                 URL.revokeObjectURL(url);
                 
-                console.log('✅ Páginas preparadas para Git');
-                showNotification('📄 Arquivo com botões baixado! Cole no index.html após <!-- CUSTOM PAGES WILL APPEAR HERE -->', 'success');
+                console.log('✅ Botões gerados com sucesso!');
+                showNotification('📄 Arquivo "botoes-para-index.txt" baixado! Cole no index.html após <!-- CUSTOM PAGES WILL APPEAR HERE -->', 'success');
                 
                 return true;
             } catch (error) {
