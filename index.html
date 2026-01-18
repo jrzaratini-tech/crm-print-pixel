@@ -435,6 +435,9 @@
                     <button class="btn-admin-item" onclick="nav('admin/admin-fabrica.html')">
                         <i class="fas fa-industry"></i><span>Fábrica</span>
                     </button>
+                    <button class="btn-admin-item" onclick="updatePagesForGit()">
+                        <i class="fas fa-code-branch"></i><span>Gerar Botões para Git</span>
+                    </button>
                 </div>
             </nav>
             
@@ -851,6 +854,52 @@
             await dbManager.updateDataStatus();
         }
 
+        async function savePagesToHTML() {
+            try {
+                const config = systemSettings.menu_config || [];
+                const activePages = config.filter(item => !item.deleted);
+                
+                // Gerar HTML dos botões
+                let buttonsHTML = '';
+                activePages.forEach(item => {
+                    let icon = 'fa-file';
+                    if (item.type === 'READ') icon = 'fa-chart-bar';
+                    if (item.type === 'WRITE') icon = 'fa-edit';
+                    if (item.type === 'NEUTRAL') icon = 'fa-eye';
+                    
+                    buttonsHTML += `                <button id="${item.id}" onclick="nav('${item.file}')">
+                    <i class="fas ${icon}"></i><span>${item.name}</span>
+                </button>
+`;
+                });
+                
+                // Criar arquivo com os botões para serem incluídos manualmente
+                const blob = new Blob([buttonsHTML], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'botoes_para_index.html';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                console.log('✅ Páginas preparadas para Git');
+                showNotification('📄 Arquivo com botões baixado! Cole no index.html após <!-- CUSTOM PAGES WILL APPEAR HERE -->', 'success');
+                
+                return true;
+            } catch (error) {
+                console.error('❌ Erro ao salvar páginas:', error);
+                showNotification('❌ Erro ao preparar páginas', 'error');
+                return false;
+            }
+        }
+
+        // Função para atualizar o HTML quando páginas mudam
+        async function updatePagesForGit() {
+            await savePagesToHTML();
+        }
+
         function setupAutoSave() {
             autoSaveTimer = setInterval(async () => {
                 if (dbManager.initialized) {
@@ -1006,12 +1055,14 @@
                         hidden: false,
                         deleted: false
                     };
-                    
                     systemSettings.menu_config.push(newPageConfig);
                 }
                 
                 await dbManager.saveSetting('menu_config', systemSettings.menu_config);
                 await setupDynamicMenu();
+                
+                // Atualizar botões no index.html para Git
+                await updatePagesForGit();
                 
                 showNotification(`✅ Página "${newPage.name}" registrada com sucesso!`, 'success');
                 
