@@ -1,4 +1,4 @@
-🚀 SISTEMA CORE v5.0 - PLATAFORMA ONLINE DEFINITIVA
+🚀 SISTEMA CORE v5.1 - PLATAFORMA ONLINE OTIMIZADA
 📋 ÍNDICE
 🏆 Visão Geral
 
@@ -27,7 +27,13 @@
 📞 Suporte
 
 🏆 VISÃO GERAL
-O SISTEMA CORE v5.0 é uma plataforma de gestão empresarial 100% online que roda em servidor Node.js com banco de dados Firebase Firestore. Baseado em arquitetura event-sourcing, é imutável, desacoplado e infinitamente extensível.
+O SISTEMA CORE v5.1 é uma plataforma de gestão empresarial 100% online que roda em servidor Node.js com banco de dados Firebase Firestore. Baseado em arquitetura event-sourcing, é imutável, desacoplado e infinitamente extensível.
+
+🔥 **Novidades v5.1:**
+- ✅ Fábrica de páginas otimizada com geração de código de menu
+- ✅ Menu dinâmico reorganizado e centralizado
+- ✅ Sistema limpo e otimizado, remoção de arquivos obsoletos
+- ✅ Estrutura menu/menu.config.js para configuração centralizada
 
 Filosofia Fundadora
 ✅ Separação total: Interface vs Lógica de Dados
@@ -125,6 +131,9 @@ CRM_PRINT_PIXEL/
 │   ├── engine.js             # 🔌 Motor de Comunicação v5.0
 │   ├── database.js           # 🗄️ Camada de Dados Firebase
 │   └── config.js             # ⚙️ Configurações Online
+│
+├── 📂 menu/                  # 🎯 CONFIGURAÇÃO DO MENU
+│   └── menu.config.js       # ⚙️ Botões e ordem do menu dinâmico
 │
 ├── 📂 pages/                  # 📂 TODAS AS TELAS
 │   ├── dashboard.html        # 📊 Dashboard Principal
@@ -349,19 +358,38 @@ await fetch('/api/database/commit', {
         payload: { cliente: 'Teste', valor: 100 }
     })
 });
-🏭 FÁBRICA DE PÁGINAS
-Fluxo de Criação
-text
-[PASSO 1] → Preencha: Nome, Arquivo, Tipo
-[PASSO 2] → Fábrica registra no menu
-[PASSO 3] → Gera Protocolo específico
-[PASSO 4] → Entrega Protocolo + Template para IA
-[PASSO 5] → IA devolve código adaptado
-[PASSO 6] → Salva em /pages/nome.html
-[PASSO 7] → Sistema reconhece automaticamente
-Protocolos por Tipo
-Tipo	Propósito	Data-Binding	Data-Action	Scripts
-READ	Dashboards/Gráficos	✅ OBRIGATÓRIO	❌ Não usa	engine.js + Chart.js
+🏭 FÁBRICA DE PÁGINAS v5.1
+Criar Novas Páginas em 3 Passos
+
+1. **Acessar:** admin/admin-fabrica.html
+2. **Preencher:** Nome no Menu, Nome do Arquivo, Tipo (WRITE/READ/NEUTRAL)
+3. **Gerar Código:** Clique em "Gerar Código Botão"
+
+**Como Adicionar ao Menu:**
+```javascript
+// Copie o código gerado e cole em menu/menu.config.js
+{
+  id: "nav_nomepagina",
+  name: "Nome da Página",
+  file: "pages/nomepagina.html", 
+  type: "WRITE", // ou READ/NEUTRAL
+  pos: 10,
+  hidden: false,
+  deleted: false
+},
+```
+
+**Tipos de Página:**
+- **WRITE:** Formulários e cadastros (inputs + botão salvar)
+- **READ:** Dashboards e relatórios (apenas exibição de dados)
+- **NEUTRAL:** Páginas informativas ou configurações
+
+**Exemplo Prático:**
+1. Preencha: "Clientes", "clientes", "WRITE"
+2. Clique em "Gerar Código Botão"
+3. Copie o código para menu/menu.config.js
+4. Crie o HTML manualmente ou com IA usando o prompt gerado
+5. Recarregue o sistema para ver no menu + Chart.js
 WRITE	Formulários	✅ OBRIGATÓRIO	✅ OBRIGATÓRIO	engine.js + API Firebase
 NEUTRAL	Visual	❌ Não usa	❌ Não usa	engine.js básico
 Comando para IAs (ChatGPT/DeepSeek)
@@ -552,7 +580,9 @@ v1.0-v3.8: Sistema base
 
 v4.0: Versão portátil (pen drive)
 
-v5.0: Versão online (Firebase/Node.js) - ATUAL
+v5.0: Versão online (Firebase/Node.js)
+
+v5.1: Versão otimizada e limpa - ATUAL
 
 Mantido por
 Arquitetura: Sistema CORE v5.0
@@ -627,3 +657,4 @@ O README agora está COMPLETO e serve como documentação definitiva para você 
 
 Sistema testado e funcionando perfeitamente em modo online! 🌐✅📱
 
+n]ao pare
