@@ -964,22 +964,6 @@
                 transform: scale(1.05);
             }
             
-            .mobile-overlay {
-                display: none;
-                position: fixed;
-                top: 0;
-                left: 0;
-                right: 0;
-                bottom: 0;
-                background: rgba(0,0,0,0.5);
-                z-index: 999;
-                backdrop-filter: blur(4px);
-            }
-            
-            .mobile-overlay.active {
-                display: block;
-            }
-            
             .dashboard-header {
                 padding: 12px 15px;
             }
@@ -1230,14 +1214,6 @@
             <div class="date-info" id="currentDate">Carregando...</div>
         </div>
     </div>
-
-    <!-- MOBILE MENU TOGGLE -->
-    <button class="mobile-menu-toggle" id="mobileMenuToggle" onclick="toggleMobileMenu()">
-        <i class="fas fa-bars"></i>
-    </button>
-    
-    <!-- MOBILE OVERLAY -->
-    <div class="mobile-overlay" id="mobileOverlay" onclick="closeMobileMenu()"></div>
 
     <!-- ============================================
          CONTEÚDO PRINCIPAL
@@ -1499,27 +1475,6 @@
         // ============================================
         // INICIALIZAÇÃO
         // ============================================
-        
-        // Funções do Menu Mobile
-        function toggleMobileMenu() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('mobileOverlay');
-            
-            if (sidebar && overlay) {
-                sidebar.classList.toggle('mobile-open');
-                overlay.classList.toggle('active');
-            }
-        }
-        
-        function closeMobileMenu() {
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('mobileOverlay');
-            
-            if (sidebar && overlay) {
-                sidebar.classList.remove('mobile-open');
-                overlay.classList.remove('active');
-            }
-        }
         
         document.addEventListener('DOMContentLoaded', function() {
             console.log('📊 Dashboard inicializando...');
