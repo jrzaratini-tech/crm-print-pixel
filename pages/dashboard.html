@@ -331,21 +331,23 @@
         /* ============================================
            MOBILE MENU TOGGLE - ADICIONADO
            ============================================ */
+        
+        /* Menu mobile - Aparece apenas em dispositivos móveis */
         .mobile-menu-toggle {
-            display: none;
+            display: none; /* Oculto por padrão no desktop */
             position: fixed;
-            top: 20px;
-            left: 20px;
-            z-index: 1001;
+            top: 15px;
+            left: 15px;
+            z-index: 1000;
             background: var(--primary-color);
             color: white;
             border: none;
-            width: 50px;
-            height: 50px;
-            border-radius: 12px;
+            width: 45px;
+            height: 45px;
+            border-radius: 10px;
             cursor: pointer;
-            font-size: 20px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            font-size: 18px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
             transition: all 0.3s;
         }
         
@@ -1976,10 +1978,12 @@
                         if (isAdmin) {
                             editMetaBtn.style.display = 'inline-flex';
                             editMetaBtn.style.visibility = 'visible';
+                            editMetaBtn.style.opacity = '1';
                             console.log('✅ Botão de edição de meta visível (modo admin)');
                         } else {
                             editMetaBtn.style.display = 'none';
                             editMetaBtn.style.visibility = 'hidden';
+                            editMetaBtn.style.opacity = '0';
                             console.log('🔒 Botão de edição de meta oculto (modo usuário)');
                         }
                     }
@@ -1990,6 +1994,7 @@
                     if (event.data.type === 'ADMIN_STATUS_RESPONSE') {
                         const isAdmin = event.data.isAdmin;
                         atualizarVisibilidadeBotao(isAdmin);
+                        console.log('📨 Status admin recebido:', isAdmin);
                     }
                 });
                 
@@ -1998,14 +2003,14 @@
                     if (window.parent && window.parent.postMessage) {
                         window.parent.postMessage({ type: 'ADMIN_STATUS_REQUEST' }, '*');
                     }
-                }, 500);
+                }, 100);
                 
-                // Verificar periodicamente (a cada 2 segundos) por segurança
+                // Verificar periodicamente (a cada 1 segundo) por segurança
                 setInterval(() => {
                     if (window.parent && window.parent.postMessage) {
                         window.parent.postMessage({ type: 'ADMIN_STATUS_REQUEST' }, '*');
                     }
-                }, 2000);
+                }, 1000);
             }
             
             // Atualizar período
