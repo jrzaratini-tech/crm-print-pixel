@@ -2180,7 +2180,21 @@
                 // CORREÇÃO 2: Atualizar despesas corretamente
                 if (elementoDespesas) {
                     elementoDespesas.textContent = formatarMoeda(dados.despesas.total);
-                    console.error('❌ Elemento meta diária não encontrado!');
+                    console.log('✅ Despesas atualizado:', formatarMoeda(dados.despesas.total));
+                }
+                
+                // NOVO: Atualizar pedidos
+                const elementoPedidosAtivos = document.querySelector('[data-bind="pedidos.ativos"]');
+                const elementoPedidosConcluidos = document.querySelector('[data-bind="pedidos.concluidos"]');
+                
+                if (elementoPedidosAtivos) {
+                    elementoPedidosAtivos.textContent = dados.pedidos.ativos;
+                    console.log('✅ Pedidos ativos atualizado:', dados.pedidos.ativos);
+                }
+                
+                if (elementoPedidosConcluidos) {
+                    elementoPedidosConcluidos.textContent = `${dados.pedidos.concluidos}/${dados.pedidos.total}`;
+                    console.log('✅ Pedidos concluídos atualizado:', `${dados.pedidos.concluidos}/${dados.pedidos.total}`);
                 }
                 
                 // NOVO: Atualizar display de dias úteis
@@ -2434,6 +2448,12 @@
                 
                 // Forçar solicitação inicial após 1 segundo
                 setTimeout(solicitarDadosAoCore, 1000);
+                
+                // NOVO: Forçar atualização imediata para teste
+                setTimeout(() => {
+                    console.log('🔄 Forçando atualização imediata para teste...');
+                    solicitarDadosAoCore();
+                }, 2000);
             });
     </script>
     
