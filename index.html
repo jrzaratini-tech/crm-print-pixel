@@ -354,29 +354,10 @@
             }
         }
         
-        @media (max-width: 480px) {
-            #sidebar {
-                width: 180px;
-            }
-            
-            #menu button {
-                padding: 10px 12px;
-                font-size: 13px;
-            }
-            
-            #menu button i {
-                width: 18px;
-                font-size: 14px;
-            }
-            
-            .status-bar {
-                padding: 5px 8px;
-                font-size: 10px;
-            }
-            
-            .notification {
-                top: 65px;
-                padding: 12px 15px;
+        @media (max-width: 576px) {
+            /* Ativar menu mobile apenas em smartphones */
+            .mobile-menu-toggle {
+                display: flex !important;
             }
         }
     </style>
@@ -434,9 +415,6 @@
                     </button>
                     <button class="btn-admin-item" onclick="nav('admin/admin-fabrica.html')">
                         <i class="fas fa-industry"></i><span>Fábrica</span>
-                    </button>
-                    <button class="btn-admin-item" onclick="updatePagesForGit()">
-                        <i class="fas fa-code-branch"></i><span>Gerar Botões para Git</span>
                     </button>
                 </div>
             </nav>
@@ -896,11 +874,6 @@
             }
         }
 
-        // Função para atualizar o HTML quando páginas mudam
-        async function updatePagesForGit() {
-            await savePagesToHTML();
-        }
-
         function setupAutoSave() {
             autoSaveTimer = setInterval(async () => {
                 if (dbManager.initialized) {
@@ -928,6 +901,11 @@
             currentPage = pageName.toLowerCase();
             
             console.log(`🌐 Navegando para: ${url}`);
+            
+            // Aguardar o iframe carregar e então notificar status admin
+            setTimeout(() => {
+                notifyAllFramesAdminStatus(isAdmin);
+            }, 1000);
         }
 
         // MOBILE MENU FUNCTIONS
@@ -1007,6 +985,9 @@
                     
                     showNotification('🔓 Modo Administrador ATIVADO', 'success');
                     console.log("🔓 Modo Admin ATIVADO");
+                    
+                    // Notificar todos os iframes sobre mudança de status
+                    notifyAllFramesAdminStatus(true);
                 } else {
                     showNotification('❌ PIN incorreto!', 'error');
                 }
@@ -1020,6 +1001,21 @@
                 
                 showNotification('🔐 Modo Administrador DESATIVADO', 'info');
                 console.log("🔐 Modo Admin DESATIVADO");
+                
+                // Notificar todos os iframes sobre mudança de status
+                notifyAllFramesAdminStatus(false);
+            }
+        }
+        
+        // Função para notificar todos os iframes sobre status admin
+        function notifyAllFramesAdminStatus(isAdminStatus) {
+            const iframe = document.getElementById('content-area');
+            if (iframe && iframe.contentWindow) {
+                iframe.contentWindow.postMessage({
+                    type: 'ADMIN_STATUS_RESPONSE',
+                    isAdmin: isAdminStatus
+                }, '*');
+                console.log('📤 Status admin enviado para iframe:', isAdminStatus);
             }
         }
 
@@ -1062,9 +1058,6 @@
                 await dbManager.saveSetting('menu_config', systemSettings.menu_config);
                 await setupDynamicMenu();
                 
-                // Atualizar botões no index.html para Git
-                await updatePagesForGit();
-                
                 showNotification(`✅ Página "${newPage.name}" registrada com sucesso!`, 'success');
                 
                 if (event.source && event.source.postMessage) {
@@ -1073,6 +1066,20 @@
                         pageId: existingPage ? existingPage.id : "nav_cust_" + Date.now(),
                         message: "Página registrada com sucesso!"
                     }, "*");
+                }
+            }
+            
+            if (event.data.type === "QUERY_REQUEST") {
+                console.log("📥 QUERY_REQUEST recebido de:", event.data.source);
+                const activeData = await dbManager.getEvents();
+                
+                if (event.source && event.source.postMessage) {
+                    event.source.postMessage({ 
+                        type: "QUERY_RESPONSE", 
+                        data: activeData,
+                        source: "core-system"
+                    }, "*");
+                    console.log("📤 QUERY_RESPONSE enviado com", activeData.length, "registros");
                 }
             }
             
@@ -1098,20 +1105,6 @@
                 }
                 
                 showNotification(`✅ ${event.data.schema} salvo com sucesso!`, 'success');
-            }
-            
-            if (event.data.type === "QUERY_REQUEST") {
-                console.log("📥 QUERY_REQUEST recebido de:", event.data.source);
-                const activeData = await dbManager.getEvents();
-                
-                if (event.source && event.source.postMessage) {
-                    event.source.postMessage({ 
-                        type: "QUERY_RESPONSE", 
-                        data: activeData,
-                        source: "core-system"
-                    }, "*");
-                    console.log("📤 QUERY_RESPONSE enviado com", activeData.length, "registros");
-                }
             }
             
             if (event.data.type === "DELETE_EVENT") {

@@ -715,230 +715,41 @@
         }
         
         /* ============================================
-           ESTILOS PARA META INTERATIVA
+           GRÁFICO DE PONTO DE EQUILÍBRIO
            ============================================ */
-        .edit-meta-btn {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: white;
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
-            cursor: pointer;
-            display: none; /* Oculto por padrão, visível apenas para admins */
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-            transition: all 0.3s;
-            margin-left: 8px;
-        }
-        
-        .edit-meta-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-            transform: scale(1.1);
-        }
-        
-        .interactive-indicator {
-            width: 20px;
-            height: 20px;
-            border-radius: 50%;
-            background: linear-gradient(135deg, var(--warning-color), #ffb74d);
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 10px;
-            margin-left: auto;
-            animation: rotate 2s linear infinite;
-            cursor: help;
-        }
-        
-        @keyframes rotate {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-        }
-        
-        /* ============================================
-           ESTILOS DO MODAL
-           ============================================ */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(5px);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 10000;
-            animation: fadeIn 0.3s ease;
-        }
-        
-        .modal-overlay.show {
-            display: flex;
-        }
-        
-        .modal-content {
-            background: white;
+        .equilibrium-chart-container {
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
             border-radius: 16px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            max-width: 450px;
-            width: 90%;
-            max-height: 90vh;
-            overflow: auto;
-            animation: slideUp 0.3s ease;
+            padding: 25px;
+            border: 1px solid #e9ecef;
+            margin-bottom: 25px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
         }
         
-        @keyframes slideUp {
-            from {
-                transform: translateY(50px);
-                opacity: 0;
-            }
-            to {
-                transform: translateY(0);
-                opacity: 1;
-            }
-        }
-        
-        .modal-header {
+        .equilibrium-chart-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            padding: 25px 25px 20px;
-            border-bottom: 1px solid #e9ecef;
+            margin-bottom: 20px;
         }
         
-        .modal-header h3 {
-            margin: 0;
-            font-size: 20px;
-            font-weight: 700;
+        .equilibrium-chart-title {
+            font-size: 16px;
+            font-weight: 600;
             color: var(--primary-color);
             display: flex;
             align-items: center;
             gap: 10px;
         }
         
-        .modal-close {
-            background: none;
-            border: none;
-            color: var(--text-secondary);
-            font-size: 20px;
-            cursor: pointer;
-            width: 36px;
-            height: 36px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s ease;
-        }
-        
-        .modal-close:hover {
-            background: #f8f9fa;
-            color: var(--danger-color);
-        }
-        
-        .modal-body {
-            padding: 25px;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: 8px;
-            font-weight: 600;
-            color: var(--text-primary);
-            font-size: 14px;
-        }
-        
-        .form-group input {
-            width: 100%;
-            padding: 12px 16px;
-            border: 2px solid #e9ecef;
-            border-radius: 8px;
-            font-size: 16px;
-            transition: all 0.3s ease;
-            background: #f8f9fa;
-        }
-        
-        .form-group input:focus {
-            outline: none;
-            border-color: var(--info-color);
+        .equilibrium-chart-wrapper {
+            height: 300px;
+            position: relative;
             background: white;
-            box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
-        }
-        
-        .form-info {
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
+            border-radius: 12px;
             padding: 15px;
-            background: linear-gradient(135deg, #e3f2fd, #f8f9fa);
-            border-radius: 8px;
-            border-left: 4px solid var(--info-color);
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.05);
         }
-        
-        .form-info i {
-            color: var(--info-color);
-            font-size: 16px;
-            margin-top: 2px;
-        }
-        
-        .form-info span {
-            font-size: 13px;
-            color: var(--text-secondary);
-            line-height: 1.5;
-        }
-        
-        .modal-footer {
-            display: flex;
-            gap: 12px;
-            justify-content: flex-end;
-            padding: 20px 25px 25px;
-            border-top: 1px solid #e9ecef;
-        }
-        
-        .btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: 14px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.3s ease;
-        }
-        
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-        }
-        
-        .btn-primary {
-            background: var(--info-color);
-            color: white;
-        }
-        
-        .btn-primary:hover {
-            background: #1976d2;
-        }
-        
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-        }
-        
-        .btn-secondary:hover {
-            background: #5a6268;
-        }
-        
                 
         /* ============================================
            FOOTER SIMPLIFICADO
@@ -1168,7 +979,8 @@
                 font-size: 16px;
             }
             
-            /* Ativar menu mobile em tablets */
+        /* Ativar menu mobile apenas em smartphones */
+        @media (max-width: 576px) {
             .mobile-menu-toggle {
                 display: flex;
                 position: fixed;
@@ -1188,7 +1000,7 @@
             }
             
             .mobile-menu-toggle:hover {
-                background: var(--accent-color);
+                background: var(--secondary-color);
                 transform: scale(1.05);
             }
             
@@ -1207,9 +1019,7 @@
             .mobile-overlay.active {
                 display: block;
             }
-        }
-        
-        @media (max-width: 576px) {
+            
             .dashboard-header {
                 padding: 12px 15px;
             }
@@ -1457,10 +1267,6 @@
                 <i class="fas fa-eye"></i>
             </button>
             
-            <button class="mobile-menu-toggle" id="mobileMenuToggle" onclick="toggleMobileMenu()">
-                <i class="fas fa-bars"></i>
-            </button>
-            
             <div class="date-info" id="currentDate">Carregando...</div>
         </div>
     </div>
@@ -1547,15 +1353,25 @@
                 </div>
             </div>
             
+            <!-- GRÁFICO DE PONTO DE EQUILÍBRIO -->
+            <div class="equilibrium-chart-container">
+                <div class="equilibrium-chart-header">
+                    <div class="equilibrium-chart-title">
+                        <i class="fas fa-chart-line"></i>
+                        Ponto de Equilíbrio Visual
+                    </div>
+                </div>
+                <div class="equilibrium-chart-wrapper">
+                    <canvas id="equilibriumChart"></canvas>
+                </div>
+            </div>
+            
             <div class="equilibrium-metrics">
                 <div class="metric-row">
                     <div class="metric-item primary">
                         <div class="metric-header-item">
                             <i class="fas fa-bullseye"></i>
                             <span>Meta Mensal</span>
-                            <button class="edit-meta-btn" id="editMetaBtn" title="Editar meta mensal">
-                                <i class="fas fa-edit"></i>
-                            </button>
                         </div>
                         <div class="metric-value-item" id="metaDisplay">€0,00</div>
                         <div class="metric-detail">Objetivo a atingir</div>
@@ -1716,36 +1532,6 @@
         <!-- FOOTER SIMPLIFICADO -->
         <div class="dashboard-footer">
             <p>PrintPixel Dashboard &copy; 2026 - Sistema de Gestão Online</p>
-        </div>
-    </div>
-
-    <!-- MODAL DE EDIÇÃO DE META -->
-    <div class="modal-overlay" id="metaModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3><i class="fas fa-bullseye"></i> Editar Meta Mensal</h3>
-                <button class="modal-close" id="closeMetaModal">
-                    <i class="fas fa-times"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label for="novaMeta">Nova Meta Mensal (€)</label>
-                    <input type="number" id="novaMeta" min="0" step="100" placeholder="Digite a nova meta...">
-                </div>
-                <div class="form-info">
-                    <i class="fas fa-info-circle"></i>
-                    <span>A meta será usada para calcular automaticamente a meta diária baseada nos dias úteis restantes.</span>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" id="cancelMetaBtn">
-                    <i class="fas fa-times"></i> Cancelar
-                </button>
-                <button class="btn btn-primary" id="saveMetaBtn">
-                    <i class="fas fa-save"></i> Salvar Meta
-                </button>
-            </div>
         </div>
     </div>
 
@@ -1961,56 +1747,21 @@
             
             // Carregar meta personalizada do localStorage
             function carregarMetaPersonalizada() {
-                const metaSalva = localStorage.getItem('dashboard_meta_mensal');
-                if (metaSalva && !isNaN(parseFloat(metaSalva))) {
-                    metaMensalPersonalizada = parseFloat(metaSalva);
-                    console.log('✅ Meta personalizada carregada:', metaMensalPersonalizada);
-                }
-            }
-            
-            // Verificar se está em modo administrador e mostrar/ocultar botão de edição
-            function verificarModoAdmin() {
-                const editMetaBtn = document.getElementById('editMetaBtn');
+                // Meta estática definida em €10.000
+                metaMensalPersonalizada = 10000;
+                console.log('✅ Meta estática definida:', metaMensalPersonalizada);
                 
-                // Função para atualizar visibilidade do botão
-                function atualizarVisibilidadeBotao(isAdmin) {
-                    if (editMetaBtn) {
-                        if (isAdmin) {
-                            editMetaBtn.style.display = 'inline-flex';
-                            editMetaBtn.style.visibility = 'visible';
-                            editMetaBtn.style.opacity = '1';
-                            console.log('✅ Botão de edição de meta visível (modo admin)');
-                        } else {
-                            editMetaBtn.style.display = 'none';
-                            editMetaBtn.style.visibility = 'hidden';
-                            editMetaBtn.style.opacity = '0';
-                            console.log('🔒 Botão de edição de meta oculto (modo usuário)');
-                        }
-                    }
+                // Atualizar imediatamente o display da meta
+                const metaDisplay = document.getElementById('metaDisplay');
+                if (metaDisplay) {
+                    metaDisplay.textContent = '€10.000,00';
                 }
                 
-                // Verificar se o sistema principal está em modo admin
-                window.addEventListener('message', function(event) {
-                    if (event.data.type === 'ADMIN_STATUS_RESPONSE') {
-                        const isAdmin = event.data.isAdmin;
-                        atualizarVisibilidadeBotao(isAdmin);
-                        console.log('📨 Status admin recebido:', isAdmin);
-                    }
-                });
-                
-                // Solicitar status admin imediatamente ao carregar
-                setTimeout(() => {
-                    if (window.parent && window.parent.postMessage) {
-                        window.parent.postMessage({ type: 'ADMIN_STATUS_REQUEST' }, '*');
-                    }
-                }, 100);
-                
-                // Verificar periodicamente (a cada 1 segundo) por segurança
-                setInterval(() => {
-                    if (window.parent && window.parent.postMessage) {
-                        window.parent.postMessage({ type: 'ADMIN_STATUS_REQUEST' }, '*');
-                    }
-                }, 1000);
+                // Atualizar label target no progresso
+                const labelTarget = document.querySelector('[data-bind="equilibrio.meta"]');
+                if (labelTarget) {
+                    labelTarget.textContent = '€10.000,00';
+                }
             }
             
             // Atualizar período
@@ -2514,46 +2265,6 @@
                 // CORREÇÃO 2: Atualizar despesas corretamente
                 if (elementoDespesas) {
                     elementoDespesas.textContent = formatarMoeda(dados.despesas.total);
-                    console.log('✅ DESPESAS ATUALIZADA CORRETAMENTE:', formatarMoeda(dados.despesas.total));
-                }
-                
-                document.querySelector('[data-bind="vendas.variacao"]').textContent = formatarPercentual(dados.vendas.variacao);
-                document.querySelector('[data-bind="lucro.margem"]').textContent = `${dados.lucro.margem}%`;
-                document.querySelector('[data-bind="despesas.variacao"]').textContent = formatarPercentual(dados.despesas.variacao);
-                
-                document.querySelector('[data-bind="pedidos.ativos"]').textContent = dados.pedidos.ativos;
-                document.querySelector('[data-bind="pedidos.concluidos"]').textContent = `${dados.pedidos.concluidos}/${dados.pedidos.total}`;
-                
-                // Atualizar ponto de equilíbrio - VERSÃO PROFISSIONAL COM META INTERATIVA
-                // Atualizar display da meta mensal
-                const metaDisplay = document.getElementById('metaDisplay');
-                if (metaDisplay) {
-                    metaDisplay.textContent = formatarMoeda(dados.equilibrio.meta);
-                }
-                
-                document.querySelector('[data-bind="equilibrio.atingido"]').textContent = formatarMoeda(dados.equilibrio.atingido);
-                document.querySelector('[data-bind="equilibrio.percentual"]').textContent = `${dados.equilibrio.percentual}%`;
-                
-                // Atualizar meta diária DINÂMICA com informações detalhadas
-                const metaDiariaDisplay = document.getElementById('metaDiariaDisplay');
-                if (metaDiariaDisplay) {
-                    const valorFormatado = formatarMoeda(dados.equilibrio.metaDiaria);
-                    metaDiariaDisplay.textContent = valorFormatado;
-                    
-                    // Forçar atualização visual (combate cache)
-                    metaDiariaDisplay.style.display = 'none';
-                    setTimeout(() => {
-                        metaDiariaDisplay.style.display = 'block';
-                    }, 10);
-                    
-                    console.log('✅ Meta diária DINÂMICA calculada:', valorFormatado);
-                    console.log('📅 Dias úteis no mês:', dados.equilibrio.diasUteis);
-                    console.log('📅 Dias úteis passados:', dados.equilibrio.diasUteisPassados);
-                    console.log('🔢 Valor da meta diária dinâmica:', dados.equilibrio.metaDiaria);
-                    
-                    // Adicionar tooltip ou informação adicional
-                    metaDiariaDisplay.title = `Meta dinâmica baseada no progresso atual\nFatura: ${formatarMoeda(dados.equilibrio.atingido)}\nFalta: ${formatarMoeda(Math.max(0, dados.equilibrio.meta - dados.equilibrio.atingido))}\nDias restantes: ${dados.equilibrio.diasUteis - dados.equilibrio.diasUteisPassados}`;
-                } else {
                     console.error('❌ Elemento meta diária não encontrado!');
                 }
                 
@@ -2617,7 +2328,7 @@
                 // Atualizar label da meta com informações de dias úteis
                 const metaLabel = document.querySelector('.progress-labels .label-target');
                 if (metaLabel) {
-                    metaLabel.textContent = formatarMoeda(dados.equilibrio.meta);
+                    metaLabel.textContent = formatarMoeda(metaMensalPersonalizada);
                 }
                 
                 // NOVO: Atualizar label de progresso atual
@@ -2630,9 +2341,14 @@
                 const dailyMetaDetail = document.getElementById('dailyMetaDetail');
                 if (dailyMetaDetail) {
                     const diasUteisRestantes = dados.equilibrio.diasUteis - dados.equilibrio.diasUteisPassados;
-                    const faltaParaMeta = Math.max(0, dados.equilibrio.meta - dados.equilibrio.atingido);
+                    const faltaParaMeta = Math.max(0, metaMensalPersonalizada - dados.equilibrio.atingido);
                     dailyMetaDetail.textContent = `${diasUteisRestantes} dias restantes`;
                     dailyMetaDetail.title = `Meta diária: ${formatarMoeda(dados.equilibrio.metaDiaria)}\nFalta para meta: ${formatarMoeda(faltaParaMeta)}\nDias úteis restantes: ${diasUteisRestantes}`;
+                }
+                
+                const progressPercentage = document.querySelector('.progress-percentage');
+                if (progressPercentage) {
+                    progressPercentage.textContent = `${Math.min(100, Math.max(0, (dados.equilibrio.atingido / metaMensalPersonalizada) * 100)).toFixed(1)}%`;
                 }
             }
             
@@ -2705,136 +2421,6 @@
                                 labels: {
                                     padding: 20,
                                     font: { size: 13 },
-                                    color: '#333'
-                                }
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        const value = context.parsed || context.raw || 0;
-                                        return `${context.label}: €${value.toLocaleString('pt-PT', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-                                    }
-                                }
-                            }
-                        }
-                    }
-                });
-
-                // Gráfico de Tendência Mensal (agora com vendas e despesas)
-                const trendCtx = document.getElementById('monthlyTrendChart');
-                charts.monthlyTrend = new Chart(trendCtx, {
-                    type: 'line',
-                    data: {
-                        labels: [],
-                        datasets: [
-                            {
-                                label: 'Vendas',
-                                data: [],
-                                borderColor: '#4CAF50',
-                                backgroundColor: 'rgba(76, 175, 80, 0.1)',
-                                borderWidth: 3,
-                                fill: true,
-                                tension: 0.4,
-                                pointRadius: 4,
-                                pointHoverRadius: 6,
-                                pointBackgroundColor: '#4CAF50'
-                            },
-                            {
-                                label: 'Despesas',
-                                data: [],
-                                borderColor: '#9C27B0',
-                                backgroundColor: 'rgba(156, 39, 176, 0.1)',
-                                borderWidth: 3,
-                                fill: true,
-                                tension: 0.4,
-                                pointRadius: 4,
-                                pointHoverRadius: 6,
-                                pointBackgroundColor: '#9C27B0'
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'top',
-                                labels: {
-                                    padding: 20,
-                                    font: { size: 14 }
-                                }
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        const value = context.parsed.y || context.raw || 0;
-                                        return `${context.dataset.label}: €${value.toLocaleString('pt-PT', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-                                    }
-                                }
-                            }
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                grid: { color: 'rgba(0,0,0,0.05)' },
-                                ticks: {
-                                    callback: function(value) {
-                                        return '€' + value.toLocaleString('pt-PT');
-                                    }
-                                }
-                            },
-                            x: {
-                                grid: { display: false }
-                            }
-                        }
-                    }
-                });
-
-                // NOVO GRÁFICO: Despesas vs Faturamento (últimos 12 meses)
-                const yearlyCtx = document.getElementById('yearlyComparisonChart');
-                charts.yearlyComparison = new Chart(yearlyCtx, {
-                    type: 'bar',
-                    data: {
-                        labels: [],
-                        datasets: [
-                            {
-                                label: 'Faturamento',
-                                data: [],
-                                backgroundColor: 'rgba(76, 175, 80, 0.7)',
-                                borderColor: '#4CAF50',
-                                borderWidth: 1,
-                                borderRadius: 4,
-                                maxBarThickness: 30
-                            },
-                            {
-                                label: 'Despesas',
-                                data: [],
-                                backgroundColor: 'rgba(156, 39, 176, 0.7)',
-                                borderColor: '#9C27B0',
-                                borderWidth: 1,
-                                borderRadius: 4,
-                                maxBarThickness: 30
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                position: 'top',
-                                labels: {
-                                    padding: 20,
-                                    font: { size: 14 }
-                                }
-                            },
-                            tooltip: {
-                                callbacks: {
-                                    label: function(context) {
-                                        const value = context.parsed.y || context.raw || 0;
-                                        return `${context.dataset.label}: €${value.toLocaleString('pt-PT', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-                                    }
-                                }
                             }
                         },
                         scales: {
@@ -2920,8 +2506,10 @@
                 // Carregar meta personalizada
                 carregarMetaPersonalizada();
                 
-                // Verificar modo administrador
-                verificarModoAdmin();
+                // Criar gráfico de equilíbrio
+                setTimeout(() => {
+                    criarEquilibrioChart();
+                }, 500);
                 
                 // Configurar event listeners
                 configurarEventListeners();
