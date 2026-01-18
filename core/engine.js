@@ -132,6 +132,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     const result = await response.json();
                     const events = result.events || [];
                     atualizarInterface(events);
+                    
+                    // Enviar dados para o dashboard via postMessage
+                    if (pageId === 'dashboard') {
+                        window.postMessage({
+                            type: "QUERY_RESPONSE",
+                            data: events
+                        }, "*");
+                    }
                 } else {
                     console.error('❌ Erro ao buscar dados do Firebase');
                 }
@@ -139,6 +147,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('❌ Erro ao carregar dados do Firebase:', error);
             }
         };
+
+        // Handler para receber mensagens do dashboard
+        window.addEventListener("message", function(event) {
+            if (event.data.type === "QUERY_REQUEST") {
+                console.log('📨 QUERY_REQUEST recebido do dashboard');
+                solicitarDados();
+            }
+        });
 
         // Handler para receber dados (compatibilidade)
         window.addEventListener('coreDataChanged', () => {
