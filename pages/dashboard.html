@@ -328,6 +328,48 @@
             gap: 30px;
         }
         
+        /* ============================================
+           MOBILE MENU TOGGLE - ADICIONADO
+           ============================================ */
+        .mobile-menu-toggle {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1001;
+            background: var(--primary-color);
+            color: white;
+            border: none;
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            transition: all 0.3s;
+        }
+        
+        .mobile-menu-toggle:hover {
+            background: var(--accent-color);
+            transform: scale(1.05);
+        }
+        
+        .mobile-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 99;
+            backdrop-filter: blur(4px);
+        }
+        
+        .mobile-overlay.active {
+            display: block;
+        }
+        
         .dashboard-chart-box {
             background: var(--card-bg);
             border-radius: var(--radius-md);
@@ -368,83 +410,532 @@
         }
         
         /* ============================================
-           EQUILIBRIUM POINT CARD
+           EQUILIBRIUM POINT CARD - PROFESSIONAL DESIGN
            ============================================ */
         .equilibrium-card {
             background: var(--card-bg);
             border-radius: var(--radius-md);
-            padding: 30px;
-            box-shadow: var(--shadow-md);
+            padding: 35px;
+            box-shadow: var(--shadow-lg);
             margin-bottom: 40px;
             border-top: 4px solid var(--info-color);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .equilibrium-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--info-color), var(--secondary-color), var(--primary-color));
+            opacity: 0.8;
         }
         
         .equilibrium-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 25px;
+            margin-bottom: 30px;
         }
         
         .equilibrium-title {
-            font-size: 20px;
+            font-size: 24px;
             font-weight: 700;
             color: var(--primary-color);
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 15px;
         }
         
-        .equilibrium-stats {
+        .equilibrium-title i {
+            font-size: 28px;
+            background: linear-gradient(135deg, var(--info-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .equilibrium-status {
             display: flex;
-            gap: 30px;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            background: rgba(33, 150, 243, 0.1);
+            border: 1px solid rgba(33, 150, 243, 0.2);
         }
         
-        .equilibrium-stat {
-            text-align: center;
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--warning-color);
+            animation: pulse 2s infinite;
         }
         
-        .equilibrium-stat-value {
-            font-size: 32px;
+        .status-indicator.success {
+            background: var(--success-color);
+        }
+        
+        .status-indicator.warning {
+            background: var(--warning-color);
+        }
+        
+        .status-indicator.danger {
+            background: var(--danger-color);
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .status-text {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--info-color);
+        }
+        
+        .equilibrium-metrics {
+            display: grid;
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+        
+        .metric-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+        
+        .metric-item {
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid #e9ecef;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        
+        .metric-item:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+        }
+        
+        .metric-item.primary {
+            border-left: 4px solid var(--primary-color);
+        }
+        
+        .metric-item.success {
+            border-left: 4px solid var(--success-color);
+        }
+        
+        .metric-item.info {
+            border-left: 4px solid var(--info-color);
+        }
+        
+        .metric-item.warning {
+            border-left: 4px solid var(--warning-color);
+        }
+        
+        .metric-item.secondary {
+            border-left: 4px solid var(--secondary-color);
+        }
+        
+        .metric-header-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        
+        .metric-header-item i {
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            font-size: 14px;
+            color: white;
+        }
+        
+        .metric-item.primary .metric-header-item i {
+            background: var(--primary-color);
+        }
+        
+        .metric-item.success .metric-header-item i {
+            background: var(--success-color);
+        }
+        
+        .metric-item.info .metric-header-item i {
+            background: var(--info-color);
+        }
+        
+        .metric-item.warning .metric-header-item i {
+            background: var(--warning-color);
+        }
+        
+        .metric-item.secondary .metric-header-item i {
+            background: var(--secondary-color);
+        }
+        
+        .metric-header-item span {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+        
+        .metric-value-item {
+            font-size: 28px;
             font-weight: 800;
-            color: var(--primary-color);
-            margin-bottom: 5px;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+            line-height: 1.2;
         }
         
-        .equilibrium-stat-value.hidden {
+        .metric-value-item.hidden {
             filter: blur(8px);
             user-select: none;
         }
         
-        .equilibrium-stat-label {
-            font-size: 14px;
+        .metric-detail {
+            font-size: 13px;
             color: var(--text-secondary);
+            font-weight: 500;
         }
         
-        .equilibrium-progress {
-            margin-top: 20px;
+        .equilibrium-progress-section {
+            background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
+            border-radius: 16px;
+            padding: 25px;
+            border: 1px solid #e9ecef;
+        }
+        
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .progress-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .progress-percentage {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--info-color);
+        }
+        
+        .progress-bar-container {
+            position: relative;
+            margin-bottom: 15px;
         }
         
         .progress-bar {
-            height: 20px;
-            background: #e0e0e0;
-            border-radius: 10px;
+            height: 24px;
+            background: #e9ecef;
+            border-radius: 12px;
             overflow: hidden;
-            margin-bottom: 10px;
+            position: relative;
         }
         
         .progress-fill {
             height: 100%;
             background: linear-gradient(90deg, var(--info-color), var(--secondary-color));
-            border-radius: 10px;
-            transition: width 1s ease-in-out;
+            border-radius: 12px;
+            transition: width 1.5s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .progress-glow {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+            animation: shimmer 2s infinite;
+        }
+        
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+        
+        .progress-milestones {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 10px;
+            pointer-events: none;
+        }
+        
+        .milestone {
+            font-size: 11px;
+            font-weight: 600;
+            color: white;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 2px 6px;
+            border-radius: 4px;
+            opacity: 0.8;
         }
         
         .progress-labels {
             display: flex;
             justify-content: space-between;
+            align-items: center;
             font-size: 14px;
             color: var(--text-secondary);
+        }
+        
+        .label-current {
+            font-weight: 600;
+            color: var(--info-color);
+        }
+        
+        .label-target {
+            font-weight: 600;
+            color: var(--success-color);
+        }
+        
+        /* ============================================
+           ESTILOS PARA META INTERATIVA
+           ============================================ */
+        .edit-meta-btn {
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: var(--primary-color);
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            transition: all 0.3s ease;
+            margin-left: auto;
+        }
+        
+        .edit-meta-btn:hover {
+            background: var(--primary-color);
+            color: white;
+            transform: scale(1.1);
+        }
+        
+        .interactive-indicator {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--warning-color), #ffb74d);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            margin-left: auto;
+            animation: rotate 2s linear infinite;
+            cursor: help;
+        }
+        
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        
+        /* ============================================
+           ESTILOS DO MODAL
+           ============================================ */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .modal-overlay.show {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 450px;
+            width: 90%;
+            max-height: 90vh;
+            overflow: auto;
+            animation: slideUp 0.3s ease;
+        }
+        
+        @keyframes slideUp {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 25px 25px 20px;
+            border-bottom: 1px solid #e9ecef;
+        }
+        
+        .modal-header h3 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 20px;
+            cursor: pointer;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+        
+        .modal-close:hover {
+            background: #f8f9fa;
+            color: var(--danger-color);
+        }
+        
+        .modal-body {
+            padding: 25px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: var(--info-color);
+            background: white;
+            box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+        }
+        
+        .form-info {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 15px;
+            background: linear-gradient(135deg, #e3f2fd, #f8f9fa);
+            border-radius: 8px;
+            border-left: 4px solid var(--info-color);
+        }
+        
+        .form-info i {
+            color: var(--info-color);
+            font-size: 16px;
+            margin-top: 2px;
+        }
+        
+        .form-info span {
+            font-size: 13px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+        
+        .modal-footer {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            padding: 20px 25px 25px;
+            border-top: 1px solid #e9ecef;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+        
+        .btn-primary {
+            background: var(--info-color);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #1976d2;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
         }
         
                 
@@ -576,21 +1067,47 @@
                 padding: 18px;
             }
             
-            .dashboard-chart-wrapper {
-                height: 280px;
-            }
-            
-            .operational-cards {
+            .metric-row {
                 grid-template-columns: 1fr;
+                gap: 15px;
             }
             
-            .equilibrium-stats {
+            .metric-item {
+                padding: 18px;
+            }
+            
+            .metric-value-item {
+                font-size: 24px;
+            }
+            
+            .equilibrium-progress-section {
+                padding: 20px;
+            }
+            
+            .progress-header {
                 flex-direction: column;
-                gap: 12px;
+                gap: 10px;
+                align-items: flex-start;
             }
             
-            .equilibrium-stat-value {
-                font-size: 28px;
+            .progress-title {
+                font-size: 14px;
+            }
+            
+            .progress-percentage {
+                font-size: 16px;
+            }
+            
+            .progress-bar {
+                height: 20px;
+            }
+            
+            .milestone {
+                font-size: 10px;
+            }
+            
+            .progress-labels {
+                font-size: 12px;
             }
             
             .section-title {
@@ -667,8 +1184,59 @@
                 font-size: 18px;
             }
             
-            .equilibrium-stat-value {
-                font-size: 24px;
+            .equilibrium-header {
+                flex-direction: column;
+                gap: 15px;
+                align-items: flex-start;
+            }
+            
+            .equilibrium-status {
+                align-self: flex-start;
+            }
+            
+            .equilibrium-metrics {
+                gap: 15px;
+            }
+            
+            .metric-row {
+                grid-template-columns: 1fr;
+                gap: 12px;
+            }
+            
+            .metric-item {
+                padding: 15px;
+            }
+            
+            .metric-value-item {
+                font-size: 20px;
+            }
+            
+            .equilibrium-progress-section {
+                padding: 18px;
+            }
+            
+            .progress-header {
+                margin-bottom: 15px;
+            }
+            
+            .progress-title {
+                font-size: 13px;
+            }
+            
+            .progress-percentage {
+                font-size: 14px;
+            }
+            
+            .progress-bar {
+                height: 18px;
+            }
+            
+            .progress-labels {
+                font-size: 11px;
+            }
+            
+            .milestone {
+                display: none;
             }
             
             .equilibrium-stat-label {
@@ -795,9 +1363,21 @@
                 <i class="fas fa-eye"></i>
             </button>
             
+            <button class="mobile-menu-toggle" id="mobileMenuToggle" onclick="toggleMobileMenu()">
+                <i class="fas fa-bars"></i>
+            </button>
+            
             <div class="date-info" id="currentDate">Carregando...</div>
         </div>
     </div>
+
+    <!-- MOBILE MENU TOGGLE -->
+    <button class="mobile-menu-toggle" id="mobileMenuToggle" onclick="toggleMobileMenu()">
+        <i class="fas fa-bars"></i>
+    </button>
+    
+    <!-- MOBILE OVERLAY -->
+    <div class="mobile-overlay" id="mobileOverlay" onclick="closeMobileMenu()"></div>
 
     <!-- ============================================
          CONTEÚDO PRINCIPAL
@@ -860,40 +1440,107 @@
             </div>
         </div>
 
-        <!-- PONTO DE EQUILÍBRIO -->
+        <!-- PONTO DE EQUILÍBRIO PROFISSIONAL -->
         <div class="equilibrium-card">
             <div class="equilibrium-header">
                 <div class="equilibrium-title">
-                    <i class="fas fa-balance-scale"></i>
-                    Ponto de Equilíbrio
+                    <i class="fas fa-chart-line"></i>
+                    Análise de Metas
                 </div>
-                <div class="equilibrium-stats">
-                    <div class="equilibrium-stat">
-                        <div class="equilibrium-stat-value" data-bind="equilibrio.atingido">€0,00</div>
-                        <div class="equilibrium-stat-label">Vendas do Mês</div>
+                <div class="equilibrium-status" id="equilibriumStatus">
+                    <span class="status-indicator" id="statusIndicator"></span>
+                    <span class="status-text" id="statusText">Carregando...</span>
+                </div>
+            </div>
+            
+            <div class="equilibrium-metrics">
+                <div class="metric-row">
+                    <div class="metric-item primary">
+                        <div class="metric-header-item">
+                            <i class="fas fa-bullseye"></i>
+                            <span>Meta Mensal</span>
+                            <button class="edit-meta-btn" id="editMetaBtn" title="Editar meta mensal">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                        </div>
+                        <div class="metric-value-item" id="metaDisplay">€0,00</div>
+                        <div class="metric-detail">Objetivo a atingir</div>
                     </div>
-                    <div class="equilibrium-stat">
-                        <div class="equilibrium-stat-value" data-bind="equilibrio.meta">€10.000,00</div>
-                        <div class="equilibrium-stat-label">Meta Mensal</div>
+                    
+                    <div class="metric-item success">
+                        <div class="metric-header-item">
+                            <i class="fas fa-euro-sign"></i>
+                            <span>Faturado</span>
+                        </div>
+                        <div class="metric-value-item" data-bind="equilibrio.atingido">€0,00</div>
+                        <div class="metric-detail">Total vendido</div>
                     </div>
-                    <div class="equilibrium-stat">
-                        <div class="equilibrium-stat-value positive" data-bind="equilibrio.percentual">0%</div>
-                        <div class="equilibrium-stat-label">Atingido</div>
+                    
+                    <div class="metric-item info">
+                        <div class="metric-header-item">
+                            <i class="fas fa-percentage"></i>
+                            <span>Progresso</span>
+                        </div>
+                        <div class="metric-value-item" data-bind="equilibrio.percentual">0%</div>
+                        <div class="metric-detail">Da meta atingida</div>
                     </div>
-                    <div class="equilibrium-stat">
-                        <div class="equilibrium-stat-value" data-bind="equilibrio.metaDiaria">€0,00</div>
-                        <div class="equilibrium-stat-label">Meta Diária</div>
+                </div>
+                
+                <div class="metric-row">
+                    <div class="metric-item warning">
+                        <div class="metric-header-item">
+                            <i class="fas fa-calendar-day"></i>
+                            <span>Meta Diária</span>
+                            <div class="interactive-indicator" title="Meta diária interativa baseada no faturamento real">
+                                <i class="fas fa-sync-alt"></i>
+                            </div>
+                        </div>
+                        <div class="metric-value-item" id="metaDiariaDisplay">€0,00</div>
+                        <div class="metric-detail" id="dailyMetaDetail">Calculada dinamicamente</div>
+                    </div>
+                    
+                    <div class="metric-item secondary">
+                        <div class="metric-header-item">
+                            <i class="fas fa-calendar-check"></i>
+                            <span>Dias Úteis</span>
+                        </div>
+                        <div class="metric-value-item" id="workingDaysDisplay">0/0</div>
+                        <div class="metric-detail">Passados/Totais</div>
+                    </div>
+                    
+                    <div class="metric-item">
+                        <div class="metric-header-item">
+                            <i class="fas fa-trending-up"></i>
+                            <span>Projeção</span>
+                        </div>
+                        <div class="metric-value-item" id="projectionValue">€0,00</div>
+                        <div class="metric-detail">Previsão mensal</div>
                     </div>
                 </div>
             </div>
-            <div class="equilibrium-progress">
-                <div class="progress-bar">
-                    <div class="progress-fill" id="equilibriumProgress" style="width: 0%"></div>
+            
+            <div class="equilibrium-progress-section">
+                <div class="progress-header">
+                    <span class="progress-title">Progresso da Meta</span>
+                    <span class="progress-percentage" data-bind="equilibrio.percentual">0%</span>
+                </div>
+                <div class="progress-bar-container">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="equilibriumProgress" style="width: 0%">
+                            <div class="progress-glow"></div>
+                        </div>
+                        <div class="progress-milestones">
+                            <div class="milestone" data-percentage="25">25%</div>
+                            <div class="milestone" data-percentage="50">50%</div>
+                            <div class="milestone" data-percentage="75">75%</div>
+                            <div class="milestone" data-percentage="100">100%</div>
+                        </div>
+                    </div>
                 </div>
                 <div class="progress-labels">
-                    <span>€0</span>
-                    <span id="diasUteisInfo">Carregando...</span>
-                    <span>Meta: €10.000</span>
+                    <span class="label-min">€0</span>
+                    <span class="label-current" id="currentProgress">€0</span>
+                    <span class="label-target" data-bind="equilibrio.meta">€0,00</span>
                 </div>
             </div>
         </div>
@@ -978,10 +1625,61 @@
         </div>
     </div>
 
+    <!-- MODAL DE EDIÇÃO DE META -->
+    <div class="modal-overlay" id="metaModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-bullseye"></i> Editar Meta Mensal</h3>
+                <button class="modal-close" id="closeMetaModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="novaMeta">Nova Meta Mensal (€)</label>
+                    <input type="number" id="novaMeta" min="0" step="100" placeholder="Digite a nova meta...">
+                </div>
+                <div class="form-info">
+                    <i class="fas fa-info-circle"></i>
+                    <span>A meta será usada para calcular automaticamente a meta diária baseada nos dias úteis restantes.</span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelMetaBtn">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+                <button class="btn btn-primary" id="saveMetaBtn">
+                    <i class="fas fa-save"></i> Salvar Meta
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // ============================================
-        // SISTEMA DE DASHBOARD - VERSÃO ONLINE
+        // INICIALIZAÇÃO
         // ============================================
+        
+        // Funções do Menu Mobile
+        function toggleMobileMenu() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('mobileOverlay');
+            
+            if (sidebar && overlay) {
+                sidebar.classList.toggle('mobile-open');
+                overlay.classList.toggle('active');
+            }
+        }
+        
+        function closeMobileMenu() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('mobileOverlay');
+            
+            if (sidebar && overlay) {
+                sidebar.classList.remove('mobile-open');
+                overlay.classList.remove('active');
+            }
+        }
         
         document.addEventListener('DOMContentLoaded', function() {
             console.log('📊 Dashboard inicializando...');
@@ -989,12 +1687,15 @@
             // Elementos do DOM
             const privacyToggle = document.getElementById('privacyToggle');
             const periodFilter = document.getElementById('periodFilter');
+        // Inicializar dashboard
+        function inicializar() {
             const currentDate = document.getElementById('currentDate');
             
             // Estado do dashboard
             let isPrivate = false;
             let charts = {};
             let dadosCore = {};
+            let metaMensalPersonalizada = 10000; // Meta padrão
             
             // ============================================
             // FUNÇÕES PRINCIPAIS - CORRIGIDAS
@@ -1002,6 +1703,9 @@
             
             // Inicializar dashboard
             function inicializar() {
+                // Carregar meta personalizada do localStorage
+                carregarMetaPersonalizada();
+                
                 atualizarDataAtual();
                 criarGraficos();
                 configurarEventListeners();
@@ -1034,6 +1738,39 @@
                     atualizarPeriodo(e.target.value);
                 });
                 
+                // Botão de edição de meta
+                const editMetaBtn = document.getElementById('editMetaBtn');
+                if (editMetaBtn) {
+                    editMetaBtn.addEventListener('click', abrirModalMeta);
+                }
+                
+                // Event listeners do modal
+                const closeMetaModal = document.getElementById('closeMetaModal');
+                const cancelMetaBtn = document.getElementById('cancelMetaBtn');
+                const saveMetaBtn = document.getElementById('saveMetaBtn');
+                const metaModal = document.getElementById('metaModal');
+                
+                if (closeMetaModal) {
+                    closeMetaModal.addEventListener('click', fecharModalMeta);
+                }
+                
+                if (cancelMetaBtn) {
+                    cancelMetaBtn.addEventListener('click', fecharModalMeta);
+                }
+                
+                if (saveMetaBtn) {
+                    saveMetaBtn.addEventListener('click', salvarNovaMeta);
+                }
+                
+                // Fechar modal ao clicar fora
+                if (metaModal) {
+                    metaModal.addEventListener('click', function(e) {
+                        if (e.target === metaModal) {
+                            fecharModalMeta();
+                        }
+                    });
+                }
+                
                 // Escutar mensagens do Core
                 window.addEventListener("message", function(event) {
                     console.log('📨 Mensagem recebida no dashboard:', event.data.type);
@@ -1063,9 +1800,9 @@
                 }
             }
             
-            // Aplicar modo privacidade
+            // Aplicar modo privacidade - ATUALIZADO PARA NOVO DESIGN
             function aplicarModoPrivacidade(privado) {
-                const elementos = document.querySelectorAll('.metric-value, .equilibrium-stat-value, .operational-value');
+                const elementos = document.querySelectorAll('.metric-value, .equilibrium-stat-value, .operational-value, .metric-value-item');
                 
                 elementos.forEach(elemento => {
                     if (privado) {
@@ -1074,6 +1811,67 @@
                         elemento.classList.remove('hidden');
                     }
                 });
+            }
+            
+            // ============================================
+            // FUNÇÕES DO MODAL DE META
+            // ============================================
+            
+            // Abrir modal de edição de meta
+            function abrirModalMeta() {
+                const modal = document.getElementById('metaModal');
+                const inputMeta = document.getElementById('novaMeta');
+                
+                if (modal && inputMeta) {
+                    // Preencher com a meta atual
+                    inputMeta.value = metaMensalPersonalizada;
+                    modal.classList.add('show');
+                    inputMeta.focus();
+                    inputMeta.select();
+                }
+            }
+            
+            // Fechar modal de edição de meta
+            function fecharModalMeta() {
+                const modal = document.getElementById('metaModal');
+                if (modal) {
+                    modal.classList.remove('show');
+                }
+            }
+            
+            // Salvar nova meta
+            function salvarNovaMeta() {
+                const inputMeta = document.getElementById('novaMeta');
+                const novaMeta = parseFloat(inputMeta.value);
+                
+                if (isNaN(novaMeta) || novaMeta <= 0) {
+                    alert('Por favor, digite um valor válido para a meta mensal.');
+                    inputMeta.focus();
+                    return;
+                }
+                
+                // Atualizar meta personalizada
+                metaMensalPersonalizada = novaMeta;
+                
+                // Salvar no localStorage para persistência
+                localStorage.setItem('dashboard_meta_mensal', novaMeta.toString());
+                
+                // Fechar modal
+                fecharModalMeta();
+                
+                // Recarregar dados para atualizar cálculos
+                solicitarDadosAoCore();
+                
+                console.log('✅ Nova meta mensal salva:', novaMeta);
+            }
+            
+            // Carregar meta personalizada do localStorage
+            function carregarMetaPersonalizada() {
+                const metaSalva = localStorage.getItem('dashboard_meta_mensal');
+                if (metaSalva && !isNaN(parseFloat(metaSalva))) {
+                    metaMensalPersonalizada = parseFloat(metaSalva);
+                    console.log('✅ Meta personalizada carregada:', metaMensalPersonalizada);
+                }
             }
             
             // Atualizar período
@@ -1134,29 +1932,31 @@
                 console.log('📊 Dashboard atualizado com sucesso');
             }
             
-            // CORREÇÃO 1: Calcular meta diária REAL considerando dias úteis
-            function calcularMetaDiariaReal(diaAtual, metaMensal = 10000) {
-                const dataAtual = new Date();
-                const ano = dataAtual.getFullYear();
-                const mes = dataAtual.getMonth();
-                
-                // Contar dias úteis no mês (segunda a sexta)
-                let diasUteis = 0;
-                const ultimoDia = new Date(ano, mes + 1, 0).getDate();
-                
-                for (let dia = 1; dia <= ultimoDia; dia++) {
-                    const diaSemana = new Date(ano, mes, dia).getDay();
-                    
-                    // Segunda a sexta são dias úteis (1-5)
-                    if (diaSemana >= 1 && diaSemana <= 5) {
-                        diasUteis++;
-                    }
+            // CORREÇÃO 1: Calcular meta diária DINÂMICA baseada no progresso real
+            function calcularMetaDiariaDinamica(faturado, metaMensal, diasUteisPassados, diasUteisTotal) {
+                if (diasUteisPassados === 0 || diasUteisTotal === 0) {
+                    return metaMensal / diasUteisTotal;
                 }
                 
-                // Calcular meta diária REAL
-                const metaDiariaReal = diasUteis > 0 ? metaMensal / diasUteis : 0;
+                // Calcular o que falta para atingir a meta
+                const faltaParaMeta = Math.max(0, metaMensal - faturado);
                 
-                return metaDiariaReal;
+                // Calcular dias úteis restantes
+                const diasUteisRestantes = diasUteisTotal - diasUteisPassados;
+                
+                if (diasUteisRestantes === 0) {
+                    // Se não há mais dias úteis, meta diária é o que falta hoje
+                    return faltaParaMeta;
+                }
+                
+                // Meta diária dinâmica: dividir o que falta pelos dias restantes
+                const metaDiariaDinamica = faltaParaMeta / diasUteisRestantes;
+                
+                // Garantir valor mínimo razoável (não inferior à média original)
+                const metaDiariaOriginal = metaMensal / diasUteisTotal;
+                const metaMinima = Math.max(metaDiariaOriginal * 0.5, metaDiariaDinamica);
+                
+                return metaMinima;
             }
             
             // CORREÇÃO 3: Calcular total de dias úteis no mês
@@ -1423,23 +2223,24 @@
                 }
                 
                 // Calcular ponto de equilíbrio
-                const metaMensal = 10000;
+                const metaMensal = metaMensalPersonalizada; // Usar meta personalizada
                 const percentualEquilibrio = Math.min(100, Math.max(0, (vendasTotais / metaMensal) * 100));
                 
-                // CORREÇÃO 1: Calcular meta diária REAL
-                const metaDiariaReal = calcularMetaDiariaReal(diaAtual, metaMensal);
+                // CORREÇÃO 1: Calcular meta diária DINÂMICA
+                const metaDiariaDinamica = calcularMetaDiariaDinamica(vendasTotais, metaMensal, diasUteisPassados, diasUteisTotal);
                 
                 // CORREÇÃO 2: Calcular dias úteis do mês para informação
                 const diasUteisTotal = calcularDiasUteisNoMes();
                 const diasUteisPassados = calcularDiasUteisPassados(diaAtual);
                 
-                // DEBUG: Verificar cálculos
                 console.log('🔍 DEBUG - Cálculos de dias úteis:');
                 console.log('  Dia atual:', diaAtual);
                 console.log('  Dias úteis total:', diasUteisTotal);
                 console.log('  Dias úteis passados:', diasUteisPassados);
                 console.log('  Meta mensal:', metaMensal);
-                console.log('  Meta diária calculada:', metaDiariaReal);
+                console.log('  Meta diária DINÂMICA:', metaDiariaDinamica);
+                console.log('  Fatura para meta:', vendasTotais);
+                console.log('  Falta para meta:', Math.max(0, metaMensal - vendasTotais));
                 
                 // Calcular variação das despesas
                 let variacaoDespesas = 0;
@@ -1527,7 +2328,7 @@
                     lucroTotal: lucroTotal.toFixed(2),
                     margemLucro: margemLucro.toFixed(1),
                     totalDespesas: totalDespesas.toFixed(2),
-                    metaDiariaReal: metaDiariaReal.toFixed(2),
+                    metaDiariaDinamica: metaDiariaDinamica.toFixed(2),
                     variacaoDespesas: variacaoDespesas.toFixed(1),
                     variacaoVendas: variacaoVendas.toFixed(1),
                     historicoAnualLength: historicoAnual.length
@@ -1555,7 +2356,7 @@
                         atingido: vendasTotais,
                         meta: metaMensal,
                         percentual: percentualEquilibrio.toFixed(1),
-                        metaDiaria: metaDiariaReal, // USANDO META DIÁRIA REAL CALCULADA
+                        metaDiaria: metaDiariaDinamica, // USANDO META DIÁRIA DINÂMICA
                         diasUteis: diasUteisTotal, // Total de dias úteis no mês
                         diasUteisPassados: diasUteisPassados // Dias úteis já passados
                     },
@@ -1620,32 +2421,85 @@
                 document.querySelector('[data-bind="pedidos.ativos"]').textContent = dados.pedidos.ativos;
                 document.querySelector('[data-bind="pedidos.concluidos"]').textContent = `${dados.pedidos.concluidos}/${dados.pedidos.total}`;
                 
-                // Atualizar ponto de equilíbrio
+                // Atualizar ponto de equilíbrio - VERSÃO PROFISSIONAL COM META INTERATIVA
+                // Atualizar display da meta mensal
+                const metaDisplay = document.getElementById('metaDisplay');
+                if (metaDisplay) {
+                    metaDisplay.textContent = formatarMoeda(dados.equilibrio.meta);
+                }
+                
                 document.querySelector('[data-bind="equilibrio.atingido"]').textContent = formatarMoeda(dados.equilibrio.atingido);
-                document.querySelector('[data-bind="equilibrio.meta"]').textContent = formatarMoeda(dados.equilibrio.meta);
                 document.querySelector('[data-bind="equilibrio.percentual"]').textContent = `${dados.equilibrio.percentual}%`;
                 
-                // CORREÇÃO 1: Atualizar meta diária REAL com informações detalhadas
-                const elementoMetaDiaria = document.querySelector('[data-bind="equilibrio.metaDiaria"]');
-                if (elementoMetaDiaria) {
+                // Atualizar meta diária DINÂMICA com informações detalhadas
+                const metaDiariaDisplay = document.getElementById('metaDiariaDisplay');
+                if (metaDiariaDisplay) {
                     const valorFormatado = formatarMoeda(dados.equilibrio.metaDiaria);
-                    elementoMetaDiaria.textContent = valorFormatado;
+                    metaDiariaDisplay.textContent = valorFormatado;
                     
                     // Forçar atualização visual (combate cache)
-                    elementoMetaDiaria.style.display = 'none';
+                    metaDiariaDisplay.style.display = 'none';
                     setTimeout(() => {
-                        elementoMetaDiaria.style.display = 'block';
+                        metaDiariaDisplay.style.display = 'block';
                     }, 10);
                     
-                    console.log('✅ Meta diária REAL calculada:', valorFormatado);
+                    console.log('✅ Meta diária DINÂMICA calculada:', valorFormatado);
                     console.log('📅 Dias úteis no mês:', dados.equilibrio.diasUteis);
                     console.log('📅 Dias úteis passados:', dados.equilibrio.diasUteisPassados);
-                    console.log('🔢 Valor bruto da meta diária:', dados.equilibrio.metaDiaria);
+                    console.log('🔢 Valor da meta diária dinâmica:', dados.equilibrio.metaDiaria);
                     
                     // Adicionar tooltip ou informação adicional
-                    elementoMetaDiaria.title = `Meta baseada em ${dados.equilibrio.diasUteis} dias úteis no mês (${dados.equilibrio.diasUteisPassados} já passados)`;
+                    metaDiariaDisplay.title = `Meta dinâmica baseada no progresso atual\nFatura: ${formatarMoeda(dados.equilibrio.atingido)}\nFalta: ${formatarMoeda(Math.max(0, dados.equilibrio.meta - dados.equilibrio.atingido))}\nDias restantes: ${dados.equilibrio.diasUteis - dados.equilibrio.diasUteisPassados}`;
                 } else {
                     console.error('❌ Elemento meta diária não encontrado!');
+                }
+                
+                // NOVO: Atualizar display de dias úteis
+                const workingDaysDisplay = document.getElementById('workingDaysDisplay');
+                if (workingDaysDisplay) {
+                    workingDaysDisplay.textContent = `${dados.equilibrio.diasUteisPassados}/${dados.equilibrio.diasUteis}`;
+                    workingDaysDisplay.title = `${dados.equilibrio.diasUteisPassados} dias úteis passados de ${dados.equilibrio.diasUteis} totais no mês`;
+                }
+                
+                // NOVO: Calcular e atualizar projeção mensal com meta dinâmica
+                const projectionValue = document.getElementById('projectionValue');
+                if (projectionValue) {
+                    const diasUteisRestantes = dados.equilibrio.diasUteis - dados.equilibrio.diasUteisPassados;
+                    const projecaoMensal = dados.equilibrio.atingido + (dados.equilibrio.metaDiaria * diasUteisRestantes);
+                    projectionValue.textContent = formatarMoeda(projecaoMensal);
+                    projectionValue.title = `Projeção baseada na meta diária dinâmica\nAtual: ${formatarMoeda(dados.equilibrio.atingido)}\nMeta diária: ${formatarMoeda(dados.equilibrio.metaDiaria)}\nDias restantes: ${diasUteisRestantes}\nProjeção: ${formatarMoeda(dados.equilibrio.metaDiaria * diasUteisRestantes)}`;
+                }
+                
+                // NOVO: Atualizar status do equilíbrio
+                const statusIndicator = document.getElementById('statusIndicator');
+                const statusText = document.getElementById('statusText');
+                const percentual = parseFloat(dados.equilibrio.percentual);
+                
+                if (statusIndicator && statusText) {
+                    // Limpar classes anteriores
+                    statusIndicator.className = 'status-indicator';
+                    
+                    if (percentual >= 100) {
+                        statusIndicator.classList.add('success');
+                        statusText.textContent = 'Meta Atingida! 🎯';
+                        statusText.style.color = 'var(--success-color)';
+                    } else if (percentual >= 75) {
+                        statusIndicator.classList.add('success');
+                        statusText.textContent = 'Excelente Progresso 🚀';
+                        statusText.style.color = 'var(--success-color)';
+                    } else if (percentual >= 50) {
+                        statusIndicator.classList.add('warning');
+                        statusText.textContent = 'Bom Andamento 👍';
+                        statusText.style.color = 'var(--warning-color)';
+                    } else if (percentual >= 25) {
+                        statusIndicator.classList.add('warning');
+                        statusText.textContent = 'Em Progresso 📈';
+                        statusText.style.color = 'var(--warning-color)';
+                    } else {
+                        statusIndicator.classList.add('danger');
+                        statusText.textContent = 'Precisa Atenção ⚠️';
+                        statusText.style.color = 'var(--danger-color)';
+                    }
                 }
                 
                 // Atualizar barra de progresso
@@ -1658,16 +2512,24 @@
                 }
                 
                 // Atualizar label da meta com informações de dias úteis
-                const metaLabel = document.querySelector('.progress-labels span:last-child');
+                const metaLabel = document.querySelector('.progress-labels .label-target');
                 if (metaLabel) {
-                    metaLabel.textContent = `Meta: ${formatarMoeda(dados.equilibrio.meta)}`;
+                    metaLabel.textContent = formatarMoeda(dados.equilibrio.meta);
                 }
                 
-                // CORREÇÃO 2: Atualizar informações de dias úteis
-                const diasUteisInfo = document.getElementById('diasUteisInfo');
-                if (diasUteisInfo) {
-                    diasUteisInfo.textContent = `${dados.equilibrio.diasUteisPassados}/${dados.equilibrio.diasUteis} dias úteis`;
-                    diasUteisInfo.title = `${dados.equilibrio.diasUteisPassados} dias úteis passados de ${dados.equilibrio.diasUteis} totais no mês`;
+                // NOVO: Atualizar label de progresso atual
+                const currentProgressLabel = document.getElementById('currentProgress');
+                if (currentProgressLabel) {
+                    currentProgressLabel.textContent = formatarMoeda(dados.equilibrio.atingido);
+                }
+                
+                // NOVO: Atualizar detalhe da meta diária dinâmica
+                const dailyMetaDetail = document.getElementById('dailyMetaDetail');
+                if (dailyMetaDetail) {
+                    const diasUteisRestantes = dados.equilibrio.diasUteis - dados.equilibrio.diasUteisPassados;
+                    const faltaParaMeta = Math.max(0, dados.equilibrio.meta - dados.equilibrio.atingido);
+                    dailyMetaDetail.textContent = `${diasUteisRestantes} dias restantes`;
+                    dailyMetaDetail.title = `Meta diária: ${formatarMoeda(dados.equilibrio.metaDiaria)}\nFalta para meta: ${formatarMoeda(faltaParaMeta)}\nDias úteis restantes: ${diasUteisRestantes}`;
                 }
             }
             
