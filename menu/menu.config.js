@@ -1,0 +1,41 @@
+﻿window.MENU_CONFIG = [
+    {
+        id: "nav_novopedido",
+        name: "Novo Pedido",
+        file: "pages/novopedido.html",
+        type: "WRITE",
+        pos: 1,
+        hidden: false,
+        deleted: false
+    },
+
+    {
+        id: "nav_pedidos",
+        name: "Pedidos",
+        file: "pages/pedidos.html",
+        type: "READ",
+        pos: 2,
+        hidden: false,
+        deleted: false
+    },
+
+    {
+        id: "nav_novadespesa",
+        name: "Nova Despesa",
+        file: "pages/novadespesa.html",
+        type: "WRITE",
+        pos: 3,
+        hidden: false,
+        deleted: false
+    },
+
+    {
+        id: "nav_despesas",
+        name: "Despesas",
+        file: "pages/despesas.html",
+        type: "READ",
+        pos: 4,
+        hidden: false,
+        deleted: false
+    }
+];

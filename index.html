@@ -806,7 +806,7 @@
 
         async function setupDynamicMenu() {
             const menuArea = document.getElementById('custom-pages-area');
-            const config = systemSettings.menu_config || [];
+            const config = window.MENU_CONFIG || []; // MENU VIA GIT
             
             menuArea.innerHTML = '';
             
@@ -834,7 +834,7 @@
 
         async function savePagesToHTML() {
             try {
-                const config = systemSettings.menu_config || [];
+                const config = window.MENU_CONFIG || []; // MENU VIA GIT
                 const activePages = config.filter(item => !item.deleted);
                 
                 // Gerar HTML dos botões
@@ -1402,5 +1402,5 @@ Admin Ativo: ${isAdmin ? 'SIM' : 'NÃO'}
             }
         };
     </script>
+    <script src="menu/menu.config.js"></script>
 </body>
-</html>

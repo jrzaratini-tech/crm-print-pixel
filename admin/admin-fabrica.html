@@ -269,7 +269,7 @@
             </button>
             <button class="btn btn-success" onclick="registerPage()">
                 <svg class="icon" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                Registrar no Menu
+                Gerar Código Botão
             </button>
         </div>
 
@@ -392,41 +392,25 @@ REGRAS RÍGIDAS:
         const data = validate();
         if (!data) return;
 
-        // Criar objeto da página NO FORMATO DO SISTEMA PRINCIPAL
-        const newPage = {
-            id: 'nav_cust_' + Date.now(),
-            name: data.name,
-            file: 'pages/' + data.file + '.html',
-            type: data.type,
-            pos: 100,
-            hidden: false,
-            deleted: false
-        };
+        // Gerar código do menu para colar na pasta menu
+        const menuCode = `{
+  id: "nav_${data.file}",
+  name: "${data.name}",
+  file: "pages/${data.file}.html",
+  type: "${data.type}",
+  pos: 100,
+  hidden: false,
+  deleted: false
+},`;
 
-        console.log('📄 Tentando registrar página:', newPage);
-
-        // MÉTODO 1: Comunicar com o sistema principal via postMessage
-        try {
-            window.parent.postMessage({
-                type: "REGISTER_NEW_PAGE",
-                payload: newPage
-            }, "*");
-            
-            showStatus(`Página "${data.name}" enviada para registro no sistema principal.`, 'success');
-            
-            setTimeout(() => {
-                showStatus('✅ Página registrada! Para ver no menu, recarregue o sistema.', 'warning');
-            }, 1000);
-            
-        } catch (error) {
-            console.error('Erro no postMessage:', error);
-            showStatus('Erro na comunicação. Verifique se está no sistema principal.', 'error');
-        }
-
-        // MÉTODO DE FALLBACK: Tentar salvar diretamente
-        setTimeout(() => {
-            tryFallbackRegistration(newPage);
-        }, 500);
+        // Mostrar o código na caixa de protocolo
+        document.getElementById('protocolText').textContent = menuCode;
+        document.getElementById('protocolBox').style.display = 'block';
+        
+        // Atualizar título da caixa
+        document.querySelector('#protocolBox strong').textContent = 'Código do Menu - Copie e cole em menu/menu.config.js (dentro do array MENU_CONFIG):';
+        
+        showStatus('Código do menu gerado! Copie e cole em menu/menu.config.js', 'success');
     }
 
     // Método de fallback para garantir o salvamento
