@@ -1109,8 +1109,101 @@
                 font-size: 12px;
             }
             
-            .section-title {
                 font-size: 20px;
+            }
+            
+            .logo-text span {
+                font-size: 12px;
+            }
+            
+            .header-right {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .date-info {
+                font-size: 13px;
+                padding: 8px 16px;
+            }
+            
+            .period-filter {
+                padding: 8px 12px;
+            }
+            
+            .period-filter select {
+                min-width: 120px;
+                font-size: 13px;
+                padding: 6px 12px;
+            }
+            
+            .metric-card {
+                padding: 20px;
+            }
+            
+            .metric-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
+            
+            .metric-title {
+                font-size: 14px;
+            }
+            
+            .metric-value {
+                font-size: 28px;
+            }
+            
+            .metric-subtitle {
+                font-size: 12px;
+            }
+            
+            .chart-container {
+                height: 250px;
+            }
+            
+            .chart-title {
+                font-size: 16px;
+            }
+            
+            /* Ativar menu mobile em tablets */
+            .mobile-menu-toggle {
+                display: flex;
+                position: fixed;
+                top: 15px;
+                left: 15px;
+                z-index: 1000;
+                background: var(--primary-color);
+                color: white;
+                border: none;
+                width: 45px;
+                height: 45px;
+                border-radius: 10px;
+                cursor: pointer;
+                font-size: 18px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+                transition: all 0.3s;
+            }
+            
+            .mobile-menu-toggle:hover {
+                background: var(--accent-color);
+                transform: scale(1.05);
+            }
+            
+            .mobile-overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.5);
+                z-index: 999;
+                backdrop-filter: blur(4px);
+            }
+            
+            .mobile-overlay.active {
+                display: block;
             }
         }
         
@@ -1875,30 +1968,44 @@
             
             // Verificar se está em modo administrador e mostrar/ocultar botão de edição
             function verificarModoAdmin() {
+                const editMetaBtn = document.getElementById('editMetaBtn');
+                
+                // Função para atualizar visibilidade do botão
+                function atualizarVisibilidadeBotao(isAdmin) {
+                    if (editMetaBtn) {
+                        if (isAdmin) {
+                            editMetaBtn.style.display = 'inline-flex';
+                            editMetaBtn.style.visibility = 'visible';
+                            console.log('✅ Botão de edição de meta visível (modo admin)');
+                        } else {
+                            editMetaBtn.style.display = 'none';
+                            editMetaBtn.style.visibility = 'hidden';
+                            console.log('🔒 Botão de edição de meta oculto (modo usuário)');
+                        }
+                    }
+                }
+                
                 // Verificar se o sistema principal está em modo admin
                 window.addEventListener('message', function(event) {
                     if (event.data.type === 'ADMIN_STATUS_RESPONSE') {
                         const isAdmin = event.data.isAdmin;
-                        const editMetaBtn = document.getElementById('editMetaBtn');
-                        
-                        if (editMetaBtn) {
-                            if (isAdmin) {
-                                editMetaBtn.style.display = 'inline-flex';
-                                console.log('✅ Botão de edição de meta visível (modo admin)');
-                            } else {
-                                editMetaBtn.style.display = 'none';
-                                console.log('🔒 Botão de edição de meta oculto (modo usuário)');
-                            }
-                        }
+                        atualizarVisibilidadeBotao(isAdmin);
                     }
                 });
                 
-                // Solicitar status admin ao carregar
+                // Solicitar status admin imediatamente ao carregar
                 setTimeout(() => {
                     if (window.parent && window.parent.postMessage) {
                         window.parent.postMessage({ type: 'ADMIN_STATUS_REQUEST' }, '*');
                     }
-                }, 1000);
+                }, 500);
+                
+                // Verificar periodicamente (a cada 2 segundos) por segurança
+                setInterval(() => {
+                    if (window.parent && window.parent.postMessage) {
+                        window.parent.postMessage({ type: 'ADMIN_STATUS_REQUEST' }, '*');
+                    }
+                }, 2000);
             }
             
             // Atualizar período
