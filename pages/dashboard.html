@@ -716,24 +716,23 @@
            ESTILOS PARA META INTERATIVA
            ============================================ */
         .edit-meta-btn {
-            background: rgba(255, 255, 255, 0.2);
-            border: 1px solid rgba(255, 255, 255, 0.3);
-            color: var(--primary-color);
-            width: 28px;
-            height: 28px;
-            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
             cursor: pointer;
-            display: flex;
+            display: none; /* Oculto por padrão, visível apenas para admins */
             align-items: center;
             justify-content: center;
-            font-size: 12px;
-            transition: all 0.3s ease;
-            margin-left: auto;
+            font-size: 14px;
+            transition: all 0.3s;
+            margin-left: 8px;
         }
         
         .edit-meta-btn:hover {
-            background: var(--primary-color);
-            color: white;
+            background: rgba(255, 255, 255, 0.2);
             transform: scale(1.1);
         }
         
@@ -1874,6 +1873,34 @@
                 }
             }
             
+            // Verificar se está em modo administrador e mostrar/ocultar botão de edição
+            function verificarModoAdmin() {
+                // Verificar se o sistema principal está em modo admin
+                window.addEventListener('message', function(event) {
+                    if (event.data.type === 'ADMIN_STATUS_RESPONSE') {
+                        const isAdmin = event.data.isAdmin;
+                        const editMetaBtn = document.getElementById('editMetaBtn');
+                        
+                        if (editMetaBtn) {
+                            if (isAdmin) {
+                                editMetaBtn.style.display = 'inline-flex';
+                                console.log('✅ Botão de edição de meta visível (modo admin)');
+                            } else {
+                                editMetaBtn.style.display = 'none';
+                                console.log('🔒 Botão de edição de meta oculto (modo usuário)');
+                            }
+                        }
+                    }
+                });
+                
+                // Solicitar status admin ao carregar
+                setTimeout(() => {
+                    if (window.parent && window.parent.postMessage) {
+                        window.parent.postMessage({ type: 'ADMIN_STATUS_REQUEST' }, '*');
+                    }
+                }, 1000);
+            }
+            
             // Atualizar período
             function atualizarPeriodo(periodo) {
                 console.log(`📅 Alterando período para: ${periodo}`);
@@ -1927,42 +1954,6 @@
                 console.log('📊 Dados processados para dashboard:', dadosCore);
                 
                 atualizarInterface(dadosCore);
-                atualizarGraficosComDados(dadosCore);
-                
-                console.log('📊 Dashboard atualizado com sucesso');
-            }
-            
-            // CORREÇÃO 1: Calcular meta diária DINÂMICA baseada no progresso real
-            function calcularMetaDiariaDinamica(faturado, metaMensal, diasUteisPassados, diasUteisTotal) {
-                if (diasUteisPassados === 0 || diasUteisTotal === 0) {
-                    return metaMensal / diasUteisTotal;
-                }
-                
-                // Calcular o que falta para atingir a meta
-                const faltaParaMeta = Math.max(0, metaMensal - faturado);
-                
-                // Calcular dias úteis restantes
-                const diasUteisRestantes = diasUteisTotal - diasUteisPassados;
-                
-                if (diasUteisRestantes === 0) {
-                    // Se não há mais dias úteis, meta diária é o que falta hoje
-                    return faltaParaMeta;
-                }
-                
-                // Meta diária dinâmica: dividir o que falta pelos dias restantes
-                const metaDiariaDinamica = faltaParaMeta / diasUteisRestantes;
-                
-                // Garantir valor mínimo razoável (não inferior à média original)
-                const metaDiariaOriginal = metaMensal / diasUteisTotal;
-                const metaMinima = Math.max(metaDiariaOriginal * 0.5, metaDiariaDinamica);
-                
-                return metaMinima;
-            }
-            
-            // CORREÇÃO 3: Calcular total de dias úteis no mês
-            function calcularDiasUteisNoMes() {
-                const dataAtual = new Date();
-                const ano = dataAtual.getFullYear();
                 const mes = dataAtual.getMonth();
                 
                 let diasUteis = 0;
@@ -2810,14 +2801,25 @@
             // INICIALIZAÇÃO
             // ============================================
             
-            inicializar();
-            
-            // Atualizar dados a cada 15 segundos
-            setInterval(solicitarDadosAoCore, 15000);
-            
-            // Forçar solicitação inicial após 1 segundo
-            setTimeout(solicitarDadosAoCore, 1000);
-        });
+            // Inicializar
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('🚀 Dashboard Profissional carregado');
+                
+                // Carregar meta personalizada
+                carregarMetaPersonalizada();
+                
+                // Verificar modo administrador
+                verificarModoAdmin();
+                
+                // Configurar event listeners
+                configurarEventListeners();
+                
+                // Iniciar solicitação de dados
+                setInterval(solicitarDadosAoCore, 15000);
+                
+                // Forçar solicitação inicial após 1 segundo
+                setTimeout(solicitarDadosAoCore, 1000);
+            });
     </script>
     
     <!-- CONEXÃO COM O CORE ENGINE -->
