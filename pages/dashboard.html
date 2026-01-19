@@ -1570,7 +1570,7 @@
                         satisfacao: pedidosConcluidos > 0 ? '94' : '0'
                     },
                     contas: {
-                        receber: totalAReceber,
+                        receber: totalAReceber + totalPedidos, // Inclui contas a receber + total de pedidos ativos
                         pagar: totalAPagar
                     },
                     vendasPorCategoria: topVendasCategorias,
@@ -1930,33 +1930,16 @@
                 
                 // Atualizar gráfico de vendas por categoria
                 if (charts.salesByCategory) {
-                    const vendasData = Array.isArray(dados.vendasPorCategoria) ? dados.vendasPorCategoria : [];
+                    const vendasData = dados.vendasPorCategoria || [];
                     
                     console.log('📊 Dados de vendas por categoria:', vendasData);
                     
-                    if (vendasData.length > 0) {
-                        // Garantir que todos os valores sejam números
-                        const dadosFormatados = vendasData.map(item => ({
-                            categoria: item.categoria || 'Sem categoria',
-                            valor: typeof item.valor === 'number' ? item.valor : parseFloat(item.valor) || 0
-                        }));
-                        
-                        console.log('📊 Dados formatados para o gráfico:', dadosFormatados);
-                        
-                        // Atualizar dados do gráfico
-                        charts.salesByCategory.data.labels = dadosFormatados.map(d => d.categoria);
-                        charts.salesByCategory.data.datasets[0].data = dadosFormatados.map(d => d.valor);
-                        charts.salesByCategory.update('none');
-                        
-                        console.log('✅ Gráfico de vendas por categoria atualizado com sucesso!');
-                    } else {
-                        console.warn('⚠️ Nenhum dado de vendas por categoria para exibir');
-                        
-                        // Se não houver dados, definir valores padrão
-                        charts.salesByCategory.data.labels = ['Sem dados de vendas'];
-                        charts.salesByCategory.data.datasets[0].data = [0];
-                        charts.salesByCategory.update('none');
-                    }
+                    // Atualizar dados do gráfico
+                    charts.salesByCategory.data.labels = vendasData.map(d => d.categoria);
+                    charts.salesByCategory.data.datasets[0].data = vendasData.map(d => d.valor);
+                    charts.salesByCategory.update('none');
+                    
+                    console.log('✅ Gráfico de vendas por categoria atualizado com sucesso!');
                 }
                 
                 // Atualizar gráfico de despesas por categoria
