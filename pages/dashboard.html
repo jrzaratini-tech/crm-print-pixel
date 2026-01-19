@@ -1954,8 +1954,11 @@
                                 .filter(item => item && item.categoria !== undefined && item.valor !== undefined)
                                 .map(item => ({
                                     categoria: String(item.categoria || 'Sem categoria').substring(0, 30),
-                                    valor: parseFloat(item.valor) || 0
+                                    valor: Math.abs(parseFloat(item.valor) || 0) // Garantir que o valor seja positivo
                                 }));
+                            
+                            // Ordenar por valor decrescente
+                            dadosFiltrados.sort((a, b) => b.valor - a.valor);
                             
                             console.log('📊 Dados processados para o gráfico:', dadosFiltrados);
                             
