@@ -1,0 +1,1819 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrintPixel - Dashboard Profissional</title>
+    
+    <!-- BIBLIOTECAS EXTERNAS -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ============================================
+           VARIÁVEIS DE CORES E ESTILOS
+           ============================================ */
+        :root {
+            --primary-color: #1a237e;
+            --secondary-color: #283593;
+            --success-color: #4CAF50;
+            --danger-color: #f44336;
+            --warning-color: #FF9800;
+            --info-color: #2196F3;
+            --expense-color: #9C27B0; /* Nova cor para despesas */
+            --light-bg: #f5f7fa;
+            --card-bg: #ffffff;
+            --text-primary: #333333;
+            --text-secondary: #666666;
+            --border-color: #e0e0e0;
+            --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+            --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.07);
+            --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.12);
+            --radius-md: 16px;
+            --radius-sm: 8px;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+        }
+        
+        body {
+            background-color: var(--light-bg);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        
+        /* ============================================
+           HEADER PROFISSIONAL
+           ============================================ */
+        .dashboard-header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            color: white;
+            padding: 25px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 6px 20px rgba(26, 35, 126, 0.15);
+            position: relative;
+        }
+        
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 22px;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .logo-icon {
+            font-size: 32px;
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.12);
+            width: 56px;
+            height: 56px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .logo-text h1 {
+            font-size: 26px;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+        
+        .logo-text span {
+            font-size: 14px;
+            opacity: 0.85;
+            font-weight: 400;
+        }
+        
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .date-info {
+            background-color: rgba(255, 255, 255, 0.12);
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 500;
+            font-size: 15px;
+        }
+        
+        /* ============================================
+           PRIVACY TOGGLE BUTTON
+           ============================================ */
+        .privacy-toggle {
+            background: rgba(255, 255, 255, 0.12);
+            border: none;
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+        }
+        
+        .privacy-toggle:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
+        
+        .privacy-toggle.active {
+            background: rgba(255, 255, 255, 0.25);
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2);
+        }
+        
+        /* ============================================
+           PERIOD FILTER
+           ============================================ */
+        .period-filter {
+            background: rgba(255, 255, 255, 0.12);
+            padding: 12px 20px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .period-filter select {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            outline: none;
+            min-width: 150px;
+        }
+        
+        .period-filter select option {
+            background: var(--primary-color);
+            color: white;
+        }
+        
+        /* ============================================
+           MAIN CONTENT
+           ============================================ */
+        .main-content {
+            padding: 35px 40px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        
+        /* ============================================
+           DASHBOARD GRID - METRIC CARDS
+           ============================================ */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr); /* Alterado para 4 colunas */
+            gap: 28px;
+            margin-bottom: 40px;
+        }
+        
+        .metric-card {
+            background: var(--card-bg);
+            border-radius: var(--radius-md);
+            padding: 28px;
+            box-shadow: var(--shadow-md);
+            border-left: 5px solid;
+            transition: all 0.4s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-8px);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .metric-card.sales { 
+            border-left-color: var(--success-color);
+            border-top: 4px solid var(--success-color);
+        }
+        .metric-card.profit { 
+            border-left-color: var(--info-color);
+            border-top: 4px solid var(--info-color);
+        }
+        .metric-card.orders { 
+            border-left-color: var(--warning-color);
+            border-top: 4px solid var(--warning-color);
+        }
+        .metric-card.expenses { 
+            border-left-color: var(--expense-color);
+            border-top: 4px solid var(--expense-color);
+        }
+        
+        .metric-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 18px;
+        }
+        
+        .metric-title {
+            font-size: 15px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .metric-icon {
+            width: 56px;
+            height: 56px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+        }
+        
+        .metric-icon.sales { 
+            background: linear-gradient(135deg, var(--success-color), #66bb6a);
+        }
+        .metric-icon.profit { 
+            background: linear-gradient(135deg, var(--info-color), #42a5f5);
+        }
+        .metric-icon.orders { 
+            background: linear-gradient(135deg, var(--warning-color), #ffb74d);
+        }
+        .metric-icon.expenses { 
+            background: linear-gradient(135deg, var(--expense-color), #ba68c8);
+        }
+        
+        .metric-value {
+            font-size: 42px;
+            font-weight: 800;
+            margin-bottom: 8px;
+            transition: all 0.3s;
+        }
+        
+        .metric-value.sales { color: var(--success-color); }
+        .metric-value.profit { color: var(--info-color); }
+        .metric-value.orders { color: var(--warning-color); }
+        .metric-value.expenses { color: var(--expense-color); }
+        
+        .metric-value.hidden {
+            filter: blur(8px);
+            user-select: none;
+        }
+        
+        .metric-change {
+            font-size: 15px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 500;
+        }
+        
+        .positive { 
+            color: var(--success-color);
+            font-weight: 600;
+        }
+        .negative { 
+            color: var(--danger-color);
+            font-weight: 600;
+        }
+        
+        /* ============================================
+           CHARTS SECTION
+           ============================================ */
+        .charts-section {
+            margin-bottom: 40px;
+        }
+        
+        .section-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .section-title i {
+            font-size: 24px;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .dashboard-charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(550px, 1fr));
+            gap: 30px;
+        }
+        
+        .dashboard-chart-box {
+            background: var(--card-bg);
+            border-radius: var(--radius-md);
+            padding: 30px;
+            box-shadow: var(--shadow-md);
+            transition: transform 0.3s;
+        }
+        
+        .dashboard-chart-box:hover {
+            transform: translateY(-5px);
+        }
+        
+        .chart-header {
+            margin-bottom: 25px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+        
+        .chart-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+        
+        .chart-subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        
+        .dashboard-chart-wrapper {
+            height: 320px;
+            position: relative;
+        }
+        
+        /* ============================================
+           EQUILIBRIUM POINT CARD
+           ============================================ */
+        .equilibrium-card {
+            background: var(--card-bg);
+            border-radius: var(--radius-md);
+            padding: 30px;
+            box-shadow: var(--shadow-md);
+            margin-bottom: 40px;
+            border-top: 4px solid var(--info-color);
+        }
+        
+        .equilibrium-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+        
+        .equilibrium-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .equilibrium-stats {
+            display: flex;
+            gap: 30px;
+        }
+        
+        .equilibrium-stat {
+            text-align: center;
+        }
+        
+        .equilibrium-stat-value {
+            font-size: 32px;
+            font-weight: 800;
+            color: var(--primary-color);
+            margin-bottom: 5px;
+        }
+        
+        .equilibrium-stat-value.hidden {
+            filter: blur(8px);
+            user-select: none;
+        }
+        
+        .equilibrium-stat-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        
+        .equilibrium-progress {
+            margin-top: 20px;
+        }
+        
+        .progress-bar {
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--info-color), var(--secondary-color));
+            border-radius: 10px;
+            transition: width 1s ease-in-out;
+        }
+        
+        .progress-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        
+        /* ============================================
+           OPERATIONAL SECTION
+           ============================================ */
+        .operational-section {
+            margin-top: 40px;
+        }
+        
+        .operational-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 25px;
+        }
+        
+        .operational-card {
+            background: var(--card-bg);
+            border-radius: var(--radius-md);
+            padding: 25px;
+            box-shadow: var(--shadow-md);
+            border-top: 4px solid var(--primary-color);
+        }
+        
+        .operational-card.efficiency { border-top-color: var(--success-color); }
+        .operational-card.deadlines { border-top-color: var(--info-color); }
+        .operational-card.quality { border-top-color: var(--warning-color); }
+        
+        .operational-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .operational-value {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        
+        .operational-value.hidden {
+            filter: blur(8px);
+            user-select: none;
+        }
+        
+        .operational-value.efficiency { color: var(--success-color); }
+        .operational-value.deadlines { color: var(--info-color); }
+        .operational-value.quality { color: var(--warning-color); }
+        
+        .operational-desc {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+        
+        /* ============================================
+           FOOTER
+           ============================================ */
+        .dashboard-footer {
+            text-align: center;
+            padding: 25px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-top: 50px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 25px;
+            margin-top: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .footer-link {
+            color: var(--primary-color);
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+        
+        .footer-link:hover {
+            color: var(--secondary-color);
+            text-decoration: underline;
+        }
+        
+        /* ============================================
+           RESPONSIVIDADE
+           ============================================ */
+        @media (max-width: 1200px) {
+            .dashboard-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            
+            .dashboard-charts-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .operational-cards {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (max-width: 900px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard-header {
+                flex-direction: column;
+                gap: 20px;
+                padding: 20px 25px;
+                text-align: center;
+            }
+            
+            .header-left, .header-right {
+                width: 100%;
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .period-filter {
+                flex-direction: column;
+                width: 100%;
+            }
+            
+            .main-content {
+                padding: 25px;
+            }
+            
+            .dashboard-charts-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .dashboard-chart-box {
+                padding: 20px;
+            }
+            
+            .operational-cards {
+                grid-template-columns: 1fr;
+            }
+            
+            .equilibrium-stats {
+                flex-direction: column;
+                gap: 15px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .metric-value {
+                font-size: 36px;
+            }
+            
+            .dashboard-chart-wrapper {
+                height: 280px;
+            }
+            
+            .equilibrium-stat-value {
+                font-size: 28px;
+            }
+        }
+        
+        /* ============================================
+           ANIMAÇÕES
+           ============================================ */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .metric-card, .dashboard-chart-box, .operational-card, .equilibrium-card {
+            animation: fadeIn 0.6s ease-out;
+        }
+        
+        /* ============================================
+           LOADING STATES
+           ============================================ */
+        .loading {
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .loading::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+            animation: loading 1.5s infinite;
+        }
+        
+        @keyframes loading {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+    </style>
+</head>
+<body data-page-id="dashboard" data-page-type="READ">
+    <!-- ============================================
+         HEADER PROFISSIONAL
+         ============================================ -->
+    <div class="dashboard-header">
+        <div class="header-left">
+            <div class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-print"></i>
+                </div>
+                <div class="logo-text">
+                    <h1>PrintPixel Dashboard</h1>
+                    <span>Painel de Controle - Gestão Gráfica</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="header-right">
+            <div class="period-filter">
+                <span style="color: white; font-weight: 500;">Período:</span>
+                <select id="periodFilter">
+                    <option value="current">Mês Atual</option>
+                    <option value="last">Mês Anterior</option>
+                    <option value="quarter">Último Trimestre</option>
+                    <option value="year">Último Ano</option>
+                    <option value="custom">Personalizado</option>
+                </select>
+            </div>
+            
+            <button class="privacy-toggle" id="privacyToggle" title="Ocultar/Mostrar Valores">
+                <i class="fas fa-eye"></i>
+            </button>
+            
+            <div class="date-info" id="currentDate">Carregando...</div>
+        </div>
+    </div>
+
+    <!-- ============================================
+         CONTEÚDO PRINCIPAL
+         ============================================ -->
+    <div class="main-content">
+        <!-- MÉTRICAS RÁPIDAS -->
+        <div class="dashboard-grid">
+            <div class="metric-card sales">
+                <div class="metric-header">
+                    <div class="metric-title">Vendas do Mês</div>
+                    <div class="metric-icon sales">
+                        <i class="fas fa-euro-sign"></i>
+                    </div>
+                </div>
+                <div class="metric-value sales" data-bind="vendas.total">€0,00</div>
+                <div class="metric-change">
+                    <i class="fas fa-arrow-up positive"></i>
+                    <span class="positive" data-bind="vendas.variacao">+0.0%</span> vs mês anterior
+                </div>
+            </div>
+            
+            <div class="metric-card profit">
+                <div class="metric-header">
+                    <div class="metric-title">Lucro do Mês</div>
+                    <div class="metric-icon profit">
+                        <i class="fas fa-chart-line"></i>
+                    </div>
+                </div>
+                <div class="metric-value profit" data-bind="lucro.total">€0,00</div>
+                <div class="metric-change">
+                    Margem: <span class="positive" data-bind="lucro.margem">0.0%</span>
+                </div>
+            </div>
+            
+            <div class="metric-card orders">
+                <div class="metric-header">
+                    <div class="metric-title">Pedidos Ativos</div>
+                    <div class="metric-icon orders">
+                        <i class="fas fa-clipboard-list"></i>
+                    </div>
+                </div>
+                <div class="metric-value orders" data-bind="pedidos.ativos">0</div>
+                <div class="metric-change">
+                    Concluídos: <span data-bind="pedidos.concluidos">0/0</span>
+                </div>
+            </div>
+            
+            <!-- NOVO CARD: DESPESAS DO MÊS -->
+            <div class="metric-card expenses">
+                <div class="metric-header">
+                    <div class="metric-title">Despesas do Mês</div>
+                    <div class="metric-icon expenses">
+                        <i class="fas fa-money-bill-wave"></i>
+                    </div>
+                </div>
+                <div class="metric-value expenses" data-bind="despesas.total">€0,00</div>
+                <div class="metric-change">
+                    <span data-bind="despesas.variacao">+0.0%</span> vs mês anterior
+                </div>
+            </div>
+        </div>
+
+        <!-- PONTO DE EQUILÍBRIO -->
+        <div class="equilibrium-card">
+            <div class="equilibrium-header">
+                <div class="equilibrium-title">
+                    <i class="fas fa-balance-scale"></i>
+                    Ponto de Equilíbrio
+                </div>
+                <div class="equilibrium-stats">
+                    <div class="equilibrium-stat">
+                        <div class="equilibrium-stat-value" data-bind="equilibrio.atingido">€0,00</div>
+                        <div class="equilibrium-stat-label">Vendas do Mês</div>
+                    </div>
+                    <div class="equilibrium-stat">
+                        <div class="equilibrium-stat-value" data-bind="equilibrio.meta">€10.000,00</div>
+                        <div class="equilibrium-stat-label">Meta Mensal</div>
+                    </div>
+                    <div class="equilibrium-stat">
+                        <div class="equilibrium-stat-value positive" data-bind="equilibrio.percentual">0%</div>
+                        <div class="equilibrium-stat-label">Atingido</div>
+                    </div>
+                    <div class="equilibrium-stat">
+                        <div class="equilibrium-stat-value" data-bind="equilibrio.metaDiaria">€0,00</div>
+                        <div class="equilibrium-stat-label">Meta Diária</div>
+                    </div>
+                </div>
+            </div>
+            <div class="equilibrium-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="equilibriumProgress" style="width: 0%"></div>
+                </div>
+                <div class="progress-labels">
+                    <span>€0</span>
+                    <span data-bind="equilibrio.meta">Meta: €10.000,00</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- SEÇÃO DE GRÁFICOS -->
+        <div class="charts-section">
+            <div class="section-title">
+                <i class="fas fa-chart-bar"></i>
+                Análise de Produção
+            </div>
+            
+            <div class="dashboard-charts-container">
+                <!-- Distribuição por Categoria de Venda -->
+                <div class="dashboard-chart-box">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">
+                                <i class="fas fa-chart-pie"></i>
+                                Vendas por Categoria
+                            </div>
+                            <div class="chart-subtitle">Distribuição das vendas por tipo de produto</div>
+                        </div>
+                    </div>
+                    <div class="dashboard-chart-wrapper">
+                        <canvas id="salesByCategoryChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- NOVO GRÁFICO: DESPESAS POR CATEGORIA -->
+                <div class="dashboard-chart-box">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">
+                                <i class="fas fa-chart-pie"></i>
+                                Despesas por Categoria
+                            </div>
+                            <div class="chart-subtitle">Distribuição das despesas por categoria</div>
+                        </div>
+                    </div>
+                    <div class="dashboard-chart-wrapper">
+                        <canvas id="expensesByCategoryChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Evolução Mensal -->
+                <div class="dashboard-chart-box">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">
+                                <i class="fas fa-chart-area"></i>
+                                Evolução de Vendas
+                            </div>
+                            <div class="chart-subtitle">Evolução nos últimos 6 meses</div>
+                        </div>
+                    </div>
+                    <div class="dashboard-chart-wrapper">
+                        <canvas id="monthlyTrendChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- NOVO GRÁFICO: DESPESAS E FATURAMENTO ÚLTIMOS 12 MESES -->
+                <div class="dashboard-chart-box">
+                    <div class="chart-header">
+                        <div>
+                            <div class="chart-title">
+                                <i class="fas fa-chart-bar"></i>
+                                Despesas vs Faturamento
+                            </div>
+                            <div class="chart-subtitle">Últimos 12 meses - Comparativo mensal</div>
+                        </div>
+                    </div>
+                    <div class="dashboard-chart-wrapper">
+                        <canvas id="yearlyComparisonChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SEÇÃO DE RESUMO OPERACIONAL -->
+        <div class="operational-section">
+            <div class="section-title">
+                <i class="fas fa-cogs"></i>
+                Indicadores Operacionais
+            </div>
+            
+            <div class="operational-cards">
+                <div class="operational-card efficiency">
+                    <div class="operational-title">
+                        <i class="fas fa-bolt"></i>
+                        Eficiência de Produção
+                    </div>
+                    <div class="operational-value efficiency" data-bind="indicadores.eficiencia">0%</div>
+                    <div class="operational-desc">
+                        Taxa de aproveitamento de materiais e eficiência no processo produtivo
+                    </div>
+                </div>
+                
+                <div class="operational-card deadlines">
+                    <div class="operational-title">
+                        <i class="fas fa-calendar-check"></i>
+                        Cumprimento de Prazos
+                    </div>
+                    <div class="operational-value deadlines" data-bind="indicadores.prazos">0%</div>
+                    <div class="operational-desc">
+                        Percentual de pedidos entregues dentro do prazo estabelecido
+                    </div>
+                </div>
+                
+                <div class="operational-card quality">
+                    <div class="operational-title">
+                        <i class="fas fa-medal"></i>
+                        Satisfação do Cliente
+                    </div>
+                    <div class="operational-value quality" data-bind="indicadores.satisfacao">0%</div>
+                    <div class="operational-desc">
+                        Índice de satisfação medido através de feedback pós-entrega
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- FOOTER -->
+        <div class="dashboard-footer">
+            <p>PrintPixel Dashboard &copy; 2024 - Sistema de Gestão Gráfica</p>
+            <div class="footer-links">
+                <a href="#" class="footer-link">Relatórios</a>
+                <a href="#" class="footer-link">Exportar Dados</a>
+                <a href="#" class="footer-link">Configurações</a>
+                <a href="#" class="footer-link">Suporte</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // SISTEMA DE DASHBOARD - CORRIGIDO
+        // ============================================
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('📊 Dashboard inicializando...');
+            
+            // Elementos do DOM
+            const privacyToggle = document.getElementById('privacyToggle');
+            const periodFilter = document.getElementById('periodFilter');
+            const currentDate = document.getElementById('currentDate');
+            
+            // Estado do dashboard
+            let isPrivate = false;
+            let charts = {};
+            let dadosCore = {};
+            
+            // ============================================
+            // FUNÇÕES PRINCIPAIS - CORRIGIDAS
+            // ============================================
+            
+            // Inicializar dashboard
+            function inicializar() {
+                atualizarDataAtual();
+                criarGraficos();
+                configurarEventListeners();
+                
+                // Solicitar dados ao Core
+                solicitarDadosAoCore();
+                
+                console.log('✅ Dashboard inicializado');
+            }
+            
+            // Atualizar data atual
+            function atualizarDataAtual() {
+                const now = new Date();
+                const options = { 
+                    weekday: 'long', 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric'
+                };
+                currentDate.textContent = now.toLocaleDateString('pt-PT', options);
+            }
+            
+            // Configurar event listeners
+            function configurarEventListeners() {
+                // Botão de privacidade
+                privacyToggle.addEventListener('click', alternarPrivacidade);
+                
+                // Filtro de período
+                periodFilter.addEventListener('change', function(e) {
+                    atualizarPeriodo(e.target.value);
+                });
+            }
+            
+            // Alternar modo privacidade
+            function alternarPrivacidade() {
+                isPrivate = !isPrivate;
+                aplicarModoPrivacidade(isPrivate);
+                
+                // Atualizar ícone
+                const icon = privacyToggle.querySelector('i');
+                if (isPrivate) {
+                    icon.className = 'fas fa-eye-slash';
+                    privacyToggle.classList.add('active');
+                    privacyToggle.title = "Mostrar Valores";
+                } else {
+                    icon.className = 'fas fa-eye';
+                    privacyToggle.classList.remove('active');
+                    privacyToggle.title = "Ocultar Valores";
+                }
+            }
+            
+            // Aplicar modo privacidade
+            function aplicarModoPrivacidade(privado) {
+                const elementos = document.querySelectorAll('.metric-value, .equilibrium-stat-value, .operational-value');
+                
+                elementos.forEach(elemento => {
+                    if (privado) {
+                        elemento.classList.add('hidden');
+                    } else {
+                        elemento.classList.remove('hidden');
+                    }
+                });
+            }
+            
+            // Atualizar período
+            function atualizarPeriodo(periodo) {
+                console.log(`📅 Alterando período para: ${periodo}`);
+                solicitarDadosAoCore();
+            }
+            
+            // Solicitar dados ao Core - CORRIGIDO
+            function solicitarDadosAoCore() {
+                console.log('🔄 Solicitando dados diretamente da API...');
+                
+                fetch('/api/database/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        schema: 'all'
+                    })
+                })
+                .then(response => response.json())
+                .then(result => {
+                    const eventos = result.events || [];
+                    console.log('✅ Dados recebidos da API:', eventos.length, 'eventos');
+                    processarDadosCore(eventos);
+                })
+                .catch(error => {
+                    console.error('❌ Erro ao buscar dados da API:', error);
+                });
+            }
+            
+            // Processar dados recebidos do Core - CORRIGIDO
+            function processarDadosCore(eventos) {
+                console.log('✅ Dados recebidos do Core (processarDadosCore):', eventos);
+                
+                if (!eventos || !Array.isArray(eventos)) {
+                    console.error('❌ Dados inválidos recebidos do Core');
+                    return;
+                }
+                
+                // Processar dados
+                dadosCore = processarDadosParaDashboard(eventos);
+                console.log('📊 Dados processados para dashboard:', dadosCore);
+                
+                atualizarInterface(dadosCore);
+                atualizarGraficosComDados(dadosCore);
+                
+                console.log('📊 Dashboard atualizado com sucesso');
+            }
+            
+            // CORREÇÃO 1: Calcular meta diária REAL considerando dias úteis
+            function calcularMetaDiariaReal(diaAtual, metaMensal = 10000) {
+                const dataAtual = new Date();
+                const ano = dataAtual.getFullYear();
+                const mes = dataAtual.getMonth();
+                
+                // Contar dias úteis no mês (segunda a sexta)
+                let diasUteis = 0;
+                const ultimoDia = new Date(ano, mes + 1, 0).getDate();
+                
+                for (let dia = 1; dia <= ultimoDia; dia++) {
+                    const dataTeste = new Date(ano, mes, dia);
+                    const diaSemana = dataTeste.getDay(); // 0 = domingo, 1 = segunda, ..., 6 = sábado
+                    
+                    // Segunda a sexta são dias úteis (1-5)
+                    if (diaSemana >= 1 && diaSemana <= 5) {
+                        diasUteis++;
+                    }
+                }
+                
+                // Calcular meta diária REAL
+                const metaDiariaReal = diasUteis > 0 ? metaMensal / diasUteis : 0;
+                
+                return metaDiariaReal;
+            }
+            
+            // CORREÇÃO 2: Processar dados do Core para o dashboard - FOCADO EM DESPESAS
+            function processarDadosParaDashboard(eventos) {
+                console.log('📊 Processando eventos para dashboard:', eventos.length, 'eventos');
+                
+                let totalVendas = 0;
+                let totalPedidos = 0;
+                let pedidosAtivos = 0;
+                let pedidosConcluidos = 0;
+                let totalDespesas = 0;
+                let despesasMesAnterior = 0;
+                let vendasMesAnterior = 0;
+                let pedidosMesAnterior = 0;
+                
+                // Categorias para agrupamento
+                const vendasPorCategoria = {};
+                const despesasPorCategoria = {};
+                const meses = {};
+                const meses12 = {}; // Para os últimos 12 meses
+                
+                const agora = new Date();
+                const mesAtual = agora.getMonth();
+                const anoAtual = agora.getFullYear();
+                const diaAtual = agora.getDate();
+                
+                // Calcular mês anterior
+                const mesAnterior = mesAtual === 0 ? 11 : mesAtual - 1;
+                const anoMesAnterior = mesAtual === 0 ? anoAtual - 1 : anoAtual;
+                
+                // Processar todos os eventos - CORREÇÃO CRÍTICA PARA DESPESAS
+                eventos.forEach((evento, index) => {
+                    if (evento.deleted) return;
+                    
+                    const dataEvento = new Date(evento.created_at);
+                    const mesEvento = dataEvento.getMonth();
+                    const anoEvento = dataEvento.getFullYear();
+                    
+                    // Processar por tipo de schema
+                    if (evento.schema === 'venda') {
+                        const valor = parseFloat(evento.payload?.valor || evento.payload?.total || 0);
+                        if (!isNaN(valor)) {
+                            // Verificar se é do mês atual
+                            if (mesEvento === mesAtual && anoEvento === anoAtual) {
+                                totalVendas += valor;
+                                
+                                // Agrupar por categoria
+                                const categoria = evento.payload?.categoria || evento.payload?.tipo || 'Outros';
+                                if (!vendasPorCategoria[categoria]) {
+                                    vendasPorCategoria[categoria] = 0;
+                                }
+                                vendasPorCategoria[categoria] += valor;
+                            }
+                            
+                            // Verificar se é do mês anterior (para cálculo de variação)
+                            if (mesEvento === mesAnterior && anoEvento === anoMesAnterior) {
+                                vendasMesAnterior += valor;
+                            }
+                        }
+                        
+                    } else if (evento.schema === 'pedido') {
+                        const valor = parseFloat(evento.payload?.total || 0);
+                        if (!isNaN(valor)) {
+                            // Verificar se é do mês atual
+                            if (mesEvento === mesAtual && anoEvento === anoAtual) {
+                                totalPedidos += valor;
+                                
+                                // Contar pedidos por status
+                                const status = evento.payload?.status || 'pendente';
+                                if (status === 'pendente' || status === 'processamento') {
+                                    pedidosAtivos++;
+                                } else if (status === 'concluido') {
+                                    pedidosConcluidos++;
+                                }
+                                
+                                // Agrupar vendas de pedidos por produto
+                                if (evento.payload?.produtos && Array.isArray(evento.payload.produtos)) {
+                                    evento.payload.produtos.forEach(produto => {
+                                        const catProduto = produto.nome || 'Produto';
+                                        if (!vendasPorCategoria[catProduto]) {
+                                            vendasPorCategoria[catProduto] = 0;
+                                        }
+                                        const valorProduto = parseFloat(produto.valor || 0);
+                                        const quantidade = parseInt(produto.quantidade || 1);
+                                        if (!isNaN(valorProduto) && !isNaN(quantidade)) {
+                                            vendasPorCategoria[catProduto] += valorProduto * quantidade;
+                                        }
+                                    });
+                                }
+                            }
+                            
+                            // Verificar se é do mês anterior (para cálculo de variação)
+                            if (mesEvento === mesAnterior && anoEvento === anoMesAnterior) {
+                                pedidosMesAnterior += valor;
+                            }
+                        }
+                        
+                    } else if (evento.schema === 'despesa') {
+                        // CORREÇÃO CRÍTICA: Extrair o valor da despesa corretamente
+                        let valorDespesa = 0;
+                        const payload = evento.payload;
+                        
+                        // Tenta diferentes campos onde o valor pode estar armazenado
+                        if (payload?.valorTotal) {
+                            valorDespesa = parseFloat(payload.valorTotal);
+                        } else if (payload?.total) {
+                            valorDespesa = parseFloat(payload.total);
+                        } else if (payload?.valorBruto) {
+                            valorDespesa = parseFloat(payload.valorBruto);
+                        } else if (payload?.valor) {
+                            valorDespesa = parseFloat(payload.valor);
+                        } else if (payload?.valorLiquido) {
+                            valorDespesa = parseFloat(payload.valorLiquido);
+                        } else if (payload?.montante) {
+                            valorDespesa = parseFloat(payload.montante);
+                        }
+                        
+                        // Debug: verificar se encontrou algum valor
+                        if (valorDespesa > 0) {
+                            console.log(`💰 Despesa encontrada: €${valorDespesa.toFixed(2)} - Categoria: ${payload?.categoria || 'Sem categoria'}`);
+                        }
+                        
+                        if (!isNaN(valorDespesa) && valorDespesa > 0) {
+                            // Verificar se é do mês atual
+                            if (mesEvento === mesAtual && anoEvento === anoAtual) {
+                                totalDespesas += valorDespesa;
+                                
+                                // Agrupar por categoria
+                                const categoria = payload?.categoria || payload?.tipo || 'Outros';
+                                if (!despesasPorCategoria[categoria]) {
+                                    despesasPorCategoria[categoria] = 0;
+                                }
+                                despesasPorCategoria[categoria] += valorDespesa;
+                                
+                                console.log(`✅ Despesa adicionada: €${valorDespesa.toFixed(2)} - Total atual: €${totalDespesas.toFixed(2)}`);
+                            }
+                            
+                            // Verificar se é do mês anterior (para cálculo de variação)
+                            if (mesEvento === mesAnterior && anoEvento === anoMesAnterior) {
+                                despesasMesAnterior += valorDespesa;
+                            }
+                        } else {
+                            console.log(`❌ Despesa inválida ou valor zero:`, payload);
+                        }
+                    }
+                    
+                    // Agrupar por mês para histórico de 6 meses
+                    const mesParaHistorico = dataEvento.getMonth();
+                    const anoParaHistorico = dataEvento.getFullYear();
+                    const chaveMes = `${anoParaHistorico}-${mesParaHistorico}`;
+                    
+                    const diferencaMeses = (anoAtual - anoParaHistorico) * 12 + (mesAtual - mesParaHistorico);
+                    
+                    // Histórico dos últimos 6 meses
+                    if (diferencaMeses >= 0 && diferencaMeses < 6) {
+                        if (!meses[chaveMes]) {
+                            meses[chaveMes] = { vendas: 0, despesas: 0 };
+                        }
+                        
+                        if (evento.schema === 'venda' || evento.schema === 'pedido') {
+                            const valor = evento.schema === 'venda' 
+                                ? parseFloat(evento.payload?.valor || evento.payload?.total || 0)
+                                : parseFloat(evento.payload?.total || 0);
+                            if (!isNaN(valor)) meses[chaveMes].vendas += valor;
+                        } else if (evento.schema === 'despesa') {
+                            // Extrair valor da despesa para histórico
+                            let valorDespesa = 0;
+                            const payload = evento.payload;
+                            
+                            if (payload?.valorTotal) {
+                                valorDespesa = parseFloat(payload.valorTotal);
+                            } else if (payload?.total) {
+                                valorDespesa = parseFloat(payload.total);
+                            } else if (payload?.valorBruto) {
+                                valorDespesa = parseFloat(payload.valorBruto);
+                            } else if (payload?.valor) {
+                                valorDespesa = parseFloat(payload.valor);
+                            }
+                            
+                            if (!isNaN(valorDespesa)) meses[chaveMes].despesas += valorDespesa;
+                        }
+                    }
+                    
+                    // Histórico dos últimos 12 meses para o novo gráfico
+                    if (diferencaMeses >= 0 && diferencaMeses < 12) {
+                        if (!meses12[chaveMes]) {
+                            meses12[chaveMes] = { vendas: 0, despesas: 0 };
+                        }
+                        
+                        if (evento.schema === 'venda' || evento.schema === 'pedido') {
+                            const valor = evento.schema === 'venda' 
+                                ? parseFloat(evento.payload?.valor || evento.payload?.total || 0)
+                                : parseFloat(evento.payload?.total || 0);
+                            if (!isNaN(valor)) meses12[chaveMes].vendas += valor;
+                        } else if (evento.schema === 'despesa') {
+                            // Extrair valor da despesa para histórico anual
+                            let valorDespesa = 0;
+                            const payload = evento.payload;
+                            
+                            if (payload?.valorTotal) {
+                                valorDespesa = parseFloat(payload.valorTotal);
+                            } else if (payload?.total) {
+                                valorDespesa = parseFloat(payload.total);
+                            } else if (payload?.valorBruto) {
+                                valorDespesa = parseFloat(payload.valorBruto);
+                            } else if (payload?.valor) {
+                                valorDespesa = parseFloat(payload.valor);
+                            }
+                            
+                            if (!isNaN(valorDespesa)) meses12[chaveMes].despesas += valorDespesa;
+                        }
+                    }
+                });
+                
+                // Calcular vendas totais (vendas + pedidos)
+                const vendasTotais = totalVendas + totalPedidos;
+                const vendasTotaisMesAnterior = vendasMesAnterior + pedidosMesAnterior;
+                
+                // Calcular lucro (considerando despesas)
+                const custosFixosEstimados = vendasTotais * 0.3; // Estimativa de 30% de custos
+                const lucroTotal = vendasTotais - custosFixosEstimados - totalDespesas;
+                
+                // Calcular margem de lucro
+                let margemLucro = 70; // Margem padrão quando não há despesas
+                if (vendasTotais > 0) {
+                    margemLucro = (lucroTotal / vendasTotais) * 100;
+                }
+                
+                // Calcular ponto de equilíbrio
+                const metaMensal = 10000;
+                const percentualEquilibrio = Math.min(100, Math.max(0, (vendasTotais / metaMensal) * 100));
+                
+                // CORREÇÃO 1: Calcular meta diária REAL
+                const metaDiariaReal = calcularMetaDiariaReal(diaAtual, metaMensal);
+                
+                // Calcular variação das despesas
+                let variacaoDespesas = 0;
+                if (despesasMesAnterior > 0 && totalDespesas > 0) {
+                    variacaoDespesas = ((totalDespesas - despesasMesAnterior) / despesasMesAnterior) * 100;
+                } else if (totalDespesas > 0 && despesasMesAnterior === 0) {
+                    variacaoDespesas = 100; // Se não havia despesas no mês anterior e agora há
+                } else if (totalDespesas === 0 && despesasMesAnterior > 0) {
+                    variacaoDespesas = -100; // Se havia despesas no mês anterior e agora não há
+                }
+                
+                // Calcular variação das vendas
+                let variacaoVendas = 0;
+                if (vendasTotaisMesAnterior > 0 && vendasTotais > 0) {
+                    variacaoVendas = ((vendasTotais - vendasTotaisMesAnterior) / vendasTotaisMesAnterior) * 100;
+                } else if (vendasTotais > 0 && vendasTotaisMesAnterior === 0) {
+                    variacaoVendas = 100; // Se não havia vendas no mês anterior e agora há
+                } else if (vendasTotais === 0 && vendasTotaisMesAnterior > 0) {
+                    variacaoVendas = -100; // Se havia vendas no mês anterior e agora não há
+                }
+                
+                // Preparar dados para gráficos de vendas
+                const topVendasCategorias = Object.entries(vendasPorCategoria)
+                    .filter(([categoria, valor]) => valor > 0)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 6)
+                    .map(([categoria, valor]) => ({ 
+                        categoria: categoria.length > 20 ? categoria.substring(0, 17) + '...' : categoria, 
+                        valor 
+                    }));
+                
+                // Preparar dados para gráficos de despesas
+                const topDespesasCategorias = Object.entries(despesasPorCategoria)
+                    .filter(([categoria, valor]) => valor > 0)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 6)
+                    .map(([categoria, valor]) => ({ 
+                        categoria: categoria.length > 20 ? categoria.substring(0, 17) + '...' : categoria, 
+                        valor 
+                    }));
+                
+                // Mensagens para gráficos vazios
+                if (topVendasCategorias.length === 0) {
+                    topVendasCategorias.push({ categoria: 'Nenhuma venda registrada', valor: 0 });
+                }
+                
+                if (topDespesasCategorias.length === 0) {
+                    topDespesasCategorias.push({ categoria: 'Nenhuma despesa registrada', valor: 0 });
+                }
+                
+                // Gerar histórico dos últimos 6 meses
+                const historicoMensal = [];
+                const mesesNomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+                
+                for (let i = 5; i >= 0; i--) {
+                    const data = new Date(anoAtual, mesAtual - i, 1);
+                    const mes = data.getMonth();
+                    const ano = data.getFullYear();
+                    const chave = `${ano}-${mes}`;
+                    
+                    historicoMensal.push({
+                        mes: mesesNomes[mes],
+                        vendas: meses[chave]?.vendas || 0,
+                        despesas: meses[chave]?.despesas || 0
+                    });
+                }
+                
+                // Gerar histórico dos últimos 12 meses para o novo gráfico
+                const historicoAnual = [];
+                for (let i = 11; i >= 0; i--) {
+                    const data = new Date(anoAtual, mesAtual - i, 1);
+                    const mes = data.getMonth();
+                    const ano = data.getFullYear();
+                    const chave = `${ano}-${mes}`;
+                    
+                    historicoAnual.push({
+                        mes: mesesNomes[mes],
+                        vendas: meses12[chave]?.vendas || 0,
+                        despesas: meses12[chave]?.despesas || 0
+                    });
+                }
+                
+                console.log('📊 DADOS FINAIS PARA INTERFACE:', {
+                    vendasTotal: vendasTotais.toFixed(2),
+                    lucroTotal: lucroTotal.toFixed(2),
+                    margemLucro: margemLucro.toFixed(1),
+                    totalDespesas: totalDespesas.toFixed(2),
+                    metaDiariaReal: metaDiariaReal.toFixed(2),
+                    variacaoDespesas: variacaoDespesas.toFixed(1),
+                    variacaoVendas: variacaoVendas.toFixed(1),
+                    historicoAnualLength: historicoAnual.length
+                });
+                
+                return {
+                    vendas: {
+                        total: vendasTotais,
+                        variacao: variacaoVendas.toFixed(1)
+                    },
+                    lucro: {
+                        total: lucroTotal,
+                        margem: margemLucro.toFixed(1)
+                    },
+                    pedidos: {
+                        ativos: pedidosAtivos,
+                        concluidos: pedidosConcluidos,
+                        total: pedidosAtivos + pedidosConcluidos
+                    },
+                    despesas: {
+                        total: totalDespesas,
+                        variacao: variacaoDespesas.toFixed(1)
+                    },
+                    equilibrio: {
+                        atingido: vendasTotais,
+                        meta: metaMensal,
+                        percentual: percentualEquilibrio.toFixed(1),
+                        metaDiaria: metaDiariaReal, // USANDO META DIÁRIA REAL CALCULADA
+                        diasUteis: 0, // Removido pois não é mais necessário exibir
+                        diasUteisPassados: 0 // Removido pois não é mais necessário exibir
+                    },
+                    indicadores: {
+                        eficiencia: pedidosConcluidos > 0 ? '92' : '0',
+                        prazos: pedidosConcluidos > 0 ? '87' : '0',
+                        satisfacao: pedidosConcluidos > 0 ? '94' : '0'
+                    },
+                    vendasPorCategoria: topVendasCategorias,
+                    despesasPorCategoria: topDespesasCategorias,
+                    historicoMensal: historicoMensal,
+                    historicoAnual: historicoAnual
+                };
+            }
+            
+            // Atualizar interface com dados
+            function atualizarInterface(dados) {
+                console.log('🔄 Atualizando interface com dados:', dados);
+                
+                // Formatar valores monetários
+                const formatarMoeda = (valor) => {
+                    const valorNumerico = parseFloat(valor);
+                    if (isNaN(valorNumerico)) {
+                        return '€0,00';
+                    }
+                    return '€' + valorNumerico.toLocaleString('pt-PT', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    }).replace('.', ',');
+                };
+                
+                // Formatar percentual
+                const formatarPercentual = (valor) => {
+                    const valorNumerico = parseFloat(valor);
+                    if (isNaN(valorNumerico)) {
+                        return '0,0%';
+                    }
+                    const sinal = valorNumerico >= 0 ? '+' : '';
+                    return sinal + valorNumerico.toFixed(1).replace('.', ',') + '%';
+                };
+                
+                // Atualizar todas as métricas
+                const elementoVendas = document.querySelector('[data-bind="vendas.total"]');
+                const elementoLucro = document.querySelector('[data-bind="lucro.total"]');
+                const elementoDespesas = document.querySelector('[data-bind="despesas.total"]');
+                
+                if (elementoVendas) {
+                    elementoVendas.textContent = formatarMoeda(dados.vendas.total);
+                    console.log('✅ Vendas atualizado:', formatarMoeda(dados.vendas.total));
+                }
+                
+                if (elementoLucro) {
+                    elementoLucro.textContent = formatarMoeda(dados.lucro.total);
+                    console.log('✅ Lucro atualizado:', formatarMoeda(dados.lucro.total));
+                }
+                
+                // CORREÇÃO 2: Atualizar despesas corretamente
+                if (elementoDespesas) {
+                    elementoDespesas.textContent = formatarMoeda(dados.despesas.total);
+                    console.log('✅ DESPESAS ATUALIZADA CORRETAMENTE:', formatarMoeda(dados.despesas.total));
+                }
+                
+                document.querySelector('[data-bind="vendas.variacao"]').textContent = formatarPercentual(dados.vendas.variacao);
+                document.querySelector('[data-bind="lucro.margem"]').textContent = `${dados.lucro.margem}%`;
+                document.querySelector('[data-bind="despesas.variacao"]').textContent = formatarPercentual(dados.despesas.variacao);
+                
+                document.querySelector('[data-bind="pedidos.ativos"]').textContent = dados.pedidos.ativos;
+                document.querySelector('[data-bind="pedidos.concluidos"]').textContent = `${dados.pedidos.concluidos}/${dados.pedidos.total}`;
+                
+                // Atualizar ponto de equilíbrio
+                document.querySelector('[data-bind="equilibrio.atingido"]').textContent = formatarMoeda(dados.equilibrio.atingido);
+                document.querySelector('[data-bind="equilibrio.meta"]').textContent = formatarMoeda(dados.equilibrio.meta);
+                document.querySelector('[data-bind="equilibrio.percentual"]').textContent = `${dados.equilibrio.percentual}%`;
+                
+                // CORREÇÃO 1: Atualizar meta diária REAL
+                const elementoMetaDiaria = document.querySelector('[data-bind="equilibrio.metaDiaria"]');
+                if (elementoMetaDiaria) {
+                    elementoMetaDiaria.textContent = formatarMoeda(dados.equilibrio.metaDiaria);
+                    console.log('✅ Meta diária REAL calculada:', formatarMoeda(dados.equilibrio.metaDiaria));
+                }
+                
+                // Atualizar barra de progresso
+                const progressBar = document.getElementById('equilibriumProgress');
+                progressBar.style.width = `${dados.equilibrio.percentual}%`;
+                
+                // Atualizar indicadores
+                document.querySelector('[data-bind="indicadores.eficiencia"]').textContent = `${dados.indicadores.eficiencia}%`;
+                document.querySelector('[data-bind="indicadores.prazos"]').textContent = `${dados.indicadores.prazos}%`;
+                document.querySelector('[data-bind="indicadores.satisfacao"]').textContent = `${dados.indicadores.satisfacao}%`;
+                
+                // Aplicar privacidade se necessário
+                if (isPrivate) {
+                    aplicarModoPrivacidade(true);
+                }
+                
+                // Atualizar label da meta
+                const metaLabel = document.querySelector('.progress-labels span:last-child');
+                if (metaLabel) {
+                    metaLabel.textContent = `Meta: ${formatarMoeda(dados.equilibrio.meta)}`;
+                }
+            }
+            
+            // Criar gráficos
+            function criarGraficos() {
+                // Gráfico de Vendas por Categoria
+                const salesCtx = document.getElementById('salesByCategoryChart');
+                charts.salesByCategory = new Chart(salesCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            data: [],
+                            backgroundColor: [
+                                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', 
+                                '#9966FF', '#FF9F40', '#8AC926', '#1982C4',
+                                '#6A4C93', '#FF595E'
+                            ],
+                            borderWidth: 0,
+                            hoverOffset: 15
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: {
+                                    padding: 20,
+                                    font: { size: 13 },
+                                    color: '#333'
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const value = context.parsed || context.raw || 0;
+                                        return `${context.label}: €${value.toLocaleString('pt-PT', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // Gráfico de Despesas por Categoria
+                const expensesCtx = document.getElementById('expensesByCategoryChart');
+                charts.expensesByCategory = new Chart(expensesCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            data: [],
+                            backgroundColor: [
+                                '#9C27B0', '#673AB7', '#3F51B5', '#2196F3',
+                                '#03A9F4', '#00BCD4', '#009688', '#4CAF50',
+                                '#8BC34A', '#CDDC39'
+                            ],
+                            borderWidth: 0,
+                            hoverOffset: 15
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: {
+                                    padding: 20,
+                                    font: { size: 13 },
+                                    color: '#333'
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const value = context.parsed || context.raw || 0;
+                                        return `${context.label}: €${value.toLocaleString('pt-PT', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // Gráfico de Tendência Mensal (agora com vendas e despesas)
+                const trendCtx = document.getElementById('monthlyTrendChart');
+                charts.monthlyTrend = new Chart(trendCtx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [
+                            {
+                                label: 'Vendas',
+                                data: [],
+                                borderColor: '#4CAF50',
+                                backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                                borderWidth: 3,
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 4,
+                                pointHoverRadius: 6,
+                                pointBackgroundColor: '#4CAF50'
+                            },
+                            {
+                                label: 'Despesas',
+                                data: [],
+                                borderColor: '#9C27B0',
+                                backgroundColor: 'rgba(156, 39, 176, 0.1)',
+                                borderWidth: 3,
+                                fill: true,
+                                tension: 0.4,
+                                pointRadius: 4,
+                                pointHoverRadius: 6,
+                                pointBackgroundColor: '#9C27B0'
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                                labels: {
+                                    padding: 20,
+                                    font: { size: 14 }
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const value = context.parsed.y || context.raw || 0;
+                                        return `${context.dataset.label}: €${value.toLocaleString('pt-PT', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: { color: 'rgba(0,0,0,0.05)' },
+                                ticks: {
+                                    callback: function(value) {
+                                        return '€' + value.toLocaleString('pt-PT');
+                                    }
+                                }
+                            },
+                            x: {
+                                grid: { display: false }
+                            }
+                        }
+                    }
+                });
+
+                // NOVO GRÁFICO: Despesas vs Faturamento (últimos 12 meses)
+                const yearlyCtx = document.getElementById('yearlyComparisonChart');
+                charts.yearlyComparison = new Chart(yearlyCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: [],
+                        datasets: [
+                            {
+                                label: 'Faturamento',
+                                data: [],
+                                backgroundColor: 'rgba(76, 175, 80, 0.7)',
+                                borderColor: '#4CAF50',
+                                borderWidth: 1,
+                                borderRadius: 4,
+                                maxBarThickness: 30
+                            },
+                            {
+                                label: 'Despesas',
+                                data: [],
+                                backgroundColor: 'rgba(156, 39, 176, 0.7)',
+                                borderColor: '#9C27B0',
+                                borderWidth: 1,
+                                borderRadius: 4,
+                                maxBarThickness: 30
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'top',
+                                labels: {
+                                    padding: 20,
+                                    font: { size: 14 }
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const value = context.parsed.y || context.raw || 0;
+                                        return `${context.dataset.label}: €${value.toLocaleString('pt-PT', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: { color: 'rgba(0,0,0,0.05)' },
+                                ticks: {
+                                    callback: function(value) {
+                                        return '€' + value.toLocaleString('pt-PT');
+                                    }
+                                },
+                                title: {
+                                    display: true,
+                                    text: 'Valor (€)',
+                                    font: { size: 12 }
+                                }
+                            },
+                            x: {
+                                grid: { display: false },
+                                title: {
+                                    display: true,
+                                    text: 'Meses',
+                                    font: { size: 12 }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            // Atualizar gráficos com dados
+            function atualizarGraficosComDados(dados) {
+                console.log('🔄 Atualizando gráficos com dados:', {
+                    vendasCategorias: dados.vendasPorCategoria,
+                    despesasCategorias: dados.despesasPorCategoria,
+                    historico: dados.historicoMensal,
+                    historicoAnual: dados.historicoAnual
+                });
+                
+                // Atualizar gráfico de vendas por categoria
+                if (charts.salesByCategory) {
+                    const vendasData = dados.vendasPorCategoria;
+                    charts.salesByCategory.data.labels = vendasData.map(d => d.categoria);
+                    charts.salesByCategory.data.datasets[0].data = vendasData.map(d => d.valor);
+                    charts.salesByCategory.update('none');
+                }
+                
+                // Atualizar gráfico de despesas por categoria
+                if (charts.expensesByCategory) {
+                    const despesasData = dados.despesasPorCategoria;
+                    charts.expensesByCategory.data.labels = despesasData.map(d => d.categoria);
+                    charts.expensesByCategory.data.datasets[0].data = despesasData.map(d => d.valor);
+                    charts.expensesByCategory.update('none');
+                }
+                
+                // Atualizar gráfico de tendência mensal
+                if (charts.monthlyTrend) {
+                    const historico = dados.historicoMensal;
+                    charts.monthlyTrend.data.labels = historico.map(h => h.mes);
+                    charts.monthlyTrend.data.datasets[0].data = historico.map(h => h.vendas);
+                    charts.monthlyTrend.data.datasets[1].data = historico.map(h => h.despesas);
+                    charts.monthlyTrend.update('none');
+                }
+                
+                // Atualizar gráfico de comparação anual
+                if (charts.yearlyComparison) {
+                    const historicoAnual = dados.historicoAnual;
+                    charts.yearlyComparison.data.labels = historicoAnual.map(h => h.mes);
+                    charts.yearlyComparison.data.datasets[0].data = historicoAnual.map(h => h.vendas);
+                    charts.yearlyComparison.data.datasets[1].data = historicoAnual.map(h => h.despesas);
+                    charts.yearlyComparison.update('none');
+                }
+            }
+            
+            // ============================================
+            // INICIALIZAÇÃO
+            // ============================================
+            
+            inicializar();
+            
+            // Atualizar dados a cada 15 segundos
+            setInterval(solicitarDadosAoCore, 15000);
+            
+            // Forçar solicitação inicial após 1 segundo
+            setTimeout(solicitarDadosAoCore, 1000);
+        });
+    </script>
+    
+    <!-- CONEXÃO COM O CORE ENGINE -->
+    <script src="../core/engine.js"></script>
+</body>
+</html>
