@@ -390,31 +390,6 @@
         .pedido-actions {
             display: flex;
             gap: 8px;
-        }
-        
-        .action-btn {
-            width: 36px;
-            height: 36px;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
-            background: var(--card-bg);
-            color: var(--text-secondary);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s;
-        }
-        
-        .action-btn:hover {
-            background: var(--hover-bg);
-            border-color: var(--primary-color);
-            color: var(--primary-color);
-        }
-        
-        .action-btn.expand {
-            background: var(--primary-color);
-            border-color: var(--primary-color);
             color: white;
         }
         
@@ -1153,6 +1128,9 @@
                             </div>
                         </div>
                         <div class="pedido-actions">
+                            <button class="action-btn edit" title="Editar pedido" data-id="${pedido.id}">
+                                <i class="fas fa-edit"></i>
+                            </button>
                             <button class="action-btn expand" title="Ver detalhes">
                                 <i class="fas fa-expand"></i>
                             </button>
@@ -1217,9 +1195,11 @@
                 `;
                 
                 // Adicionar event listeners
+                const editBtn = card.querySelector('.action-btn.edit');
                 const expandBtn = card.querySelector('.action-btn.expand');
                 const statusSelect = card.querySelector('.status-select');
                 
+                editBtn.addEventListener('click', () => editarPedido(pedido));
                 expandBtn.addEventListener('click', () => abrirModalDetalhes(pedido));
                 statusSelect.addEventListener('change', (e) => atualizarStatusPedido(pedido.id, e.target.value));
                 
@@ -1450,6 +1430,17 @@
                 
                 atualizarContadores();
                 console.log(`✅ Status do pedido ${pedidoId} atualizado para: ${novoStatus}`);
+            }
+            
+            // ============================================
+            // FUNÇÕES DE EDIÇÃO
+            // ============================================
+            
+            // Função para editar um pedido
+            function editarPedido(pedido) {
+                console.log('Editando pedido:', pedido);
+                // Redirecionar para a página de novo pedido com o ID do pedido para edição
+                window.location.href = `novopedido.html?edit=${pedido.id}`;
             }
             
             // ============================================

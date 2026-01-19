@@ -5,6 +5,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Formulário de Pedido</title>
     <style>
+        /* Estilo para mensagem de sucesso */
+        .success-message {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #10b981;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 6px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
         * {
             margin: 0;
             padding: 0;
@@ -720,6 +744,12 @@
             
             // Coletar dados
             const pedidoData = coletarDadosPedido();
+            const pedidoId = document.getElementById('pedidoForm').dataset.pedidoId;
+            
+            // Definir o ID do pedido se estiver em modo de edição
+            if (pedidoId) {
+                pedidoData.id = pedidoId;
+            }
             
             // Enviar para o Core (o engine.js fará o commit automático)
             console.log('Pedido pronto para salvar:', pedidoData);
@@ -729,77 +759,94 @@
             saveBtn.textContent = '✓ SALVO!';
             saveBtn.disabled = true;
             
-            setTimeout(() => {
-                saveBtn.style.backgroundColor = '';
-                saveBtn.textContent = 'SALVAR PEDIDO';
-                saveBtn.disabled = false;
+            // Criar evento para salvar
+            const evento = {
+                id: pedidoId || `pedido_${Date.now()}`,
+                schema: 'pedido',
+                payload: pedidoData,
+                created_at: new Date().toISOString()
+            };
+            
+            // Salvar usando o Core Engine
+            if (typeof Core !== 'undefined' && typeof Core.commit === 'function') {
+                Core.commit([evento])
+                    .then(() => {
+                        console.log('Pedido salvo com sucesso!');
+                        showSuccessMessage('Pedido salvo com sucesso!');
+                        
+                        // Resetar botão após 2 segundos
+                        setTimeout(() => {
+                            if (!pedidoId && confirm('Pedido salvo com sucesso! Deseja criar um novo pedido?')) {
+                                clearForm();
+                            } else {
+                                saveBtn.style.backgroundColor = '';
+                                saveBtn.textContent = pedidoId ? 'ATUALIZAR PEDIDO' : 'SALVAR PEDIDO';
+                                saveBtn.disabled = false;
+                                
+                                // Se for uma edição, voltar para a lista de pedidos
+                                if (pedidoId) {
+                                    setTimeout(() => {
+                                        window.location.href = 'pedidos.html';
+                                    }, 1000);
+                                }
+                            }
+                        }, 2000);
+                    })
+                    .catch(error => {
+                        console.error('Erro ao salvar pedido:', error);
+                        alert('Erro ao salvar o pedido. Por favor, tente novamente.');
+                        saveBtn.style.backgroundColor = '';
+                        saveBtn.textContent = pedidoId ? 'ATUALIZAR PEDIDO' : 'SALVAR PEDIDO';
+                        saveBtn.disabled = false;
+                    });
+            } else {
+                console.warn('Core Engine não encontrado. Simulando salvamento...');
+                showSuccessMessage('Pedido salvo com sucesso! (modo de demonstração)');
                 
-                // Limpar formulário
-                if (confirm('Pedido salvo com sucesso! Deseja criar um novo pedido?')) {
-                    pedidoForm.reset();
-                    productsTableBody.innerHTML = '';
-                    productIndex = 0;
-                    ivaSimRadio.checked = true;
-                    addProductRow();
-                    calculateTotals();
-                    
-                    // Resetar datas para valores padrão
-                    const today = new Date();
-                    const tomorrow = new Date(today);
-                    tomorrow.setDate(tomorrow.getDate() + 1);
-                    
-                    document.getElementById('dataFechamento').valueAsDate = today;
-                    document.getElementById('dataEntrega').valueAsDate = tomorrow;
-                    document.getElementById('dataEntrada').valueAsDate = today;
+                // Simular salvamento local
+                const eventos = JSON.parse(localStorage.getItem('eventos') || '[]');
+                const index = eventos.findIndex(e => e.id === evento.id);
+                
+                if (index >= 0) {
+                    eventos[index] = evento; // Atualizar existente
+                } else {
+                    eventos.push(evento); // Adicionar novo
                 }
-            }, 2000);
+                
+                localStorage.setItem('eventos', JSON.stringify(eventos));
+                
+                // Resetar botão após 2 segundos
+                setTimeout(() => {
+                    if (!pedidoId && confirm('Pedido salvo com sucesso! Deseja criar um novo pedido?')) {
+                        clearForm();
+                    } else {
+                        saveBtn.style.backgroundColor = '';
+                        saveBtn.textContent = pedidoId ? 'ATUALIZAR PEDIDO' : 'SALVAR PEDIDO';
+                        saveBtn.disabled = false;
+                        
+                        // Se for uma edição, voltar para a lista de pedidos
+                        if (pedidoId) {
+                            setTimeout(() => {
+                                window.location.href = 'pedidos.html';
+                            }, 1000);
+                        }
+                    }
+                }, 2000);
+            }
             
             return false;
         }
 
         // Função para limpar o formulário
         function clearForm() {
-            if (confirm('Tem certeza de que deseja cancelar? Todos os dados não salvos serão perdidos.')) {
-                pedidoForm.reset();
-                productsTableBody.innerHTML = '';
-                productIndex = 0;
-                ivaSimRadio.checked = true;
-                addProductRow();
-                calculateTotals();
-                
-                // Resetar datas para valores padrão
-                const today = new Date();
-                const tomorrow = new Date(today);
-                tomorrow.setDate(tomorrow.getDate() + 1);
-                
-                document.getElementById('dataFechamento').valueAsDate = today;
-                document.getElementById('dataEntrega').valueAsDate = tomorrow;
-                document.getElementById('dataEntrada').valueAsDate = today;
-            }
-        }
-
-        // Event Listeners
-        addProductBtn.addEventListener('click', () => {
-            addProductRow();
-            calculateTotals();
-        });
-
-        cancelBtn.addEventListener('click', clearForm);
-
-        saveBtn.addEventListener('click', salvarPedido);
-        
-        // Atualizar totais quando o valor de instalação mudar
-        valorInstalacaoInput.addEventListener('input', calculateTotals);
-        
-        // Atualizar totais quando a opção de IVA mudar
-        ivaSimRadio.addEventListener('change', calculateTotals);
-        ivaNaoRadio.addEventListener('change', calculateTotals);
-
-        // Inicializar o formulário com um produto
-        document.addEventListener('DOMContentLoaded', () => {
+            // Limpar campos do formulário
+            pedidoForm.reset();
+            productsTableBody.innerHTML = '';
+            productIndex = 0;
+            ivaSimRadio.checked = true;
             addProductRow();
             
-            // Definir datas padrão
+            // Resetar datas para valores padrão
             const today = new Date();
             const tomorrow = new Date(today);
             tomorrow.setDate(tomorrow.getDate() + 1);
@@ -808,8 +855,140 @@
             document.getElementById('dataEntrega').valueAsDate = tomorrow;
             document.getElementById('dataEntrada').valueAsDate = today;
             
+            // Remover ID do pedido se existir
+            if (pedidoForm.dataset.pedidoId) {
+                delete pedidoForm.dataset.pedidoId;
+            }
+            
+            // Resetar texto do botão
+            saveBtn.textContent = 'SALVAR PEDIDO';
+            
             // Calcular totais iniciais
             calculateTotals();
+        }
+        
+        // Função para carregar um pedido existente para edição
+        function carregarPedidoParaEdicao(pedidoId) {
+            console.log(`Carregando pedido ${pedidoId} para edição...`);
+            
+            // Buscar o pedido no banco de dados
+            const eventos = JSON.parse(localStorage.getItem('eventos') || '[]');
+            const pedidoEvento = eventos.find(e => e.id === pedidoId && e.schema === 'pedido');
+            
+            if (!pedidoEvento) {
+                alert('Pedido não encontrado!');
+                window.location.href = 'pedidos.html';
+                return;
+            }
+            
+            const pedido = pedidoEvento.payload;
+            
+            // Preencher campos do formulário
+            document.getElementById('nomeCliente').value = pedido.cliente || '';
+            document.getElementById('nomeEmpresa').value = pedido.empresa || '';
+            document.getElementById('contribuinte').value = pedido.nif || '';
+            document.getElementById('morada').value = pedido.endereco || '';
+            document.getElementById('telemovel').value = pedido.telefone || '';
+            document.getElementById('numeroPedido').value = pedido.numero || '';
+            document.getElementById('dataFechamento').value = pedido.dataFechamento || '';
+            document.getElementById('dataEntrega').value = pedido.dataEntrega || '';
+            document.getElementById('dataEntrada').value = pedido.dataEntrada || '';
+            document.getElementById('valorEntrada').value = pedido.entrada || '0';
+            document.getElementById('valorInstalacao').value = pedido.instalacao || '0';
+            document.getElementById('observacoes').value = pedido.observacoes || '';
+            
+            // Definir status
+            if (pedido.status) {
+                const statusRadio = document.querySelector(`input[name="status"][value="${pedido.status}"]`);
+                if (statusRadio) statusRadio.checked = true;
+            }
+            
+            // Definir opção de IVA
+            if (pedido.comIVA !== undefined) {
+                if (pedido.comIVA === 'sim' || pedido.comIVA === true) {
+                    document.getElementById('ivaSim').checked = true;
+                } else {
+                    document.getElementById('ivaNao').checked = true;
+                }
+            }
+            
+            // Limpar produtos existentes
+            productsTableBody.innerHTML = '';
+            productIndex = 0;
+            
+            // Adicionar produtos
+            if (pedido.produtos && pedido.produtos.length > 0) {
+                pedido.produtos.forEach((produto, index) => {
+                    if (index > 0) {
+                        addProductRow();
+                    }
+                    
+                    const row = productsTableBody.lastElementChild;
+                    const select = row.querySelector('.product-select');
+                    if (select) select.value = produto.nome || '';
+                    
+                    const tamanho = row.querySelector('input[data-bind$=".tamanho"]');
+                    if (tamanho) tamanho.value = produto.tamanho || '';
+                    
+                    const quantidade = row.querySelector('.quantity-input');
+                    if (quantidade) quantidade.value = produto.quantidade || '1';
+                    
+                    const valor = row.querySelector('.price-input');
+                    if (valor) valor.value = produto.valor || '0';
+                    
+                    const obs = row.querySelector('input[data-bind$=".observacoes"]');
+                    if (obs) obs.value = produto.observacoes || '';
+                });
+            } else {
+                addProductRow();
+            }
+            
+            // Calcular totais
+            calculateTotals();
+            
+            // Atualizar texto do botão
+            saveBtn.textContent = 'ATUALIZAR PEDIDO';
+            
+            // Adicionar ID do pedido ao formulário
+            pedidoForm.dataset.pedidoId = pedidoId;
+        }
+        
+        // Função auxiliar para exibir mensagem de sucesso
+        function showSuccessMessage(message) {
+            // Remover mensagens anteriores
+            const existingMessages = document.querySelectorAll('.success-message');
+            existingMessages.forEach(msg => msg.remove());
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'success-message';
+            messageDiv.textContent = message;
+            document.body.appendChild(messageDiv);
+            
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 3000);
+        }
+        
+        // Verificar se há um pedido para edição quando a página carregar
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const pedidoId = urlParams.get('edit');
+            
+            if (pedidoId) {
+                carregarPedidoParaEdicao(pedidoId);
+            } else {
+                // Configurar datas padrão apenas para novo pedido
+                const today = new Date();
+                const tomorrow = new Date(today);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                
+                document.getElementById('dataFechamento').valueAsDate = today;
+                document.getElementById('dataEntrega').valueAsDate = tomorrow;
+                document.getElementById('dataEntrada').valueAsDate = today;
+                
+                // Adicionar primeira linha de produto
+                addProductRow();
+            }
         });
     </script>
     
