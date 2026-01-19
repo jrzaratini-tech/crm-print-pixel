@@ -185,9 +185,28 @@
            ============================================ */
         .dashboard-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr); /* Alterado para 4 colunas */
-            gap: 28px;
+            grid-template-columns: repeat(6, 1fr); /* Alterado para 6 colunas */
+            gap: 20px; /* Reduzi um pouco o gap para caber mais cards */
             margin-bottom: 40px;
+        }
+        
+        /* Estilo para telas menores - ajusta para 2 colunas */
+        @media (max-width: 1600px) {
+            .dashboard-grid {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+        
+        @media (max-width: 1200px) {
+            .dashboard-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
         }
         
         .metric-card {
@@ -221,6 +240,14 @@
         .metric-card.expenses { 
             border-left-color: var(--expense-color);
             border-top: 4px solid var(--expense-color);
+        }
+        .metric-card.receber { 
+            border-left-color: #4caf50;
+            border-top: 4px solid #4caf50;
+        }
+        .metric-card.pagar { 
+            border-left-color: #f44336;
+            border-top: 4px solid #f44336;
         }
         
         .metric-header {
@@ -261,6 +288,12 @@
         .metric-icon.expenses { 
             background: linear-gradient(135deg, var(--expense-color), #ba68c8);
         }
+        .metric-icon.receber { 
+            background: linear-gradient(135deg, #4caf50, #81c784);
+        }
+        .metric-icon.pagar { 
+            background: linear-gradient(135deg, #f44336, #e57373);
+        }
         
         .metric-value {
             font-size: 42px;
@@ -273,6 +306,8 @@
         .metric-value.profit { color: var(--info-color); }
         .metric-value.orders { color: var(--warning-color); }
         .metric-value.expenses { color: var(--expense-color); }
+        .metric-value.receber { color: #4caf50; } /* Verde para Restante a Receber */
+        .metric-value.pagar { color: #f44336; } /* Vermelho para Restante a Pagar */
         
         .metric-value.hidden {
             filter: blur(8px);
@@ -464,12 +499,10 @@
             border-radius: var(--radius-md);
             padding: 25px;
             box-shadow: var(--shadow-md);
-            border-top: 4px solid var(--primary-color);
+            border: 1px solid var(--border-color);
         }
         
-        .operational-card.efficiency { border-top-color: var(--success-color); }
-        .operational-card.deadlines { border-top-color: var(--info-color); }
-        .operational-card.quality { border-top-color: var(--warning-color); }
+        /* Removendo estilos específicos das bordas dos cards */
         
         .operational-title {
             font-size: 16px;
@@ -492,9 +525,23 @@
             user-select: none;
         }
         
-        .operational-value.efficiency { color: var(--success-color); }
-        .operational-value.deadlines { color: var(--info-color); }
-        .operational-value.quality { color: var(--warning-color); }
+        .operational-value {
+            color: var(--text-primary) !important;
+            font-size: 24px;
+            font-weight: 600;
+        }
+        
+        .operational-card {
+            background: var(--card-bg) !important;
+            border: 1px solid var(--border-color) !important;
+            box-shadow: var(--shadow-md) !important;
+        }
+        
+        .operational-card, .operational-card * {
+            border: none !important;
+            border-top: none !important;
+            border-color: transparent !important;
+        }
         
         .operational-desc {
             font-size: 14px;
@@ -745,6 +792,36 @@
                     <span data-bind="despesas.variacao">+0.0%</span> vs mês anterior
                 </div>
             </div>
+            
+            <!-- NOVO CARD: RESTANTE A RECEBER -->
+            <div class="metric-card receber">
+                <div class="metric-header">
+                    <div class="metric-title">Restante a Receber</div>
+                    <div class="metric-icon receber">
+                        <i class="fas fa-hand-holding-usd"></i>
+                    </div>
+                </div>
+                <div class="metric-value receber" data-bind="contas.receber">€0,00</div>
+                <div class="metric-change">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>Vencimento</span>
+                </div>
+            </div>
+            
+            <!-- NOVO CARD: RESTANTE A PAGAR -->
+            <div class="metric-card pagar">
+                <div class="metric-header">
+                    <div class="metric-title">Restante a Pagar</div>
+                    <div class="metric-icon pagar">
+                        <i class="fas fa-file-invoice-dollar"></i>
+                    </div>
+                </div>
+                <div class="metric-value pagar" data-bind="contas.pagar">€0,00</div>
+                <div class="metric-change">
+                    <i class="fas fa-calendar-alt"></i>
+                    <span>Vencimento</span>
+                </div>
+            </div>
         </div>
 
         <!-- PONTO DE EQUILÍBRIO -->
@@ -866,34 +943,31 @@
             </div>
             
             <div class="operational-cards">
-                <div class="operational-card efficiency">
+                <div class="operational-card">
                     <div class="operational-title">
-                        <i class="fas fa-bolt"></i>
                         Eficiência de Produção
                     </div>
-                    <div class="operational-value efficiency" data-bind="indicadores.eficiencia">0%</div>
+                    <div class="operational-value" data-bind="indicadores.eficiencia">0%</div>
                     <div class="operational-desc">
                         Taxa de aproveitamento de materiais e eficiência no processo produtivo
                     </div>
                 </div>
                 
-                <div class="operational-card deadlines">
+                <div class="operational-card">
                     <div class="operational-title">
-                        <i class="fas fa-calendar-check"></i>
                         Cumprimento de Prazos
                     </div>
-                    <div class="operational-value deadlines" data-bind="indicadores.prazos">0%</div>
+                    <div class="operational-value" data-bind="indicadores.prazos">0%</div>
                     <div class="operational-desc">
                         Percentual de pedidos entregues dentro do prazo estabelecido
                     </div>
                 </div>
                 
-                <div class="operational-card quality">
+                <div class="operational-card">
                     <div class="operational-title">
-                        <i class="fas fa-medal"></i>
                         Satisfação do Cliente
                     </div>
-                    <div class="operational-value quality" data-bind="indicadores.satisfacao">0%</div>
+                    <div class="operational-value" data-bind="indicadores.satisfacao">0%</div>
                     <div class="operational-desc">
                         Índice de satisfação medido através de feedback pós-entrega
                     </div>
@@ -1050,30 +1124,60 @@
                 console.log('📊 Dashboard atualizado com sucesso');
             }
             
-            // CORREÇÃO 1: Calcular meta diária REAL considerando dias úteis
-            function calcularMetaDiariaReal(diaAtual, metaMensal = 10000) {
+            // Calcular meta diária REAL considerando faturamento atual e dias úteis restantes
+            function calcularMetaDiariaReal(faturamentoAtual = 0, metaMensal = 10000) {
                 const dataAtual = new Date();
                 const ano = dataAtual.getFullYear();
                 const mes = dataAtual.getMonth();
+                const diaAtual = dataAtual.getDate();
                 
-                // Contar dias úteis no mês (segunda a sexta)
-                let diasUteis = 0;
+                // Contar dias úteis totais e dias úteis já passados
+                let diasUteisTotal = 0;
+                let diasUteisPassados = 0;
                 const ultimoDia = new Date(ano, mes + 1, 0).getDate();
                 
                 for (let dia = 1; dia <= ultimoDia; dia++) {
                     const dataTeste = new Date(ano, mes, dia);
                     const diaSemana = dataTeste.getDay(); // 0 = domingo, 1 = segunda, ..., 6 = sábado
                     
-                    // Segunda a sexta são dias úteis (1-5)
+                    // Verificar se é dia útil (segunda a sexta)
                     if (diaSemana >= 1 && diaSemana <= 5) {
-                        diasUteis++;
+                        diasUteisTotal++;
+                        
+                        // Verificar se o dia já passou (incluindo o dia atual)
+                        if (dia <= diaAtual) {
+                            diasUteisPassados++;
+                        }
                     }
                 }
                 
-                // Calcular meta diária REAL
-                const metaDiariaReal = diasUteis > 0 ? metaMensal / diasUteis : 0;
+                // Calcular dias úteis restantes (excluindo o dia atual se for dia útil)
+                const hojeEUmdiaUtil = new Date().getDay() >= 1 && new Date().getDay() <= 5;
+                const diasUteisRestantes = hojeEUmdiaUtil 
+                    ? diasUteisTotal - diasUteisPassados 
+                    : diasUteisTotal - diasUteisPassados + 1;
                 
-                return metaDiariaReal;
+                // Calcular o saldo restante para atingir a meta
+                const saldoRestante = Math.max(0, metaMensal - faturamentoAtual);
+                
+                // Calcular meta diária necessária para atingir a meta até o final do mês
+                let metaDiaria = 0;
+                
+                if (diasUteisRestantes > 0) {
+                    metaDiaria = saldoRestante / diasUteisRestantes;
+                }
+                
+                console.log('📊 Cálculo de meta diária:', {
+                    metaMensal,
+                    faturamentoAtual,
+                    saldoRestante,
+                    diasUteisTotal,
+                    diasUteisPassados,
+                    diasUteisRestantes,
+                    metaDiariaCalculada: metaDiaria
+                });
+                
+                return metaDiaria;
             }
             
             // CORREÇÃO 2: Processar dados do Core para o dashboard - FOCADO EM DESPESAS
@@ -1095,6 +1199,10 @@
                 const meses = {};
                 const meses12 = {}; // Para os últimos 12 meses
                 
+                // Variáveis para controle de contas a receber e pagar
+                let totalAReceber = 0;
+                let totalAPagar = 0;
+                
                 const agora = new Date();
                 const mesAtual = agora.getMonth();
                 const anoAtual = agora.getFullYear();
@@ -1107,6 +1215,19 @@
                 // Processar todos os eventos - CORREÇÃO CRÍTICA PARA DESPESAS
                 eventos.forEach((evento, index) => {
                     if (evento.deleted) return;
+                    
+                    // Processar contas a receber e pagar
+                    if (evento.schema === 'conta_receber' && evento.status !== 'pago') {
+                        const valor = parseFloat(evento.valor || 0);
+                        if (!isNaN(valor) && valor > 0) {
+                            totalAReceber += valor;
+                        }
+                    } else if (evento.schema === 'conta_pagar' && evento.status !== 'pago') {
+                        const valor = parseFloat(evento.valor || 0);
+                        if (!isNaN(valor) && valor > 0) {
+                            totalAPagar += valor;
+                        }
+                    }
                     
                     const dataEvento = new Date(evento.created_at);
                     const mesEvento = dataEvento.getMonth();
@@ -1306,8 +1427,8 @@
                 const metaMensal = 10000;
                 const percentualEquilibrio = Math.min(100, Math.max(0, (vendasTotais / metaMensal) * 100));
                 
-                // CORREÇÃO 1: Calcular meta diária REAL
-                const metaDiariaReal = calcularMetaDiariaReal(diaAtual, metaMensal);
+                // Calcular meta diária REAL com base no faturamento atual e dias úteis restantes
+                const metaDiariaReal = calcularMetaDiariaReal(vendasTotais, metaMensal);
                 
                 // Calcular variação das despesas
                 let variacaoDespesas = 0;
@@ -1330,14 +1451,30 @@
                 }
                 
                 // Preparar dados para gráficos de vendas
-                const topVendasCategorias = Object.entries(vendasPorCategoria)
-                    .filter(([categoria, valor]) => valor > 0)
-                    .sort((a, b) => b[1] - a[1])
-                    .slice(0, 6)
-                    .map(([categoria, valor]) => ({ 
-                        categoria: categoria.length > 20 ? categoria.substring(0, 17) + '...' : categoria, 
-                        valor 
-                    }));
+                let topVendasCategorias = [];
+                
+                // Verificar se há vendas para processar
+                const entradasVendas = Object.entries(vendasPorCategoria);
+                
+                if (entradasVendas.length > 0) {
+                    // Processar categorias com valores positivos
+                    topVendasCategorias = entradasVendas
+                        .filter(([categoria, valor]) => valor > 0)
+                        .sort((a, b) => b[1] - a[1])
+                        .slice(0, 6)
+                        .map(([categoria, valor]) => ({ 
+                            categoria: categoria.length > 20 ? categoria.substring(0, 17) + '...' : categoria, 
+                            valor: parseFloat(valor.toFixed(2)) // Garantir que o valor tenha no máximo 2 casas decimais
+                        }));
+                }
+                
+                // Se não houver categorias com valores positivos, adicionar uma mensagem
+                if (topVendasCategorias.length === 0) {
+                    topVendasCategorias.push({ 
+                        categoria: 'Sem dados de vendas', 
+                        valor: 0 
+                    });
+                }
                 
                 // Preparar dados para gráficos de despesas
                 const topDespesasCategorias = Object.entries(despesasPorCategoria)
@@ -1432,6 +1569,10 @@
                         prazos: pedidosConcluidos > 0 ? '87' : '0',
                         satisfacao: pedidosConcluidos > 0 ? '94' : '0'
                     },
+                    contas: {
+                        receber: totalAReceber,
+                        pagar: totalAPagar
+                    },
                     vendasPorCategoria: topVendasCategorias,
                     despesasPorCategoria: topDespesasCategorias,
                     historicoMensal: historicoMensal,
@@ -1469,6 +1610,8 @@
                 const elementoVendas = document.querySelector('[data-bind="vendas.total"]');
                 const elementoLucro = document.querySelector('[data-bind="lucro.total"]');
                 const elementoDespesas = document.querySelector('[data-bind="despesas.total"]');
+                const elementoReceber = document.querySelector('[data-bind="contas.receber"]');
+                const elementoPagar = document.querySelector('[data-bind="contas.pagar"]');
                 
                 if (elementoVendas) {
                     elementoVendas.textContent = formatarMoeda(dados.vendas.total);
@@ -1509,10 +1652,31 @@
                 const progressBar = document.getElementById('equilibriumProgress');
                 progressBar.style.width = `${dados.equilibrio.percentual}%`;
                 
-                // Atualizar indicadores
-                document.querySelector('[data-bind="indicadores.eficiencia"]').textContent = `${dados.indicadores.eficiencia}%`;
-                document.querySelector('[data-bind="indicadores.prazos"]').textContent = `${dados.indicadores.prazos}%`;
-                document.querySelector('[data-bind="indicadores.satisfacao"]').textContent = `${dados.indicadores.satisfacao}%`;
+                // Atualizar indicadores - Removendo classes de cor
+                const eficienciaEl = document.querySelector('[data-bind="indicadores.eficiencia"]');
+                const prazosEl = document.querySelector('[data-bind="indicadores.prazos"]');
+                const satisfacaoEl = document.querySelector('[data-bind="indicadores.satisfacao"]');
+                
+                // Remover classes de cor
+                eficienciaEl.className = 'operational-value';
+                prazosEl.className = 'operational-value';
+                satisfacaoEl.className = 'operational-value';
+                
+                // Atualizar textos
+                eficienciaEl.textContent = `${dados.indicadores.eficiencia}%`;
+                prazosEl.textContent = `${dados.indicadores.prazos}%`;
+                satisfacaoEl.textContent = `${dados.indicadores.satisfacao}%`;
+                
+                // Atualizar contas a receber e pagar
+                if (elementoReceber) {
+                    elementoReceber.textContent = formatarMoeda(dados.contas?.receber || 0);
+                    console.log('✅ Restante a Receber atualizado:', formatarMoeda(dados.contas?.receber || 0));
+                }
+                
+                if (elementoPagar) {
+                    elementoPagar.textContent = formatarMoeda(dados.contas?.pagar || 0);
+                    console.log('✅ Restante a Pagar atualizado:', formatarMoeda(dados.contas?.pagar || 0));
+                }
                 
                 // Aplicar privacidade se necessário
                 if (isPrivate) {
@@ -1766,10 +1930,33 @@
                 
                 // Atualizar gráfico de vendas por categoria
                 if (charts.salesByCategory) {
-                    const vendasData = dados.vendasPorCategoria;
-                    charts.salesByCategory.data.labels = vendasData.map(d => d.categoria);
-                    charts.salesByCategory.data.datasets[0].data = vendasData.map(d => d.valor);
-                    charts.salesByCategory.update('none');
+                    const vendasData = Array.isArray(dados.vendasPorCategoria) ? dados.vendasPorCategoria : [];
+                    
+                    console.log('📊 Dados de vendas por categoria:', vendasData);
+                    
+                    if (vendasData.length > 0) {
+                        // Garantir que todos os valores sejam números
+                        const dadosFormatados = vendasData.map(item => ({
+                            categoria: item.categoria || 'Sem categoria',
+                            valor: typeof item.valor === 'number' ? item.valor : parseFloat(item.valor) || 0
+                        }));
+                        
+                        console.log('📊 Dados formatados para o gráfico:', dadosFormatados);
+                        
+                        // Atualizar dados do gráfico
+                        charts.salesByCategory.data.labels = dadosFormatados.map(d => d.categoria);
+                        charts.salesByCategory.data.datasets[0].data = dadosFormatados.map(d => d.valor);
+                        charts.salesByCategory.update('none');
+                        
+                        console.log('✅ Gráfico de vendas por categoria atualizado com sucesso!');
+                    } else {
+                        console.warn('⚠️ Nenhum dado de vendas por categoria para exibir');
+                        
+                        // Se não houver dados, definir valores padrão
+                        charts.salesByCategory.data.labels = ['Sem dados de vendas'];
+                        charts.salesByCategory.data.datasets[0].data = [0];
+                        charts.salesByCategory.update('none');
+                    }
                 }
                 
                 // Atualizar gráfico de despesas por categoria
