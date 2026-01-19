@@ -1985,10 +1985,45 @@
                 
                 // Atualizar gráfico de despesas por categoria
                 if (charts.expensesByCategory) {
-                    const despesasData = dados.despesasPorCategoria;
-                    charts.expensesByCategory.data.labels = despesasData.map(d => d.categoria);
-                    charts.expensesByCategory.data.datasets[0].data = despesasData.map(d => d.valor);
-                    charts.expensesByCategory.update('none');
+                    try {
+                        const despesasData = Array.isArray(dados.despesasPorCategoria) ? dados.despesasPorCategoria : [];
+                        
+                        console.log('💰 Dados de despesas por categoria (raw):', despesasData);
+                        
+                        // Verificar se temos dados válidos
+                        if (despesasData.length > 0 && despesasData[0] && 'categoria' in despesasData[0] && 'valor' in despesasData[0]) {
+                            // Filtrar e formatar os dados
+                            const dadosFiltrados = despesasData
+                                .filter(item => item && item.categoria !== undefined && item.valor !== undefined)
+                                .map(item => ({
+                                    categoria: String(item.categoria || 'Sem categoria').substring(0, 30),
+                                    valor: parseFloat(item.valor) || 0
+                                }));
+                            
+                            console.log('💰 Dados processados para o gráfico de despesas:', dadosFiltrados);
+                            
+                            // Atualizar dados do gráfico
+                            charts.expensesByCategory.data.labels = dadosFiltrados.map(d => d.categoria);
+                            charts.expensesByCategory.data.datasets[0].data = dadosFiltrados.map(d => d.valor);
+                            
+                            // Atualizar o gráfico com animação
+                            charts.expensesByCategory.update();
+                            
+                            console.log('✅ Gráfico de despesas por categoria atualizado com sucesso!');
+                        } else {
+                            console.warn('⚠️ Dados de despesas por categoria inválidos ou vazios, usando dados de exemplo');
+                            // Usar dados de exemplo para evitar erro no gráfico
+                            charts.expensesByCategory.data.labels = ['Sem dados disponíveis'];
+                            charts.expensesByCategory.data.datasets[0].data = [1];
+                            charts.expensesByCategory.update();
+                        }
+                    } catch (error) {
+                        console.error('❌ Erro ao atualizar gráfico de despesas por categoria:', error);
+                        // Garantir que o gráfico não quebre
+                        charts.expensesByCategory.data.labels = ['Erro ao carregar'];
+                        charts.expensesByCategory.data.datasets[0].data = [1];
+                        charts.expensesByCategory.update();
+                    }
                 }
                 
                 // Atualizar gráfico de tendência mensal
