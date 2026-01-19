@@ -992,6 +992,9 @@
         // SISTEMA DE DASHBOARD - CORRIGIDO
         // ============================================
         
+        // Variável global para armazenar o período selecionado
+        let periodoAtual = 'mes_atual';
+        
         document.addEventListener('DOMContentLoaded', function() {
             console.log('📊 Dashboard inicializando...');
             
@@ -1078,12 +1081,62 @@
             // Atualizar período
             function atualizarPeriodo(periodo) {
                 console.log(`📅 Alterando período para: ${periodo}`);
+                periodoAtual = periodo;
+                
+                // Atualizar a classe ativa no menu de período
+                document.querySelectorAll('.periodo-btn').forEach(btn => {
+                    if (btn.getAttribute('data-periodo') === periodo) {
+                        btn.classList.add('active');
+                    } else {
+                        btn.classList.remove('active');
+                    }
+                });
+                
                 solicitarDadosAoCore();
             }
             
-            // Solicitar dados ao Core - CORRIGIDO
+            // Solicitar dados ao Core - ATUALIZADO para suportar filtro de período
             function solicitarDadosAoCore() {
                 console.log('🔄 Solicitando dados diretamente da API...');
+                
+                // Obter as datas de início e fim com base no período selecionado
+                const agora = new Date();
+                const mesAtual = agora.getMonth();
+                const anoAtual = agora.getFullYear();
+                const diaAtual = agora.getDate();
+                
+                let dataInicio, dataFim;
+                
+                switch(periodoAtual) {
+                    case 'hoje':
+                        dataInicio = new Date(anoAtual, mesAtual, diaAtual, 0, 0, 0, 0);
+                        dataFim = new Date(anoAtual, mesAtual, diaAtual, 23, 59, 59, 999);
+                        break;
+                    case 'semana':
+                        const diaSemana = agora.getDay();
+                        const diff = agora.getDate() - diaSemana + (diaSemana === 0 ? -6 : 1);
+                        dataInicio = new Date(anoAtual, mesAtual, diff, 0, 0, 0, 0);
+                        dataFim = new Date(anoAtual, mesAtual, diff + 6, 23, 59, 59, 999);
+                        break;
+                    case 'mes_anterior':
+                        dataInicio = new Date(anoAtual, mesAtual - 1, 1, 0, 0, 0, 0);
+                        dataFim = new Date(anoAtual, mesAtual, 0, 23, 59, 59, 999);
+                        break;
+                    case 'ano_atual':
+                        dataInicio = new Date(anoAtual, 0, 1, 0, 0, 0, 0);
+                        dataFim = new Date(anoAtual, 11, 31, 23, 59, 59, 999);
+                        break;
+                    case 'todos':
+                        dataInicio = new Date(0); // Data mínima
+                        dataFim = new Date('2999-12-31T23:59:59.999Z'); // Data máxima
+                        break;
+                    case 'mes_atual':
+                    default:
+                        dataInicio = new Date(anoAtual, mesAtual, 1, 0, 0, 0, 0);
+                        dataFim = new Date(anoAtual, mesAtual + 1, 0, 23, 59, 59, 999);
+                }
+                
+                console.log(`📅 Período selecionado: ${periodoAtual} (${dataInicio.toLocaleDateString()} - ${dataFim.toLocaleDateString()})`);
                 
                 fetch('/api/database/query', {
                     method: 'POST',
@@ -1091,37 +1144,35 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        schema: 'all'
+                        schema: 'all',
+                        filters: {
+                            dataInicio: dataInicio.toISOString(),
+                            dataFim: dataFim.toISOString()
+                        }
                     })
                 })
                 .then(response => response.json())
                 .then(result => {
                     const eventos = result.events || [];
-                    console.log('✅ Dados recebidos da API:', eventos.length, 'eventos');
-                    processarDadosCore(eventos);
+                    console.log(`✅ Dados recebidos da API (${periodoAtual}):`, eventos.length, 'eventos');
+                    
+                    if (!eventos || !Array.isArray(eventos)) {
+                        console.error('❌ Dados inválidos recebidos da API');
+                        return;
+                    }
+                    
+                    // Processar dados
+                    dadosCore = processarDadosParaDashboard(eventos);
+                    console.log('📊 Dados processados para dashboard:', dadosCore);
+                    
+                    atualizarInterface(dadosCore);
+                    atualizarGraficosComDados(dadosCore);
+                    
+                    console.log('📊 Dashboard atualizado com sucesso');
                 })
                 .catch(error => {
                     console.error('❌ Erro ao buscar dados da API:', error);
                 });
-            }
-            
-            // Processar dados recebidos do Core - CORRIGIDO
-            function processarDadosCore(eventos) {
-                console.log('✅ Dados recebidos do Core (processarDadosCore):', eventos);
-                
-                if (!eventos || !Array.isArray(eventos)) {
-                    console.error('❌ Dados inválidos recebidos do Core');
-                    return;
-                }
-                
-                // Processar dados
-                dadosCore = processarDadosParaDashboard(eventos);
-                console.log('📊 Dados processados para dashboard:', dadosCore);
-                
-                atualizarInterface(dadosCore);
-                atualizarGraficosComDados(dadosCore);
-                
-                console.log('📊 Dashboard atualizado com sucesso');
             }
             
             // Calcular meta diária REAL considerando faturamento atual e dias úteis restantes
@@ -1212,6 +1263,9 @@
                 const mesAnterior = mesAtual === 0 ? 11 : mesAtual - 1;
                 const anoMesAnterior = mesAtual === 0 ? anoAtual - 1 : anoAtual;
                 
+                // As datas de início e fim agora são fornecidas pelo servidor
+                // Removida a lógica de cálculo de datas, pois a filtragem é feita no servidor
+                
                 // Processar todos os eventos - CORREÇÃO CRÍTICA PARA DESPESAS
                 eventos.forEach((evento, index) => {
                     if (evento.deleted) return;
@@ -1237,20 +1291,20 @@
                     if (evento.schema === 'venda') {
                         const valor = parseFloat(evento.payload?.valor || evento.payload?.total || 0);
                         if (!isNaN(valor)) {
-                            // Verificar se é do mês atual
-                            if (mesEvento === mesAtual && anoEvento === anoAtual) {
-                                totalVendas += valor;
-                                
-                                // Agrupar por categoria
-                                const categoria = evento.payload?.categoria || evento.payload?.tipo || 'Outros';
-                                if (!vendasPorCategoria[categoria]) {
-                                    vendasPorCategoria[categoria] = 0;
-                                }
-                                vendasPorCategoria[categoria] += valor;
-                            }
+                            totalVendas += valor;
                             
-                            // Verificar se é do mês anterior (para cálculo de variação)
-                            if (mesEvento === mesAnterior && anoEvento === anoMesAnterior) {
+                            // Agrupar por categoria
+                            const categoria = evento.payload?.categoria || evento.payload?.tipo || 'Outros';
+                            if (!vendasPorCategoria[categoria]) {
+                                vendasPorCategoria[categoria] = 0;
+                            }
+                            vendasPorCategoria[categoria] += valor;
+                            
+                            // Calcular dados do período de comparação (mês anterior)
+                            const dataInicioComparacao = new Date(anoMesAnterior, mesAnterior, 1);
+                            const dataFimComparacao = new Date(anoMesAnterior, mesAnterior + 1, 0, 23, 59, 59, 999);
+                            
+                            if (dataEvento >= dataInicioComparacao && dataEvento <= dataFimComparacao) {
                                 vendasMesAnterior += valor;
                             }
                         }
@@ -1258,36 +1312,36 @@
                     } else if (evento.schema === 'pedido') {
                         const valor = parseFloat(evento.payload?.total || 0);
                         if (!isNaN(valor)) {
-                            // Verificar se é do mês atual
-                            if (mesEvento === mesAtual && anoEvento === anoAtual) {
-                                totalPedidos += valor;
-                                
-                                // Contar pedidos por status
-                                const status = evento.payload?.status || 'pendente';
-                                if (status === 'pendente' || status === 'processamento') {
-                                    pedidosAtivos++;
-                                } else if (status === 'concluido') {
-                                    pedidosConcluidos++;
-                                }
-                                
-                                // Agrupar vendas de pedidos por produto
-                                if (evento.payload?.produtos && Array.isArray(evento.payload.produtos)) {
-                                    evento.payload.produtos.forEach(produto => {
-                                        const catProduto = produto.nome || 'Produto';
-                                        if (!vendasPorCategoria[catProduto]) {
-                                            vendasPorCategoria[catProduto] = 0;
-                                        }
-                                        const valorProduto = parseFloat(produto.valor || 0);
-                                        const quantidade = parseInt(produto.quantidade || 1);
-                                        if (!isNaN(valorProduto) && !isNaN(quantidade)) {
-                                            vendasPorCategoria[catProduto] += valorProduto * quantidade;
-                                        }
-                                    });
-                                }
+                            totalPedidos += valor;
+                            
+                            // Contar pedidos por status
+                            const status = evento.payload?.status || 'pendente';
+                            if (status === 'pendente' || status === 'processamento') {
+                                pedidosAtivos++;
+                            } else if (status === 'concluido') {
+                                pedidosConcluidos++;
                             }
                             
-                            // Verificar se é do mês anterior (para cálculo de variação)
-                            if (mesEvento === mesAnterior && anoEvento === anoMesAnterior) {
+                            // Agrupar vendas de pedidos por produto
+                            if (evento.payload?.produtos && Array.isArray(evento.payload.produtos)) {
+                                evento.payload.produtos.forEach(produto => {
+                                    const catProduto = produto.nome || 'Produto';
+                                    if (!vendasPorCategoria[catProduto]) {
+                                        vendasPorCategoria[catProduto] = 0;
+                                    }
+                                    const valorProduto = parseFloat(produto.valor || 0);
+                                    const quantidade = parseInt(produto.quantidade || 1);
+                                    if (!isNaN(valorProduto) && !isNaN(quantidade)) {
+                                        vendasPorCategoria[catProduto] += valorProduto * quantidade;
+                                    }
+                                });
+                            }
+                            
+                            // Calcular dados do período de comparação (mês anterior)
+                            const dataInicioComparacao = new Date(anoMesAnterior, mesAnterior, 1);
+                            const dataFimComparacao = new Date(anoMesAnterior, mesAnterior + 1, 0, 23, 59, 59, 999);
+                            
+                            if (dataEvento >= dataInicioComparacao && dataEvento <= dataFimComparacao) {
                                 pedidosMesAnterior += valor;
                             }
                         }
@@ -1318,22 +1372,22 @@
                         }
                         
                         if (!isNaN(valorDespesa) && valorDespesa > 0) {
-                            // Verificar se é do mês atual
-                            if (mesEvento === mesAtual && anoEvento === anoAtual) {
-                                totalDespesas += valorDespesa;
-                                
-                                // Agrupar por categoria
-                                const categoria = payload?.categoria || payload?.tipo || 'Outros';
-                                if (!despesasPorCategoria[categoria]) {
-                                    despesasPorCategoria[categoria] = 0;
-                                }
-                                despesasPorCategoria[categoria] += valorDespesa;
-                                
-                                console.log(`✅ Despesa adicionada: €${valorDespesa.toFixed(2)} - Total atual: €${totalDespesas.toFixed(2)}`);
-                            }
+                            totalDespesas += valorDespesa;
                             
-                            // Verificar se é do mês anterior (para cálculo de variação)
-                            if (mesEvento === mesAnterior && anoEvento === anoMesAnterior) {
+                            // Agrupar por categoria
+                            const categoria = payload?.categoria || payload?.tipo || 'Outros';
+                            if (!despesasPorCategoria[categoria]) {
+                                despesasPorCategoria[categoria] = 0;
+                            }
+                            despesasPorCategoria[categoria] += valorDespesa;
+                            
+                            console.log(`✅ Despesa adicionada: €${valorDespesa.toFixed(2)} - Total atual: €${totalDespesas.toFixed(2)}`);
+                            
+                            // Calcular dados do período de comparação (mês anterior)
+                            const dataInicioComparacao = new Date(anoMesAnterior, mesAnterior, 1);
+                            const dataFimComparacao = new Date(anoMesAnterior, mesAnterior + 1, 0, 23, 59, 59, 999);
+                            
+                            if (dataEvento >= dataInicioComparacao && dataEvento <= dataFimComparacao) {
                                 despesasMesAnterior += valorDespesa;
                             }
                         } else {
