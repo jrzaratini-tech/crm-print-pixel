@@ -612,28 +612,28 @@
             const row = document.createElement('tr');
             const index = productIndex++;
             
-            // Gerar HTML da linha com data-bind simplificado
+            // CORREÇÃO AQUI: data-bind com ponto (.) em vez de colchetes []
             row.innerHTML = `
                 <td>
-                    <select class="product-select" data-bind="pedido.produtos[${index}].nome" required>
+                    <select class="product-select" data-bind="pedido.produtos.${index}.nome" required>
                         <option value="">Selecione um produto</option>
                         ${produtos.map(p => `<option value="${p}" ${productData && productData.nome === p ? 'selected' : ''}>${p}</option>`).join('')}
                     </select>
                 </td>
                 <td>
-                    <input type="text" class="tamanho-input" data-bind="pedido.produtos[${index}].tamanho" 
+                    <input type="text" class="tamanho-input" data-bind="pedido.produtos.${index}.tamanho" 
                            placeholder="Ex: 30x40cm" value="${productData ? (productData.tamanho || '') : ''}">
                 </td>
                 <td>
-                    <input type="number" class="quantidade-input" data-bind="pedido.produtos[${index}].quantidade" 
+                    <input type="number" class="quantidade-input" data-bind="pedido.produtos.${index}.quantidade" 
                            min="1" value="${productData ? (productData.quantidade || 1) : 1}" required>
                 </td>
                 <td>
-                    <input type="number" class="valor-input" data-bind="pedido.produtos[${index}].valor" 
+                    <input type="number" class="valor-input" data-bind="pedido.produtos.${index}.valor" 
                            min="0" step="0.01" value="${productData ? (productData.valor || '0.00') : '0.00'}" required>
                 </td>
                 <td>
-                    <textarea class="obs-input" data-bind="pedido.produtos[${index}].observacoes" 
+                    <textarea class="obs-input" data-bind="pedido.produtos.${index}.observacoes" 
                               placeholder="Observações do produto..." rows="2">${productData ? (productData.observacoes || '') : ''}</textarea>
                 </td>
                 <td>
@@ -676,18 +676,18 @@
             productIndex = 0;
             
             rows.forEach((row, index) => {
-                // Atualizar data-binds com novo índice
+                // CORREÇÃO AQUI: data-bind com ponto (.) em vez de colchetes []
                 const select = row.querySelector('.product-select');
                 const tamanho = row.querySelector('.tamanho-input');
                 const quantidade = row.querySelector('.quantidade-input');
                 const valor = row.querySelector('.valor-input');
                 const obs = row.querySelector('.obs-input');
                 
-                if (select) select.setAttribute('data-bind', `pedido.produtos[${index}].nome`);
-                if (tamanho) tamanho.setAttribute('data-bind', `pedido.produtos[${index}].tamanho`);
-                if (quantidade) quantidade.setAttribute('data-bind', `pedido.produtos[${index}].quantidade`);
-                if (valor) valor.setAttribute('data-bind', `pedido.produtos[${index}].valor`);
-                if (obs) obs.setAttribute('data-bind', `pedido.produtos[${index}].observacoes`);
+                if (select) select.setAttribute('data-bind', `pedido.produtos.${index}.nome`);
+                if (tamanho) tamanho.setAttribute('data-bind', `pedido.produtos.${index}.tamanho`);
+                if (quantidade) quantidade.setAttribute('data-bind', `pedido.produtos.${index}.quantidade`);
+                if (valor) valor.setAttribute('data-bind', `pedido.produtos.${index}.valor`);
+                if (obs) obs.setAttribute('data-bind', `pedido.produtos.${index}.observacoes`);
                 
                 productIndex = index + 1;
             });
@@ -813,57 +813,6 @@
             }
             
             return true;
-        }
-
-        // Função para preparar dados para o Core Engine
-        function preparePedidoData() {
-            const now = new Date();
-            
-            // Coletar produtos
-            const produtosArray = [];
-            document.querySelectorAll('#productsTableBody tr').forEach(row => {
-                const produto = {
-                    nome: row.querySelector('.product-select').value,
-                    tamanho: row.querySelector('.tamanho-input').value || '',
-                    quantidade: parseInt(row.querySelector('.quantidade-input').value) || 1,
-                    valor: parseFloat(row.querySelector('.valor-input').value) || 0,
-                    observacoes: row.querySelector('.obs-input').value || ''
-                };
-                produtosArray.push(produto);
-            });
-            
-            // Criar objeto do pedido no formato esperado pelo dashboard
-            const pedidoData = {
-                cliente: document.getElementById('cliente').value,
-                empresa: document.getElementById('empresa').value,
-                nif: document.getElementById('nif').value,
-                morada: document.getElementById('morada').value,
-                telemovel: document.getElementById('telemovel').value,
-                numero: document.getElementById('numero').value,
-                produtos: produtosArray,
-                total: parseFloat(pedidoTotalInput.value) || 0,
-                status: document.querySelector('input[name="status"]:checked').value,
-                dataEntrega: document.getElementById('dataEntrega').value,
-                observacoes: document.getElementById('observacoes').value || '',
-                
-                // Campos adicionais (serão ignorados pelo dashboard mas mantidos no payload)
-                atendente: document.getElementById('atendente').value,
-                entrada: parseFloat(document.getElementById('valorEntrada').value) || 0,
-                dataEntrada: document.getElementById('dataEntrada').value || '',
-                instalacao: parseFloat(document.getElementById('valorInstalacao').value) || 0,
-                comIVA: document.querySelector('input[name="ivaOption"]:checked').value,
-                subtotal: parseFloat(pedidoSubtotalInput.value) || 0,
-                iva: parseFloat(pedidoIVAInput.value) || 0,
-                created_at: now.toISOString(),
-                updated_at: now.toISOString()
-            };
-            
-            // Se estiver em modo de edição, manter o ID
-            if (isEditMode && currentPedidoId) {
-                pedidoData.id = currentPedidoId;
-            }
-            
-            return pedidoData;
         }
 
         // Função para limpar o formulário
