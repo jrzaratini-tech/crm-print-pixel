@@ -1,5 +1,3 @@
-[file name]: despesas.html
-[file content begin]
 <!DOCTYPE html>
 <html lang="pt">
 <head>
@@ -71,7 +69,7 @@
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-            gap: 16px;
+            gap: 20px;
         }
         
         .header-title {
@@ -83,7 +81,7 @@
         .header-icon {
             width: 48px;
             height: 48px;
-            background: linear-gradient(135deg, var(--danger-color) 0%, #ef4444 100%);
+            background: linear-gradient(135deg, var(--danger-color) 0%, #dc2626 100%);
             border-radius: 12px;
             display: flex;
             align-items: center;
@@ -108,14 +106,13 @@
         .header-actions {
             display: flex;
             gap: 12px;
-            flex-wrap: wrap;
         }
         
-        .btn-download {
-            padding: 12px 24px;
-            background: var(--success-color);
+        .btn-new {
+            background-color: var(--primary-color);
             color: white;
             border: none;
+            padding: 12px 24px;
             border-radius: var(--radius-md);
             cursor: pointer;
             font-weight: 600;
@@ -125,9 +122,10 @@
             transition: all 0.2s;
         }
         
-        .btn-download:hover {
-            background: #0da271;
+        .btn-new:hover {
+            background-color: var(--secondary-color);
             transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
         }
         
         /* ============================================
@@ -139,11 +137,17 @@
         
         .counters-grid {
             display: grid;
-            grid-template-columns: repeat(2, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 16px;
         }
         
         @media (max-width: 768px) {
+            .counters-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (max-width: 480px) {
             .counters-grid {
                 grid-template-columns: 1fr;
             }
@@ -161,6 +165,14 @@
         
         .counter-card:hover {
             transform: translateY(-2px);
+        }
+        
+        .counter-card.total {
+            border-top: 4px solid var(--primary-color);
+        }
+        
+        .counter-card.mensal {
+            border-top: 4px solid var(--info-color);
         }
         
         .counter-card.pagas {
@@ -182,6 +194,16 @@
             margin: 0 auto 12px;
         }
         
+        .counter-card.total .counter-icon {
+            background: #e0e7ff;
+            color: var(--primary-color);
+        }
+        
+        .counter-card.mensal .counter-icon {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
         .counter-card.pagas .counter-icon {
             background: #d1fae5;
             color: #065f46;
@@ -196,6 +218,14 @@
             font-size: 28px;
             font-weight: 700;
             margin-bottom: 4px;
+        }
+        
+        .counter-card.total .counter-value {
+            color: var(--primary-color);
+        }
+        
+        .counter-card.mensal .counter-value {
+            color: var(--info-color);
         }
         
         .counter-card.pagas .counter-value {
@@ -213,79 +243,148 @@
         }
         
         /* ============================================
-           FILTROS AVANÇADOS
+           CONTROLES E FILTROS
            ============================================ */
-        .filters-section {
-            background: var(--card-bg);
-            padding: 24px;
-            border-radius: var(--radius-lg);
-            box-shadow: var(--shadow-md);
+        .controls-section {
             margin-bottom: 24px;
-            border: 1px solid var(--border-color);
         }
         
-        .filters-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        .filters-container {
+            display: flex;
             gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
         }
         
         .filter-group {
             display: flex;
-            flex-direction: column;
+            gap: 8px;
+            background: var(--card-bg);
+            padding: 8px 12px;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
         }
         
-        .filter-label {
-            font-weight: 600;
-            margin-bottom: 8px;
-            color: var(--text-primary);
+        .filter-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 20px;
+            background: transparent;
+            color: var(--text-secondary);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
             font-size: 14px;
             display: flex;
             align-items: center;
             gap: 6px;
         }
         
-        .filter-input {
-            padding: 10px 12px;
-            border: 1.5px solid var(--border-color);
-            border-radius: var(--radius-sm);
-            font-size: 14px;
-            background: var(--card-bg);
-            color: var(--text-primary);
+        .filter-btn:hover {
+            background: var(--hover-bg);
         }
         
-        .filter-input:focus {
-            outline: none;
-            border-color: var(--primary-color);
-        }
-        
-        .filter-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 12px;
-            margin-top: 16px;
-            padding-top: 16px;
-            border-top: 1px solid var(--border-color);
-        }
-        
-        .btn-filter {
-            padding: 10px 20px;
-            border: none;
-            border-radius: var(--radius-sm);
-            cursor: pointer;
-            font-weight: 500;
-            font-size: 14px;
-            transition: all 0.2s;
-        }
-        
-        .btn-filter-clear {
-            background: var(--text-secondary);
-            color: white;
-        }
-        
-        .btn-filter-apply {
+        .filter-btn.active {
             background: var(--primary-color);
             color: white;
+        }
+        
+        .categoria-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+        
+        .categoria-COMBUSTIVEL {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .categoria-ALUGUEL {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .categoria-AGUA {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .categoria-LUZ {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .categoria-TELEFONE {
+            background: #e0e7ff;
+            color: var(--primary-color);
+        }
+        
+        .categoria-WHATSAPP {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .categoria-CAFE {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .categoria-ESCRITORIO {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .categoria-COMUNICAÇÃO {
+            background: #e0e7ff;
+            color: var(--primary-color);
+        }
+        
+        .categoria-FINANÇAS {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .categoria-OUTROS {
+            background: #f1f5f9;
+            color: var(--text-secondary);
+        }
+        
+        .search-box {
+            flex: 1;
+            max-width: 400px;
+            position: relative;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 12px 20px 12px 44px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background: var(--card-bg);
+            font-size: 14px;
+            transition: all 0.2s;
+            box-shadow: var(--shadow-sm);
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(26, 35, 126, 0.1);
+        }
+        
+        .search-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
         }
         
         /* ============================================
@@ -295,31 +394,28 @@
             margin-bottom: 32px;
         }
         
-        .despesas-list {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
+        .despesas-grid {
+            display: grid;
+            gap: 20px;
         }
         
-        .despesa-item {
+        .despesa-card {
             background: var(--card-bg);
             border-radius: var(--radius-md);
-            padding: 16px;
+            padding: 20px;
             box-shadow: var(--shadow-sm);
             border: 1px solid var(--border-color);
             transition: all 0.3s;
             position: relative;
             overflow: hidden;
-            cursor: pointer;
         }
         
-        .despesa-item:hover {
+        .despesa-card:hover {
             box-shadow: var(--shadow-md);
             transform: translateY(-2px);
-            background: var(--hover-bg);
         }
         
-        .despesa-item::before {
+        .despesa-card::before {
             content: '';
             position: absolute;
             left: 0;
@@ -328,11 +424,11 @@
             height: 100%;
         }
         
-        .despesa-item.paga::before {
+        .despesa-card.paga::before {
             background: var(--success-color);
         }
         
-        .despesa-item.pendente::before {
+        .despesa-card.pendente::before {
             background: var(--warning-color);
         }
         
@@ -340,7 +436,7 @@
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
         }
         
         .despesa-info {
@@ -348,7 +444,7 @@
         }
         
         .despesa-descricao {
-            font-size: 16px;
+            font-size: 18px;
             font-weight: 600;
             margin-bottom: 4px;
             color: var(--text-primary);
@@ -357,7 +453,7 @@
         .despesa-fornecedor {
             font-size: 14px;
             color: var(--text-secondary);
-            margin-bottom: 6px;
+            margin-bottom: 8px;
         }
         
         .despesa-meta {
@@ -374,31 +470,108 @@
             gap: 4px;
         }
         
-        .categoria-badge {
-            display: inline-flex;
+        .despesa-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .action-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--card-bg);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
             align-items: center;
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 11px;
-            font-weight: 600;
-            letter-spacing: 0.3px;
-            margin-right: 8px;
+            justify-content: center;
+            transition: all 0.2s;
         }
         
-        .despesa-valor {
-            font-size: 18px;
-            font-weight: 700;
+        .action-btn:hover {
+            background: var(--hover-bg);
+        }
+        
+        .action-btn.edit:hover {
+            color: var(--info-color);
+            border-color: var(--info-color);
+        }
+        
+        .action-btn.delete:hover {
             color: var(--danger-color);
-            text-align: right;
-            min-width: 120px;
+            border-color: var(--danger-color);
         }
         
-        .despesa-extra {
+        .action-btn.view:hover {
+            color: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        
+        .despesa-content {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+            margin-bottom: 16px;
+        }
+        
+        @media (max-width: 1024px) {
+            .despesa-content {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .despesa-detais {
+            flex: 2;
+        }
+        
+        .detalhe-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .detalhe-item:last-child {
+            border-bottom: none;
+        }
+        
+        .detalhe-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        
+        .detalhe-value {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+        
+        .despesa-resumo {
+            flex: 1;
+        }
+        
+        .resumo-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .resumo-item:last-child {
+            border-bottom: none;
+        }
+        
+        .resumo-total {
+            font-weight: 700;
+            font-size: 18px;
+            color: var(--danger-color);
+        }
+        
+        .despesa-footer {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-top: 12px;
-            padding-top: 12px;
+            padding-top: 16px;
             border-top: 1px solid var(--border-color);
         }
         
@@ -407,23 +580,24 @@
             color: var(--text-secondary);
             font-style: italic;
             flex: 1;
+            margin-right: 16px;
         }
         
-        .despesa-anexos {
+        .despesa-status {
             display: flex;
             gap: 8px;
             align-items: center;
         }
         
-        .anexo-badge {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            padding: 4px 8px;
-            background: var(--light-bg);
+        .status-select {
+            padding: 6px 12px;
             border-radius: 6px;
-            font-size: 12px;
-            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+            background: var(--card-bg);
+            color: var(--text-primary);
+            font-size: 13px;
+            cursor: pointer;
+            min-width: 150px;
         }
         
         /* ============================================
@@ -451,7 +625,7 @@
             background: var(--card-bg);
             border-radius: var(--radius-lg);
             width: 90%;
-            max-width: 900px;
+            max-width: 800px;
             max-height: 90vh;
             overflow-y: auto;
             box-shadow: var(--shadow-lg);
@@ -475,14 +649,10 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            position: sticky;
-            top: 0;
-            background: var(--card-bg);
-            z-index: 10;
         }
         
         .modal-title {
-            font-size: 24px;
+            font-size: 20px;
             font-weight: 700;
             color: var(--danger-color);
         }
@@ -515,7 +685,7 @@
         }
         
         .section-title {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 600;
             color: var(--primary-color);
             margin-bottom: 16px;
@@ -525,8 +695,8 @@
         
         .info-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 16px;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
         }
         
         .info-item {
@@ -536,7 +706,7 @@
         }
         
         .info-label {
-            font-size: 13px;
+            font-size: 12px;
             color: var(--text-secondary);
             font-weight: 500;
             text-transform: uppercase;
@@ -544,88 +714,37 @@
         }
         
         .info-value {
-            font-size: 15px;
+            font-size: 14px;
             color: var(--text-primary);
             font-weight: 500;
         }
         
-        .valores-container {
-            max-width: 400px;
-            margin: 20px 0;
-        }
-        
-        .valor-item {
+        .total-section {
             display: flex;
-            justify-content: space-between;
-            padding: 10px 0;
-            border-bottom: 1px solid var(--border-color);
+            justify-content: flex-end;
+            margin-top: 24px;
         }
         
-        .valor-item:last-child {
-            border-bottom: none;
-            font-weight: 700;
-            font-size: 18px;
-            color: var(--danger-color);
-        }
-        
-        .nota-fiscal-container {
-            margin-top: 16px;
-            padding: 16px;
+        .total-box {
+            width: 250px;
             background: var(--light-bg);
+            padding: 20px;
             border-radius: var(--radius-md);
             border: 1px solid var(--border-color);
         }
         
-        .nota-fiscal-img {
-            max-width: 100%;
-            max-height: 500px;
-            border-radius: var(--radius-sm);
-            margin-top: 12px;
-            cursor: pointer;
-            transition: transform 0.3s;
-        }
-        
-        .nota-fiscal-img:hover {
-            transform: scale(1.02);
-        }
-        
-        .modal-actions {
+        .total-row {
             display: flex;
-            gap: 12px;
-            margin-top: 20px;
-            padding-top: 20px;
-            border-top: 1px solid var(--border-color);
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-color);
         }
         
-        .btn-modal {
-            padding: 10px 20px;
-            border: none;
-            border-radius: var(--radius-sm);
-            cursor: pointer;
-            font-weight: 500;
-            font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.2s;
-        }
-        
-        .btn-modal.download {
-            background: var(--success-color);
-            color: white;
-        }
-        
-        .btn-modal.download:hover {
-            background: #0da271;
-        }
-        
-        .btn-modal.edit {
-            background: var(--primary-color);
-            color: white;
-        }
-        
-        .btn-modal.edit:hover {
-            background: var(--secondary-color);
+        .total-row:last-child {
+            border-bottom: none;
+            font-weight: 700;
+            font-size: 16px;
+            color: var(--danger-color);
         }
         
         /* ============================================
@@ -633,8 +752,12 @@
            ============================================ */
         .empty-state {
             text-align: center;
-            padding: 80px 32px;
+            padding: 60px 32px;
             color: var(--text-secondary);
+            background: var(--card-bg);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-sm);
         }
         
         .empty-icon {
@@ -644,7 +767,7 @@
         }
         
         .empty-title {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 600;
             margin-bottom: 8px;
         }
@@ -652,56 +775,30 @@
         .empty-text {
             font-size: 14px;
             max-width: 400px;
-            margin: 0 auto;
+            margin: 0 auto 20px;
         }
         
         /* ============================================
-           MODAL DE VISUALIZAÇÃO DE IMAGEM
+           LOADING
            ============================================ */
-        .image-viewer-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(0, 0, 0, 0.9);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 2000;
+        .loading-container {
+            text-align: center;
+            padding: 60px;
         }
         
-        .image-viewer-overlay.active {
-            display: flex;
-        }
-        
-        .image-viewer-container {
-            position: relative;
-            max-width: 90%;
-            max-height: 90%;
-        }
-        
-        .image-viewer-img {
-            max-width: 100%;
-            max-height: 90vh;
-            border-radius: var(--radius-sm);
-        }
-        
-        .image-viewer-close {
-            position: absolute;
-            top: -40px;
-            right: 0;
-            width: 36px;
-            height: 36px;
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top: 3px solid var(--danger-color);
             border-radius: 50%;
-            background: rgba(255, 255, 255, 0.2);
-            color: white;
-            border: none;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
         
         /* ============================================
@@ -714,44 +811,61 @@
             
             .header-content {
                 flex-direction: column;
-                gap: 16px;
-                text-align: center;
-            }
-            
-            .header-title {
-                justify-content: center;
+                align-items: stretch;
             }
             
             .header-actions {
-                width: 100%;
+                justify-content: center;
+            }
+            
+            .filters-container {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .search-box {
+                max-width: none;
+            }
+            
+            .filter-group {
                 justify-content: center;
             }
             
             .despesa-header {
                 flex-direction: column;
                 gap: 12px;
-                align-items: flex-start;
             }
             
-            .despesa-valor {
-                text-align: left;
-                min-width: auto;
+            .despesa-actions {
+                align-self: flex-end;
             }
             
-            .despesa-extra {
+            .despesa-footer {
                 flex-direction: column;
                 gap: 12px;
-                align-items: flex-start;
+                align-items: stretch;
             }
             
-            .modal-container {
-                width: 95%;
-                margin: 16px;
+            .despesa-observacoes {
+                margin-right: 0;
+                margin-bottom: 12px;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .header-title {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .filter-group {
+                flex-wrap: wrap;
+                justify-content: center;
             }
         }
     </style>
 </head>
-<body data-page-id="gestao_despesas" data-page-type="READ">
+<body data-page-id="despesas" data-page-type="READ">
     <!-- ============================================
          HEADER
          ============================================ -->
@@ -766,11 +880,10 @@
                     <p>Controle e análise de todas as despesas da empresa</p>
                 </div>
             </div>
-            
             <div class="header-actions">
-                <button class="btn-download" id="downloadBtn">
-                    <i class="fas fa-file-archive"></i>
-                    Download Notas Mensais
+                <button class="btn-new" onclick="window.location.href='novadespesa.html'">
+                    <i class="fas fa-plus"></i>
+                    Nova Despesa
                 </button>
             </div>
         </div>
@@ -781,12 +894,28 @@
          ============================================ -->
     <section class="counters-section">
         <div class="counters-grid">
+            <div class="counter-card total">
+                <div class="counter-icon">
+                    <i class="fas fa-file-invoice-dollar"></i>
+                </div>
+                <div class="counter-value" data-bind="despesas.total">0</div>
+                <div class="counter-label">Total de Despesas</div>
+            </div>
+            
+            <div class="counter-card mensal">
+                <div class="counter-icon">
+                    <i class="fas fa-calendar-alt"></i>
+                </div>
+                <div class="counter-value" data-bind="despesas.mensal">€ 0,00</div>
+                <div class="counter-label">Despesas do Mês</div>
+            </div>
+            
             <div class="counter-card pagas">
                 <div class="counter-icon">
                     <i class="fas fa-check-circle"></i>
                 </div>
                 <div class="counter-value" data-bind="despesas.pagas">0</div>
-                <div class="counter-label">Despesas Pagas</div>
+                <div class="counter-label">Pagas</div>
             </div>
             
             <div class="counter-card pendentes">
@@ -794,82 +923,35 @@
                     <i class="fas fa-clock"></i>
                 </div>
                 <div class="counter-value" data-bind="despesas.pendentes">0</div>
-                <div class="counter-label">Despesas a Pagar</div>
+                <div class="counter-label">A Pagar</div>
             </div>
         </div>
     </section>
 
     <!-- ============================================
-         FILTROS AVANÇADOS
+         CONTROLES E FILTROS
          ============================================ -->
-    <section class="filters-section">
-        <div class="filters-grid">
+    <section class="controls-section">
+        <div class="filters-container">
             <div class="filter-group">
-                <label class="filter-label">
-                    <i class="fas fa-filter"></i>
-                    Status
-                </label>
-                <select class="filter-input" id="filterStatus">
-                    <option value="all">Todos os Status</option>
-                    <option value="pago">Pagas</option>
-                    <option value="pendente">A Pagar</option>
-                </select>
+                <button class="filter-btn active" data-filter="all">
+                    <i class="fas fa-layer-group"></i>
+                    Todas
+                </button>
+                <button class="filter-btn" data-filter="paga">
+                    <i class="fas fa-check-circle" style="color: var(--success-color);"></i>
+                    Pagas
+                </button>
+                <button class="filter-btn" data-filter="pendente">
+                    <i class="fas fa-clock" style="color: var(--warning-color);"></i>
+                    A Pagar
+                </button>
             </div>
             
-            <div class="filter-group">
-                <label class="filter-label">
-                    <i class="fas fa-building"></i>
-                    Fornecedor
-                </label>
-                <select class="filter-input" id="filterFornecedor">
-                    <option value="all">Todos os Fornecedores</option>
-                    <!-- Fornecedores serão carregados dinamicamente -->
-                </select>
+            <div class="search-box">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" class="search-input" id="searchInput" placeholder="Buscar descrição ou fornecedor...">
             </div>
-            
-            <div class="filter-group">
-                <label class="filter-label">
-                    <i class="fas fa-tags"></i>
-                    Categoria
-                </label>
-                <select class="filter-input" id="filterCategoria">
-                    <option value="all">Todas as Categorias</option>
-                    <!-- Categorias serão carregadas dinamicamente -->
-                </select>
-            </div>
-            
-            <div class="filter-group">
-                <label class="filter-label">
-                    <i class="fas fa-calendar"></i>
-                    Mês
-                </label>
-                <select class="filter-input" id="filterMes">
-                    <option value="all">Todos os Meses</option>
-                    <option value="01">Janeiro</option>
-                    <option value="02">Fevereiro</option>
-                    <option value="03">Março</option>
-                    <option value="04">Abril</option>
-                    <option value="05">Maio</option>
-                    <option value="06">Junho</option>
-                    <option value="07">Julho</option>
-                    <option value="08">Agosto</option>
-                    <option value="09">Setembro</option>
-                    <option value="10">Outubro</option>
-                    <option value="11">Novembro</option>
-                    <option value="12">Dezembro</option>
-                </select>
-            </div>
-        </div>
-        
-        <div class="filter-actions">
-            <button class="btn-filter btn-filter-clear" id="clearFilters">
-                <i class="fas fa-broom"></i>
-                Limpar Filtros
-            </button>
-            <button class="btn-filter btn-filter-apply" id="applyFilters">
-                <i class="fas fa-search"></i>
-                Aplicar Filtros
-            </button>
         </div>
     </section>
 
@@ -877,7 +959,12 @@
          LISTA DE DESPESAS
          ============================================ -->
     <section class="despesas-container">
-        <div class="despesas-list" id="despesasList">
+        <div id="loadingState" class="loading-container">
+            <div class="loading-spinner"></div>
+            <p>Carregando despesas...</p>
+        </div>
+        
+        <div class="despesas-grid" id="despesasGrid" style="display: none;">
             <!-- As despesas serão carregadas dinamicamente aqui -->
         </div>
         
@@ -887,7 +974,11 @@
                 <i class="fas fa-file-invoice-dollar"></i>
             </div>
             <h3 class="empty-title">Nenhuma despesa encontrada</h3>
-            <p class="empty-text">Não há despesas correspondentes aos filtros atuais. Tente ajustar os filtros.</p>
+            <p class="empty-text">Não há despesas correspondentes aos filtros atuais. Tente ajustar os filtros ou crie uma nova despesa.</p>
+            <button class="btn-new" onclick="window.location.href='novadespesa.html'">
+                <i class="fas fa-plus"></i>
+                Criar Primeira Despesa
+            </button>
         </div>
     </section>
 
@@ -897,7 +988,7 @@
     <div class="modal-overlay" id="modalOverlay">
         <div class="modal-container">
             <div class="modal-header">
-                <h2 class="modal-title" id="modalTitle">Detalhes da Despesa</h2>
+                <h2 class="modal-title">Detalhes da Despesa</h2>
                 <button class="modal-close" id="modalClose">
                     <i class="fas fa-times"></i>
                 </button>
@@ -908,712 +999,602 @@
         </div>
     </div>
 
-    <!-- ============================================
-         MODAL DE VISUALIZAÇÃO DE IMAGEM
-         ============================================ -->
-    <div class="image-viewer-overlay" id="imageViewerOverlay">
-        <div class="image-viewer-container">
-            <img id="imageViewerImg" class="image-viewer-img" alt="Nota Fiscal">
-            <button class="image-viewer-close" id="imageViewerClose">
-                <i class="fas fa-times"></i>
-            </button>
-        </div>
-    </div>
-
     <script>
         // ============================================
-        // SISTEMA DE GESTÃO DE DESPESAS - CORRIGIDO
+        // SISTEMA DE GESTÃO DE DESPESAS - CORE v5.1 COMPATÍVEL
         // ============================================
         
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('💰 Sistema de Gestão de Despesas carregado');
+            console.log('💰 Página de Gestão de Despesas (CORE v5.1) carregada');
             
             // Elementos do DOM
-            const despesasList = document.getElementById('despesasList');
+            const despesasGrid = document.getElementById('despesasGrid');
             const emptyState = document.getElementById('emptyState');
+            const loadingState = document.getElementById('loadingState');
+            const searchInput = document.getElementById('searchInput');
+            const filterButtons = document.querySelectorAll('.filter-btn');
             const modalOverlay = document.getElementById('modalOverlay');
             const modalClose = document.getElementById('modalClose');
             const modalContent = document.getElementById('modalContent');
-            const modalTitle = document.getElementById('modalTitle');
-            const downloadBtn = document.getElementById('downloadBtn');
-            const imageViewerOverlay = document.getElementById('imageViewerOverlay');
-            const imageViewerImg = document.getElementById('imageViewerImg');
-            const imageViewerClose = document.getElementById('imageViewerClose');
-            
-            // Filtros
-            const filterStatus = document.getElementById('filterStatus');
-            const filterFornecedor = document.getElementById('filterFornecedor');
-            const filterCategoria = document.getElementById('filterCategoria');
-            const filterMes = document.getElementById('filterMes');
-            const clearFiltersBtn = document.getElementById('clearFilters');
-            const applyFiltersBtn = document.getElementById('applyFilters');
             
             // Estado da aplicação
             let todasDespesas = [];
-            let fornecedores = [];
-            let categorias = [];
-            let despesaSelecionada = null;
-            let filtrosAtivos = {
-                status: 'all',
-                fornecedor: 'all',
-                categoria: 'all',
-                mes: 'all'
-            };
+            let filtroAtual = 'all';
+            let termoBusca = '';
             
             // ============================================
-            // FUNÇÕES PRINCIPAIS - CORRIGIDAS
+            // FUNÇÕES PRINCIPAIS - SIGA PROTOCOLO CORE
             // ============================================
             
-            // Inicializar sistema
-            function inicializar() {
-                carregarDespesas();
-                configurarEventListeners();
-                console.log('✅ Sistema de gestão de despesas inicializado');
-            }
-            
-            // Carregar despesas do sistema
-            function carregarDespesas() {
-                console.log('🔄 Carregando despesas do Firebase...');
-                
-                // Usar API do servidor online
-                fetch('/api/database/query', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        schema: 'despesa'
-                    })
-                })
-                .then(response => response.json())
-                .then(result => {
+            // Carregar despesas do Firebase via API Core
+            async function carregarDespesas() {
+                try {
+                    console.log('🔄 Carregando despesas do Firebase (CORE v5.1)...');
+                    
+                    // Usar API REST do servidor CORE
+                    const response = await fetch('/api/database/query', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            schema: 'despesa',
+                            filters: { deleted: false }
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`Erro na API: ${response.status}`);
+                    }
+                    
+                    const result = await response.json();
+                    
                     if (result.success && result.events) {
-                        console.log('✅ Despesas recebidas do Firebase:', result.events);
+                        console.log(`✅ ${result.events.length} despesas recebidas do Firebase`);
                         processarDespesas(result.events);
                     } else {
-                        console.error('❌ Nenhuma despesa recebida do Firebase');
+                        console.warn('⚠️ Nenhuma despesa recebida ou formato inválido:', result);
                         processarDespesas([]);
                     }
-                })
-                .catch(error => {
+                    
+                } catch (error) {
                     console.error('❌ Erro ao buscar despesas do Firebase:', error);
-                    // Fallback: tentar comunicação via postMessage
-                    window.parent.postMessage({ 
-                        type: "QUERY_REQUEST",
-                        source: 'gestao_despesas',
-                        schema: 'despesa'
-                    }, "*");
-                });
+                    mostrarErro('Erro ao carregar despesas. Verifique a conexão com o servidor.');
+                }
             }
             
-            // Processar despesas recebidas - CORRIGIDO
-            function processarDespesas(despesas) {
-                todasDespesas = despesas
-                    .filter(d => d.schema === 'despesa' && !d.deleted)
-                    .map(d => ({
-                        ...d,
-                        payload: {
-                            ...d.payload,
-                            id: d.id,
-                            createdAt: d.created_at,
-                            statusPagamento: d.payload.statusPagamento || 'pendente',
-                            // Garantir que o valor total esteja presente
-                            total: d.payload.valorTotal || d.payload.total || 0
+            // Processar despesas seguindo schema do README
+            function processarDespesas(events) {
+                console.log('📦 Processando eventos do Firebase:', events.length);
+                
+                // Filtrar apenas eventos do schema "despesa" e não deletados
+                todasDespesas = events
+                    .filter(event => {
+                        const isValid = event.schema === 'despesa' && !event.deleted;
+                        return isValid;
+                    })
+                    .map(event => {
+                        // Garantir que payload seja um objeto válido
+                        let payload = event.payload;
+                        if (typeof payload === 'string') {
+                            try {
+                                payload = JSON.parse(payload);
+                            } catch (e) {
+                                console.warn('⚠️ Payload não é JSON válido:', payload);
+                                payload = {};
+                            }
                         }
-                    }))
+                        
+                        // Garantir que temos todos os campos necessários do schema
+                        const despesaFormatada = {
+                            // Campos do schema "despesa" do README
+                            id: event.id,
+                            descricao: payload.descricao || 'Despesa sem descrição',
+                            fornecedor: payload.fornecedor || 'Fornecedor não informado',
+                            valor: parseFloat(payload.valor) || 0,
+                            categoria: payload.categoria || 'OUTROS',
+                            data: payload.data || new Date().toISOString().split('T')[0],
+                            observacoes: payload.observacoes || '',
+                            
+                            // Status de pagamento (usando lógica padrão)
+                            statusPagamento: payload.paga || payload.statusPagamento || 'pendente',
+                            dataPagamento: payload.dataPagamento || '',
+                            
+                            // Metadados do evento
+                            createdAt: event.timestamp || event.created_at || new Date().toISOString(),
+                            pageId: event.pageId || 'nova_despesa'
+                        };
+                        
+                        return despesaFormatada;
+                    })
                     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
                 
-                console.log(`✅ ${todasDespesas.length} despesas carregadas`);
+                console.log(`✅ ${todasDespesas.length} despesas processadas`);
                 
-                // Atualizar contadores de despesas para o dashboard
-                atualizarContadoresDashboard();
-                
-                // Extrair fornecedores e categorias únicas
-                extrairFiltrosUnicos();
+                // Atualizar UI
                 atualizarContadores();
-                aplicarFiltros();
+                aplicarFiltrosEBusca();
+                
+                // Ocultar loading, mostrar grid
+                loadingState.style.display = 'none';
+                despesasGrid.style.display = 'grid';
             }
             
-            // Atualizar contadores do dashboard - NOVA FUNÇÃO
-            function atualizarContadoresDashboard() {
-                // Contar despesas pagas e pendentes
-                const despesasPagas = todasDespesas.filter(d => d.payload.statusPagamento === 'pago').length;
-                const despesasPendentes = todasDespesas.filter(d => d.payload.statusPagamento === 'pendente').length;
-                
-                // Enviar para o dashboard via postMessage
-                window.parent.postMessage({
-                    type: "DASHBOARD_UPDATE",
-                    data: {
-                        despesas: {
-                            pagas: despesasPagas,
-                            pendentes: despesasPendentes
-                        }
-                    }
-                }, "*");
-            }
-            
-            // Extrair fornecedores e categorias únicas
-            function extrairFiltrosUnicos() {
-                fornecedores = [...new Set(todasDespesas.map(d => d.payload.fornecedor).filter(Boolean))];
-                categorias = [...new Set(todasDespesas.map(d => d.payload.categoria).filter(Boolean))];
-                
-                // Atualizar selects de filtro
-                atualizarSelectFiltro(filterFornecedor, fornecedores);
-                atualizarSelectFiltro(filterCategoria, categorias);
-            }
-            
-            // Atualizar select de filtro
-            function atualizarSelectFiltro(select, valores) {
-                const valorAtual = select.value;
-                
-                while (select.options.length > 1) {
-                    select.remove(1);
-                }
-                
-                valores.forEach(valor => {
-                    const option = document.createElement('option');
-                    option.value = valor;
-                    option.textContent = valor;
-                    select.appendChild(option);
-                });
-                
-                if (valorAtual !== 'all') {
-                    const optionExists = Array.from(select.options).some(opt => opt.value === valorAtual);
-                    if (optionExists) {
-                        select.value = valorAtual;
-                    }
-                }
-            }
-            
-            // Atualizar contadores
+            // Atualizar contadores com data-bind (Core Engine vai capturar)
             function atualizarContadores() {
-                const despesasPagas = todasDespesas.filter(d => d.payload.statusPagamento === 'pago').length;
-                const despesasPendentes = todasDespesas.filter(d => d.payload.statusPagamento === 'pendente').length;
+                const total = todasDespesas.length;
+                const pagas = todasDespesas.filter(d => d.statusPagamento === 'paga' || d.statusPagamento === 'pago').length;
+                const pendentes = todasDespesas.filter(d => d.statusPagamento === 'pendente').length;
                 
-                document.querySelectorAll('[data-bind="despesas.pagas"]').forEach(el => {
-                    el.textContent = despesasPagas;
+                // Calcular total do mês atual
+                const hoje = new Date();
+                const mesAtual = hoje.getMonth() + 1;
+                const anoAtual = hoje.getFullYear();
+                
+                const despesasMes = todasDespesas.filter(d => {
+                    const dataDespesa = new Date(d.data);
+                    return dataDespesa.getMonth() + 1 === mesAtual && 
+                           dataDespesa.getFullYear() === anoAtual;
                 });
                 
-                document.querySelectorAll('[data-bind="despesas.pendentes"]').forEach(el => {
-                    el.textContent = despesasPendentes;
-                });
+                const totalMes = despesasMes.reduce((sum, d) => sum + d.valor, 0);
+                
+                console.log(`📊 Contadores: Total=${total}, Pagas=${pagas}, Pendentes=${pendentes}, Total Mês=${totalMes}`);
+                
+                // O Core Engine irá atualizar automaticamente via data-bind
+                // Mas vamos atualizar manualmente também para garantir
+                document.querySelector('[data-bind="despesas.total"]').textContent = total;
+                document.querySelector('[data-bind="despesas.mensal"]').textContent = formatarMoeda(totalMes);
+                document.querySelector('[data-bind="despesas.pagas"]').textContent = pagas;
+                document.querySelector('[data-bind="despesas.pendentes"]').textContent = pendentes;
             }
             
-            // Aplicar filtros
-            function aplicarFiltros() {
-                let despesasFiltradas = todasDespesas;
+            // Aplicar filtros e busca
+            function aplicarFiltrosEBusca() {
+                let despesasFiltradas = [...todasDespesas];
                 
-                // Filtrar por status
-                if (filtrosAtivos.status !== 'all') {
-                    despesasFiltradas = despesasFiltradas.filter(d => 
-                        d.payload.statusPagamento === filtrosAtivos.status
-                    );
-                }
-                
-                // Filtrar por fornecedor
-                if (filtrosAtivos.fornecedor !== 'all') {
-                    despesasFiltradas = despesasFiltradas.filter(d => 
-                        d.payload.fornecedor === filtrosAtivos.fornecedor
-                    );
-                }
-                
-                // Filtrar por categoria
-                if (filtrosAtivos.categoria !== 'all') {
-                    despesasFiltradas = despesasFiltradas.filter(d => 
-                        d.payload.categoria === filtrosAtivos.categoria
-                    );
-                }
-                
-                // Filtrar por mês
-                if (filtrosAtivos.mes !== 'all') {
+                // Aplicar filtro de status
+                if (filtroAtual !== 'all') {
                     despesasFiltradas = despesasFiltradas.filter(d => {
-                        if (!d.payload.dataCompra) return false;
-                        const dataCompra = new Date(d.payload.dataCompra);
-                        const mes = (dataCompra.getMonth() + 1).toString().padStart(2, '0');
-                        return mes === filtrosAtivos.mes;
+                        if (filtroAtual === 'paga') {
+                            return d.statusPagamento === 'paga' || d.statusPagamento === 'pago';
+                        } else {
+                            return d.statusPagamento === filtroAtual;
+                        }
                     });
                 }
                 
-                // Renderizar despesas filtradas
+                // Aplicar busca
+                if (termoBusca.trim() !== '') {
+                    const busca = termoBusca.toLowerCase();
+                    despesasFiltradas = despesasFiltradas.filter(d => {
+                        const descricao = (d.descricao || '').toLowerCase();
+                        const fornecedor = (d.fornecedor || '').toLowerCase();
+                        
+                        return descricao.includes(busca) || 
+                               fornecedor.includes(busca);
+                    });
+                }
+                
+                // Renderizar despesas
                 renderizarDespesas(despesasFiltradas);
                 
                 // Mostrar/ocultar estado vazio
                 if (despesasFiltradas.length === 0) {
                     emptyState.style.display = 'block';
-                    despesasList.style.display = 'none';
+                    despesasGrid.style.display = 'none';
                 } else {
                     emptyState.style.display = 'none';
-                    despesasList.style.display = 'flex';
+                    despesasGrid.style.display = 'grid';
                 }
             }
             
             // Renderizar lista de despesas
             function renderizarDespesas(despesas) {
-                despesasList.innerHTML = '';
+                despesasGrid.innerHTML = '';
                 
-                despesas.forEach((despesa, index) => {
-                    const item = criarItemDespesa(despesa);
-                    despesasList.appendChild(item);
-                    
-                    // Adicionar animação de entrada
-                    item.style.animationDelay = `${index * 0.05}s`;
+                despesas.forEach(despesa => {
+                    const card = criarCardDespesa(despesa);
+                    despesasGrid.appendChild(card);
+                });
+                
+                // Adicionar animação de entrada
+                const cards = document.querySelectorAll('.despesa-card');
+                cards.forEach((card, index) => {
+                    card.style.animationDelay = `${index * 0.05}s`;
+                    card.classList.add('slide-up');
                 });
             }
             
-            // Criar item de despesa para lista - CORRIGIDO
-            function criarItemDespesa(despesa) {
-                const payload = despesa.payload;
-                const total = parseFloat(payload.total || payload.valorTotal || 0);
-                const status = payload.statusPagamento || 'pendente';
-                const hasAnexo = !!payload.notaFiscal;
+            // Criar card de despesa (formato profissional)
+            function criarCardDespesa(despesa) {
+                const valor = despesa.valor || 0;
+                const status = despesa.statusPagamento;
+                const statusClasse = (status === 'paga' || status === 'pago') ? 'paga' : 'pendente';
+                const statusTexto = (status === 'paga' || status === 'pago') ? 'Paga' : 'A Pagar';
+                const categoria = despesa.categoria || 'OUTROS';
                 
+                // Formatadores
                 const formatarData = (dataStr) => {
                     if (!dataStr) return 'N/A';
-                    const data = new Date(dataStr);
-                    return data.toLocaleDateString('pt-BR');
+                    try {
+                        const data = new Date(dataStr);
+                        return data.toLocaleDateString('pt-PT');
+                    } catch (e) {
+                        return dataStr;
+                    }
                 };
                 
                 const formatarMoeda = (valor) => {
-                    return `€${parseFloat(valor).toFixed(2).replace('.', ',')}`;
+                    return new Intl.NumberFormat('pt-PT', {
+                        style: 'currency',
+                        currency: 'EUR',
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    }).format(valor);
                 };
                 
-                const item = document.createElement('div');
-                item.className = `despesa-item ${status}`;
-                item.dataset.id = despesa.id;
+                const card = document.createElement('div');
+                card.className = `despesa-card ${statusClasse}`;
+                card.dataset.id = despesa.id;
                 
-                item.innerHTML = `
+                card.innerHTML = `
                     <div class="despesa-header">
                         <div class="despesa-info">
-                            <div class="despesa-descricao">${payload.descricao || 'Despesa sem descrição'}</div>
-                            <div class="despesa-fornecedor">
-                                <i class="fas fa-building"></i>
-                                ${payload.fornecedor || 'Fornecedor não informado'}
-                                ${payload.categoria ? `
-                                    <span class="categoria-badge" style="background-color: #3b82f620; color: #3b82f6;">
-                                        ${payload.categoria}
-                                    </span>
-                                ` : ''}
-                            </div>
+                            <div class="despesa-descricao">${despesa.descricao}</div>
+                            <div class="despesa-fornecedor">${despesa.fornecedor}</div>
                             <div class="despesa-meta">
                                 <div class="despesa-meta-item">
-                                    <i class="fas fa-calendar"></i>
-                                    <span>${formatarData(payload.dataCompra || payload.createdAt)}</span>
+                                    <i class="fas fa-calendar-alt"></i>
+                                    <span>${formatarData(despesa.data)}</span>
                                 </div>
                                 <div class="despesa-meta-item">
-                                    <i class="fas fa-clock"></i>
-                                    <span>Venc: ${formatarData(payload.dataVencimento)}</span>
+                                    <i class="fas fa-tag"></i>
+                                    <span class="categoria-badge categoria-${categoria}">${categoria}</span>
                                 </div>
                             </div>
                         </div>
-                        <div class="despesa-valor">
-                            ${formatarMoeda(total)}
+                        <div class="despesa-actions">
+                            <button class="action-btn edit" title="Editar despesa" data-id="${despesa.id}">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button class="action-btn view" title="Ver detalhes" data-id="${despesa.id}">
+                                <i class="fas fa-eye"></i>
+                            </button>
                         </div>
                     </div>
-                    <div class="despesa-extra">
-                        <div class="despesa-observacoes">
-                            ${payload.observacoes ? `📝 ${payload.observacoes.substring(0, 60)}${payload.observacoes.length > 60 ? '...' : ''}` : ''}
-                        </div>
-                        <div class="despesa-anexos">
-                            ${hasAnexo ? `
-                                <span class="anexo-badge">
-                                    <i class="fas fa-paperclip"></i>
-                                    Com anexo
+                    
+                    <div class="despesa-content">
+                        <div class="despesa-detais">
+                            <div class="detalhe-item">
+                                <span class="detalhe-label">Categoria:</span>
+                                <span class="detalhe-value">
+                                    <span class="categoria-badge categoria-${categoria}">${categoria}</span>
                                 </span>
+                            </div>
+                            <div class="detalhe-item">
+                                <span class="detalhe-label">Data de Registro:</span>
+                                <span class="detalhe-value">${formatarData(despesa.createdAt)}</span>
+                            </div>
+                            ${despesa.dataPagamento ? `
+                                <div class="detalhe-item">
+                                    <span class="detalhe-label">Data de Pagamento:</span>
+                                    <span class="detalhe-value">${formatarData(despesa.dataPagamento)}</span>
+                                </div>
                             ` : ''}
-                            <span class="anexo-badge">
-                                <i class="fas fa-${status === 'pago' ? 'check-circle' : 'clock'}"></i>
-                                ${status === 'pago' ? 'Paga' : 'A Pagar'}
-                            </span>
+                        </div>
+                        
+                        <div class="despesa-resumo">
+                            <div class="resumo-item resumo-total">
+                                <span>Valor:</span>
+                                <span>${formatarMoeda(valor)}</span>
+                            </div>
+                            <div class="resumo-item">
+                                <span>Status:</span>
+                                <span>${statusTexto}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="despesa-footer">
+                        <div class="despesa-observacoes">
+                            ${despesa.observacoes ? `📝 ${despesa.observacoes.substring(0, 100)}${despesa.observacoes.length > 100 ? '...' : ''}` : 'Sem observações'}
+                        </div>
+                        <div class="despesa-status">
+                            <select class="status-select" data-id="${despesa.id}">
+                                <option value="pendente" ${status === 'pendente' ? 'selected' : ''}>A Pagar</option>
+                                <option value="paga" ${(status === 'paga' || status === 'pago') ? 'selected' : ''}>Paga</option>
+                            </select>
                         </div>
                     </div>
                 `;
                 
-                item.addEventListener('click', () => abrirModalDetalhes(despesa));
+                // Adicionar event listeners
+                const editBtn = card.querySelector('.action-btn.edit');
+                const viewBtn = card.querySelector('.action-btn.view');
+                const statusSelect = card.querySelector('.status-select');
                 
-                return item;
+                editBtn.addEventListener('click', () => editarDespesa(despesa.id));
+                viewBtn.addEventListener('click', () => abrirModalDetalhes(despesa));
+                statusSelect.addEventListener('change', (e) => atualizarStatusDespesa(despesa.id, e.target.value));
+                
+                return card;
             }
             
-            // Abrir modal com detalhes da despesa - CORRIGIDO
+            // Abrir modal com detalhes da despesa
             function abrirModalDetalhes(despesa) {
-                despesaSelecionada = despesa;
-                const payload = despesa.payload;
-                const total = parseFloat(payload.total || payload.valorTotal || 0);
-                const valorBruto = parseFloat(payload.valorBruto) || 0;
-                const valorIVA = parseFloat(payload.valorIVA) || 0;
-                const status = payload.statusPagamento || 'pendente';
-                const hasAnexo = !!payload.notaFiscal;
+                const valor = despesa.valor || 0;
+                const status = despesa.statusPagamento;
+                const statusTexto = (status === 'paga' || status === 'pago') ? 'Paga' : 'A Pagar';
+                const categoria = despesa.categoria || 'OUTROS';
                 
+                // Formatadores
                 const formatarData = (dataStr) => {
                     if (!dataStr) return 'Não informado';
-                    const data = new Date(dataStr);
-                    return data.toLocaleDateString('pt-BR');
-                };
-                
-                const formatarDataCompleta = (dataStr) => {
-                    if (!dataStr) return 'Não informado';
-                    const data = new Date(dataStr);
-                    return data.toLocaleDateString('pt-BR') + ' ' + data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                    try {
+                        const data = new Date(dataStr);
+                        return data.toLocaleDateString('pt-PT') + ' ' + data.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+                    } catch (e) {
+                        return dataStr;
+                    }
                 };
                 
                 const formatarMoeda = (valor) => {
-                    return `€${parseFloat(valor).toFixed(2).replace('.', ',')}`;
+                    return new Intl.NumberFormat('pt-PT', {
+                        style: 'currency',
+                        currency: 'EUR',
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    }).format(valor);
                 };
-                
-                modalTitle.textContent = `Despesa: ${payload.descricao || 'Sem descrição'}`;
                 
                 modalContent.innerHTML = `
                     <div class="modal-section">
-                        <h3 class="section-title">Informações Gerais</h3>
+                        <h3 class="section-title">Informações da Despesa</h3>
                         <div class="info-grid">
                             <div class="info-item">
                                 <div class="info-label">Descrição</div>
-                                <div class="info-value">${payload.descricao || 'Não informado'}</div>
+                                <div class="info-value">${despesa.descricao}</div>
                             </div>
                             <div class="info-item">
                                 <div class="info-label">Fornecedor</div>
-                                <div class="info-value">${payload.fornecedor || 'Não informado'}</div>
-                            </div>
-                            <div class="info-item">
-                                <div class="info-label">Telefone</div>
-                                <div class="info-value">${payload.telefone || 'Não informado'}</div>
-                            </div>
-                            <div class="info-item">
-                                <div class="info-label">NIF</div>
-                                <div class="info-value">${payload.nifFornecedor || 'Não informado'}</div>
+                                <div class="info-value">${despesa.fornecedor}</div>
                             </div>
                             <div class="info-item">
                                 <div class="info-label">Categoria</div>
                                 <div class="info-value">
-                                    <span class="categoria-badge" style="background-color: #3b82f620; color: #3b82f6; padding: 4px 12px;">
-                                        ${payload.categoria || 'Sem categoria'}
-                                    </span>
+                                    <span class="categoria-badge categoria-${categoria}">${categoria}</span>
                                 </div>
                             </div>
                             <div class="info-item">
                                 <div class="info-label">Status</div>
-                                <div class="info-value">
-                                    ${status === 'pago' ? 
-                                        '<span class="categoria-badge" style="background-color: #10b98120; color: #10b981;">Paga</span>' : 
-                                        '<span class="categoria-badge" style="background-color: #f59e0b20; color: #f59e0b;">A Pagar</span>'}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="modal-section">
-                        <h3 class="section-title">Datas</h3>
-                        <div class="info-grid">
-                            <div class="info-item">
-                                <div class="info-label">Data da Compra</div>
-                                <div class="info-value">${formatarData(payload.dataCompra)}</div>
+                                <div class="info-value">${statusTexto}</div>
                             </div>
                             <div class="info-item">
-                                <div class="info-label">Data de Vencimento</div>
-                                <div class="info-value">${formatarData(payload.dataVencimento)}</div>
+                                <div class="info-label">Data da Despesa</div>
+                                <div class="info-value">${formatarData(despesa.data)}</div>
                             </div>
-                            ${payload.dataPagamento ? `
-                                <div class="info-item">
-                                    <div class="info-label">Data do Pagamento</div>
-                                    <div class="info-value">${formatarData(payload.dataPagamento)}</div>
-                                </div>
-                            ` : ''}
                             <div class="info-item">
                                 <div class="info-label">Registrado em</div>
-                                <div class="info-value">${formatarDataCompleta(payload.createdAt)}</div>
+                                <div class="info-value">${formatarData(despesa.createdAt)}</div>
                             </div>
                         </div>
                     </div>
                     
                     <div class="modal-section">
                         <h3 class="section-title">Valores</h3>
-                        <div class="valores-container">
-                            <div class="valor-item">
-                                <span>Valor Bruto:</span>
-                                <span>${formatarMoeda(valorBruto)}</span>
-                            </div>
-                            <div class="valor-item">
-                                <span>IVA (${payload.comIVA === 'comIVA' ? '23%' : 'Isento'}):</span>
-                                <span>${formatarMoeda(valorIVA)}</span>
-                            </div>
-                            <div class="valor-item">
-                                <span>TOTAL:</span>
-                                <span>${formatarMoeda(total)}</span>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="modal-section">
-                        <h3 class="section-title">Forma de Pagamento</h3>
-                        <div class="info-grid">
-                            <div class="info-item">
-                                <div class="info-label">Método</div>
-                                <div class="info-value">${payload.formaPagamento || payload.metodosPagamento || 'Não informado'}</div>
-                            </div>
-                            ${payload.outroPagamento ? `
-                                <div class="info-item">
-                                    <div class="info-label">Detalhes</div>
-                                    <div class="info-value">${payload.outroPagamento}</div>
+                        <div class="total-section">
+                            <div class="total-box">
+                                <div class="total-row">
+                                    <span>Valor Total:</span>
+                                    <span>${formatarMoeda(valor)}</span>
                                 </div>
-                            ` : ''}
+                            </div>
                         </div>
                     </div>
                     
-                    ${payload.observacoes ? `
+                    ${despesa.observacoes ? `
                         <div class="modal-section">
                             <h3 class="section-title">Observações</h3>
                             <div style="padding: 16px; background: var(--light-bg); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-                                ${payload.observacoes}
+                                ${despesa.observacoes}
                             </div>
                         </div>
                     ` : ''}
                     
-                    ${hasAnexo ? `
-                        <div class="modal-section">
-                            <h3 class="section-title">Nota Fiscal/Anexo</h3>
-                            <div class="nota-fiscal-container">
-                                <p>Documento anexado à despesa:</p>
-                                ${payload.notaFiscal.startsWith('data:image/') ? 
-                                    `<img src="${payload.notaFiscal}" class="nota-fiscal-img" alt="Nota Fiscal" onclick="visualizarImagem('${payload.notaFiscal}')">` :
-                                    `
-                                    <div style="margin-top: 12px;">
-                                        <p><i class="fas fa-file-pdf"></i> Documento anexado (formato: ${payload.notaFiscal.substring(0, 30)}...)</p>
-                                        <button class="btn-modal download" onclick="downloadAnexo('${despesa.id}', '${payload.descricao || 'despesa'}')" style="margin-top: 10px;">
-                                            <i class="fas fa-download"></i>
-                                            Baixar Documento
-                                        </button>
-                                    </div>
-                                    `}
-                            </div>
-                        </div>
-                    ` : ''}
-                    
-                    <div class="modal-actions">
-                        ${hasAnexo ? `
-                            <button class="btn-modal download" onclick="downloadAnexoIndividual('${despesa.id}', '${payload.descricao || 'despesa'}')">
-                                <i class="fas fa-download"></i>
-                                Baixar Anexo
+                    <div class="modal-section">
+                        <h3 class="section-title">Ações</h3>
+                        <div style="display: flex; gap: 12px;">
+                            <button class="btn-new" onclick="editarDespesa('${despesa.id}')" style="margin-right: 0;">
+                                <i class="fas fa-edit"></i>
+                                Editar Despesa
                             </button>
-                        ` : ''}
-                        <button class="btn-modal edit" onclick="editarDespesa('${despesa.id}')">
-                            <i class="fas fa-edit"></i>
-                            Editar Despesa
-                        </button>
+                        </div>
                     </div>
                 `;
                 
                 modalOverlay.classList.add('active');
             }
             
-            // Visualizar imagem em tela cheia
-            window.visualizarImagem = function(base64Data) {
-                if (!base64Data) return;
-                
-                imageViewerImg.src = base64Data;
-                imageViewerOverlay.classList.add('active');
-            };
-            
-            // Download de anexo individual
-            window.downloadAnexoIndividual = function(despesaId, descricao) {
-                const despesa = todasDespesas.find(d => d.id === despesaId);
-                if (!despesa || !despesa.payload.notaFiscal) {
-                    alert('Nenhum anexo disponível para download.');
-                    return;
-                }
-                
-                const base64Data = despesa.payload.notaFiscal;
-                const descricaoFormatada = descricao.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-                
-                if (base64Data.startsWith('data:image/')) {
-                    // É uma imagem
-                    const link = document.createElement('a');
-                    link.href = base64Data;
-                    link.download = `nota_fiscal_${descricaoFormatada}_${despesaId.substring(0, 8)}.png`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                } else {
-                    // É outro tipo de documento
-                    try {
-                        const byteString = atob(base64Data.split(',')[1]);
-                        const mimeString = base64Data.split(',')[0].split(':')[1].split(';')[0];
-                        const ab = new ArrayBuffer(byteString.length);
-                        const ia = new Uint8Array(ab);
-                        
-                        for (let i = 0; i < byteString.length; i++) {
-                            ia[i] = byteString.charCodeAt(i);
-                        }
-                        
-                        const blob = new Blob([ab], { type: mimeString });
-                        const link = document.createElement('a');
-                        link.href = URL.createObjectURL(blob);
-                        
-                        // Determinar extensão baseada no tipo MIME
-                        let extensao = '.bin';
-                        if (mimeString.includes('pdf')) extensao = '.pdf';
-                        else if (mimeString.includes('word')) extensao = '.docx';
-                        else if (mimeString.includes('msword')) extensao = '.doc';
-                        
-                        link.download = `documento_${descricaoFormatada}_${despesaId.substring(0, 8)}${extensao}`;
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                        URL.revokeObjectURL(link.href);
-                    } catch (error) {
-                        console.error('Erro ao processar documento:', error);
-                        alert('Erro ao processar o documento para download.');
-                    }
-                }
-            };
-            
-            // Download de anexo (função auxiliar)
-            window.downloadAnexo = window.downloadAnexoIndividual;
-            
-            // Editar despesa
-            window.editarDespesa = function(despesaId) {
-                console.log(`📝 Editando despesa: ${despesaId}`);
-                modalOverlay.classList.remove('active');
-                alert(`Funcionalidade de edição para despesa ${despesaId} será implementada em breve.`);
-            };
-            
-            // Gerar download ZIP das notas mensais
-            async function gerarDownloadMensal() {
-                console.log('🗂️ Gerando download mensal...');
-                
-                // Obter o mês selecionado
-                const mesSelecionado = filtrosAtivos.mes !== 'all' ? filtrosAtivos.mes : new Date().getMonth() + 1;
-                
-                // Filtrar despesas do mês
-                const despesasMes = todasDespesas.filter(d => {
-                    if (!d.payload.dataCompra) return false;
-                    const dataCompra = new Date(d.payload.dataCompra);
-                    const mes = (dataCompra.getMonth() + 1).toString().padStart(2, '0');
-                    return mes === mesSelecionado.toString().padStart(2, '0');
-                });
-                
-                if (despesasMes.length === 0) {
-                    alert('Nenhuma despesa encontrada para o mês selecionado.');
-                    return;
-                }
-                
-                // Contar despesas com anexos
-                const despesasComAnexo = despesasMes.filter(d => d.payload.notaFiscal);
-                
-                if (despesasComAnexo.length === 0) {
-                    alert('Nenhuma despesa com anexos encontrada para o mês selecionado.');
-                    return;
-                }
-                
-                // Mostrar loading
-                downloadBtn.disabled = true;
-                downloadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Preparando download...';
-                
+            // Atualizar status da despesa via API Core
+            async function atualizarStatusDespesa(despesaId, novoStatus) {
                 try {
-                    // Para cada despesa com anexo, criar link de download
-                    setTimeout(() => {
-                        let contador = 0;
-                        despesasComAnexo.forEach((despesa, index) => {
-                            setTimeout(() => {
-                                window.downloadAnexoIndividual(despesa.id, despesa.payload.descricao || `despesa_${index + 1}`);
-                                contador++;
-                                
-                                if (contador === despesasComAnexo.length) {
-                                    // Restaurar botão
-                                    setTimeout(() => {
-                                        downloadBtn.disabled = false;
-                                        downloadBtn.innerHTML = '<i class="fas fa-file-archive"></i> Download Notas Mensais';
-                                    }, 1000);
-                                }
-                            }, index * 500);
-                        });
-                    }, 1000);
+                    console.log(`🔄 Atualizando status da despesa ${despesaId} para: ${novoStatus}`);
+                    
+                    // Buscar o evento original
+                    const response = await fetch('/api/database/query', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            schema: 'despesa',
+                            filters: { id: despesaId }
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('Erro ao buscar despesa');
+                    }
+                    
+                    const result = await response.json();
+                    const eventos = result.events || [];
+                    
+                    if (eventos.length === 0) {
+                        throw new Error('Despesa não encontrada');
+                    }
+                    
+                    const eventoOriginal = eventos[0];
+                    const payloadAtualizado = {
+                        ...eventoOriginal.payload,
+                        statusPagamento: novoStatus,
+                        dataPagamento: novoStatus === 'paga' ? new Date().toISOString().split('T')[0] : '',
+                        updated_at: new Date().toISOString()
+                    };
+                    
+                    // Criar novo evento de atualização
+                    const eventoAtualizacao = {
+                        schema: 'despesa',
+                        payload: payloadAtualizado,
+                        pageId: 'despesas',
+                        timestamp: new Date().toISOString(),
+                        deleted: false
+                    };
+                    
+                    // Enviar para Firebase via API Core
+                    const commitResponse = await fetch('/api/database/commit', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(eventoAtualizacao)
+                    });
+                    
+                    if (!commitResponse.ok) {
+                        throw new Error('Erro ao atualizar despesa');
+                    }
+                    
+                    // Atualizar localmente
+                    const despesaIndex = todasDespesas.findIndex(d => d.id === despesaId);
+                    if (despesaIndex !== -1) {
+                        todasDespesas[despesaIndex].statusPagamento = novoStatus;
+                        todasDespesas[despesaIndex].dataPagamento = novoStatus === 'paga' ? new Date().toISOString().split('T')[0] : '';
+                    }
+                    
+                    // Feedback visual
+                    const card = document.querySelector(`.despesa-card[data-id="${despesaId}"]`);
+                    if (card) {
+                        card.className = `despesa-card ${novoStatus}`;
+                        
+                        const statusSelect = card.querySelector('.status-select');
+                        statusSelect.style.backgroundColor = '#10b981';
+                        statusSelect.style.color = 'white';
+                        
+                        setTimeout(() => {
+                            statusSelect.style.backgroundColor = '';
+                            statusSelect.style.color = '';
+                        }, 1000);
+                    }
+                    
+                    atualizarContadores();
+                    console.log(`✅ Status da despesa ${despesaId} atualizado para: ${novoStatus}`);
                     
                 } catch (error) {
-                    console.error('Erro ao gerar download:', error);
-                    alert('Erro ao preparar o download. Por favor, tente novamente.');
-                    
-                    downloadBtn.disabled = false;
-                    downloadBtn.innerHTML = '<i class="fas fa-file-archive"></i> Download Notas Mensais';
+                    console.error('❌ Erro ao atualizar status:', error);
+                    alert('Erro ao atualizar status da despesa. Tente novamente.');
                 }
             }
             
             // ============================================
-            // CONFIGURAÇÃO DE EVENT LISTENERS
+            // FUNÇÕES DE EDIÇÃO
             // ============================================
             
-            function configurarEventListeners() {
-                // Aplicar filtros
-                applyFiltersBtn.addEventListener('click', function() {
-                    filtrosAtivos = {
-                        status: filterStatus.value,
-                        fornecedor: filterFornecedor.value,
-                        categoria: filterCategoria.value,
-                        mes: filterMes.value
-                    };
-                    
-                    aplicarFiltros();
-                });
-                
-                // Limpar filtros
-                clearFiltersBtn.addEventListener('click', function() {
-                    filterStatus.value = 'all';
-                    filterFornecedor.value = 'all';
-                    filterCategoria.value = 'all';
-                    filterMes.value = 'all';
-                    
-                    filtrosAtivos = {
-                        status: 'all',
-                        fornecedor: 'all',
-                        categoria: 'all',
-                        mes: 'all'
-                    };
-                    
-                    aplicarFiltros();
-                });
-                
-                // Download mensal
-                downloadBtn.addEventListener('click', gerarDownloadMensal);
-                
-                // Fechar modais
-                modalClose.addEventListener('click', () => {
-                    modalOverlay.classList.remove('active');
-                });
-                
-                modalOverlay.addEventListener('click', (e) => {
-                    if (e.target === modalOverlay) {
-                        modalOverlay.classList.remove('active');
-                    }
-                });
-                
-                imageViewerClose.addEventListener('click', () => {
-                    imageViewerOverlay.classList.remove('active');
-                });
-                
-                imageViewerOverlay.addEventListener('click', (e) => {
-                    if (e.target === imageViewerOverlay) {
-                        imageViewerOverlay.classList.remove('active');
-                    }
-                });
-                
-                // Escutar mensagens do Core
-                window.addEventListener("message", function(event) {
-                    if (event.data.type === "QUERY_RESPONSE") {
-                        processarDespesas(event.data.data || []);
-                    }
-                });
+            // Função para editar uma despesa (redireciona para o formulário)
+            function editarDespesa(despesaId) {
+                console.log('✏️ Editando despesa:', despesaId);
+                window.location.href = `novadespesa.html?edit=${despesaId}`;
             }
+            
+            // ============================================
+            // FUNÇÕES AUXILIARES
+            // ============================================
+            
+            function mostrarErro(mensagem) {
+                console.error('❌ Erro:', mensagem);
+                loadingState.innerHTML = `
+                    <div style="color: var(--danger-color);">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px;"></i>
+                        <h3>Erro ao carregar dados</h3>
+                        <p>${mensagem}</p>
+                        <button class="btn-new" onclick="location.reload()" style="margin-top: 16px;">
+                            <i class="fas fa-redo"></i>
+                            Tentar Novamente
+                        </button>
+                    </div>
+                `;
+            }
+            
+            function formatarMoeda(valor) {
+                return new Intl.NumberFormat('pt-PT', {
+                    style: 'currency',
+                    currency: 'EUR',
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                }).format(valor);
+            }
+            
+            // ============================================
+            // EVENT LISTENERS
+            // ============================================
+            
+            // Filtrar despesas por status
+            filterButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    filterButtons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    filtroAtual = btn.dataset.filter;
+                    aplicarFiltrosEBusca();
+                });
+            });
+            
+            // Buscar despesas
+            searchInput.addEventListener('input', (e) => {
+                termoBusca = e.target.value.toLowerCase();
+                aplicarFiltrosEBusca();
+            });
+            
+            // Fechar modal
+            modalClose.addEventListener('click', () => {
+                modalOverlay.classList.remove('active');
+            });
+            
+            modalOverlay.addEventListener('click', (e) => {
+                if (e.target === modalOverlay) {
+                    modalOverlay.classList.remove('active');
+                }
+            });
+            
+            // Escutar eventos do Core Engine
+            document.addEventListener('coreDataChanged', () => {
+                console.log('🔄 Dados atualizados pelo Core Engine');
+                carregarDespesas();
+            });
+            
+            // Auto-refresh a cada 30 segundos
+            setInterval(carregarDespesas, 30000);
             
             // ============================================
             // INICIALIZAÇÃO
             // ============================================
             
-            inicializar();
+            // Iniciar carregamento das despesas
+            carregarDespesas();
             
-            // Auto-refresh a cada 5 segundos
-            setInterval(carregarDespesas, 5000);
+            console.log('✅ Sistema de gestão de despesas inicializado (CORE v5.1)');
         });
     </script>
     
-    <!-- CONEXÃO COM O CORE -->
+    <!-- CONEXÃO COM O CORE ENGINE (OBRIGATÓRIO) -->
     <script src="../core/engine.js"></script>
 </body>
 </html>
