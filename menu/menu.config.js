@@ -20,11 +20,21 @@
     },
 
     {
+        id: "nav_ordemproducao",
+        name: "Ordem de Produção",
+        file: "pages/ordemproducao.html",
+        type: "WRITE",
+        pos: 3,
+        hidden: false,
+        deleted: false
+    },
+
+    {
         id: "nav_novadespesa",
         name: "Nova Despesa",
         file: "pages/novadespesa.html",
         type: "WRITE",
-        pos: 3,
+        pos: 4,
         hidden: false,
         deleted: false
     },
@@ -34,7 +44,7 @@
         name: "Despesas",
         file: "pages/despesas.html",
         type: "READ",
-        pos: 4,
+        pos: 5,
         hidden: false,
         deleted: false
     }

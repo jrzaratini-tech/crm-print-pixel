@@ -1,0 +1,1493 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrintPixel - Ordem de Produção</title>
+    
+    <style>
+        /* ============================================
+           VARIÁVEIS E RESET
+           ============================================ */
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --accent-red: #ef4444;
+            --accent-yellow: #f59e0b;
+            --accent-green: #10b981;
+            --accent-blue: #3b82f6;
+            --border-color: #334155;
+            --shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            --radius: 12px;
+            --transition: all 0.3s ease;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', monospace, sans-serif;
+        }
+        
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            padding: 20px;
+        }
+        
+        /* ============================================
+           HEADER FIXO
+           ============================================ */
+        .production-header {
+            background: var(--card-bg);
+            padding: 20px 30px;
+            border-radius: var(--radius);
+            margin-bottom: 30px;
+            border: 2px solid var(--border-color);
+            box-shadow: var(--shadow);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 20px;
+            z-index: 100;
+        }
+        
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .header-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, var(--accent-blue), #2563eb);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+        }
+        
+        .header-text h1 {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-green));
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            margin-bottom: 5px;
+        }
+        
+        .header-text p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            letter-spacing: 0.5px;
+        }
+        
+        .header-stats {
+            display: flex;
+            gap: 30px;
+            text-align: center;
+        }
+        
+        .stat-box {
+            min-width: 120px;
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .stat-pendente .stat-value {
+            color: var(--accent-yellow);
+        }
+        
+        .stat-processamento .stat-value {
+            color: var(--accent-blue);
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        /* ============================================
+           PAINEL DE PRODUÇÃO (ESTILO McDONALD'S)
+           ============================================ */
+        .production-board {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .order-card {
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            padding: 20px;
+            border: 2px solid var(--border-color);
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .order-card:hover {
+            transform: translateY(-5px);
+            border-color: var(--accent-blue);
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.6);
+        }
+        
+        /* Status colors */
+        .order-card.pendente {
+            border-left: 6px solid var(--accent-yellow);
+        }
+        
+        .order-card.processamento {
+            border-left: 6px solid var(--accent-blue);
+        }
+        
+        .order-card.atrasado {
+            border-left: 6px solid var(--accent-red);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { border-left-color: var(--accent-red); }
+            50% { border-left-color: #ff6b6b; }
+        }
+        
+        .order-card.concluido {
+            border-left: 6px solid var(--accent-green);
+            opacity: 0.7;
+        }
+        
+        /* Order header */
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .order-number {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: 1px;
+        }
+        
+        .order-status {
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .status-pendente {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--accent-yellow);
+        }
+        
+        .status-processamento {
+            background: rgba(59, 130, 246, 0.2);
+            color: var(--accent-blue);
+        }
+        
+        .status-atrasado {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--accent-red);
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        /* Order info */
+        .order-info {
+            margin-bottom: 15px;
+            flex-grow: 1;
+        }
+        
+        .order-cliente {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+        
+        .order-empresa {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+        
+        .order-meta {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            font-size: 12px;
+        }
+        
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .meta-icon {
+            color: var(--accent-blue);
+            font-size: 14px;
+        }
+        
+        /* Products list */
+        .products-preview {
+            margin-bottom: 15px;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .products-title {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .product-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        
+        .product-tag {
+            background: rgba(59, 130, 246, 0.2);
+            color: var(--accent-blue);
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        
+        /* Order footer */
+        .order-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 15px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .order-total {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--accent-green);
+        }
+        
+        .order-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .action-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            border: none;
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+        
+        .action-btn:hover {
+            background: var(--accent-blue);
+            color: white;
+            transform: scale(1.1);
+        }
+        
+        .action-btn.complete:hover {
+            background: var(--accent-green);
+        }
+        
+        .action-btn.delay:hover {
+            background: var(--accent-red);
+        }
+        
+        /* Timer */
+        .order-timer {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            background: rgba(0, 0, 0, 0.3);
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        
+        /* ============================================
+           CONTROLES DO PAINEL
+           ============================================ */
+        .controls-panel {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: var(--radius);
+            margin-bottom: 30px;
+            border: 2px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        
+        .filter-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .filter-btn {
+            padding: 10px 20px;
+            border: 2px solid var(--border-color);
+            background: transparent;
+            color: var(--text-secondary);
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .filter-btn:hover {
+            border-color: var(--accent-blue);
+            color: var(--accent-blue);
+        }
+        
+        .filter-btn.active {
+            border-color: var(--accent-blue);
+            background: rgba(59, 130, 246, 0.2);
+            color: var(--accent-blue);
+        }
+        
+        .refresh-btn {
+            padding: 10px 24px;
+            background: linear-gradient(135deg, var(--accent-blue), #2563eb);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: var(--transition);
+        }
+        
+        .refresh-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(59, 130, 246, 0.4);
+        }
+        
+        /* ============================================
+           STATUS LEGEND
+           ============================================ */
+        .legend-panel {
+            background: var(--card-bg);
+            padding: 15px 20px;
+            border-radius: var(--radius);
+            margin-bottom: 30px;
+            border: 2px solid var(--border-color);
+        }
+        
+        .legend-title {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .legend-items {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+        }
+        
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            border-radius: 4px;
+        }
+        
+        .legend-pendente {
+            background: var(--accent-yellow);
+        }
+        
+        .legend-processamento {
+            background: var(--accent-blue);
+        }
+        
+        .legend-atrasado {
+            background: var(--accent-red);
+        }
+        
+        .legend-concluido {
+            background: var(--accent-green);
+        }
+        
+        /* ============================================
+           MENSAGENS DE ESTADO
+           ============================================ */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+        
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            color: var(--border-color);
+        }
+        
+        .loading-state {
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 3px solid var(--border-color);
+            border-top: 3px solid var(--accent-blue);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* ============================================
+           MODAL DE DETALHES
+           ============================================ */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal-container {
+            background: var(--card-bg);
+            border-radius: var(--radius);
+            width: 90%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+            border: 2px solid var(--border-color);
+            box-shadow: var(--shadow);
+            animation: modalSlide 0.3s ease-out;
+        }
+        
+        @keyframes modalSlide {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .modal-header {
+            padding: 20px 30px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        
+        .modal-close {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            border: none;
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+        
+        .modal-close:hover {
+            background: var(--accent-red);
+            color: white;
+        }
+        
+        .modal-content {
+            padding: 30px;
+        }
+        
+        /* ============================================
+           RESPONSIVIDADE
+           ============================================ */
+        @media (max-width: 1024px) {
+            .production-board {
+                grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .production-header {
+                flex-direction: column;
+                gap: 20px;
+                text-align: center;
+            }
+            
+            .header-title {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .header-stats {
+                justify-content: center;
+            }
+            
+            .controls-panel {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .filter-buttons {
+                justify-content: center;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            body {
+                padding: 10px;
+            }
+            
+            .production-board {
+                grid-template-columns: 1fr;
+            }
+            
+            .stat-box {
+                min-width: 100px;
+            }
+            
+            .stat-value {
+                font-size: 24px;
+            }
+        }
+        
+        /* ============================================
+           ANIMAÇÕES DE ENTRADA
+           ============================================ */
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .order-card {
+            animation: slideUp 0.4s ease-out;
+        }
+        
+        /* ============================================
+           AUTO-REFRESH INDICATOR
+           ============================================ */
+        .auto-refresh {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--card-bg);
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            z-index: 99;
+        }
+        
+        .refresh-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--accent-green);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+    </style>
+    
+    <!-- FONT AWESOME -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body data-page-id="ordem_producao" data-page-type="READ">
+    <!-- ============================================
+         HEADER FIXO
+         ============================================ -->
+    <header class="production-header">
+        <div class="header-title">
+            <div class="header-icon">
+                <i class="fas fa-industry"></i>
+            </div>
+            <div class="header-text">
+                <h1>ORDEM DE PRODUÇÃO</h1>
+                <p>Sistema de monitoramento em tempo real - PrintPixel</p>
+            </div>
+        </div>
+        
+        <div class="header-stats">
+            <div class="stat-box stat-pendente">
+                <div class="stat-value" data-bind="producao.pendentes">0</div>
+                <div class="stat-label">Pendentes</div>
+            </div>
+            <div class="stat-box stat-processamento">
+                <div class="stat-value" data-bind="producao.processamento">0</div>
+                <div class="stat-label">Em Produção</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-value" data-bind="producao.total">0</div>
+                <div class="stat-label">Total</div>
+            </div>
+        </div>
+    </header>
+    
+    <!-- ============================================
+         CONTROLES DO PAINEL
+         ============================================ -->
+    <section class="controls-panel">
+        <div class="filter-buttons">
+            <button class="filter-btn active" data-filter="all">
+                <i class="fas fa-layer-group"></i>
+                Todos
+            </button>
+            <button class="filter-btn" data-filter="pendente">
+                <i class="fas fa-clock"></i>
+                Pendentes
+            </button>
+            <button class="filter-btn" data-filter="processamento">
+                <i class="fas fa-cogs"></i>
+                Em Produção
+            </button>
+            <button class="filter-btn" data-filter="atrasado">
+                <i class="fas fa-exclamation-triangle"></i>
+                Atrasados
+            </button>
+        </div>
+        
+        <button class="refresh-btn" id="manualRefresh">
+            <i class="fas fa-redo"></i>
+            Atualizar Agora
+        </button>
+    </section>
+    
+    <!-- ============================================
+         LEGENDA DE STATUS
+         ============================================ -->
+    <section class="legend-panel">
+        <div class="legend-title">Legenda de Status</div>
+        <div class="legend-items">
+            <div class="legend-item">
+                <div class="legend-color legend-pendente"></div>
+                <span>Pendente</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color legend-processamento"></div>
+                <span>Em Produção</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color legend-atrasado"></div>
+                <span>Atrasado</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color legend-concluido"></div>
+                <span>Concluído</span>
+            </div>
+        </div>
+    </section>
+    
+    <!-- ============================================
+         PAINEL DE PRODUÇÃO
+         ============================================ -->
+    <section class="production-board" id="productionBoard">
+        <!-- Os cards de pedido serão carregados dinamicamente aqui -->
+    </section>
+    
+    <!-- ============================================
+         ESTADOS DE CARREGAMENTO E VAZIO
+         ============================================ -->
+    <div class="loading-state" id="loadingState">
+        <div class="loading-spinner"></div>
+        <p>Carregando ordens de produção...</p>
+    </div>
+    
+    <div class="empty-state" id="emptyState" style="display: none;">
+        <div class="empty-icon">
+            <i class="fas fa-clipboard-list"></i>
+        </div>
+        <h3>Nenhuma ordem de produção encontrada</h3>
+        <p>Quando houver pedidos pendentes ou em produção, eles aparecerão aqui automaticamente.</p>
+    </div>
+    
+    <!-- ============================================
+         MODAL DE DETALHES
+         ============================================ -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 class="modal-title">Detalhes da Ordem</h2>
+                <button class="modal-close" id="modalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-content" id="modalContent">
+                <!-- Conteúdo será preenchido dinamicamente -->
+            </div>
+        </div>
+    </div>
+    
+    <!-- ============================================
+         INDICADOR DE AUTO-REFRESH
+         ============================================ -->
+    <div class="auto-refresh">
+        <div class="refresh-dot"></div>
+        <span>Atualização automática: <span id="refreshTimer">30</span>s</span>
+    </div>
+
+    <script>
+        // ============================================
+        // SISTEMA DE ORDEM DE PRODUÇÃO - CORE v5.1
+        // ============================================
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🏭 Sistema de Ordem de Produção (CORE v5.1) inicializado');
+            
+            // Elementos do DOM
+            const productionBoard = document.getElementById('productionBoard');
+            const emptyState = document.getElementById('emptyState');
+            const loadingState = document.getElementById('loadingState');
+            const modalOverlay = document.getElementById('modalOverlay');
+            const modalClose = document.getElementById('modalClose');
+            const modalContent = document.getElementById('modalContent');
+            const manualRefresh = document.getElementById('manualRefresh');
+            const filterButtons = document.querySelectorAll('.filter-btn');
+            const refreshTimer = document.getElementById('refreshTimer');
+            
+            // Estado da aplicação
+            let todasOrdens = [];
+            let filtroAtual = 'all';
+            let contadorRefresh = 30;
+            
+            // ============================================
+            // FUNÇÕES PRINCIPAIS - SIGA PROTOCOLO CORE
+            // ============================================
+            
+            // Carregar ordens do Firebase via API Core
+            async function carregarOrdens() {
+                try {
+                    console.log('🔄 Carregando ordens de produção do Firebase...');
+                    
+                    // Usar API REST do servidor CORE
+                    const response = await fetch('/api/database/query', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            schema: 'pedido',
+                            filters: { deleted: false }
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`Erro na API: ${response.status}`);
+                    }
+                    
+                    const result = await response.json();
+                    
+                    if (result.success && result.events) {
+                        console.log(`✅ ${result.events.length} pedidos recebidos do Firebase`);
+                        processarOrdens(result.events);
+                    } else {
+                        console.warn('⚠️ Nenhum pedido recebido ou formato inválido:', result);
+                        processarOrdens([]);
+                    }
+                    
+                } catch (error) {
+                    console.error('❌ Erro ao buscar ordens do Firebase:', error);
+                    mostrarErro('Erro ao carregar ordens. Verifique a conexão com o servidor.');
+                }
+            }
+            
+            // Processar ordens seguindo schema do README
+            function processarOrdens(events) {
+                console.log('📦 Processando eventos do Firebase:', events.length);
+                
+                // Filtrar apenas eventos do schema "pedido" e não deletados
+                todasOrdens = events
+                    .filter(event => {
+                        const isValid = event.schema === 'pedido' && !event.deleted;
+                        return isValid;
+                    })
+                    .map(event => {
+                        // Garantir que payload seja um objeto válido
+                        let payload = event.payload;
+                        if (typeof payload === 'string') {
+                            try {
+                                payload = JSON.parse(payload);
+                            } catch (e) {
+                                console.warn('⚠️ Payload não é JSON válido:', payload);
+                                payload = {};
+                            }
+                        }
+                        
+                        // Determinar se está atrasado (data de entrega passada)
+                        const hoje = new Date();
+                        const dataEntrega = payload.dataEntrega ? new Date(payload.dataEntrega) : null;
+                        let status = payload.status || 'pendente';
+                        
+                        if (status === 'pendente' && dataEntrega && dataEntrega < hoje) {
+                            status = 'atrasado';
+                        }
+                        
+                        // Calcular tempo decorrido
+                        const dataCriacao = event.timestamp ? new Date(event.timestamp) : new Date();
+                        const tempoDecorrido = Math.floor((hoje - dataCriacao) / (1000 * 60)); // minutos
+                        
+                        // Formatar ordem
+                        const ordemFormatada = {
+                            // Campos do schema "pedido"
+                            id: event.id,
+                            cliente: payload.cliente || 'Cliente não informado',
+                            empresa: payload.empresa || 'Empresa não informada',
+                            nif: payload.nif || '',
+                            morada: payload.morada || '',
+                            telemovel: payload.telemovel || '',
+                            numero: payload.numero || `PED-${event.id.substring(0, 8)}`,
+                            produtos: Array.isArray(payload.produtos) ? payload.produtos : [],
+                            total: parseFloat(payload.total) || 0,
+                            status: status,
+                            dataEntrega: payload.dataEntrega || '',
+                            observacoes: payload.observacoes || '',
+                            
+                            // Campos adicionais
+                            atendente: payload.atendente || '',
+                            entrada: parseFloat(payload.entrada) || 0,
+                            dataEntrada: payload.dataEntrada || '',
+                            instalacao: parseFloat(payload.instalacao) || 0,
+                            
+                            // Metadados
+                            createdAt: event.timestamp || event.created_at || new Date().toISOString(),
+                            pageId: event.pageId || 'novo_pedido',
+                            tempoDecorrido: tempoDecorrido
+                        };
+                        
+                        return ordemFormatada;
+                    })
+                    .sort((a, b) => {
+                        // Ordenar: atrasados > pendentes > processamento > concluídos
+                        const ordemPrioridade = { atrasado: 0, pendente: 1, processamento: 2, concluido: 3 };
+                        const prioridadeA = ordemPrioridade[a.status] || 4;
+                        const prioridadeB = ordemPrioridade[b.status] || 4;
+                        
+                        if (prioridadeA !== prioridadeB) {
+                            return prioridadeA - prioridadeB;
+                        }
+                        
+                        // Se mesma prioridade, ordenar por data mais antiga
+                        return new Date(a.createdAt) - new Date(b.createdAt);
+                    });
+                
+                console.log(`✅ ${todasOrdens.length} ordens processadas`);
+                
+                // Atualizar UI
+                atualizarContadores();
+                aplicarFiltro();
+                
+                // Ocultar loading, mostrar board
+                loadingState.style.display = 'none';
+                productionBoard.style.display = 'grid';
+            }
+            
+            // Atualizar contadores com data-bind
+            function atualizarContadores() {
+                const total = todasOrdens.length;
+                const pendentes = todasOrdens.filter(o => o.status === 'pendente' || o.status === 'atrasado').length;
+                const processamento = todasOrdens.filter(o => o.status === 'processamento').length;
+                
+                console.log(`📊 Contadores: Total=${total}, Pendentes/Atrasados=${pendentes}, Processamento=${processamento}`);
+                
+                // Atualizar elementos com data-bind
+                document.querySelector('[data-bind="producao.total"]').textContent = total;
+                document.querySelector('[data-bind="producao.pendentes"]').textContent = pendentes;
+                document.querySelector('[data-bind="producao.processamento"]').textContent = processamento;
+            }
+            
+            // Aplicar filtro atual
+            function aplicarFiltro() {
+                let ordensFiltradas = [...todasOrdens];
+                
+                // Aplicar filtro de status
+                if (filtroAtual !== 'all') {
+                    ordensFiltradas = ordensFiltradas.filter(o => o.status === filtroAtual);
+                }
+                
+                // Remover concluídos do painel principal
+                ordensFiltradas = ordensFiltradas.filter(o => o.status !== 'concluido');
+                
+                // Renderizar ordens
+                renderizarOrdens(ordensFiltradas);
+                
+                // Mostrar/ocultar estado vazio
+                if (ordensFiltradas.length === 0) {
+                    emptyState.style.display = 'block';
+                    productionBoard.style.display = 'none';
+                } else {
+                    emptyState.style.display = 'none';
+                    productionBoard.style.display = 'grid';
+                }
+            }
+            
+            // Renderizar ordens no painel
+            function renderizarOrdens(ordens) {
+                productionBoard.innerHTML = '';
+                
+                ordens.forEach(ordem => {
+                    const card = criarCardOrdem(ordem);
+                    productionBoard.appendChild(card);
+                });
+                
+                // Adicionar animação de entrada
+                const cards = document.querySelectorAll('.order-card');
+                cards.forEach((card, index) => {
+                    card.style.animationDelay = `${index * 0.1}s`;
+                });
+            }
+            
+            // Criar card de ordem
+            function criarCardOrdem(ordem) {
+                const produtos = ordem.produtos || [];
+                const total = ordem.total || 0;
+                
+                // Formatadores
+                const formatarData = (dataStr) => {
+                    if (!dataStr) return 'Não definida';
+                    try {
+                        const data = new Date(dataStr);
+                        return data.toLocaleDateString('pt-PT');
+                    } catch (e) {
+                        return dataStr;
+                    }
+                };
+                
+                const formatarMoeda = (valor) => {
+                    return new Intl.NumberFormat('pt-PT', {
+                        style: 'currency',
+                        currency: 'EUR',
+                        minimumFractionDigits: 0,
+                        maximumFractionDigits: 0
+                    }).format(valor);
+                };
+                
+                const formatarTempo = (minutos) => {
+                    if (minutos < 60) return `${minutos}min`;
+                    const horas = Math.floor(minutos / 60);
+                    const mins = minutos % 60;
+                    return `${horas}h${mins > 0 ? ` ${mins}min` : ''}`;
+                };
+                
+                // Status info
+                const getStatusInfo = (status) => {
+                    switch(status) {
+                        case 'pendente': return { texto: 'PENDENTE', classe: 'status-pendente' };
+                        case 'processamento': return { texto: 'EM PRODUÇÃO', classe: 'status-processamento' };
+                        case 'atrasado': return { texto: 'ATRASADO', classe: 'status-atrasado' };
+                        case 'concluido': return { texto: 'CONCLUÍDO', classe: 'status-concluido' };
+                        default: return { texto: status, classe: '' };
+                    }
+                };
+                
+                const statusInfo = getStatusInfo(ordem.status);
+                
+                const card = document.createElement('div');
+                card.className = `order-card ${ordem.status}`;
+                card.dataset.id = ordem.id;
+                
+                // Limitar produtos para exibição
+                const produtosExibicao = produtos.slice(0, 4);
+                
+                card.innerHTML = `
+                    <div class="order-timer">
+                        <i class="fas fa-clock"></i> ${formatarTempo(ordem.tempoDecorrido || 0)}
+                    </div>
+                    
+                    <div class="order-header">
+                        <div class="order-number">${ordem.numero}</div>
+                        <div class="order-status ${statusInfo.classe}">${statusInfo.texto}</div>
+                    </div>
+                    
+                    <div class="order-info">
+                        <div class="order-cliente">${ordem.cliente}</div>
+                        <div class="order-empresa">${ordem.empresa}</div>
+                        
+                        <div class="order-meta">
+                            <div class="meta-item">
+                                <i class="fas fa-calendar-alt meta-icon"></i>
+                                <span>Entrega: ${formatarData(ordem.dataEntrega)}</span>
+                            </div>
+                            <div class="meta-item">
+                                <i class="fas fa-user-tie meta-icon"></i>
+                                <span>Atendente: ${ordem.atendente || 'N/A'}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="products-preview">
+                        <div class="products-title">Produtos (${produtos.length})</div>
+                        <div class="product-tags">
+                            ${produtosExibicao.map(prod => `
+                                <div class="product-tag">${prod.nome || 'Produto'} ${prod.quantidade ? `×${prod.quantidade}` : ''}</div>
+                            `).join('')}
+                            ${produtos.length > 4 ? `<div class="product-tag">+${produtos.length - 4} mais</div>` : ''}
+                        </div>
+                    </div>
+                    
+                    <div class="order-footer">
+                        <div class="order-total">${formatarMoeda(total)}</div>
+                        <div class="order-actions">
+                            <button class="action-btn complete" title="Marcar como concluído" data-id="${ordem.id}">
+                                <i class="fas fa-check"></i>
+                            </button>
+                            <button class="action-btn" title="Ver detalhes" data-id="${ordem.id}">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            ${ordem.status === 'pendente' ? `
+                                <button class="action-btn" title="Iniciar produção" data-id="${ordem.id}">
+                                    <i class="fas fa-play"></i>
+                                </button>
+                            ` : ''}
+                            ${ordem.status === 'processamento' ? `
+                                <button class="action-btn delay" title="Reportar problema" data-id="${ordem.id}">
+                                    <i class="fas fa-exclamation"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+                
+                // Adicionar event listeners
+                const viewBtn = card.querySelector('.order-actions .action-btn:nth-child(2)');
+                const completeBtn = card.querySelector('.action-btn.complete');
+                const startBtn = card.querySelector('.action-btn:nth-child(3)');
+                const problemBtn = card.querySelector('.action-btn.delay');
+                
+                viewBtn.addEventListener('click', () => abrirModalDetalhes(ordem));
+                if (completeBtn) completeBtn.addEventListener('click', () => atualizarStatusOrdem(ordem.id, 'concluido'));
+                if (startBtn) startBtn.addEventListener('click', () => atualizarStatusOrdem(ordem.id, 'processamento'));
+                if (problemBtn) problemBtn.addEventListener('click', () => reportarProblema(ordem.id));
+                
+                return card;
+            }
+            
+            // Abrir modal com detalhes da ordem
+            function abrirModalDetalhes(ordem) {
+                const produtos = ordem.produtos || [];
+                const total = ordem.total || 0;
+                const iva = ordem.iva || 0;
+                const subtotal = ordem.subtotal || total - iva;
+                
+                // Formatadores
+                const formatarData = (dataStr) => {
+                    if (!dataStr) return 'Não informado';
+                    try {
+                        const data = new Date(dataStr);
+                        return data.toLocaleDateString('pt-PT') + ' ' + data.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+                    } catch (e) {
+                        return dataStr;
+                    }
+                };
+                
+                const formatarMoeda = (valor) => {
+                    return new Intl.NumberFormat('pt-PT', {
+                        style: 'currency',
+                        currency: 'EUR',
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    }).format(valor);
+                };
+                
+                modalContent.innerHTML = `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px;">
+                        <div>
+                            <h3 style="color: var(--accent-blue); margin-bottom: 15px; font-size: 16px;">INFORMAÇÕES DO PEDIDO</h3>
+                            <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 8px;">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                    <div>
+                                        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Número</div>
+                                        <div style="font-weight: 700; font-size: 18px;">${ordem.numero}</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Status</div>
+                                        <div class="order-status ${ordem.status === 'pendente' ? 'status-pendente' : ordem.status === 'processamento' ? 'status-processamento' : 'status-atrasado'}" style="display: inline-block;">
+                                            ${ordem.status === 'pendente' ? 'PENDENTE' : ordem.status === 'processamento' ? 'EM PRODUÇÃO' : 'ATRASADO'}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Data de Entrega</div>
+                                        <div style="font-weight: 600;">${formatarData(ordem.dataEntrega)}</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Atendente</div>
+                                        <div style="font-weight: 600;">${ordem.atendente || 'Não informado'}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h3 style="color: var(--accent-blue); margin-bottom: 15px; font-size: 16px;">CLIENTE</h3>
+                            <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 8px;">
+                                <div style="margin-bottom: 10px;">
+                                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Cliente</div>
+                                    <div style="font-weight: 700; font-size: 18px;">${ordem.cliente}</div>
+                                </div>
+                                <div style="margin-bottom: 10px;">
+                                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Empresa</div>
+                                    <div style="font-weight: 600;">${ordem.empresa}</div>
+                                </div>
+                                <div style="margin-bottom: 10px;">
+                                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Telemóvel</div>
+                                    <div style="font-weight: 600;">${ordem.telemovel || 'Não informado'}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 30px;">
+                        <h3 style="color: var(--accent-blue); margin-bottom: 15px; font-size: 16px;">PRODUTOS (${produtos.length})</h3>
+                        <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 8px;">
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="border-bottom: 1px solid var(--border-color);">
+                                        <th style="text-align: left; padding: 12px; font-size: 12px; color: var(--text-secondary);">Produto</th>
+                                        <th style="text-align: left; padding: 12px; font-size: 12px; color: var(--text-secondary);">Tamanho</th>
+                                        <th style="text-align: left; padding: 12px; font-size: 12px; color: var(--text-secondary);">Qtd</th>
+                                        <th style="text-align: left; padding: 12px; font-size: 12px; color: var(--text-secondary);">Valor Unit.</th>
+                                        <th style="text-align: left; padding: 12px; font-size: 12px; color: var(--text-secondary);">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${produtos.map(prod => `
+                                        <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                                            <td style="padding: 12px;">
+                                                <div style="font-weight: 600;">${prod.nome || 'Produto'}</div>
+                                                ${prod.observacoes ? `<div style="font-size: 11px; color: var(--text-secondary); margin-top: 3px;">${prod.observacoes}</div>` : ''}
+                                            </td>
+                                            <td style="padding: 12px;">${prod.tamanho || 'N/A'}</td>
+                                            <td style="padding: 12px;">${prod.quantidade || 1}</td>
+                                            <td style="padding: 12px;">${formatarMoeda(prod.valor || 0)}</td>
+                                            <td style="padding: 12px; font-weight: 600;">${formatarMoeda((prod.valor || 0) * (prod.quantidade || 1))}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div style="display: flex; justify-content: flex-end;">
+                        <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 8px; width: 300px;">
+                            <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-color);">
+                                <span>Subtotal:</span>
+                                <span>${formatarMoeda(subtotal)}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-color);">
+                                <span>IVA (23%):</span>
+                                <span>${formatarMoeda(iva)}</span>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; padding: 8px 0; font-weight: 700; font-size: 18px;">
+                                <span>TOTAL:</span>
+                                <span style="color: var(--accent-green);">${formatarMoeda(total)}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    ${ordem.observacoes ? `
+                        <div style="margin-top: 30px;">
+                            <h3 style="color: var(--accent-blue); margin-bottom: 15px; font-size: 16px;">OBSERVAÇÕES</h3>
+                            <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 8px;">
+                                ${ordem.observacoes}
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    <div style="display: flex; gap: 15px; margin-top: 30px;">
+                        <button class="refresh-btn" style="flex: 1;" onclick="atualizarStatusOrdem('${ordem.id}', 'concluido'); fecharModal();">
+                            <i class="fas fa-check"></i>
+                            Marcar como Concluído
+                        </button>
+                        <button class="filter-btn" style="flex: 1;" onclick="fecharModal();">
+                            <i class="fas fa-times"></i>
+                            Fechar
+                        </button>
+                    </div>
+                `;
+                
+                modalOverlay.classList.add('active');
+            }
+            
+            // Atualizar status da ordem via API Core
+            async function atualizarStatusOrdem(ordemId, novoStatus) {
+                try {
+                    console.log(`🔄 Atualizando status da ordem ${ordemId} para: ${novoStatus}`);
+                    
+                    // Buscar o evento original
+                    const response = await fetch('/api/database/query', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            schema: 'pedido',
+                            filters: { id: ordemId }
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('Erro ao buscar ordem');
+                    }
+                    
+                    const result = await response.json();
+                    const eventos = result.events || [];
+                    
+                    if (eventos.length === 0) {
+                        throw new Error('Ordem não encontrada');
+                    }
+                    
+                    const eventoOriginal = eventos[0];
+                    const payloadAtualizado = {
+                        ...eventoOriginal.payload,
+                        status: novoStatus,
+                        updated_at: new Date().toISOString()
+                    };
+                    
+                    // Criar novo evento de atualização
+                    const eventoAtualizacao = {
+                        schema: 'pedido',
+                        payload: payloadAtualizado,
+                        pageId: 'ordem_producao',
+                        timestamp: new Date().toISOString(),
+                        deleted: false
+                    };
+                    
+                    // Enviar para Firebase via API Core
+                    const commitResponse = await fetch('/api/database/commit', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(eventoAtualizacao)
+                    });
+                    
+                    if (!commitResponse.ok) {
+                        throw new Error('Erro ao atualizar ordem');
+                    }
+                    
+                    // Feedback visual
+                    const card = document.querySelector(`.order-card[data-id="${ordemId}"]`);
+                    if (card) {
+                        card.classList.add('concluido');
+                        card.style.opacity = '0.5';
+                        card.style.transform = 'scale(0.95)';
+                        
+                        setTimeout(() => {
+                            carregarOrdens(); // Recarregar ordens
+                        }, 1000);
+                    }
+                    
+                    console.log(`✅ Status da ordem ${ordemId} atualizado para: ${novoStatus}`);
+                    
+                } catch (error) {
+                    console.error('❌ Erro ao atualizar status:', error);
+                    alert('Erro ao atualizar status da ordem. Tente novamente.');
+                }
+            }
+            
+            // Reportar problema na ordem
+            function reportarProblema(ordemId) {
+                const problema = prompt('Descreva o problema encontrado na produção:');
+                if (problema) {
+                    alert(`Problema reportado para a ordem ${ordemId}:\n\n${problema}\n\nA equipe será notificada.`);
+                    // Aqui poderia enviar uma notificação para o sistema
+                }
+            }
+            
+            // Fechar modal
+            function fecharModal() {
+                modalOverlay.classList.remove('active');
+            }
+            
+            // Mostrar erro
+            function mostrarErro(mensagem) {
+                console.error('❌ Erro:', mensagem);
+                loadingState.innerHTML = `
+                    <div style="color: var(--accent-red); text-align: center;">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px;"></i>
+                        <h3>Erro ao carregar dados</h3>
+                        <p>${mensagem}</p>
+                        <button class="refresh-btn" onclick="location.reload()" style="margin-top: 16px;">
+                            <i class="fas fa-redo"></i>
+                            Tentar Novamente
+                        </button>
+                    </div>
+                `;
+            }
+            
+            // ============================================
+            // EVENT LISTENERS
+            // ============================================
+            
+            // Filtrar ordens
+            filterButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    filterButtons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    filtroAtual = btn.dataset.filter;
+                    aplicarFiltro();
+                });
+            });
+            
+            // Atualizar manualmente
+            manualRefresh.addEventListener('click', () => {
+                manualRefresh.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Atualizando...';
+                carregarOrdens();
+                setTimeout(() => {
+                    manualRefresh.innerHTML = '<i class="fas fa-redo"></i> Atualizar Agora';
+                }, 1000);
+            });
+            
+            // Fechar modal
+            modalClose.addEventListener('click', fecharModal);
+            modalOverlay.addEventListener('click', (e) => {
+                if (e.target === modalOverlay) {
+                    fecharModal();
+                }
+            });
+            
+            // Escutar eventos do Core Engine
+            document.addEventListener('coreDataChanged', () => {
+                console.log('🔄 Dados atualizados pelo Core Engine');
+                carregarOrdens();
+            });
+            
+            // ============================================
+            // TIMER DE AUTO-REFRESH
+            // ============================================
+            
+            function iniciarTimerRefresh() {
+                contadorRefresh = 30;
+                const timer = setInterval(() => {
+                    contadorRefresh--;
+                    refreshTimer.textContent = contadorRefresh;
+                    
+                    if (contadorRefresh <= 0) {
+                        clearInterval(timer);
+                        console.log('🔄 Auto-refresh acionado');
+                        carregarOrdens();
+                        iniciarTimerRefresh();
+                    }
+                }, 1000);
+            }
+            
+            // ============================================
+            // INICIALIZAÇÃO
+            // ============================================
+            
+            // Iniciar carregamento das ordens
+            carregarOrdens();
+            
+            // Iniciar timer de auto-refresh
+            iniciarTimerRefresh();
+            
+            // Auto-refresh a cada 30 segundos
+            setInterval(carregarOrdens, 30000);
+            
+            console.log('✅ Sistema de ordem de produção inicializado (CORE v5.1)');
+            
+            // Expor funções para uso global (se necessário)
+            window.fecharModal = fecharModal;
+            window.atualizarStatusOrdem = atualizarStatusOrdem;
+        });
+    </script>
+    
+    <!-- CONEXÃO COM O CORE ENGINE (OBRIGATÓRIO) -->
+    <script src="../core/engine.js"></script>
+</body>
+</html>
