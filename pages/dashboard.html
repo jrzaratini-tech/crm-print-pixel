@@ -388,7 +388,6 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            margin-bottom: 10px;
         }
         
         .chart-subtitle {
@@ -717,11 +716,11 @@
             <div class="period-filter">
                 <span style="color: white; font-weight: 500;">Período:</span>
                 <select id="periodFilter">
-                    <option value="current">Mês Atual</option>
-                    <option value="last">Mês Anterior</option>
-                    <option value="quarter">Último Trimestre</option>
-                    <option value="year">Último Ano</option>
-                    <option value="custom">Personalizado</option>
+                    <option value="mes_atual">Mês Atual</option>
+                    <option value="mes_anterior">Mês Anterior</option>
+                    <option value="trimestre">Último Trimestre</option>
+                    <option value="ano_atual">Ano Atual</option>
+                    <option value="todos">Todo o Período</option>
                 </select>
             </div>
             
@@ -804,7 +803,7 @@
                 <div class="metric-value receber" data-bind="contas.receber">€0,00</div>
                 <div class="metric-change">
                     <i class="fas fa-calendar-alt"></i>
-                    <span>Vencimento</span>
+                    <span>Contas a receber</span>
                 </div>
             </div>
             
@@ -819,7 +818,7 @@
                 <div class="metric-value pagar" data-bind="contas.pagar">€0,00</div>
                 <div class="metric-change">
                     <i class="fas fa-calendar-alt"></i>
-                    <span>Vencimento</span>
+                    <span>Contas a pagar</span>
                 </div>
             </div>
         </div>
@@ -1043,7 +1042,9 @@
                 
                 // Filtro de período
                 periodFilter.addEventListener('change', function(e) {
-                    atualizarPeriodo(e.target.value);
+                    periodoAtual = e.target.value;
+                    console.log('📅 Período alterado para:', periodoAtual);
+                    solicitarDadosAoCore();
                 });
             }
             
@@ -1078,80 +1079,74 @@
                 });
             }
             
-            // Atualizar período
-            function atualizarPeriodo(periodo) {
-                console.log(`📅 Alterando período para: ${periodo}`);
-                periodoAtual = periodo;
-                
-                // Atualizar a classe ativa no menu de período
-                document.querySelectorAll('.periodo-btn').forEach(btn => {
-                    if (btn.getAttribute('data-periodo') === periodo) {
-                        btn.classList.add('active');
-                    } else {
-                        btn.classList.remove('active');
-                    }
-                });
-                
-                solicitarDadosAoCore();
-            }
-            
-            // Solicitar dados ao Core - ATUALIZADO para suportar filtro de período
+            // Solicitar dados ao Core - CORRIGIDO para suportar filtro de período
             function solicitarDadosAoCore() {
-                console.log('🔄 Solicitando dados diretamente da API...');
+                console.log('🔄 Solicitando dados da API com período:', periodoAtual);
                 
-                // Obter as datas de início e fim com base no período selecionado
+                // Calcular datas baseadas no período selecionado
                 const agora = new Date();
                 const mesAtual = agora.getMonth();
                 const anoAtual = agora.getFullYear();
-                const diaAtual = agora.getDate();
                 
                 let dataInicio, dataFim;
                 
                 switch(periodoAtual) {
-                    case 'hoje':
-                        dataInicio = new Date(anoAtual, mesAtual, diaAtual, 0, 0, 0, 0);
-                        dataFim = new Date(anoAtual, mesAtual, diaAtual, 23, 59, 59, 999);
-                        break;
-                    case 'semana':
-                        const diaSemana = agora.getDay();
-                        const diff = agora.getDate() - diaSemana + (diaSemana === 0 ? -6 : 1);
-                        dataInicio = new Date(anoAtual, mesAtual, diff, 0, 0, 0, 0);
-                        dataFim = new Date(anoAtual, mesAtual, diff + 6, 23, 59, 59, 999);
-                        break;
                     case 'mes_anterior':
-                        dataInicio = new Date(anoAtual, mesAtual - 1, 1, 0, 0, 0, 0);
-                        dataFim = new Date(anoAtual, mesAtual, 0, 23, 59, 59, 999);
+                        // Mês anterior completo
+                        dataInicio = new Date(anoAtual, mesAtual - 1, 1);
+                        dataFim = new Date(anoAtual, mesAtual, 0);
+                        break;
+                    case 'trimestre':
+                        // Últimos 3 meses
+                        dataInicio = new Date(anoAtual, mesAtual - 3, 1);
+                        dataFim = new Date(anoAtual, mesAtual + 1, 0);
                         break;
                     case 'ano_atual':
-                        dataInicio = new Date(anoAtual, 0, 1, 0, 0, 0, 0);
-                        dataFim = new Date(anoAtual, 11, 31, 23, 59, 59, 999);
+                        // Desde o início do ano
+                        dataInicio = new Date(anoAtual, 0, 1);
+                        dataFim = new Date(anoAtual, 11, 31);
                         break;
                     case 'todos':
-                        dataInicio = new Date(0); // Data mínima
-                        dataFim = new Date('2999-12-31T23:59:59.999Z'); // Data máxima
+                        // Todos os dados (sem filtro de data)
+                        dataInicio = null;
+                        dataFim = null;
                         break;
                     case 'mes_atual':
                     default:
-                        dataInicio = new Date(anoAtual, mesAtual, 1, 0, 0, 0, 0);
-                        dataFim = new Date(anoAtual, mesAtual + 1, 0, 23, 59, 59, 999);
+                        // Mês atual completo
+                        dataInicio = new Date(anoAtual, mesAtual, 1);
+                        dataFim = new Date(anoAtual, mesAtual + 1, 0);
                 }
                 
-                console.log(`📅 Período selecionado: ${periodoAtual} (${dataInicio.toLocaleDateString()} - ${dataFim.toLocaleDateString()})`);
+                console.log('📅 Datas filtradas:', { 
+                    dataInicio: dataInicio ? dataInicio.toISOString() : 'null',
+                    dataFim: dataFim ? dataFim.toISOString() : 'null'
+                });
+                
+                // Preparar o corpo da requisição
+                const body = { schema: 'all' };
+                
+                // Adicionar filtros de data apenas se definidos
+                if (dataInicio && dataFim) {
+                    body.filters = {
+                        dataInicio: dataInicio.toISOString(),
+                        dataFim: dataFim.toISOString()
+                    };
+                }
                 
                 fetch('/api/database/query', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        schema: 'all',
-                        filters: {
-                            dataInicio: dataInicio.toISOString(),
-                            dataFim: dataFim.toISOString()
-                        }
-                    })
+                    body: JSON.stringify(body)
                 })
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Erro na API: ${response.status}`);
+                    }
+                    return response.json();
+                })
                 .then(result => {
                     const eventos = result.events || [];
                     console.log(`✅ Dados recebidos da API (${periodoAtual}):`, eventos.length, 'eventos');
@@ -1162,7 +1157,7 @@
                     }
                     
                     // Processar dados
-                    dadosCore = processarDadosParaDashboard(eventos);
+                    dadosCore = processarDadosParaDashboard(eventos, periodoAtual);
                     console.log('📊 Dados processados para dashboard:', dadosCore);
                     
                     atualizarInterface(dadosCore);
@@ -1218,21 +1213,11 @@
                     metaDiaria = saldoRestante / diasUteisRestantes;
                 }
                 
-                console.log('📊 Cálculo de meta diária:', {
-                    metaMensal,
-                    faturamentoAtual,
-                    saldoRestante,
-                    diasUteisTotal,
-                    diasUteisPassados,
-                    diasUteisRestantes,
-                    metaDiariaCalculada: metaDiaria
-                });
-                
                 return metaDiaria;
             }
             
-            // CORREÇÃO 2: Processar dados do Core para o dashboard - FOCADO EM DESPESAS
-            function processarDadosParaDashboard(eventos) {
+            // CORREÇÃO: Processar dados do Core para o dashboard - MELHORADO
+            function processarDadosParaDashboard(eventos, periodo) {
                 console.log('📊 Processando eventos para dashboard:', eventos.length, 'eventos');
                 
                 let totalVendas = 0;
@@ -1250,55 +1235,59 @@
                 const meses = {};
                 const meses12 = {}; // Para os últimos 12 meses
                 
-                // Variáveis para controle de contas a receber e pagar
+                // Variáveis para controle de contas a receber e pagar - CORRIGIDO
                 let totalAReceber = 0;
                 let totalAPagar = 0;
                 
                 const agora = new Date();
                 const mesAtual = agora.getMonth();
                 const anoAtual = agora.getFullYear();
-                const diaAtual = agora.getDate();
                 
-                // Calcular mês anterior
+                // Calcular mês anterior para comparação
                 const mesAnterior = mesAtual === 0 ? 11 : mesAtual - 1;
                 const anoMesAnterior = mesAtual === 0 ? anoAtual - 1 : anoAtual;
                 
-                // As datas de início e fim agora são fornecidas pelo servidor
-                // Removida a lógica de cálculo de datas, pois a filtragem é feita no servidor
-                
-                // Processar todos os eventos - CORREÇÃO CRÍTICA PARA DESPESAS
+                // Processar todos os eventos
                 eventos.forEach((evento, index) => {
                     if (evento.deleted) return;
-                    
-                    // Processar contas a receber e pagar
-                    if (evento.schema === 'conta_receber' && evento.status !== 'pago') {
-                        const valor = parseFloat(evento.valor || 0);
-                        if (!isNaN(valor) && valor > 0) {
-                            totalAReceber += valor;
-                        }
-                    } else if (evento.schema === 'conta_pagar' && evento.status !== 'pago') {
-                        const valor = parseFloat(evento.valor || 0);
-                        if (!isNaN(valor) && valor > 0) {
-                            totalAPagar += valor;
-                        }
-                    }
                     
                     const dataEvento = new Date(evento.created_at);
                     const mesEvento = dataEvento.getMonth();
                     const anoEvento = dataEvento.getFullYear();
                     
+                    // CORREÇÃO CRÍTICA: Processar contas a receber e pagar
+                    if (evento.schema === 'conta_receber') {
+                        const valor = parseFloat(evento.payload?.valor || evento.payload?.total || 0);
+                        if (!isNaN(valor) && valor > 0) {
+                            const status = evento.payload?.status || 'pendente';
+                            if (status === 'pendente' || status === 'atrasado') {
+                                totalAReceber += valor;
+                            }
+                        }
+                    } else if (evento.schema === 'conta_pagar') {
+                        const valor = parseFloat(evento.payload?.valor || evento.payload?.total || 0);
+                        if (!isNaN(valor) && valor > 0) {
+                            const status = evento.payload?.status || 'pendente';
+                            if (status === 'pendente' || status === 'atrasado') {
+                                totalAPagar += valor;
+                            }
+                        }
+                    }
+                    
                     // Processar por tipo de schema
                     if (evento.schema === 'venda') {
                         const valor = parseFloat(evento.payload?.valor || evento.payload?.total || 0);
-                        if (!isNaN(valor)) {
+                        if (!isNaN(valor) && valor > 0) {
                             totalVendas += valor;
                             
-                            // Agrupar por categoria
-                            const categoria = evento.payload?.categoria || evento.payload?.tipo || 'Outros';
-                            if (!vendasPorCategoria[categoria]) {
-                                vendasPorCategoria[categoria] = 0;
+                            // Agrupar por categoria - CORREÇÃO: usar categoria correta
+                            const categoria = evento.payload?.categoria || evento.payload?.tipo || evento.payload?.produto || 'Outros';
+                            const categoriaLimpa = categoria.trim() || 'Outros';
+                            
+                            if (!vendasPorCategoria[categoriaLimpa]) {
+                                vendasPorCategoria[categoriaLimpa] = 0;
                             }
-                            vendasPorCategoria[categoria] += valor;
+                            vendasPorCategoria[categoriaLimpa] += valor;
                             
                             // Calcular dados do período de comparação (mês anterior)
                             const dataInicioComparacao = new Date(anoMesAnterior, mesAnterior, 1);
@@ -1311,7 +1300,7 @@
                         
                     } else if (evento.schema === 'pedido') {
                         const valor = parseFloat(evento.payload?.total || 0);
-                        if (!isNaN(valor)) {
+                        if (!isNaN(valor) && valor > 0) {
                             totalPedidos += valor;
                             
                             // Contar pedidos por status
@@ -1322,19 +1311,28 @@
                                 pedidosConcluidos++;
                             }
                             
-                            // Agrupar vendas de pedidos por produto
+                            // Agrupar vendas de pedidos por produto/categoria - CORREÇÃO MELHORADA
                             if (evento.payload?.produtos && Array.isArray(evento.payload.produtos)) {
                                 evento.payload.produtos.forEach(produto => {
-                                    const catProduto = produto.nome || 'Produto';
-                                    if (!vendasPorCategoria[catProduto]) {
-                                        vendasPorCategoria[catProduto] = 0;
+                                    const catProduto = produto.nome || produto.categoria || 'Produto';
+                                    const catProdutoLimpa = catProduto.trim() || 'Produto';
+                                    
+                                    if (!vendasPorCategoria[catProdutoLimpa]) {
+                                        vendasPorCategoria[catProdutoLimpa] = 0;
                                     }
                                     const valorProduto = parseFloat(produto.valor || 0);
                                     const quantidade = parseInt(produto.quantidade || 1);
                                     if (!isNaN(valorProduto) && !isNaN(quantidade)) {
-                                        vendasPorCategoria[catProduto] += valorProduto * quantidade;
+                                        vendasPorCategoria[catProdutoLimpa] += valorProduto * quantidade;
                                     }
                                 });
+                            } else {
+                                // Se não houver produtos, agrupar pelo número do pedido ou cliente
+                                const catPedido = `Pedido ${evento.payload?.numero || '#' + (index + 1)}`;
+                                if (!vendasPorCategoria[catPedido]) {
+                                    vendasPorCategoria[catPedido] = 0;
+                                }
+                                vendasPorCategoria[catPedido] += valor;
                             }
                             
                             // Calcular dados do período de comparação (mês anterior)
@@ -1347,7 +1345,7 @@
                         }
                         
                     } else if (evento.schema === 'despesa') {
-                        // CORREÇÃO CRÍTICA: Extrair o valor da despesa corretamente
+                        // Extrair o valor da despesa corretamente
                         let valorDespesa = 0;
                         const payload = evento.payload;
                         
@@ -1366,22 +1364,17 @@
                             valorDespesa = parseFloat(payload.montante);
                         }
                         
-                        // Debug: verificar se encontrou algum valor
-                        if (valorDespesa > 0) {
-                            console.log(`💰 Despesa encontrada: €${valorDespesa.toFixed(2)} - Categoria: ${payload?.categoria || 'Sem categoria'}`);
-                        }
-                        
                         if (!isNaN(valorDespesa) && valorDespesa > 0) {
                             totalDespesas += valorDespesa;
                             
                             // Agrupar por categoria
                             const categoria = payload?.categoria || payload?.tipo || 'Outros';
-                            if (!despesasPorCategoria[categoria]) {
-                                despesasPorCategoria[categoria] = 0;
-                            }
-                            despesasPorCategoria[categoria] += valorDespesa;
+                            const categoriaLimpa = categoria.trim() || 'Outros';
                             
-                            console.log(`✅ Despesa adicionada: €${valorDespesa.toFixed(2)} - Total atual: €${totalDespesas.toFixed(2)}`);
+                            if (!despesasPorCategoria[categoriaLimpa]) {
+                                despesasPorCategoria[categoriaLimpa] = 0;
+                            }
+                            despesasPorCategoria[categoriaLimpa] += valorDespesa;
                             
                             // Calcular dados do período de comparação (mês anterior)
                             const dataInicioComparacao = new Date(anoMesAnterior, mesAnterior, 1);
@@ -1390,12 +1383,10 @@
                             if (dataEvento >= dataInicioComparacao && dataEvento <= dataFimComparacao) {
                                 despesasMesAnterior += valorDespesa;
                             }
-                        } else {
-                            console.log(`❌ Despesa inválida ou valor zero:`, payload);
                         }
                     }
                     
-                    // Agrupar por mês para histórico de 6 meses
+                    // Agrupar por mês para histórico
                     const mesParaHistorico = dataEvento.getMonth();
                     const anoParaHistorico = dataEvento.getFullYear();
                     const chaveMes = `${anoParaHistorico}-${mesParaHistorico}`;
@@ -1414,7 +1405,6 @@
                                 : parseFloat(evento.payload?.total || 0);
                             if (!isNaN(valor)) meses[chaveMes].vendas += valor;
                         } else if (evento.schema === 'despesa') {
-                            // Extrair valor da despesa para histórico
                             let valorDespesa = 0;
                             const payload = evento.payload;
                             
@@ -1444,7 +1434,6 @@
                                 : parseFloat(evento.payload?.total || 0);
                             if (!isNaN(valor)) meses12[chaveMes].vendas += valor;
                         } else if (evento.schema === 'despesa') {
-                            // Extrair valor da despesa para histórico anual
                             let valorDespesa = 0;
                             const payload = evento.payload;
                             
@@ -1504,7 +1493,7 @@
                     variacaoVendas = -100; // Se havia vendas no mês anterior e agora não há
                 }
                 
-                // Preparar dados para gráficos de vendas
+                // Preparar dados para gráficos de vendas - CORREÇÃO APLICADA
                 let topVendasCategorias = [];
                 
                 // Verificar se há vendas para processar
@@ -1518,7 +1507,7 @@
                         .slice(0, 6)
                         .map(([categoria, valor]) => ({ 
                             categoria: categoria.length > 20 ? categoria.substring(0, 17) + '...' : categoria, 
-                            valor: parseFloat(valor.toFixed(2)) // Garantir que o valor tenha no máximo 2 casas decimais
+                            valor: parseFloat(valor.toFixed(2))
                         }));
                 }
                 
@@ -1586,10 +1575,12 @@
                     lucroTotal: lucroTotal.toFixed(2),
                     margemLucro: margemLucro.toFixed(1),
                     totalDespesas: totalDespesas.toFixed(2),
+                    totalAReceber: totalAReceber.toFixed(2), // CORREÇÃO: Adicionado
+                    totalAPagar: totalAPagar.toFixed(2),     // CORREÇÃO: Adicionado
                     metaDiariaReal: metaDiariaReal.toFixed(2),
                     variacaoDespesas: variacaoDespesas.toFixed(1),
                     variacaoVendas: variacaoVendas.toFixed(1),
-                    historicoAnualLength: historicoAnual.length
+                    topVendasCategorias: topVendasCategorias.length
                 });
                 
                 return {
@@ -1614,9 +1605,7 @@
                         atingido: vendasTotais,
                         meta: metaMensal,
                         percentual: percentualEquilibrio.toFixed(1),
-                        metaDiaria: metaDiariaReal, // USANDO META DIÁRIA REAL CALCULADA
-                        diasUteis: 0, // Removido pois não é mais necessário exibir
-                        diasUteisPassados: 0 // Removido pois não é mais necessário exibir
+                        metaDiaria: metaDiariaReal
                     },
                     indicadores: {
                         eficiencia: pedidosConcluidos > 0 ? '92' : '0',
@@ -1624,9 +1613,8 @@
                         satisfacao: pedidosConcluidos > 0 ? '94' : '0'
                     },
                     contas: {
-                        receber: totalAReceber, // Apenas o valor que ainda falta ser recebido
-                        pagar: totalAPagar,
-                        totalPedidos: totalPedidos
+                        receber: totalAReceber,
+                        pagar: totalAPagar
                     },
                     vendasPorCategoria: topVendasCategorias,
                     despesasPorCategoria: topDespesasCategorias,
@@ -1678,10 +1666,20 @@
                     console.log('✅ Lucro atualizado:', formatarMoeda(dados.lucro.total));
                 }
                 
-                // CORREÇÃO 2: Atualizar despesas corretamente
                 if (elementoDespesas) {
                     elementoDespesas.textContent = formatarMoeda(dados.despesas.total);
-                    console.log('✅ DESPESAS ATUALIZADA CORRETAMENTE:', formatarMoeda(dados.despesas.total));
+                    console.log('✅ Despesas atualizado:', formatarMoeda(dados.despesas.total));
+                }
+                
+                // CORREÇÃO CRÍTICA: Atualizar contas a receber e pagar
+                if (elementoReceber) {
+                    elementoReceber.textContent = formatarMoeda(dados.contas?.receber || 0);
+                    console.log('✅ Restante a Receber atualizado:', formatarMoeda(dados.contas?.receber || 0));
+                }
+                
+                if (elementoPagar) {
+                    elementoPagar.textContent = formatarMoeda(dados.contas?.pagar || 0);
+                    console.log('✅ Restante a Pagar atualizado:', formatarMoeda(dados.contas?.pagar || 0));
                 }
                 
                 document.querySelector('[data-bind="vendas.variacao"]').textContent = formatarPercentual(dados.vendas.variacao);
@@ -1696,7 +1694,7 @@
                 document.querySelector('[data-bind="equilibrio.meta"]').textContent = formatarMoeda(dados.equilibrio.meta);
                 document.querySelector('[data-bind="equilibrio.percentual"]').textContent = `${dados.equilibrio.percentual}%`;
                 
-                // CORREÇÃO 1: Atualizar meta diária REAL
+                // Atualizar meta diária REAL
                 const elementoMetaDiaria = document.querySelector('[data-bind="equilibrio.metaDiaria"]');
                 if (elementoMetaDiaria) {
                     elementoMetaDiaria.textContent = formatarMoeda(dados.equilibrio.metaDiaria);
@@ -1707,31 +1705,18 @@
                 const progressBar = document.getElementById('equilibriumProgress');
                 progressBar.style.width = `${dados.equilibrio.percentual}%`;
                 
-                // Atualizar indicadores - Removendo classes de cor
+                // Atualizar indicadores
                 const eficienciaEl = document.querySelector('[data-bind="indicadores.eficiencia"]');
                 const prazosEl = document.querySelector('[data-bind="indicadores.prazos"]');
                 const satisfacaoEl = document.querySelector('[data-bind="indicadores.satisfacao"]');
                 
-                // Remover classes de cor
                 eficienciaEl.className = 'operational-value';
                 prazosEl.className = 'operational-value';
                 satisfacaoEl.className = 'operational-value';
                 
-                // Atualizar textos
                 eficienciaEl.textContent = `${dados.indicadores.eficiencia}%`;
                 prazosEl.textContent = `${dados.indicadores.prazos}%`;
                 satisfacaoEl.textContent = `${dados.indicadores.satisfacao}%`;
-                
-                // Atualizar contas a receber e pagar
-                if (elementoReceber) {
-                    elementoReceber.textContent = formatarMoeda(dados.contas?.receber || 0);
-                    console.log('✅ Restante a Receber atualizado:', formatarMoeda(dados.contas?.receber || 0));
-                }
-                
-                if (elementoPagar) {
-                    elementoPagar.textContent = formatarMoeda(dados.contas?.pagar || 0);
-                    console.log('✅ Restante a Pagar atualizado:', formatarMoeda(dados.contas?.pagar || 0));
-                }
                 
                 // Aplicar privacidade se necessário
                 if (isPrivate) {
@@ -1985,7 +1970,7 @@
                 });
             }
             
-            // Atualizar gráficos com dados
+            // Atualizar gráficos com dados - CORREÇÃO APLICADA
             function atualizarGraficosComDados(dados) {
                 console.log('🔄 Atualizando gráficos com dados:', {
                     vendasCategorias: dados.vendasPorCategoria,
@@ -1994,12 +1979,12 @@
                     historicoAnual: dados.historicoAnual
                 });
                 
-                // Atualizar gráfico de vendas por categoria
+                // CORREÇÃO: Atualizar gráfico de vendas por categoria (mesma lógica do gráfico de despesas)
                 if (charts.salesByCategory) {
                     try {
                         const vendasData = Array.isArray(dados.vendasPorCategoria) ? dados.vendasPorCategoria : [];
                         
-                        console.log('📊 Dados de vendas por categoria (raw):', vendasData);
+                        console.log('📊 Dados de vendas por categoria para gráfico:', vendasData);
                         
                         // Verificar se temos dados válidos
                         if (vendasData.length > 0 && vendasData[0] && 'categoria' in vendasData[0] && 'valor' in vendasData[0]) {
@@ -2008,13 +1993,13 @@
                                 .filter(item => item && item.categoria !== undefined && item.valor !== undefined)
                                 .map(item => ({
                                     categoria: String(item.categoria || 'Sem categoria').substring(0, 30),
-                                    valor: Math.abs(parseFloat(item.valor) || 0) // Garantir que o valor seja positivo
+                                    valor: parseFloat(item.valor) || 0
                                 }));
                             
                             // Ordenar por valor decrescente
                             dadosFiltrados.sort((a, b) => b.valor - a.valor);
                             
-                            console.log('📊 Dados processados para o gráfico:', dadosFiltrados);
+                            console.log('📊 Dados processados para o gráfico de vendas:', dadosFiltrados);
                             
                             // Atualizar dados do gráfico
                             charts.salesByCategory.data.labels = dadosFiltrados.map(d => d.categoria);
@@ -2045,7 +2030,7 @@
                     try {
                         const despesasData = Array.isArray(dados.despesasPorCategoria) ? dados.despesasPorCategoria : [];
                         
-                        console.log('💰 Dados de despesas por categoria (raw):', despesasData);
+                        console.log('💰 Dados de despesas por categoria para gráfico:', despesasData);
                         
                         // Verificar se temos dados válidos
                         if (despesasData.length > 0 && despesasData[0] && 'categoria' in despesasData[0] && 'valor' in despesasData[0]) {
