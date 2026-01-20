@@ -68,6 +68,8 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
         }
         
         .header-title {
@@ -101,6 +103,31 @@
             font-weight: 400;
         }
         
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .btn-new {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        
+        .btn-new:hover {
+            background-color: var(--secondary-color);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+        
         /* ============================================
            CONTADORES SIMPLES
            ============================================ */
@@ -110,11 +137,17 @@
         
         .counters-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 16px;
         }
         
         @media (max-width: 768px) {
+            .counters-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (max-width: 480px) {
             .counters-grid {
                 grid-template-columns: 1fr;
             }
@@ -132,6 +165,10 @@
         
         .counter-card:hover {
             transform: translateY(-2px);
+        }
+        
+        .counter-card.total {
+            border-top: 4px solid var(--primary-color);
         }
         
         .counter-card.pendente {
@@ -157,6 +194,11 @@
             margin: 0 auto 12px;
         }
         
+        .counter-card.total .counter-icon {
+            background: #e0e7ff;
+            color: var(--primary-color);
+        }
+        
         .counter-card.pendente .counter-icon {
             background: #fef3c7;
             color: #92400e;
@@ -176,6 +218,10 @@
             font-size: 28px;
             font-weight: 700;
             margin-bottom: 4px;
+        }
+        
+        .counter-card.total .counter-value {
+            color: var(--primary-color);
         }
         
         .counter-card.pendente .counter-value {
@@ -379,6 +425,7 @@
             gap: 16px;
             font-size: 13px;
             color: var(--text-secondary);
+            flex-wrap: wrap;
         }
         
         .pedido-meta-item {
@@ -390,7 +437,39 @@
         .pedido-actions {
             display: flex;
             gap: 8px;
-            color: white;
+        }
+        
+        .action-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background: var(--card-bg);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        
+        .action-btn:hover {
+            background: var(--hover-bg);
+        }
+        
+        .action-btn.edit:hover {
+            color: var(--info-color);
+            border-color: var(--info-color);
+        }
+        
+        .action-btn.delete:hover {
+            color: var(--danger-color);
+            border-color: var(--danger-color);
+        }
+        
+        .action-btn.view:hover {
+            color: var(--primary-color);
+            border-color: var(--primary-color);
         }
         
         .pedido-content {
@@ -398,6 +477,12 @@
             grid-template-columns: 2fr 1fr;
             gap: 24px;
             margin-bottom: 16px;
+        }
+        
+        @media (max-width: 1024px) {
+            .pedido-content {
+                grid-template-columns: 1fr;
+            }
         }
         
         .produtos-list {
@@ -452,6 +537,7 @@
         .produto-valor {
             font-weight: 600;
             color: var(--primary-color);
+            white-space: nowrap;
         }
         
         .pedido-resumo {
@@ -494,6 +580,7 @@
         .pedido-status {
             display: flex;
             gap: 8px;
+            align-items: center;
         }
         
         .status-select {
@@ -504,6 +591,7 @@
             color: var(--text-primary);
             font-size: 13px;
             cursor: pointer;
+            min-width: 150px;
         }
         
         /* ============================================
@@ -531,7 +619,7 @@
             background: var(--card-bg);
             border-radius: var(--radius-lg);
             width: 90%;
-            max-width: 900px;
+            max-width: 800px;
             max-height: 90vh;
             overflow-y: auto;
             box-shadow: var(--shadow-lg);
@@ -558,7 +646,7 @@
         }
         
         .modal-title {
-            font-size: 24px;
+            font-size: 20px;
             font-weight: 700;
             color: var(--primary-color);
         }
@@ -587,11 +675,11 @@
         }
         
         .modal-section {
-            margin-bottom: 32px;
+            margin-bottom: 24px;
         }
         
         .section-title {
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 600;
             color: var(--primary-color);
             margin-bottom: 16px;
@@ -601,8 +689,8 @@
         
         .info-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 16px;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
         }
         
         .info-item {
@@ -612,7 +700,7 @@
         }
         
         .info-label {
-            font-size: 13px;
+            font-size: 12px;
             color: var(--text-secondary);
             font-weight: 500;
             text-transform: uppercase;
@@ -620,7 +708,7 @@
         }
         
         .info-value {
-            font-size: 15px;
+            font-size: 14px;
             color: var(--text-primary);
             font-weight: 500;
         }
@@ -633,9 +721,9 @@
         
         .produtos-table th {
             background: var(--hover-bg);
-            padding: 12px 16px;
+            padding: 12px;
             text-align: left;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 600;
             color: var(--text-secondary);
             text-transform: uppercase;
@@ -643,19 +731,9 @@
         }
         
         .produtos-table td {
-            padding: 12px 16px;
+            padding: 12px;
             border-bottom: 1px solid var(--border-color);
             font-size: 14px;
-            vertical-align: top;
-        }
-        
-        .produto-observacao-cell {
-            font-size: 12px;
-            color: var(--text-secondary);
-            font-style: italic;
-            padding-left: 8px;
-            border-left: 2px solid var(--border-color);
-            margin-top: 4px;
         }
         
         .total-section {
@@ -665,7 +743,7 @@
         }
         
         .total-box {
-            width: 300px;
+            width: 250px;
             background: var(--light-bg);
             padding: 20px;
             border-radius: var(--radius-md);
@@ -682,7 +760,7 @@
         .total-row:last-child {
             border-bottom: none;
             font-weight: 700;
-            font-size: 18px;
+            font-size: 16px;
         }
         
         /* ============================================
@@ -690,8 +768,12 @@
            ============================================ */
         .empty-state {
             text-align: center;
-            padding: 80px 32px;
+            padding: 60px 32px;
             color: var(--text-secondary);
+            background: var(--card-bg);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-sm);
         }
         
         .empty-icon {
@@ -701,7 +783,7 @@
         }
         
         .empty-title {
-            font-size: 20px;
+            font-size: 18px;
             font-weight: 600;
             margin-bottom: 8px;
         }
@@ -709,18 +791,35 @@
         .empty-text {
             font-size: 14px;
             max-width: 400px;
-            margin: 0 auto;
+            margin: 0 auto 20px;
+        }
+        
+        /* ============================================
+           LOADING
+           ============================================ */
+        .loading-container {
+            text-align: center;
+            padding: 60px;
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top: 3px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
         
         /* ============================================
            RESPONSIVIDADE
            ============================================ */
-        @media (max-width: 1024px) {
-            .pedido-content {
-                grid-template-columns: 1fr;
-            }
-        }
-        
         @media (max-width: 768px) {
             body {
                 padding: 16px;
@@ -728,11 +827,10 @@
             
             .header-content {
                 flex-direction: column;
-                gap: 16px;
-                text-align: center;
+                align-items: stretch;
             }
             
-            .header-title {
+            .header-actions {
                 justify-content: center;
             }
             
@@ -743,6 +841,10 @@
             
             .search-box {
                 max-width: none;
+            }
+            
+            .filter-group {
+                justify-content: center;
             }
             
             .pedido-header {
@@ -766,29 +868,20 @@
             }
         }
         
-        /* ============================================
-           ANIMAÇÕES
-           ============================================ */
-        .fade-in {
-            animation: fadeIn 0.5s ease-out;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        
-        .slide-up {
-            animation: slideUp 0.3s ease-out;
-        }
-        
-        @keyframes slideUp {
-            from { transform: translateY(20px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
+        @media (max-width: 480px) {
+            .header-title {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .filter-group {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
         }
     </style>
 </head>
-<body data-page-id="gestao_pedidos" data-page-type="READ">
+<body data-page-id="pedidos" data-page-type="READ">
     <!-- ============================================
          HEADER SIMPLIFICADO
          ============================================ -->
@@ -803,6 +896,12 @@
                     <p>Visualize e gerencie todos os pedidos do sistema</p>
                 </div>
             </div>
+            <div class="header-actions">
+                <button class="btn-new" onclick="window.location.href='novopedido.html'">
+                    <i class="fas fa-plus"></i>
+                    Novo Pedido
+                </button>
+            </div>
         </div>
     </header>
 
@@ -811,6 +910,14 @@
          ============================================ -->
     <section class="counters-section">
         <div class="counters-grid">
+            <div class="counter-card total">
+                <div class="counter-icon">
+                    <i class="fas fa-boxes"></i>
+                </div>
+                <div class="counter-value" data-bind="pedidos.total">0</div>
+                <div class="counter-label">Total de Pedidos</div>
+            </div>
+            
             <div class="counter-card pendente">
                 <div class="counter-icon">
                     <i class="fas fa-clock"></i>
@@ -872,7 +979,12 @@
          LISTA DE PEDIDOS
          ============================================ -->
     <section class="pedidos-container">
-        <div class="pedidos-grid" id="pedidosGrid">
+        <div id="loadingState" class="loading-container">
+            <div class="loading-spinner"></div>
+            <p>Carregando pedidos...</p>
+        </div>
+        
+        <div class="pedidos-grid" id="pedidosGrid" style="display: none;">
             <!-- Os pedidos serão carregados dinamicamente aqui -->
         </div>
         
@@ -882,7 +994,11 @@
                 <i class="fas fa-clipboard"></i>
             </div>
             <h3 class="empty-title">Nenhum pedido encontrado</h3>
-            <p class="empty-text">Não há pedidos correspondentes aos filtros atuais. Tente ajustar os filtros ou adicione um novo pedido.</p>
+            <p class="empty-text">Não há pedidos correspondentes aos filtros atuais. Tente ajustar os filtros ou crie um novo pedido.</p>
+            <button class="btn-new" onclick="window.location.href='novopedido.html'">
+                <i class="fas fa-plus"></i>
+                Criar Primeiro Pedido
+            </button>
         </div>
     </section>
 
@@ -905,15 +1021,16 @@
 
     <script>
         // ============================================
-        // SISTEMA DE GESTÃO DE PEDIDOS
+        // SISTEMA DE GESTÃO DE PEDIDOS - CORE v5.1 COMPATÍVEL
         // ============================================
         
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('📋 Página de Gestão de Pedidos carregada');
+            console.log('📋 Página de Gestão de Pedidos (CORE v5.1) carregada');
             
             // Elementos do DOM
             const pedidosGrid = document.getElementById('pedidosGrid');
             const emptyState = document.getElementById('emptyState');
+            const loadingState = document.getElementById('loadingState');
             const searchInput = document.getElementById('searchInput');
             const filterButtons = document.querySelectorAll('.filter-btn');
             const modalOverlay = document.getElementById('modalOverlay');
@@ -926,56 +1043,59 @@
             let termoBusca = '';
             
             // ============================================
-            // FUNÇÕES PRINCIPAIS
+            // FUNÇÕES PRINCIPAIS - SIGA PROTOCOLO CORE
             // ============================================
             
-            // Carregar pedidos do sistema
-            function carregarPedidos() {
-                console.log('🔄 Carregando pedidos do Firebase...');
-                
-                // Usar API do servidor online
-                fetch('/api/database/query', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        schema: 'pedido'
-                    })
-                })
-                .then(response => response.json())
-                .then(result => {
+            // Carregar pedidos do Firebase via API Core
+            async function carregarPedidos() {
+                try {
+                    console.log('🔄 Carregando pedidos do Firebase (CORE v5.1)...');
+                    
+                    // Usar API REST do servidor CORE
+                    const response = await fetch('/api/database/query', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            schema: 'pedido',
+                            filters: { deleted: false }
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`Erro na API: ${response.status}`);
+                    }
+                    
+                    const result = await response.json();
+                    
                     if (result.success && result.events) {
-                        console.log('✅ Pedidos recebidos do Firebase:', result.events);
+                        console.log(`✅ ${result.events.length} pedidos recebidos do Firebase`);
                         processarPedidos(result.events);
                     } else {
-                        console.error('❌ Nenhum pedido recebido do Firebase');
+                        console.warn('⚠️ Nenhum pedido recebido ou formato inválido:', result);
                         processarPedidos([]);
                     }
-                })
-                .catch(error => {
+                    
+                } catch (error) {
                     console.error('❌ Erro ao buscar pedidos do Firebase:', error);
-                    // Fallback: tentar comunicação via postMessage
-                    window.parent.postMessage({ 
-                        type: "QUERY_REQUEST",
-                        source: 'gestao_pedidos'
-                    }, "*");
-                });
+                    mostrarErro('Erro ao carregar pedidos. Verifique a conexão com o servidor.');
+                }
             }
             
-            // Processar pedidos recebidos
-            function processarPedidos(pedidos) {
-                console.log('📦 Pedidos brutos recebidos:', pedidos);
+            // Processar pedidos seguindo schema do README
+            function processarPedidos(events) {
+                console.log('📦 Processando eventos do Firebase:', events.length);
                 
-                todosPedidos = pedidos
-                    .filter(p => {
-                        const isValid = p.schema === 'pedido' && !p.deleted;
-                        console.log(`🔍 Pedido ${p.id}: schema=${p.schema}, deleted=${p.deleted}, válido=${isValid}`);
+                // Filtrar apenas eventos do schema "pedido" e não deletados
+                todosPedidos = events
+                    .filter(event => {
+                        const isValid = event.schema === 'pedido' && !event.deleted;
                         return isValid;
                     })
-                    .map(p => {
-                        // Garantir que o payload seja um objeto válido
-                        let payload = p.payload;
+                    .map(event => {
+                        // Garantir que payload seja um objeto válido
+                        let payload = event.payload;
                         if (typeof payload === 'string') {
                             try {
                                 payload = JSON.parse(payload);
@@ -983,70 +1103,86 @@
                                 console.warn('⚠️ Payload não é JSON válido:', payload);
                                 payload = {};
                             }
-                        } else if (payload && typeof payload === 'object' && payload.toString && payload.toString().includes('System.Object')) {
-                            // Converter objeto PowerShell para objeto JavaScript
-                            const newObj = {};
-                            for (const key in payload) {
-                                if (payload.hasOwnProperty(key)) {
-                                    newObj[key] = payload[key];
-                                }
-                            }
-                            payload = newObj;
                         }
                         
-                        return {
-                            ...p,
-                            payload: {
-                                ...payload,
-                                id: p.id,
-                                createdAt: p.created_at,
-                                status: payload.status || 'pendente',
-                                produtos: Array.isArray(payload.produtos) ? payload.produtos : []
-                            }
+                        // Garantir que temos todos os campos necessários do schema
+                        const pedidoFormatado = {
+                            // Campos do schema "pedido" do README
+                            id: event.id,
+                            cliente: payload.cliente || 'Cliente não informado',
+                            empresa: payload.empresa || 'Empresa não informada',
+                            nif: payload.nif || '',
+                            morada: payload.morada || '',
+                            telemovel: payload.telemovel || '',
+                            numero: payload.numero || `PED-${event.id.substring(0, 8)}`,
+                            produtos: Array.isArray(payload.produtos) ? payload.produtos : [],
+                            total: parseFloat(payload.total) || 0,
+                            status: payload.status || 'pendente',
+                            dataEntrega: payload.dataEntrega || '',
+                            observacoes: payload.observacoes || '',
+                            
+                            // Campos adicionais do formulário
+                            atendente: payload.atendente || '',
+                            entrada: parseFloat(payload.entrada) || 0,
+                            dataEntrada: payload.dataEntrada || '',
+                            instalacao: parseFloat(payload.instalacao) || 0,
+                            comIVA: payload.comIVA || 'sim',
+                            subtotal: parseFloat(payload.subtotal) || 0,
+                            iva: parseFloat(payload.iva) || 0,
+                            
+                            // Metadados do evento
+                            createdAt: event.timestamp || event.created_at || new Date().toISOString(),
+                            pageId: event.pageId || 'novo_pedido'
                         };
+                        
+                        return pedidoFormatado;
                     })
                     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
                 
-                console.log(`✅ ${todosPedidos.length} pedidos processados:`, todosPedidos);
+                console.log(`✅ ${todosPedidos.length} pedidos processados`);
+                
+                // Atualizar UI
                 atualizarContadores();
                 aplicarFiltrosEBusca();
+                
+                // Ocultar loading, mostrar grid
+                loadingState.style.display = 'none';
+                pedidosGrid.style.display = 'grid';
             }
             
-            // Atualizar contadores
+            // Atualizar contadores com data-bind (Core Engine vai capturar)
             function atualizarContadores() {
-                const contadores = {
-                    pendentes: todosPedidos.filter(p => p.payload.status === 'pendente').length,
-                    processamento: todosPedidos.filter(p => p.payload.status === 'processamento').length,
-                    concluidos: todosPedidos.filter(p => p.payload.status === 'concluido').length
-                };
+                const total = todosPedidos.length;
+                const pendentes = todosPedidos.filter(p => p.status === 'pendente').length;
+                const processamento = todosPedidos.filter(p => p.status === 'processamento').length;
+                const concluidos = todosPedidos.filter(p => p.status === 'concluido').length;
                 
-                // Atualizar elementos com data-bind
-                Object.entries(contadores).forEach(([tipo, valor]) => {
-                    const elementos = document.querySelectorAll(`[data-bind="pedidos.${tipo}"]`);
-                    elementos.forEach(el => {
-                        el.textContent = valor;
-                    });
-                });
+                console.log(`📊 Contadores: Total=${total}, Pendentes=${pendentes}, Processamento=${processamento}, Concluídos=${concluidos}`);
+                
+                // O Core Engine irá atualizar automaticamente via data-bind
+                // Mas vamos atualizar manualmente também para garantir
+                document.querySelector('[data-bind="pedidos.total"]').textContent = total;
+                document.querySelector('[data-bind="pedidos.pendentes"]').textContent = pendentes;
+                document.querySelector('[data-bind="pedidos.processamento"]').textContent = processamento;
+                document.querySelector('[data-bind="pedidos.concluidos"]').textContent = concluidos;
             }
             
             // Aplicar filtros e busca
             function aplicarFiltrosEBusca() {
-                let pedidosFiltrados = todosPedidos;
+                let pedidosFiltrados = [...todosPedidos];
                 
                 // Aplicar filtro de status
                 if (filtroAtual !== 'all') {
-                    pedidosFiltrados = pedidosFiltrados.filter(p => 
-                        p.payload.status === filtroAtual
-                    );
+                    pedidosFiltrados = pedidosFiltrados.filter(p => p.status === filtroAtual);
                 }
                 
                 // Aplicar busca
                 if (termoBusca.trim() !== '') {
                     const busca = termoBusca.toLowerCase();
                     pedidosFiltrados = pedidosFiltrados.filter(p => {
-                        const cliente = (p.payload.cliente || '').toLowerCase();
-                        const empresa = (p.payload.empresa || '').toLowerCase();
-                        const numero = (p.payload.numero || '').toLowerCase();
+                        const cliente = (p.cliente || '').toLowerCase();
+                        const empresa = (p.empresa || '').toLowerCase();
+                        const numero = (p.numero || '').toLowerCase();
                         
                         return cliente.includes(busca) || 
                                empresa.includes(busca) || 
@@ -1084,46 +1220,61 @@
                 });
             }
             
-            // Criar card de pedido
+            // Criar card de pedido (formato profissional)
             function criarCardPedido(pedido) {
-                const payload = pedido.payload;
-                const produtos = payload.produtos || [];
-                const total = parseFloat(payload.total) || 0;
-                const iva = parseFloat(payload.iva) || 0;
-                const subtotal = parseFloat(payload.subtotal) || total - iva;
-                
-                const card = document.createElement('div');
-                card.className = `pedido-card ${payload.status}`;
-                card.dataset.id = pedido.id;
+                const produtos = pedido.produtos || [];
+                const total = pedido.total || 0;
+                const iva = pedido.iva || 0;
+                const subtotal = pedido.subtotal || total - iva;
+                const entrada = pedido.entrada || 0;
+                const valorRestante = total - entrada;
                 
                 // Formatadores
                 const formatarData = (dataStr) => {
                     if (!dataStr) return 'N/A';
-                    const data = new Date(dataStr);
-                    return data.toLocaleDateString('pt-BR');
+                    try {
+                        const data = new Date(dataStr);
+                        return data.toLocaleDateString('pt-PT');
+                    } catch (e) {
+                        return dataStr;
+                    }
                 };
                 
                 const formatarMoeda = (valor) => {
-                    return `€${parseFloat(valor).toFixed(2)}`;
+                    return new Intl.NumberFormat('pt-PT', {
+                        style: 'currency',
+                        currency: 'EUR',
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    }).format(valor);
                 };
+                
+                const card = document.createElement('div');
+                card.className = `pedido-card ${pedido.status}`;
+                card.dataset.id = pedido.id;
+                
+                // Calcular total produtos
+                const totalProdutos = produtos.reduce((sum, prod) => {
+                    return sum + ((prod.valor || 0) * (prod.quantidade || 1));
+                }, 0);
                 
                 card.innerHTML = `
                     <div class="pedido-header">
                         <div class="pedido-info">
-                            <div class="pedido-cliente">${payload.cliente || 'Cliente não informado'}</div>
-                            <div class="pedido-empresa">${payload.empresa || 'Empresa não informada'}</div>
+                            <div class="pedido-cliente">${pedido.cliente}</div>
+                            <div class="pedido-empresa">${pedido.empresa}</div>
                             <div class="pedido-meta">
                                 <div class="pedido-meta-item">
                                     <i class="fas fa-hashtag"></i>
-                                    <span>${payload.numero || 'N/A'}</span>
+                                    <span>${pedido.numero}</span>
                                 </div>
                                 <div class="pedido-meta-item">
-                                    <i class="fas fa-calendar"></i>
-                                    <span>${formatarData(payload.dataFechamento)}</span>
+                                    <i class="fas fa-calendar-alt"></i>
+                                    <span>Entrega: ${formatarData(pedido.dataEntrega)}</span>
                                 </div>
                                 <div class="pedido-meta-item">
-                                    <i class="fas fa-truck"></i>
-                                    <span>${formatarData(payload.dataEntrega)}</span>
+                                    <i class="fas fa-user-tie"></i>
+                                    <span>Atendente: ${pedido.atendente || 'N/A'}</span>
                                 </div>
                             </div>
                         </div>
@@ -1131,8 +1282,8 @@
                             <button class="action-btn edit" title="Editar pedido" data-id="${pedido.id}">
                                 <i class="fas fa-edit"></i>
                             </button>
-                            <button class="action-btn expand" title="Ver detalhes">
-                                <i class="fas fa-expand"></i>
+                            <button class="action-btn view" title="Ver detalhes" data-id="${pedido.id}">
+                                <i class="fas fa-eye"></i>
                             </button>
                         </div>
                     </div>
@@ -1158,7 +1309,7 @@
                             ${produtos.length > 3 ? `
                                 <div class="produto-item">
                                     <div class="produto-info">
-                                        <div class="produto-nome">+ ${produtos.length - 3} outros produtos</div>
+                                        <div class="produto-nome text-muted">+ ${produtos.length - 3} outros produtos</div>
                                     </div>
                                 </div>
                             ` : ''}
@@ -1173,6 +1324,16 @@
                                 <span>IVA (23%):</span>
                                 <span>${formatarMoeda(iva)}</span>
                             </div>
+                            ${entrada > 0 ? `
+                                <div class="resumo-item">
+                                    <span>Entrada:</span>
+                                    <span>${formatarMoeda(entrada)}</span>
+                                </div>
+                                <div class="resumo-item">
+                                    <span>Restante:</span>
+                                    <span>${formatarMoeda(valorRestante)}</span>
+                                </div>
+                            ` : ''}
                             <div class="resumo-item resumo-total">
                                 <span>Total:</span>
                                 <span>${formatarMoeda(total)}</span>
@@ -1182,13 +1343,13 @@
                     
                     <div class="pedido-footer">
                         <div class="pedido-observacoes">
-                            ${payload.observacoes ? `📝 ${payload.observacoes.substring(0, 100)}${payload.observacoes.length > 100 ? '...' : ''}` : 'Sem observações gerais'}
+                            ${pedido.observacoes ? `📝 ${pedido.observacoes.substring(0, 100)}${pedido.observacoes.length > 100 ? '...' : ''}` : 'Sem observações'}
                         </div>
                         <div class="pedido-status">
                             <select class="status-select" data-id="${pedido.id}">
-                                <option value="pendente" ${payload.status === 'pendente' ? 'selected' : ''}>Pendente</option>
-                                <option value="processamento" ${payload.status === 'processamento' ? 'selected' : ''}>Em Processamento</option>
-                                <option value="concluido" ${payload.status === 'concluido' ? 'selected' : ''}>Concluído</option>
+                                <option value="pendente" ${pedido.status === 'pendente' ? 'selected' : ''}>Pendente</option>
+                                <option value="processamento" ${pedido.status === 'processamento' ? 'selected' : ''}>Em Processamento</option>
+                                <option value="concluido" ${pedido.status === 'concluido' ? 'selected' : ''}>Concluído</option>
                             </select>
                         </div>
                     </div>
@@ -1196,11 +1357,11 @@
                 
                 // Adicionar event listeners
                 const editBtn = card.querySelector('.action-btn.edit');
-                const expandBtn = card.querySelector('.action-btn.expand');
+                const viewBtn = card.querySelector('.action-btn.view');
                 const statusSelect = card.querySelector('.status-select');
                 
-                editBtn.addEventListener('click', () => editarPedido(pedido));
-                expandBtn.addEventListener('click', () => abrirModalDetalhes(pedido));
+                editBtn.addEventListener('click', () => editarPedido(pedido.id));
+                viewBtn.addEventListener('click', () => abrirModalDetalhes(pedido));
                 statusSelect.addEventListener('change', (e) => atualizarStatusPedido(pedido.id, e.target.value));
                 
                 return card;
@@ -1208,25 +1369,35 @@
             
             // Abrir modal com detalhes do pedido
             function abrirModalDetalhes(pedido) {
-                const payload = pedido.payload;
-                const produtos = payload.produtos || [];
-                const total = parseFloat(payload.total) || 0;
-                const iva = parseFloat(payload.iva) || 0;
-                const subtotal = parseFloat(payload.subtotal) || total - iva;
-                const entrada = parseFloat(payload.entrada) || 0;
-                const instalacao = parseFloat(payload.instalacao) || 0;
+                const produtos = pedido.produtos || [];
+                const total = pedido.total || 0;
+                const iva = pedido.iva || 0;
+                const subtotal = pedido.subtotal || total - iva;
+                const entrada = pedido.entrada || 0;
+                const instalacao = pedido.instalacao || 0;
+                const valorRestante = total - entrada;
                 
                 // Formatadores
                 const formatarData = (dataStr) => {
                     if (!dataStr) return 'Não informado';
-                    const data = new Date(dataStr);
-                    return data.toLocaleDateString('pt-BR') + ' ' + data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                    try {
+                        const data = new Date(dataStr);
+                        return data.toLocaleDateString('pt-PT') + ' ' + data.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+                    } catch (e) {
+                        return dataStr;
+                    }
                 };
                 
                 const formatarMoeda = (valor) => {
-                    return `€${parseFloat(valor).toFixed(2)}`;
+                    return new Intl.NumberFormat('pt-PT', {
+                        style: 'currency',
+                        currency: 'EUR',
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                    }).format(valor);
                 };
                 
+                // Status info
                 const getStatusInfo = (status) => {
                     switch(status) {
                         case 'pendente': return { texto: 'Pendente', classe: 'status-pendente' };
@@ -1236,7 +1407,7 @@
                     }
                 };
                 
-                const statusInfo = getStatusInfo(payload.status);
+                const statusInfo = getStatusInfo(pedido.status);
                 
                 modalContent.innerHTML = `
                     <div class="modal-section">
@@ -1244,11 +1415,7 @@
                         <div class="info-grid">
                             <div class="info-item">
                                 <div class="info-label">Número do Pedido</div>
-                                <div class="info-value">${payload.numero || 'N/A'}</div>
-                            </div>
-                            <div class="info-item">
-                                <div class="info-label">Número da Fatura</div>
-                                <div class="info-value">${payload.fatura || 'N/A'}</div>
+                                <div class="info-value">${pedido.numero}</div>
                             </div>
                             <div class="info-item">
                                 <div class="info-label">Status</div>
@@ -1257,8 +1424,12 @@
                                 </div>
                             </div>
                             <div class="info-item">
-                                <div class="info-label">Data de Registro</div>
-                                <div class="info-value">${formatarData(payload.createdAt)}</div>
+                                <div class="info-label">Data de Criação</div>
+                                <div class="info-value">${formatarData(pedido.createdAt)}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Data de Entrega</div>
+                                <div class="info-value">${formatarData(pedido.dataEntrega)}</div>
                             </div>
                         </div>
                     </div>
@@ -1268,27 +1439,27 @@
                         <div class="info-grid">
                             <div class="info-item">
                                 <div class="info-label">Cliente</div>
-                                <div class="info-value">${payload.cliente || 'Não informado'}</div>
+                                <div class="info-value">${pedido.cliente}</div>
                             </div>
                             <div class="info-item">
                                 <div class="info-label">Empresa</div>
-                                <div class="info-value">${payload.empresa || 'Não informada'}</div>
+                                <div class="info-value">${pedido.empresa}</div>
                             </div>
                             <div class="info-item">
                                 <div class="info-label">NIF</div>
-                                <div class="info-value">${payload.nif || 'Não informado'}</div>
+                                <div class="info-value">${pedido.nif || 'Não informado'}</div>
                             </div>
                             <div class="info-item">
                                 <div class="info-label">Morada</div>
-                                <div class="info-value">${payload.morada || 'Não informada'}</div>
+                                <div class="info-value">${pedido.morada || 'Não informada'}</div>
                             </div>
                             <div class="info-item">
                                 <div class="info-label">Telemóvel</div>
-                                <div class="info-value">${payload.telemovel || 'Não informado'}</div>
+                                <div class="info-value">${pedido.telemovel || 'Não informado'}</div>
                             </div>
                             <div class="info-item">
                                 <div class="info-label">Atendente</div>
-                                <div class="info-value">${payload.atendente || 'Não informado'}</div>
+                                <div class="info-value">${pedido.atendente || 'Não informado'}</div>
                             </div>
                         </div>
                     </div>
@@ -1297,16 +1468,12 @@
                         <h3 class="section-title">Datas</h3>
                         <div class="info-grid">
                             <div class="info-item">
-                                <div class="info-label">Data do Fechamento</div>
-                                <div class="info-value">${formatarData(payload.dataFechamento)}</div>
-                            </div>
-                            <div class="info-item">
-                                <div class="info-label">Data da Entrega</div>
-                                <div class="info-value">${formatarData(payload.dataEntrega)}</div>
+                                <div class="info-label">Data de Entrega</div>
+                                <div class="info-value">${formatarData(pedido.dataEntrega)}</div>
                             </div>
                             <div class="info-item">
                                 <div class="info-label">Data da Entrada</div>
-                                <div class="info-value">${formatarData(payload.dataEntrada)}</div>
+                                <div class="info-value">${formatarData(pedido.dataEntrada)}</div>
                             </div>
                         </div>
                     </div>
@@ -1318,8 +1485,8 @@
                                 <tr>
                                     <th>Produto</th>
                                     <th>Tamanho</th>
-                                    <th>Quantidade</th>
-                                    <th>Valor Unitário</th>
+                                    <th>Qtd</th>
+                                    <th>Valor Unit.</th>
                                     <th>Total</th>
                                     <th>Observações</th>
                                 </tr>
@@ -1332,12 +1499,7 @@
                                         <td>${prod.quantidade || 1}</td>
                                         <td>${formatarMoeda(prod.valor || 0)}</td>
                                         <td>${formatarMoeda((prod.valor || 0) * (prod.quantidade || 1))}</td>
-                                        <td>
-                                            ${prod.observacoes || ''}
-                                            ${prod.observacoes ? `
-                                                <div class="produto-observacao-cell">${prod.observacoes}</div>
-                                            ` : ''}
-                                        </td>
+                                        <td>${prod.observacoes || ''}</td>
                                     </tr>
                                 `).join('')}
                             </tbody>
@@ -1352,26 +1514,30 @@
                                     <span>Subtotal Produtos:</span>
                                     <span>${formatarMoeda(subtotal - instalacao)}</span>
                                 </div>
-                                <div class="total-row">
-                                    <span>Instalação/Deslocamento:</span>
-                                    <span>${formatarMoeda(instalacao)}</span>
-                                </div>
+                                ${instalacao > 0 ? `
+                                    <div class="total-row">
+                                        <span>Instalação:</span>
+                                        <span>${formatarMoeda(instalacao)}</span>
+                                    </div>
+                                ` : ''}
                                 <div class="total-row">
                                     <span>Subtotal:</span>
                                     <span>${formatarMoeda(subtotal)}</span>
                                 </div>
                                 <div class="total-row">
-                                    <span>IVA (${payload.comIVA === 'sim' ? '23%' : 'Isento'}):</span>
+                                    <span>IVA (${pedido.comIVA === 'sim' ? '23%' : 'Isento'}):</span>
                                     <span>${formatarMoeda(iva)}</span>
                                 </div>
-                                <div class="total-row">
-                                    <span>Entrada:</span>
-                                    <span>${formatarMoeda(entrada)}</span>
-                                </div>
-                                <div class="total-row">
-                                    <span>Valor Restante:</span>
-                                    <span>${formatarMoeda(total - entrada)}</span>
-                                </div>
+                                ${entrada > 0 ? `
+                                    <div class="total-row">
+                                        <span>Entrada:</span>
+                                        <span>${formatarMoeda(entrada)}</span>
+                                    </div>
+                                    <div class="total-row">
+                                        <span>Valor Restante:</span>
+                                        <span>${formatarMoeda(valorRestante)}</span>
+                                    </div>
+                                ` : ''}
                                 <div class="total-row">
                                     <span>TOTAL:</span>
                                     <span>${formatarMoeda(total)}</span>
@@ -1380,11 +1546,11 @@
                         </div>
                     </div>
                     
-                    ${payload.observacoes ? `
+                    ${pedido.observacoes ? `
                         <div class="modal-section">
                             <h3 class="section-title">Observações Gerais</h3>
-                            <div style="padding: 16px; background: var(--light-bg); border-radius: var(--radius-md);">
-                                ${payload.observacoes}
+                            <div style="padding: 16px; background: var(--light-bg); border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                                ${pedido.observacoes}
                             </div>
                         </div>
                     ` : ''}
@@ -1393,54 +1559,120 @@
                 modalOverlay.classList.add('active');
             }
             
-            // Atualizar status do pedido
-            function atualizarStatusPedido(pedidoId, novoStatus) {
-                const pedido = todosPedidos.find(p => p.id === pedidoId);
-                if (!pedido) return;
-                
-                // Criar evento de atualização
-                const eventoAtualizacao = {
-                    type: "UPDATE_EVENT",
-                    id: pedidoId,
-                    updates: { status: novoStatus },
-                    source: 'gestao_pedidos'
-                };
-                
-                // Enviar para o Core
-                window.parent.postMessage(eventoAtualizacao, "*");
-                
-                // Atualizar localmente
-                pedido.payload.status = novoStatus;
-                
-                // Feedback visual
-                const card = document.querySelector(`.pedido-card[data-id="${pedidoId}"]`);
-                if (card) {
-                    card.className = `pedido-card ${novoStatus}`;
+            // Atualizar status do pedido via API Core
+            async function atualizarStatusPedido(pedidoId, novoStatus) {
+                try {
+                    console.log(`🔄 Atualizando status do pedido ${pedidoId} para: ${novoStatus}`);
                     
-                    // Animação de confirmação
-                    const statusSelect = card.querySelector('.status-select');
-                    statusSelect.style.backgroundColor = '#10b981';
-                    statusSelect.style.color = 'white';
+                    // Buscar o evento original
+                    const response = await fetch('/api/database/query', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            schema: 'pedido',
+                            filters: { id: pedidoId }
+                        })
+                    });
                     
-                    setTimeout(() => {
-                        statusSelect.style.backgroundColor = '';
-                        statusSelect.style.color = '';
-                    }, 1000);
+                    if (!response.ok) {
+                        throw new Error('Erro ao buscar pedido');
+                    }
+                    
+                    const result = await response.json();
+                    const eventos = result.events || [];
+                    
+                    if (eventos.length === 0) {
+                        throw new Error('Pedido não encontrado');
+                    }
+                    
+                    const eventoOriginal = eventos[0];
+                    const payloadAtualizado = {
+                        ...eventoOriginal.payload,
+                        status: novoStatus,
+                        updated_at: new Date().toISOString()
+                    };
+                    
+                    // Criar novo evento de atualização
+                    const eventoAtualizacao = {
+                        schema: 'pedido',
+                        payload: payloadAtualizado,
+                        pageId: 'pedidos',
+                        timestamp: new Date().toISOString(),
+                        deleted: false
+                    };
+                    
+                    // Enviar para Firebase via API Core
+                    const commitResponse = await fetch('/api/database/commit', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(eventoAtualizacao)
+                    });
+                    
+                    if (!commitResponse.ok) {
+                        throw new Error('Erro ao atualizar pedido');
+                    }
+                    
+                    // Atualizar localmente
+                    const pedidoIndex = todosPedidos.findIndex(p => p.id === pedidoId);
+                    if (pedidoIndex !== -1) {
+                        todosPedidos[pedidoIndex].status = novoStatus;
+                    }
+                    
+                    // Feedback visual
+                    const card = document.querySelector(`.pedido-card[data-id="${pedidoId}"]`);
+                    if (card) {
+                        card.className = `pedido-card ${novoStatus}`;
+                        
+                        const statusSelect = card.querySelector('.status-select');
+                        statusSelect.style.backgroundColor = '#10b981';
+                        statusSelect.style.color = 'white';
+                        
+                        setTimeout(() => {
+                            statusSelect.style.backgroundColor = '';
+                            statusSelect.style.color = '';
+                        }, 1000);
+                    }
+                    
+                    atualizarContadores();
+                    console.log(`✅ Status do pedido ${pedidoId} atualizado para: ${novoStatus}`);
+                    
+                } catch (error) {
+                    console.error('❌ Erro ao atualizar status:', error);
+                    alert('Erro ao atualizar status do pedido. Tente novamente.');
                 }
-                
-                atualizarContadores();
-                console.log(`✅ Status do pedido ${pedidoId} atualizado para: ${novoStatus}`);
             }
             
             // ============================================
             // FUNÇÕES DE EDIÇÃO
             // ============================================
             
-            // Função para editar um pedido
-            function editarPedido(pedido) {
-                console.log('Editando pedido:', pedido);
-                // Redirecionar para a página de novo pedido com o ID do pedido para edição
-                window.location.href = `novopedido.html?edit=${pedido.id}`;
+            // Função para editar um pedido (redireciona para o formulário)
+            function editarPedido(pedidoId) {
+                console.log('✏️ Editando pedido:', pedidoId);
+                window.location.href = `novopedido.html?edit=${pedidoId}`;
+            }
+            
+            // ============================================
+            // FUNÇÕES AUXILIARES
+            // ============================================
+            
+            function mostrarErro(mensagem) {
+                console.error('❌ Erro:', mensagem);
+                loadingState.innerHTML = `
+                    <div style="color: var(--danger-color);">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px;"></i>
+                        <h3>Erro ao carregar dados</h3>
+                        <p>${mensagem}</p>
+                        <button class="btn-new" onclick="location.reload()" style="margin-top: 16px;">
+                            <i class="fas fa-redo"></i>
+                            Tentar Novamente
+                        </button>
+                    </div>
+                `;
             }
             
             // ============================================
@@ -1474,27 +1706,27 @@
                 }
             });
             
-            // Escutar mensagens do Core
-            window.addEventListener("message", function(event) {
-                if (event.data.type === "QUERY_RESPONSE") {
-                    processarPedidos(event.data.data || []);
-                }
+            // Escutar eventos do Core Engine
+            document.addEventListener('coreDataChanged', () => {
+                console.log('🔄 Dados atualizados pelo Core Engine');
+                carregarPedidos();
             });
+            
+            // Auto-refresh a cada 30 segundos
+            setInterval(carregarPedidos, 30000);
             
             // ============================================
             // INICIALIZAÇÃO
             // ============================================
             
+            // Iniciar carregamento dos pedidos
             carregarPedidos();
             
-            // Auto-refresh a cada 5 segundos
-            setInterval(carregarPedidos, 5000);
-            
-            console.log('✅ Sistema de gestão de pedidos inicializado');
-            
-            // Prevenir que o engine.js interfira com nosso sistema
-            window.engineJsHandled = true;
+            console.log('✅ Sistema de gestão de pedidos inicializado (CORE v5.1)');
         });
     </script>
+    
+    <!-- CONEXÃO COM O CORE ENGINE (OBRIGATÓRIO) -->
+    <script src="../core/engine.js"></script>
 </body>
 </html>
