@@ -3,145 +3,76 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PrintPixel - Nova Despesa</title>
-    
-    <!-- BIBLIOTECAS EXTERNAS -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
+    <title>Formulário de Despesa - PrintPixel</title>
     <style>
-        /* ============================================
-           VARIÁVEIS DE CORES E ESTILOS
-           ============================================ */
-        :root {
-            --primary-color: #1a237e;
-            --secondary-color: #283593;
-            --success-color: #10b981;
-            --warning-color: #f59e0b;
-            --danger-color: #ef4444;
-            --info-color: #3b82f6;
-            --light-bg: #f8fafc;
-            --card-bg: #ffffff;
-            --text-primary: #1e293b;
-            --text-secondary: #64748b;
-            --border-color: #e2e8f0;
-            --hover-bg: #f1f5f9;
-            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
-            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
-            --radius-sm: 8px;
-            --radius-md: 12px;
-            --radius-lg: 16px;
+        /* Estilo para mensagem de sucesso */
+        .success-message {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #10b981;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 6px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
         }
         
-        /* ============================================
-           RESET E CONFIGURAÇÕES GERAIS
-           ============================================ */
+        /* Estilos principais */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
         }
         
         body {
-            background-color: var(--light-bg);
-            color: var(--text-primary);
-            line-height: 1.5;
-            min-height: 100vh;
+            background-color: #f8fafc;
+            color: #1e293b;
             padding: 20px;
+            line-height: 1.5;
         }
         
-        /* ============================================
-           HEADER
-           ============================================ */
-        .page-header {
-            background: var(--card-bg);
-            padding: 24px;
-            border-radius: var(--radius-lg);
-            box-shadow: var(--shadow-md);
-            margin-bottom: 24px;
-            border: 1px solid var(--border-color);
-        }
-        
-        .header-content {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .header-title {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-        
-        .header-icon {
-            width: 48px;
-            height: 48px;
-            background: linear-gradient(135deg, var(--danger-color) 0%, #ef4444 100%);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            color: white;
-        }
-        
-        .header-text h1 {
-            font-size: 24px;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-            color: var(--danger-color);
-        }
-        
-        .header-text p {
-            color: var(--text-secondary);
-            font-size: 14px;
-            font-weight: 400;
-        }
-        
-        /* ============================================
-           FORMULÁRIO
-           ============================================ */
-        .form-container {
+        .container {
             max-width: 1000px;
             margin: 0 auto;
-        }
-        
-        .form-card {
-            background: var(--card-bg);
-            border-radius: var(--radius-lg);
-            padding: 32px;
-            box-shadow: var(--shadow-md);
-            border: 1px solid var(--border-color);
-            margin-bottom: 24px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+            padding: 30px;
         }
         
         .form-section {
-            margin-bottom: 32px;
+            margin-bottom: 40px;
         }
         
         .section-title {
             font-size: 18px;
-            font-weight: 600;
-            color: var(--primary-color);
+            color: #dc2626;
             margin-bottom: 20px;
-            padding-bottom: 12px;
-            border-bottom: 2px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .section-title i {
-            color: var(--primary-color);
+            padding-bottom: 10px;
+            border-bottom: 2px solid #dc2626;
+            font-weight: 600;
+            letter-spacing: -0.2px;
         }
         
         .form-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 24px;
+            margin-bottom: 24px;
         }
         
         .form-group {
@@ -149,54 +80,42 @@
             flex-direction: column;
         }
         
-        .form-group.full-width {
-            grid-column: 1 / -1;
-        }
-        
         label {
             font-weight: 600;
-            margin-bottom: 8px;
-            color: var(--text-primary);
+            margin-bottom: 10px;
+            color: #334155;
             font-size: 14px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        
-        .required::after {
-            content: " *";
-            color: var(--danger-color);
+            letter-spacing: 0.2px;
         }
         
         input, select, textarea {
             padding: 12px 16px;
-            border: 1.5px solid var(--border-color);
-            border-radius: var(--radius-sm);
+            border: 1.5px solid #e2e8f0;
+            border-radius: 6px;
             font-size: 15px;
             transition: all 0.2s;
-            background-color: var(--card-bg);
-            color: var(--text-primary);
+            background-color: white;
         }
         
         input:focus, select:focus, textarea:focus {
+            border-color: #2563eb;
             outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(26, 35, 126, 0.1);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
         }
         
         input[type="date"] {
             padding: 11px 16px;
         }
         
-        input[type="file"] {
-            padding: 10px;
-            border: 2px dashed var(--border-color);
-            background: var(--light-bg);
-            cursor: pointer;
+        input[type="number"] {
+            text-align: right;
         }
         
-        input[type="file"]:hover {
-            border-color: var(--primary-color);
+        input[type="file"] {
+            padding: 10px;
+            border: 2px dashed #e2e8f0;
+            background: #f8fafc;
+            cursor: pointer;
         }
         
         .radio-group {
@@ -209,38 +128,15 @@
         .radio-option {
             display: flex;
             align-items: center;
-            gap: 8px;
         }
         
         .radio-option input {
+            margin-right: 8px;
             width: 18px;
             height: 18px;
         }
         
         .radio-option label {
-            margin-bottom: 0;
-            font-weight: 500;
-        }
-        
-        .checkbox-group {
-            display: flex;
-            gap: 16px;
-            margin-top: 8px;
-            flex-wrap: wrap;
-        }
-        
-        .checkbox-option {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .checkbox-option input {
-            width: 18px;
-            height: 18px;
-        }
-        
-        .checkbox-option label {
             margin-bottom: 0;
             font-weight: 500;
         }
@@ -252,7 +148,6 @@
             border-radius: 20px;
             font-size: 12px;
             font-weight: 600;
-            letter-spacing: 0.3px;
         }
         
         .status-pago {
@@ -268,15 +163,16 @@
         .file-preview {
             margin-top: 12px;
             padding: 12px;
-            background: var(--light-bg);
-            border-radius: var(--radius-sm);
-            border: 1px solid var(--border-color);
+            background: #f8fafc;
+            border-radius: 6px;
+            border: 1px solid #e2e8f0;
+            display: none;
         }
         
         .file-preview img {
             max-width: 100%;
             max-height: 200px;
-            border-radius: var(--radius-sm);
+            border-radius: 6px;
             margin-top: 8px;
         }
         
@@ -286,56 +182,53 @@
             gap: 8px;
             margin-top: 8px;
             font-size: 14px;
-            color: var(--text-secondary);
+            color: #64748b;
+        }
+        
+        .compression-info {
+            font-size: 11px;
+            color: #94a3b8;
+            margin-top: 4px;
+            font-style: italic;
         }
         
         .total-section {
-            margin-top: 24px;
+            margin-top: 30px;
             padding: 20px;
-            background: var(--light-bg);
-            border-radius: var(--radius-md);
-            border: 1px solid var(--border-color);
+            background: #f8fafc;
+            border-radius: 8px;
+            border: 1.5px solid #e2e8f0;
         }
         
         .total-row {
             display: flex;
             justify-content: space-between;
             padding: 10px 0;
-            border-bottom: 1px solid var(--border-color);
+            border-bottom: 1px solid #e2e8f0;
         }
         
         .total-row:last-child {
             border-bottom: none;
             font-weight: 700;
             font-size: 18px;
-            color: var(--danger-color);
+            color: #dc2626;
         }
         
-        /* ============================================
-           CATEGORIAS
-           ============================================ */
         .categoria-select {
             width: 100%;
             padding: 12px 16px;
-            border: 1.5px solid var(--border-color);
-            border-radius: var(--radius-sm);
+            border: 1.5px solid #e2e8f0;
+            border-radius: 6px;
             font-size: 15px;
-            background-color: var(--card-bg);
-            color: var(--text-primary);
+            background-color: white;
             cursor: pointer;
-        }
-        
-        .categoria-select:focus {
-            outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 3px rgba(26, 35, 126, 0.1);
         }
         
         .outra-categoria-input {
             margin-top: 12px;
             padding: 12px 16px;
-            border: 1.5px solid var(--border-color);
-            border-radius: var(--radius-sm);
+            border: 1.5px solid #e2e8f0;
+            border-radius: 6px;
             font-size: 15px;
             width: 100%;
             display: none;
@@ -345,113 +238,75 @@
             display: block;
         }
         
-        /* ============================================
-           BOTÕES DE AÇÃO
-           ============================================ */
         .form-actions {
             display: flex;
             justify-content: flex-end;
             gap: 16px;
-            margin-top: 32px;
-            padding-top: 24px;
-            border-top: 1px solid var(--border-color);
+            margin-top: 40px;
+            padding-top: 30px;
+            border-top: 1px solid #e2e8f0;
         }
         
         .btn-cancel {
-            padding: 14px 28px;
-            background: var(--text-secondary);
+            background-color: #64748b;
             color: white;
             border: none;
-            border-radius: var(--radius-md);
+            padding: 15px 32px;
+            border-radius: 6px;
             cursor: pointer;
             font-weight: 600;
-            font-size: 15px;
             transition: all 0.2s;
+            font-size: 15px;
+            letter-spacing: 0.3px;
         }
         
         .btn-cancel:hover {
-            background: #4a5568;
-            transform: translateY(-2px);
+            background-color: #475569;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(100, 116, 139, 0.2);
         }
         
         .btn-save {
-            padding: 14px 28px;
-            background: var(--danger-color);
+            background-color: #dc2626;
             color: white;
             border: none;
-            border-radius: var(--radius-md);
+            padding: 15px 32px;
+            border-radius: 6px;
             cursor: pointer;
             font-weight: 600;
-            font-size: 15px;
             transition: all 0.2s;
-            position: relative;
+            font-size: 15px;
+            letter-spacing: 0.3px;
         }
         
         .btn-save:hover {
-            background: #dc2626;
-            transform: translateY(-2px);
-        }
-        
-        .btn-save:disabled {
-            opacity: 0.7;
-            cursor: not-allowed;
-            transform: none;
+            background-color: #b91c1c;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(220, 38, 38, 0.2);
         }
         
         .btn-save.saving {
-            background: var(--warning-color);
+            background-color: #059669;
+            opacity: 0.8;
         }
         
         .btn-save.success {
-            background: var(--success-color);
+            background-color: #059669;
         }
         
-        /* ============================================
-           MENSAGEM DE CONFIRMAÇÃO
-           ============================================ */
-        .confirmation-message {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: var(--success-color);
-            color: white;
-            padding: 16px 24px;
-            border-radius: var(--radius-md);
-            box-shadow: var(--shadow-lg);
-            z-index: 1000;
-            display: none;
-            align-items: center;
-            gap: 12px;
-            animation: slideIn 0.3s ease-out;
+        .required::after {
+            content: " *";
+            color: #ef4444;
         }
         
-        .confirmation-message.show {
-            display: flex;
+        .field-note {
+            font-size: 12px;
+            color: #64748b;
+            margin-top: 4px;
+            font-style: italic;
         }
         
-        @keyframes slideIn {
-            from {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-            to {
-                transform: translateX(0);
-                opacity: 1;
-            }
-        }
-        
-        /* ============================================
-           RESPONSIVIDADE
-           ============================================ */
         @media (max-width: 768px) {
-            body {
-                padding: 16px;
-            }
-            
-            .form-card {
-                padding: 20px;
-            }
-            
             .form-grid {
                 grid-template-columns: 1fr;
             }
@@ -460,75 +315,42 @@
                 flex-direction: column;
             }
             
-            .radio-group, .checkbox-group {
+            .btn-cancel, .btn-save {
+                width: 100%;
+            }
+            
+            .radio-group {
                 flex-direction: column;
                 gap: 12px;
             }
             
-            .confirmation-message {
-                top: 10px;
+            .success-message {
+                bottom: 10px;
                 right: 10px;
                 left: 10px;
             }
         }
-        
-        /* ============================================
-           ANIMAÇÕES
-           ============================================ */
-        .fade-in {
-            animation: fadeIn 0.5s ease-out;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
     </style>
 </head>
 <body data-page-id="nova_despesa" data-page-type="WRITE">
-    <!-- ============================================
-         HEADER
-         ============================================ -->
-    <header class="page-header">
-        <div class="header-content">
-            <div class="header-title">
-                <div class="header-icon">
-                    <i class="fas fa-money-bill-wave"></i>
-                </div>
-                <div class="header-text">
-                    <h1>Registro de Despesa</h1>
-                    <p>Registre todas as despesas da empresa com detalhes completos</p>
-                </div>
-            </div>
-        </div>
-    </header>
-
-    <!-- ============================================
-         FORMULÁRIO PRINCIPAL
-         ============================================ -->
-    <div class="form-container">
-        <form id="despesaForm" class="form-card fade-in">
-            <!-- SEÇÃO: INFORMAÇÕES BÁSICAS -->
+    <div class="container">
+        <form id="despesaForm">
+            <input type="hidden" id="despesaId" data-bind="despesa.id" value="">
+            
             <div class="form-section">
-                <h2 class="section-title">
-                    <i class="fas fa-info-circle"></i>
-                    Informações Básicas
-                </h2>
+                <h2 class="section-title">Informações da Despesa</h2>
                 
                 <div class="form-grid">
-                    <!-- FORNECEDOR -->
                     <div class="form-group">
                         <label for="fornecedor" class="required">Fornecedor</label>
                         <input type="text" id="fornecedor" name="fornecedor" data-bind="despesa.fornecedor" placeholder="Nome do fornecedor" required>
                     </div>
                     
-                    <!-- DESCRIÇÃO -->
                     <div class="form-group">
                         <label for="descricao" class="required">Descrição da Despesa</label>
                         <input type="text" id="descricao" name="descricao" data-bind="despesa.descricao" placeholder="Ex: Compra de material gráfico" required>
                     </div>
                     
-                    <!-- CAMPO DE TELEFONE -->
                     <div class="form-group">
                         <label for="telefone">Telefone do Fornecedor</label>
                         <input type="tel" id="telefone" name="telefone" data-bind="despesa.telefone" placeholder="Ex: 912345678">
@@ -541,12 +363,8 @@
                 </div>
             </div>
             
-            <!-- SEÇÃO: DATAS -->
             <div class="form-section">
-                <h2 class="section-title">
-                    <i class="fas fa-calendar-alt"></i>
-                    Datas
-                </h2>
+                <h2 class="section-title">Datas</h2>
                 
                 <div class="form-grid">
                     <div class="form-group">
@@ -566,21 +384,15 @@
                 </div>
             </div>
             
-            <!-- SEÇÃO: VALORES -->
             <div class="form-section">
-                <h2 class="section-title">
-                    <i class="fas fa-euro-sign"></i>
-                    Valores
-                </h2>
+                <h2 class="section-title">Valores</h2>
                 
                 <div class="form-grid">
-                    <!-- VALOR BRUTO (SEM IVA) -->
                     <div class="form-group">
                         <label for="valorBruto" class="required">Valor Bruto (sem IVA)</label>
                         <input type="number" id="valorBruto" name="valorBruto" data-bind="despesa.valorBruto" min="0" step="0.01" placeholder="0.00" required>
                     </div>
                     
-                    <!-- OPÇÃO DE IVA -->
                     <div class="form-group">
                         <label>IVA</label>
                         <div class="radio-group">
@@ -595,7 +407,6 @@
                         </div>
                     </div>
                     
-                    <!-- STATUS DO PAGAMENTO -->
                     <div class="form-group">
                         <label>Status do Pagamento</label>
                         <div class="radio-group">
@@ -611,7 +422,6 @@
                     </div>
                 </div>
                 
-                <!-- RESUMO DOS VALORES CALCULADOS -->
                 <div class="total-section">
                     <div class="total-row">
                         <span>Valor Bruto (sem IVA):</span>
@@ -628,40 +438,39 @@
                 </div>
             </div>
             
-            <!-- SEÇÃO: CATEGORIA -->
             <div class="form-section">
-                <h2 class="section-title">
-                    <i class="fas fa-tags"></i>
-                    Categoria
-                </h2>
+                <h2 class="section-title">Categoria</h2>
                 
                 <div class="form-group">
                     <label for="categoria" class="required">Selecione uma Categoria</label>
                     <select id="categoria" name="categoria" class="categoria-select" data-bind="despesa.categoria" required>
                         <option value="">Selecione uma categoria...</option>
-                        <option value="SALARIO">SALÁRIO</option>
-                        <option value="COMISSAO">COMISSÃO</option>
-                        <option value="ALIMENTACAO">ALIMENTAÇÃO</option>
-                        <option value="COMBUSTIVEL">COMBUSTÍVEL</option>
-                        <option value="REFEICAO">REFEIÇÃO</option>
-                        <option value="HOSPEDAGEM">HOSPEDAGEM</option>
-                        <option value="TRANSPORTE">TRANSPORTE</option>
-                        <option value="MATERIAL">MATERIAL DE ESCRITÓRIO</option>
-                        <option value="MANUTENCAO">MANUTENÇÃO</option>
-                        <option value="AUTOMOVEL">AUTOMÓVEL</option>
-                        <option value="TELEFONE">TELEFONE/INTERNET</option>
-                        <option value="IMPOSTOS">IMPOSTOS</option>
-                        <option value="ALUGUEL">ALUGUEL</option>
-                        <option value="CONTADOR">CONTADOR</option>
-                        <option value="MARKETING">MARKETING</option>
-                        <option value="AUTOCALCO">AUTOCALCO</option>
-                        <option value="IMPRESSOES">IMPRESSÕES</option>
-                        <option value="OUTROS">OUTROS</option>
-                        <option value="MACRO">MACRO</option>
+                        <option value="ÁGUA">ÁGUA</option>
+                        <option value="AMAZON">AMAZON</option>
+                        <option value="ALIMENTAÇÃO">ALIMENTAÇÃO</option>
+                        <option value="ARRENDAMENTO">ARRENDAMENTO</option>
+                        <option value="COMISSÃO">COMISSÃO</option>
+                        <option value="CONTABILIDADE">CONTABILIDADE</option>
                         <option value="CTT">CTT</option>
-                        <option value="WEDDT">WEDDT</option>
+                        <option value="COMBUSTÍVEL">COMBUSTÍVEL</option>
+                        <option value="CAFÉ">CAFÉ</option>
+                        <option value="DIMATUR">DIMATUR</option>
+                        <option value="DAGOL">DAGOL</option>
+                        <option value="ENERGIA">ENERGIA</option>
+                        <option value="FILAMENTO 3D">FILAMENTO 3D</option>
+                        <option value="IMPOSTOS">IMPOSTOS</option>
+                        <option value="LEROY MERLIN">LEROY MERLIN</option>
+                        <option value="LUZACRIL">LUZACRIL</option>
+                        <option value="MANUTENÇÃO">MANUTENÇÃO</option>
+                        <option value="MATERIAL ESCRITORIO">MATERIAL ESCRITORIO</option>
+                        <option value="MAKRO">MAKRO</option>
+                        <option value="PLOTTERZONE">PLOTTERZONE</option>
+                        <option value="POLEGADA LED">POLEGADA LED</option>
+                        <option value="SALÁRIO">SALÁRIO</option>
+                        <option value="SANTANDER">SANTANDER</option>
                         <option value="TRANSPORTE">TRANSPORTE</option>
-                        <option value="MANUTENÇÃO MAQUINAS">MANUTENÇÃO MÁQUINAS</option>
+                        <option value="TELEFONE/INTERNET">TELEFONE/INTERNET</option>
+                        <option value="WEDDT">WEDDT</option>
                         <option value="OUTROS">OUTROS</option>
                     </select>
                     
@@ -669,12 +478,8 @@
                 </div>
             </div>
             
-            <!-- SEÇÃO: FORMA DE PAGAMENTO -->
             <div class="form-section">
-                <h2 class="section-title">
-                    <i class="fas fa-credit-card"></i>
-                    Forma de Pagamento
-                </h2>
+                <h2 class="section-title">Forma de Pagamento</h2>
                 
                 <div class="form-grid">
                     <div class="form-group">
@@ -697,361 +502,632 @@
                 </div>
             </div>
             
-            <!-- SEÇÃO: ANEXOS E OBSERVAÇÕES -->
             <div class="form-section">
-                <h2 class="section-title">
-                    <i class="fas fa-paperclip"></i>
-                    Anexos e Observações
-                </h2>
+                <h2 class="section-title">Anexos e Observações</h2>
                 
                 <div class="form-grid">
-                    <div class="form-group full-width">
+                    <div class="form-group">
                         <label for="observacoes">Observações</label>
                         <textarea id="observacoes" name="observacoes" data-bind="despesa.observacoes" rows="4" placeholder="Observações sobre a despesa..."></textarea>
                     </div>
                     
-                    <div class="form-group full-width">
+                    <div class="form-group">
                         <label for="notaFiscal">Anexar Nota Fiscal/Fatura</label>
                         <input type="file" id="notaFiscal" name="notaFiscal" accept="image/*,.pdf,.doc,.docx">
-                        <div class="file-preview" id="filePreview" style="display: none;">
+                        <div class="field-note">Formatos aceitos: JPG, PNG, PDF, DOC (máx. 2MB). Imagens serão otimizadas.</div>
+                        <div class="field-note">Dica: Para melhor otimização, use PDF para documentos e JPG para imagens.</div>
+                        <div class="file-preview" id="filePreview">
                             <div id="fileName"></div>
                             <div class="file-info" id="fileInfo"></div>
+                            <div class="compression-info" id="compressionInfo"></div>
                             <img id="fileImage" style="display: none;">
                         </div>
                     </div>
                 </div>
             </div>
             
-            <!-- BOTÕES DE AÇÃO -->
-            <div class="form-actions">
-                <button type="button" class="btn-cancel" id="cancelBtn">
-                    <i class="fas fa-times"></i>
-                    Cancelar
-                </button>
-                <button type="button" class="btn-save" id="saveBtn" data-action="commit">
-                    <i class="fas fa-save"></i>
-                    Salvar Despesa
-                </button>
-            </div>
+            <!-- Campos ocultos para totais (usados pelo engine.js) -->
+            <input type="hidden" id="despesaValorTotal" data-bind="despesa.valorTotal" value="0">
+            <input type="hidden" id="despesaValorIVA" data-bind="despesa.valorIVA" value="0">
+            <input type="hidden" id="despesaNotaFiscal" data-bind="despesa.notaFiscal" value="">
+            <input type="hidden" id="despesaTipoArquivo" data-bind="despesa.tipoArquivo" value="">
+            <input type="hidden" id="despesaTamanhoOriginal" data-bind="despesa.tamanhoOriginal" value="">
+            <input type="hidden" id="despesaTamanhoOtimizado" data-bind="despesa.tamanhoOtimizado" value="">
             
-            <!-- CAMPOS OCULTOS PARA VALORES CALCULADOS -->
-            <input type="hidden" id="valorTotalHidden" data-bind="despesa.valorTotal">
-            <input type="hidden" id="valorIVAHidden" data-bind="despesa.valorIVA">
+            <div class="form-actions">
+                <button type="button" class="btn-cancel" id="cancelBtn">CANCELAR</button>
+                <button type="button" class="btn-save" id="saveBtn" data-action="commit">SALVAR DESPESA</button>
+            </div>
         </form>
-    </div>
-
-    <!-- MENSAGEM DE CONFIRMAÇÃO -->
-    <div class="confirmation-message" id="confirmationMessage">
-        <i class="fas fa-check-circle"></i>
-        <div>
-            <strong>Despesa salva com sucesso!</strong>
-            <div style="font-size: 14px; opacity: 0.9;">A despesa foi registrada no sistema.</div>
-        </div>
     </div>
 
     <script>
         // ============================================
-        // SISTEMA DE REGISTRO DE DESPESAS
+        // VARIÁVEIS GLOBAIS E REFERÊNCIAS
+        // ============================================
+        let isEditMode = false;
+        let currentDespesaId = '';
+        let notaFiscalBase64 = '';
+        let tipoArquivo = '';
+        let tamanhoOriginal = 0;
+        let tamanhoOtimizado = 0;
+        
+        // Referências DOM
+        const despesaForm = document.getElementById('despesaForm');
+        const saveBtn = document.getElementById('saveBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const categoriaSelect = document.getElementById('categoria');
+        const outraCategoriaInput = document.getElementById('outraCategoriaInput');
+        const formaPagamentoSelect = document.getElementById('formaPagamento');
+        const outroPagamentoInput = document.getElementById('outroPagamento');
+        const notaFiscalInput = document.getElementById('notaFiscal');
+        const filePreview = document.getElementById('filePreview');
+        
+        // Elementos para cálculo
+        const valorBrutoInput = document.getElementById('valorBruto');
+        const ivaSimRadio = document.getElementById('ivaSim');
+        const ivaNaoRadio = document.getElementById('ivaNao');
+        const valorBrutoDisplay = document.getElementById('valorBrutoDisplay');
+        const valorIVADisplay = document.getElementById('valorIVADisplay');
+        const valorTotalDisplay = document.getElementById('valorTotalDisplay');
+        
+        // Campos ocultos para valores calculados
+        const valorTotalHidden = document.getElementById('despesaValorTotal');
+        const valorIVAHidden = document.getElementById('despesaValorIVA');
+        const notaFiscalHidden = document.getElementById('despesaNotaFiscal');
+        const tipoArquivoHidden = document.getElementById('despesaTipoArquivo');
+        const tamanhoOriginalHidden = document.getElementById('despesaTamanhoOriginal');
+        const tamanhoOtimizadoHidden = document.getElementById('despesaTamanhoOtimizado');
+        
+        // ============================================
+        // FUNÇÕES DE COMPRESSÃO DE IMAGEM
         // ============================================
         
-        document.addEventListener('DOMContentLoaded', function() {
-            console.log('💰 Sistema de Despesas carregado');
-            
-            // Elementos do DOM
-            const despesaForm = document.getElementById('despesaForm');
-            const saveBtn = document.getElementById('saveBtn');
-            const cancelBtn = document.getElementById('cancelBtn');
-            const categoriaSelect = document.getElementById('categoria');
-            const outraCategoriaInput = document.getElementById('outraCategoriaInput');
-            const formaPagamentoSelect = document.getElementById('formaPagamento');
-            const outroPagamentoInput = document.getElementById('outroPagamento');
-            const notaFiscalInput = document.getElementById('notaFiscal');
-            const filePreview = document.getElementById('filePreview');
-            const confirmationMessage = document.getElementById('confirmationMessage');
-            
-            // Elementos para cálculo
-            const valorBrutoInput = document.getElementById('valorBruto');
-            const ivaSimRadio = document.getElementById('ivaSim');
-            const ivaNaoRadio = document.getElementById('ivaNao');
-            const valorBrutoDisplay = document.getElementById('valorBrutoDisplay');
-            const valorIVADisplay = document.getElementById('valorIVADisplay');
-            const valorTotalDisplay = document.getElementById('valorTotalDisplay');
-            
-            // Campos ocultos para valores calculados
-            const valorTotalHidden = document.getElementById('valorTotalHidden');
-            const valorIVAHidden = document.getElementById('valorIVAHidden');
-            
-            // Estado da aplicação
-            let notaFiscalBase64 = '';
-            
-            // ============================================
-            // FUNÇÕES DE INICIALIZAÇÃO
-            // ============================================
-            
-            // Inicializar sistema
-            function inicializar() {
-                configurarEventListeners();
-                calcularTotais();
-                configurarDatasPadrao();
-                
-                // Desabilitar campo "Outro" inicialmente
-                outroPagamentoInput.disabled = true;
-                
-                console.log('✅ Sistema de despesas inicializado');
-            }
-            
-            // Configurar datas padrão
-            function configurarDatasPadrao() {
-                const hoje = new Date();
-                const amanha = new Date(hoje);
-                amanha.setDate(amanha.getDate() + 1);
-                
-                document.getElementById('dataCompra').valueAsDate = hoje;
-                document.getElementById('dataVencimento').valueAsDate = amanha;
-                document.getElementById('dataPagamento').valueAsDate = hoje;
-            }
-            
-            // Calcular totais
-            function calcularTotais() {
-                const valorBruto = parseFloat(valorBrutoInput.value) || 0;
-                
-                // Se tem IVA, calcular o valor com IVA (23%)
-                if (ivaSimRadio.checked) {
-                    const valorComIVA = valorBruto * 1.23;
-                    const valorIVA = valorComIVA - valorBruto;
-                    
-                    // Atualizar displays
-                    valorBrutoDisplay.textContent = formatarMoeda(valorBruto);
-                    valorIVADisplay.textContent = formatarMoeda(valorIVA);
-                    valorTotalDisplay.textContent = formatarMoeda(valorComIVA);
-                    
-                    // Atualizar campos ocultos (serão usados pelo engine.js)
-                    valorTotalHidden.value = valorComIVA.toFixed(2);
-                    valorIVAHidden.value = valorIVA.toFixed(2);
-                } else {
-                    // Se isento de IVA
-                    valorBrutoDisplay.textContent = formatarMoeda(valorBruto);
-                    valorIVADisplay.textContent = '€0.00';
-                    valorTotalDisplay.textContent = formatarMoeda(valorBruto);
-                    
-                    // Atualizar campos ocultos
-                    valorTotalHidden.value = valorBruto.toFixed(2);
-                    valorIVAHidden.value = '0.00';
-                }
-            }
-            
-            // Formatar moeda
-            function formatarMoeda(valor) {
-                return '€' + valor.toFixed(2).replace('.', ',');
-            }
-            
-            // Processar anexo de nota fiscal
-            function processarNotaFiscal(file) {
-                if (!file) {
-                    notaFiscalBase64 = '';
-                    filePreview.style.display = 'none';
+        // Função para comprimir imagem
+        function comprimirImagem(file, maxWidth = 1024, quality = 0.7) {
+            return new Promise((resolve, reject) => {
+                if (!file.type.startsWith('image/')) {
+                    // Não é imagem, retornar o arquivo original
+                    resolve({
+                        base64: '',
+                        tipo: file.type,
+                        tamanhoOriginal: file.size,
+                        tamanhoOtimizado: file.size
+                    });
                     return;
                 }
                 
                 const reader = new FileReader();
-                reader.onloadend = function() {
-                    notaFiscalBase64 = reader.result;
+                reader.readAsDataURL(file);
+                
+                reader.onload = (event) => {
+                    const img = new Image();
+                    img.src = event.target.result;
                     
-                    // Mostrar preview
-                    filePreview.style.display = 'block';
-                    document.getElementById('fileName').textContent = file.name;
-                    document.getElementById('fileInfo').textContent = 
-                        `Tipo: ${file.type} • Tamanho: ${(file.size / 1024).toFixed(2)}KB`;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        let width = img.width;
+                        let height = img.height;
+                        
+                        // Redimensionar se necessário
+                        if (width > maxWidth) {
+                            height = (height * maxWidth) / width;
+                            width = maxWidth;
+                        }
+                        
+                        canvas.width = width;
+                        canvas.height = height;
+                        
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        // Converter para JPG com qualidade otimizada
+                        const base64 = canvas.toDataURL('image/jpeg', quality);
+                        
+                        resolve({
+                            base64: base64,
+                            tipo: 'image/jpeg',
+                            tamanhoOriginal: file.size,
+                            tamanhoOtimizado: Math.round((base64.length * 3) / 4) // Estimativa do tamanho em bytes
+                        });
+                    };
                     
-                    // Se for imagem, mostrar preview
-                    if (file.type.startsWith('image/')) {
-                        const fileImage = document.getElementById('fileImage');
-                        fileImage.src = reader.result;
-                        fileImage.style.display = 'block';
+                    img.onerror = reject;
+                };
+                
+                reader.onerror = reject;
+            });
+        }
+        
+        // Função para processar PDF ou outros documentos
+        function processarDocumento(file, maxSizeKB = 200) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                
+                reader.onload = (event) => {
+                    let base64 = event.target.result;
+                    let tamanhoOtimizado = Math.round((base64.length * 3) / 4);
+                    
+                    // Se for muito grande, tentar reduzir
+                    if (tamanhoOtimizado > maxSizeKB * 1024) {
+                        // Para documentos, apenas armazenamos referência e não o conteúdo completo
+                        // Em produção, você pode querer usar storage externo como Firebase Storage
+                        showMessage('Documento muito grande. Salve apenas o número da nota ou referência.', 'warning');
+                        resolve({
+                            base64: '', // Não armazenar documentos muito grandes
+                            tipo: file.type,
+                            tamanhoOriginal: file.size,
+                            tamanhoOtimizado: 0,
+                            referencia: file.name
+                        });
                     } else {
-                        document.getElementById('fileImage').style.display = 'none';
+                        resolve({
+                            base64: base64,
+                            tipo: file.type,
+                            tamanhoOriginal: file.size,
+                            tamanhoOtimizado: tamanhoOtimizado
+                        });
                     }
                 };
                 
-                reader.readAsDataURL(file);
+                reader.onerror = reject;
+            });
+        }
+        
+        // ============================================
+        // FUNÇÕES PRINCIPAIS
+        // ============================================
+        
+        // Função para inicializar o formulário
+        function inicializarFormulario() {
+            configurarEventListeners();
+            calcularTotais();
+            configurarDatasPadrao();
+            
+            // Desabilitar campo "Outro" inicialmente
+            outroPagamentoInput.disabled = true;
+            
+            console.log('✅ Formulário de despesa inicializado');
+        }
+        
+        // Função para configurar datas padrão
+        function configurarDatasPadrao() {
+            const hoje = new Date();
+            const amanha = new Date(hoje);
+            amanha.setDate(amanha.getDate() + 1);
+            
+            document.getElementById('dataCompra').valueAsDate = hoje;
+            document.getElementById('dataVencimento').valueAsDate = amanha;
+            document.getElementById('dataPagamento').valueAsDate = hoje;
+        }
+        
+        // Função para calcular totais
+        function calcularTotais() {
+            const valorBruto = parseFloat(valorBrutoInput.value) || 0;
+            
+            // Se tem IVA, calcular o valor com IVA (23%)
+            if (ivaSimRadio.checked) {
+                const valorComIVA = valorBruto * 1.23;
+                const valorIVA = valorComIVA - valorBruto;
+                
+                // Atualizar displays
+                valorBrutoDisplay.textContent = formatarMoeda(valorBruto);
+                valorIVADisplay.textContent = formatarMoeda(valorIVA);
+                valorTotalDisplay.textContent = formatarMoeda(valorComIVA);
+                
+                // Atualizar campos ocultos (serão usados pelo engine.js)
+                valorTotalHidden.value = valorComIVA.toFixed(2);
+                valorIVAHidden.value = valorIVA.toFixed(2);
+            } else {
+                // Se isento de IVA
+                valorBrutoDisplay.textContent = formatarMoeda(valorBruto);
+                valorIVADisplay.textContent = '€0.00';
+                valorTotalDisplay.textContent = formatarMoeda(valorBruto);
+                
+                // Atualizar campos ocultos
+                valorTotalHidden.value = valorBruto.toFixed(2);
+                valorIVAHidden.value = '0.00';
+            }
+        }
+        
+        // Função para formatar moeda
+        function formatarMoeda(valor) {
+            return '€' + valor.toFixed(2).replace('.', ',');
+        }
+        
+        // Função para processar anexo de nota fiscal
+        async function processarNotaFiscal(file) {
+            if (!file) {
+                limparNotaFiscal();
+                return;
             }
             
-            // Validar formulário
-            function validarFormulario() {
-                const camposObrigatorios = ['fornecedor', 'descricao', 'dataCompra', 'dataVencimento', 'valorBruto', 'categoria', 'formaPagamento'];
-                
-                for (const campoId of camposObrigatorios) {
-                    const campo = document.getElementById(campoId);
-                    if (!campo.value.trim()) {
-                        mostrarErro(`Por favor, preencha o campo: ${campo.previousElementSibling?.textContent || campoId}`);
-                        campo.focus();
-                        return false;
-                    }
-                }
-                
-                // Validação especial para categoria "Outros"
-                if (categoriaSelect.value === 'OUTROS' && !outraCategoriaInput.value.trim()) {
-                    mostrarErro('Por favor, especifique a categoria "Outros".');
-                    outraCategoriaInput.focus();
-                    return false;
-                }
-                
-                // Validação especial para forma de pagamento "Outro"
-                if (formaPagamentoSelect.value === 'outro' && !outroPagamentoInput.value.trim()) {
-                    mostrarErro('Por favor, especifique a forma de pagamento "Outro".');
-                    outroPagamentoInput.focus();
-                    return false;
-                }
-                
-                // Validação de valor bruto
-                const valorBruto = parseFloat(document.getElementById('valorBruto').value);
-                if (isNaN(valorBruto) || valorBruto <= 0) {
-                    mostrarErro('Por favor, insira um valor bruto válido (maior que 0).');
-                    document.getElementById('valorBruto').focus();
-                    return false;
-                }
-                
-                return true;
+            // Verificar tamanho do arquivo (máx. 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                showMessage('O arquivo é muito grande (máx. 5MB).', 'error');
+                notaFiscalInput.value = '';
+                limparNotaFiscal();
+                return;
             }
             
-            // Mostrar mensagem de erro
-            function mostrarErro(mensagem) {
-                alert(mensagem);
-            }
+            // Mostrar preview inicial
+            filePreview.style.display = 'block';
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileInfo').textContent = 
+                `Tipo: ${file.type} • Tamanho original: ${(file.size / 1024).toFixed(2)}KB`;
+            document.getElementById('compressionInfo').textContent = 'Otimizando arquivo...';
             
-            // Mostrar mensagem de confirmação
-            function mostrarConfirmacao() {
-                confirmationMessage.classList.add('show');
+            try {
+                let resultado;
                 
-                // Esconder após 3 segundos
-                setTimeout(() => {
-                    confirmationMessage.classList.remove('show');
-                }, 3000);
-            }
-            
-            // Limpar formulário
-            function limparFormulario() {
-                despesaForm.reset();
-                notaFiscalBase64 = '';
-                filePreview.style.display = 'none';
-                outraCategoriaInput.classList.remove('active');
-                outraCategoriaInput.value = '';
-                outroPagamentoInput.disabled = true;
-                outroPagamentoInput.value = '';
-                calcularTotais();
-                configurarDatasPadrao();
-                
-                console.log('🔄 Formulário limpo para nova despesa');
-            }
-            
-            // ============================================
-            // CONFIGURAÇÃO DE EVENT LISTENERS
-            // ============================================
-            
-            function configurarEventListeners() {
-                // Cálculo de totais
-                valorBrutoInput.addEventListener('input', calcularTotais);
-                ivaSimRadio.addEventListener('change', calcularTotais);
-                ivaNaoRadio.addEventListener('change', calcularTotais);
-                
-                // Nota fiscal
-                notaFiscalInput.addEventListener('change', (e) => {
-                    processarNotaFiscal(e.target.files[0]);
-                });
-                
-                // Categoria "Outros"
-                categoriaSelect.addEventListener('change', (e) => {
-                    if (e.target.value === 'OUTROS') {
-                        outraCategoriaInput.classList.add('active');
-                        outraCategoriaInput.required = true;
+                if (file.type.startsWith('image/')) {
+                    // Comprimir imagem
+                    resultado = await comprimirImagem(file, 1024, 0.7);
+                    
+                    // Mostrar preview da imagem otimizada
+                    const fileImage = document.getElementById('fileImage');
+                    fileImage.src = resultado.base64;
+                    fileImage.style.display = 'block';
+                    
+                    document.getElementById('compressionInfo').textContent = 
+                        `Imagem otimizada: ${(resultado.tamanhoOtimizado / 1024).toFixed(2)}KB (redução de ${((1 - resultado.tamanhoOtimizado/file.size) * 100).toFixed(1)}%)`;
+                } else if (file.type === 'application/pdf' || 
+                          file.type.includes('document') || 
+                          file.type.includes('msword') || 
+                          file.type.includes('wordprocessing')) {
+                    // Processar documento
+                    resultado = await processarDocumento(file, 200);
+                    
+                    if (resultado.base64) {
+                        document.getElementById('compressionInfo').textContent = 
+                            `Documento: ${(resultado.tamanhoOtimizado / 1024).toFixed(2)}KB`;
                     } else {
-                        outraCategoriaInput.classList.remove('active');
-                        outraCategoriaInput.required = false;
-                        outraCategoriaInput.value = '';
-                    }
-                });
-                
-                // Forma de pagamento "Outro"
-                formaPagamentoSelect.addEventListener('change', (e) => {
-                    if (e.target.value === 'outro') {
-                        outroPagamentoInput.disabled = false;
-                        outroPagamentoInput.required = true;
-                    } else {
-                        outroPagamentoInput.disabled = true;
-                        outroPagamentoInput.required = false;
-                        outroPagamentoInput.value = '';
-                    }
-                });
-                
-                // Botão cancelar
-                cancelBtn.addEventListener('click', () => {
-                    if (confirm('Tem certeza que deseja cancelar? Todos os dados serão perdidos.')) {
-                        limparFormulario();
-                    }
-                });
-                
-                // Data de pagamento condicional
-                document.querySelectorAll('input[name="statusPagamento"]').forEach(radio => {
-                    radio.addEventListener('change', (e) => {
-                        const dataPagamentoInput = document.getElementById('dataPagamento');
-                        if (e.target.value === 'pago') {
-                            dataPagamentoInput.required = true;
-                            dataPagamentoInput.disabled = false;
-                            dataPagamentoInput.valueAsDate = new Date();
-                        } else {
-                            dataPagamentoInput.required = false;
-                            dataPagamentoInput.disabled = true;
-                            dataPagamentoInput.value = '';
-                        }
-                    });
-                });
-                
-                // Botão salvar - AGORA SOMENTE VALIDAÇÃO, O ENGINE.JS FAZ O COMMIT
-                saveBtn.addEventListener('click', function(e) {
-                    // Apenas validação, o engine.js irá capturar o data-action="commit"
-                    if (!validarFormulario()) {
-                        e.preventDefault();
-                        return;
+                        document.getElementById('compressionInfo').textContent = 
+                            `Documento armazenado como referência apenas: ${resultado.referencia}`;
                     }
                     
-                    // O engine.js irá mostrar a confirmação após o salvamento
-                });
-                
-                // Prevenir envio padrão do formulário
-                despesaForm.addEventListener('submit', function(e) {
-                    e.preventDefault();
-                });
-            }
-            
-            // ============================================
-            // INICIALIZAÇÃO
-            // ============================================
-            
-            inicializar();
-            
-            // Escutar mensagens do engine.js quando a despesa for salva
-            window.addEventListener('message', function(event) {
-                if (event.data.type === 'COMMIT_SUCCESS') {
-                    console.log('✅ Despesa salva com sucesso via engine.js');
-                    mostrarConfirmacao();
+                    document.getElementById('fileImage').style.display = 'none';
+                } else {
+                    // Outros tipos de arquivo
+                    const reader = new FileReader();
+                    reader.readAsDataURL(file);
                     
-                    // Após 2 segundos, perguntar se quer registrar outra
-                    setTimeout(() => {
-                        const resposta = confirm('Despesa salva com sucesso! Deseja registrar outra despesa?');
+                    reader.onload = (event) => {
+                        resultado = {
+                            base64: event.target.result,
+                            tipo: file.type,
+                            tamanhoOriginal: file.size,
+                            tamanhoOtimizado: Math.round((event.target.result.length * 3) / 4)
+                        };
                         
-                        if (resposta) {
+                        document.getElementById('compressionInfo').textContent = 
+                            `Arquivo: ${(resultado.tamanhoOtimizado / 1024).toFixed(2)}KB`;
+                    };
+                    
+                    await new Promise(resolve => reader.onloadend = resolve);
+                }
+                
+                // Armazenar dados
+                notaFiscalBase64 = resultado.base64;
+                tipoArquivo = resultado.tipo;
+                tamanhoOriginal = resultado.tamanhoOriginal;
+                tamanhoOtimizado = resultado.tamanhoOtimizado || resultado.tamanhoOriginal;
+                
+                // Atualizar campos ocultos
+                notaFiscalHidden.value = notaFiscalBase64;
+                tipoArquivoHidden.value = tipoArquivo;
+                tamanhoOriginalHidden.value = tamanhoOriginal;
+                tamanhoOtimizadoHidden.value = tamanhoOtimizado;
+                
+            } catch (error) {
+                console.error('Erro ao processar arquivo:', error);
+                showMessage('Erro ao processar arquivo. Tente novamente.', 'error');
+                limparNotaFiscal();
+            }
+        }
+        
+        // Função para limpar nota fiscal
+        function limparNotaFiscal() {
+            notaFiscalBase64 = '';
+            tipoArquivo = '';
+            tamanhoOriginal = 0;
+            tamanhoOtimizado = 0;
+            filePreview.style.display = 'none';
+            
+            // Limpar campos ocultos
+            notaFiscalHidden.value = '';
+            tipoArquivoHidden.value = '';
+            tamanhoOriginalHidden.value = '';
+            tamanhoOtimizadoHidden.value = '';
+        }
+        
+        // Função para validar o formulário
+        function validarFormulario() {
+            const camposObrigatorios = ['fornecedor', 'descricao', 'dataCompra', 'dataVencimento', 'valorBruto', 'categoria', 'formaPagamento'];
+            
+            for (const campoId of camposObrigatorios) {
+                const campo = document.getElementById(campoId);
+                if (!campo.value.trim()) {
+                    showMessage(`O campo "${campo.previousElementSibling?.textContent.replace(' *', '') || campoId}" é obrigatório.`, 'warning');
+                    campo.focus();
+                    return false;
+                }
+            }
+            
+            // Validação especial para categoria "Outros"
+            if (categoriaSelect.value === 'OUTROS' && !outraCategoriaInput.value.trim()) {
+                showMessage('Por favor, especifique a categoria "Outros".', 'warning');
+                outraCategoriaInput.focus();
+                return false;
+            }
+            
+            // Validação especial para forma de pagamento "Outro"
+            if (formaPagamentoSelect.value === 'outro' && !outroPagamentoInput.value.trim()) {
+                showMessage('Por favor, especifique a forma de pagamento "Outro".', 'warning');
+                outroPagamentoInput.focus();
+                return false;
+            }
+            
+            // Validação de valor bruto
+            const valorBruto = parseFloat(document.getElementById('valorBruto').value);
+            if (isNaN(valorBruto) || valorBruto <= 0) {
+                showMessage('Por favor, insira um valor bruto válido (maior que 0).', 'warning');
+                document.getElementById('valorBruto').focus();
+                return false;
+            }
+            
+            // Validação da data de vencimento
+            const dataCompra = new Date(document.getElementById('dataCompra').value);
+            const dataVencimento = new Date(document.getElementById('dataVencimento').value);
+            if (dataVencimento < dataCompra) {
+                showMessage('A data de vencimento não pode ser anterior à data da compra.', 'warning');
+                document.getElementById('dataVencimento').focus();
+                return false;
+            }
+            
+            // Se status é "Pago", data de pagamento é obrigatória
+            const statusPago = document.getElementById('statusPago').checked;
+            if (statusPago && !document.getElementById('dataPagamento').value) {
+                showMessage('A data de pagamento é obrigatória quando o status é "Pago".', 'warning');
+                document.getElementById('dataPagamento').focus();
+                return false;
+            }
+            
+            // Verificar tamanho do arquivo otimizado
+            if (tamanhoOtimizado > 500 * 1024) { // 500KB
+                if (!confirm(`A nota fiscal otimizada tem ${(tamanhoOtimizado / 1024).toFixed(2)}KB. Isso pode sobrecarregar o banco de dados. Deseja continuar?`)) {
+                    return false;
+                }
+            }
+            
+            return true;
+        }
+        
+        // Função para preparar dados para o Core Engine
+        function prepararDespesaData() {
+            const now = new Date();
+            
+            // Criar objeto da despesa no formato esperado pelo sistema
+            const despesaData = {
+                fornecedor: document.getElementById('fornecedor').value,
+                descricao: document.getElementById('descricao').value,
+                telefone: document.getElementById('telefone').value || '',
+                nifFornecedor: document.getElementById('nifFornecedor').value || '',
+                dataCompra: document.getElementById('dataCompra').value,
+                dataVencimento: document.getElementById('dataVencimento').value,
+                dataPagamento: document.getElementById('dataPagamento').value || '',
+                valorBruto: parseFloat(document.getElementById('valorBruto').value) || 0,
+                comIVA: document.querySelector('input[name="ivaOption"]:checked').value,
+                statusPagamento: document.querySelector('input[name="statusPagamento"]:checked').value,
+                categoria: document.getElementById('categoria').value,
+                outraCategoria: document.getElementById('outraCategoriaInput').value || '',
+                formaPagamento: document.getElementById('formaPagamento').value,
+                outroPagamento: document.getElementById('outroPagamento').value || '',
+                observacoes: document.getElementById('observacoes').value || '',
+                valorTotal: parseFloat(valorTotalHidden.value) || 0,
+                valorIVA: parseFloat(valorIVAHidden.value) || 0,
+                notaFiscal: notaFiscalBase64 || '',
+                tipoArquivo: tipoArquivo || '',
+                tamanhoOriginal: tamanhoOriginal || 0,
+                tamanhoOtimizado: tamanhoOtimizado || 0,
+                created_at: now.toISOString(),
+                updated_at: now.toISOString()
+            };
+            
+            // Se estiver em modo de edição, manter o ID
+            if (isEditMode && currentDespesaId) {
+                despesaData.id = currentDespesaId;
+            }
+            
+            return despesaData;
+        }
+        
+        // Função para mostrar mensagens
+        function showMessage(message, type = 'info') {
+            // Remover mensagens anteriores
+            const existingMessages = document.querySelectorAll('.success-message');
+            existingMessages.forEach(msg => msg.remove());
+            
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'success-message';
+            messageDiv.textContent = message;
+            
+            // Cor baseada no tipo
+            if (type === 'warning') {
+                messageDiv.style.backgroundColor = '#f59e0b';
+            } else if (type === 'error') {
+                messageDiv.style.backgroundColor = '#ef4444';
+            } else if (type === 'success') {
+                messageDiv.style.backgroundColor = '#10b981';
+            }
+            
+            document.body.appendChild(messageDiv);
+            
+            setTimeout(() => {
+                messageDiv.remove();
+            }, 3000);
+        }
+        
+        // Função para limpar o formulário
+        function limparFormulario() {
+            despesaForm.reset();
+            limparNotaFiscal();
+            outraCategoriaInput.classList.remove('active');
+            outraCategoriaInput.value = '';
+            outroPagamentoInput.disabled = true;
+            outroPagamentoInput.value = '';
+            calcularTotais();
+            configurarDatasPadrao();
+            
+            // Resetar modo de edição
+            isEditMode = false;
+            currentDespesaId = '';
+            
+            showMessage('Formulário limpo. Pronto para nova despesa.', 'info');
+        }
+        
+        // ============================================
+        // CONFIGURAÇÃO DE EVENT LISTENERS
+        // ============================================
+        
+        function configurarEventListeners() {
+            // Cálculo de totais
+            valorBrutoInput.addEventListener('input', calcularTotais);
+            ivaSimRadio.addEventListener('change', calcularTotais);
+            ivaNaoRadio.addEventListener('change', calcularTotais);
+            
+            // Nota fiscal
+            notaFiscalInput.addEventListener('change', (e) => {
+                processarNotaFiscal(e.target.files[0]);
+            });
+            
+            // Categoria "Outros"
+            categoriaSelect.addEventListener('change', (e) => {
+                if (e.target.value === 'OUTROS') {
+                    outraCategoriaInput.classList.add('active');
+                    outraCategoriaInput.required = true;
+                } else {
+                    outraCategoriaInput.classList.remove('active');
+                    outraCategoriaInput.required = false;
+                    outraCategoriaInput.value = '';
+                }
+            });
+            
+            // Forma de pagamento "Outro"
+            formaPagamentoSelect.addEventListener('change', (e) => {
+                if (e.target.value === 'outro') {
+                    outroPagamentoInput.disabled = false;
+                    outroPagamentoInput.required = true;
+                } else {
+                    outroPagamentoInput.disabled = true;
+                    outroPagamentoInput.required = false;
+                    outroPagamentoInput.value = '';
+                }
+            });
+            
+            // Data de pagamento condicional
+            document.querySelectorAll('input[name="statusPagamento"]').forEach(radio => {
+                radio.addEventListener('change', (e) => {
+                    const dataPagamentoInput = document.getElementById('dataPagamento');
+                    if (e.target.value === 'pago') {
+                        dataPagamentoInput.required = true;
+                        dataPagamentoInput.disabled = false;
+                        dataPagamentoInput.valueAsDate = new Date();
+                    } else {
+                        dataPagamentoInput.required = false;
+                        dataPagamentoInput.disabled = true;
+                        dataPagamentoInput.value = '';
+                    }
+                });
+            });
+            
+            // Botão cancelar
+            cancelBtn.addEventListener('click', () => {
+                if (confirm('Tem certeza que deseja cancelar? Todos os dados serão perdidos.')) {
+                    limparFormulario();
+                }
+            });
+            
+            // Botão salvar - O engine.js fará o commit automaticamente devido ao data-action="commit"
+            saveBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                
+                if (!validarFormulario()) {
+                    return;
+                }
+                
+                // Feedback visual
+                saveBtn.classList.add('saving');
+                saveBtn.textContent = 'SALVANDO...';
+                saveBtn.disabled = true;
+                
+                // O engine.js irá capturar os data-binds e fazer o commit
+                // Após o commit, o engine.js disparará um evento
+            });
+        }
+        
+        // ============================================
+        // INICIALIZAÇÃO
+        // ============================================
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            // Verificar se é modo de edição
+            const urlParams = new URLSearchParams(window.location.search);
+            const editId = urlParams.get('edit');
+            
+            if (editId) {
+                // Modo de edição - implementar carregamento da despesa
+                console.log('Modo edição para despesa ID:', editId);
+                showMessage('Modo de edição - carregando despesa...', 'info');
+                
+                // Para compatibilidade, redirecionar para lista se não implementado
+                setTimeout(() => {
+                    if (confirm('Funcionalidade de edição em desenvolvimento. Deseja ir para a lista de despesas?')) {
+                        window.location.href = 'despesas.html';
+                    }
+                }, 1500);
+            } else {
+                // Configurar novo formulário
+                inicializarFormulario();
+            }
+            
+            // Configurar listener para evento do engine.js
+            document.addEventListener('coreCommitSuccess', (event) => {
+                const detail = event.detail || {};
+                
+                if (detail.schema === 'despesa') {
+                    // Feedback de sucesso
+                    saveBtn.classList.remove('saving');
+                    saveBtn.textContent = '✓ SALVO!';
+                    
+                    showMessage(`Despesa ${isEditMode ? 'atualizada' : 'criada'} com sucesso!`, 'success');
+                    
+                    // Redirecionar após 2 segundos
+                    setTimeout(() => {
+                        if (confirm(`Despesa ${isEditMode ? 'atualizada' : 'criada'} com sucesso! Deseja criar uma nova despesa?`)) {
                             limparFormulario();
+                            saveBtn.textContent = 'SALVAR DESPESA';
+                            saveBtn.disabled = false;
                         } else {
-                            // Voltar para dashboard
-                            window.parent.postMessage({ type: 'NAVIGATE_TO', page: 'dashboard' }, '*');
+                            window.location.href = 'despesas.html';
                         }
                     }, 2000);
                 }
             });
+            
+            document.addEventListener('coreCommitError', (event) => {
+                console.error('Erro no commit:', event.detail);
+                saveBtn.classList.remove('saving');
+                saveBtn.textContent = isEditMode ? 'ATUALIZAR DESPESA' : 'SALVAR DESPESA';
+                saveBtn.disabled = false;
+                
+                showMessage('Erro ao salvar despesa. Tente novamente.', 'error');
+            });
         });
     </script>
     
-    <!-- CONEXÃO COM O CORE -->
+    <!-- CONEXÃO COM O CORE ENGINE -->
     <script src="../core/engine.js"></script>
 </body>
 </html>
