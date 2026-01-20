@@ -1,15 +1,16 @@
 /**
- * ENGINE.JS v5.0 - MOTOR DE COMUNICAÇÃO ATUALIZADO
+ * ENGINE.JS v5.1 - MOTOR DE COMUNICAÇÃO ATUALIZADO
  * Localização: /core/engine.js
  * Responsável por: Data-binding, Commits, Queries e UI Updates.
- * Atualizado para salvar no Pen Drive via API Node.js
+ * Atualizado para salvar no Firebase via API Node.js
+ * CORREÇÃO: Agora processa corretamente produtos de pedidos com data-bind "pedido.produtos.X.campo"
  */
 document.addEventListener('DOMContentLoaded', () => {
     const pageId = document.body.getAttribute('data-page-id') || 'pagina-sem-id';
     const pageType = document.body.getAttribute('data-page-type') || 'NEUTRAL';
 
-    console.log(`🚀 Engine v5.0 Ativa: ${pageId} [Tipo: ${pageType}]`);
-    console.log(`💾 Modo: Salvamento exclusivo no Pen Drive`);
+    console.log(`🚀 Engine v5.1 Ativa: ${pageId} [Tipo: ${pageType}]`);
+    console.log(`💾 Modo: Salvamento no Firebase Online`);
 
     // --- MODO ESCRITA (WRITE) ---
     const commitBtn = document.querySelector('[data-action="commit"]');
@@ -56,7 +57,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (schema && Object.keys(payload).length > 0) {
                 try {
-                    // Salvar no Pen Drive via API
+                    // Salvar no Firebase via API
                     const response = await fetch('/api/database/commit', {
                         method: 'POST',
                         headers: {
@@ -74,6 +75,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         const result = await response.json();
                         console.log('✅ Dados salvos no Firebase:', result);
                         
+                        // Disparar evento de sucesso
+                        window.dispatchEvent(new CustomEvent('coreCommitSuccess', {
+                            detail: { schema: schema, payload: payload, result: result }
+                        }));
+                        
                         // Feedback visual
                         commitBtn.style.backgroundColor = "#27ae60";
                         commitBtn.textContent = "✓ Salvo Online!";
@@ -88,15 +94,24 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Disparar evento de mudança de dados
                         window.dispatchEvent(new CustomEvent('coreDataChanged'));
                         
-                        // Limpar formulário
-                        limparFormulario(inputs);
+                        // Limpar formulário se não estiver em modo de edição
+                        if (!document.getElementById('pedidoId')?.value) {
+                            limparFormulario(inputs);
+                        }
                         
                     } else {
-                        throw new Error('Falha ao salvar no Firebase');
+                        const errorText = await response.text();
+                        throw new Error(`Falha ao salvar no Firebase: ${errorText}`);
                     }
                 } catch (error) {
                     console.error('❌ Erro ao salvar no Firebase:', error);
-                    alert('❌ Erro ao salvar dados online!');
+                    
+                    // Disparar evento de erro
+                    window.dispatchEvent(new CustomEvent('coreCommitError', {
+                        detail: { error: error.message, schema: schema }
+                    }));
+                    
+                    alert('❌ Erro ao salvar dados online! Verifique o console.');
                 }
             } else {
                 console.error('❌ Erro: Schema não identificado ou payload vazio');
@@ -124,14 +139,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     },
                     body: JSON.stringify({
                         schema: pageId.includes('pedido') ? 'pedido' : 
-                               pageId.includes('despesa') ? 'despesa' : 'all'
+                               pageId.includes('despesa') ? 'despesa' : 'all',
+                        filters: { deleted: false }
                     })
                 });
                 
                 if (response.ok) {
                     const result = await response.json();
                     const events = result.events || [];
+                    
+                    // Atualizar interface com os dados
                     atualizarInterface(events);
+                    
+                    // Atualizar contadores via data-bind
+                    atualizarContadoresDataBind(events);
                     
                     // Enviar dados para o dashboard via postMessage
                     if (pageId === 'dashboard') {
@@ -158,11 +179,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Handler para receber dados (compatibilidade)
         window.addEventListener('coreDataChanged', () => {
+            console.log('🔄 Evento coreDataChanged recebido');
             solicitarDados();
         });
 
-        // Auto-refresh a cada 5 segundos
-        setInterval(solicitarDados, 5000);
+        // Auto-refresh a cada 10 segundos
+        setInterval(solicitarDados, 10000);
         
         // Carregar dados iniciais
         solicitarDados();
@@ -174,6 +196,8 @@ document.addEventListener('DOMContentLoaded', () => {
         inputs.forEach(input => {
             if (input.type === 'checkbox' || input.type === 'radio') {
                 input.checked = false;
+            } else if (input.tagName === 'SELECT') {
+                input.selectedIndex = 0;
             } else {
                 input.value = '';
             }
@@ -213,7 +237,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function criarLinhaTabela(event) {
         const tr = document.createElement('tr');
-        const data = new Date(event.created_at).toLocaleString('pt-BR');
+        const data = new Date(event.timestamp || event.created_at).toLocaleString('pt-BR');
         
         let content = '';
         if (event.schema === 'venda') {
@@ -233,12 +257,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td><span class="status-badge warning">Registrada</span></td>
             `;
         } else if (event.schema === 'pedido') {
+            const produtosCount = Array.isArray(event.payload.produtos) ? event.payload.produtos.length : 0;
             content = `
                 <td>${data}</td>
                 <td>${event.payload.cliente || '-'}</td>
-                <td>${event.payload.produtos?.length || 0} itens</td>
+                <td>${produtosCount} itens</td>
                 <td>R$ ${(event.payload.total || 0).toFixed(2)}</td>
-                <td><span class="status-badge pending">Pendente</span></td>
+                <td><span class="status-badge ${event.payload.status || 'pending'}">${event.payload.status || 'Pendente'}</span></td>
             `;
         } else {
             content = `
@@ -256,7 +281,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function criarListItem(event) {
         const li = document.createElement('li');
-        const data = new Date(event.created_at).toLocaleString('pt-BR');
+        const data = new Date(event.timestamp || event.created_at).toLocaleString('pt-BR');
         
         let icon = '';
         let text = '';
@@ -269,7 +294,8 @@ document.addEventListener('DOMContentLoaded', () => {
             text = `Despesa: ${event.payload.descricao || event.payload.categoria} - R$ ${event.payload.valor}`;
         } else if (event.schema === 'pedido') {
             icon = '📦';
-            text = `Pedido: ${event.payload.cliente}`;
+            const produtosCount = Array.isArray(event.payload.produtos) ? event.payload.produtos.length : 0;
+            text = `Pedido: ${event.payload.cliente} - ${produtosCount} produtos - R$ ${event.payload.total}`;
         } else {
             icon = '📄';
             text = `${event.schema}: ${JSON.stringify(event.payload).substring(0, 30)}...`;
@@ -301,57 +327,118 @@ document.addEventListener('DOMContentLoaded', () => {
         if (pedidosElement) pedidosElement.textContent = pedidosCount;
     }
 
+    function atualizarContadoresDataBind(events) {
+        // Atualizar contadores via data-bind (para páginas READ)
+        const pedidos = events.filter(e => e.schema === 'pedido');
+        const totalPedidos = pedidos.length;
+        const pendentes = pedidos.filter(p => p.payload.status === 'pendente').length;
+        const processamento = pedidos.filter(p => p.payload.status === 'processamento').length;
+        const concluidos = pedidos.filter(p => p.payload.status === 'concluido').length;
+        
+        // Atualizar elementos com data-bind
+        const totalElement = document.querySelector('[data-bind="pedidos.total"]');
+        const pendentesElement = document.querySelector('[data-bind="pedidos.pendentes"]');
+        const processamentoElement = document.querySelector('[data-bind="pedidos.processamento"]');
+        const concluidosElement = document.querySelector('[data-bind="pedidos.concluidos"]');
+        
+        if (totalElement) totalElement.textContent = totalPedidos;
+        if (pendentesElement) pendentesElement.textContent = pendentes;
+        if (processamentoElement) processamentoElement.textContent = processamento;
+        if (concluidosElement) concluidosElement.textContent = concluidos;
+    }
+
     function processarPedidoCompleto(inputs) {
         const payload = {};
+        const produtosMap = new Map(); // Para agrupar produtos por índice
+        
+        console.log(`🛠️ Processando ${inputs.length} inputs para pedido...`);
         
         inputs.forEach(input => {
-            const bindPath = input.getAttribute('data-bind').split('.');
+            const bindPath = input.getAttribute('data-bind');
+            if (!bindPath) return;
             
-            if (bindPath[0] === 'pedido') {
-                const field = bindPath[1];
-                
-                // Suporte para diferentes tipos de input
-                if (input.type === 'checkbox') {
-                    payload[field] = input.checked;
-                } else if (input.type === 'radio') {
-                    if (input.checked) payload[field] = input.value;
-                } else if (input.type === 'number') {
-                    payload[field] = parseFloat(input.value) || 0;
-                } else if (input.type === 'date') {
-                    payload[field] = input.value;
-                } else {
-                    payload[field] = input.value;
-                }
-            } else if (bindPath[0] === 'produto') {
-                // Para produtos com índice (ex: pedido.produtos.0.nome)
-                const parts = bindPath[1].split('.');
-                if (parts[0] === 'produtos' && parts[1]) {
-                    const index = parseInt(parts[1]);
-                    const field = parts[2];
+            const parts = bindPath.split('.');
+            
+            if (parts[0] === 'pedido') {
+                if (parts[1] === 'produtos' && parts.length >= 3) {
+                    // É um produto: pedido.produtos.X.campo
+                    const index = parseInt(parts[2]);
+                    const field = parts[3];
                     
-                    if (!payload.produtos) payload.produtos = [];
-                    if (!payload.produtos[index]) payload.produtos[index] = {};
-                    
-                    if (input.type === 'number') {
-                        payload.produtos[index][field] = parseFloat(input.value) || 0;
-                    } else {
-                        payload.produtos[index][field] = input.value;
+                    if (!isNaN(index) && field) {
+                        // Inicializar array se necessário
+                        if (!payload.produtos) {
+                            payload.produtos = [];
+                        }
+                        
+                        // Garantir que existe objeto no índice
+                        if (!payload.produtos[index]) {
+                            payload.produtos[index] = {};
+                        }
+                        
+                        // Coletar valor com base no tipo de input
+                        let value;
+                        if (input.type === 'checkbox') {
+                            value = input.checked;
+                        } else if (input.type === 'radio') {
+                            value = input.checked ? input.value : undefined;
+                        } else if (input.type === 'number') {
+                            value = parseFloat(input.value) || 0;
+                        } else if (input.type === 'date') {
+                            value = input.value;
+                        } else {
+                            value = input.value;
+                        }
+                        
+                        // Se for radio e não está checked, não adicionar
+                        if (!(input.type === 'radio' && !input.checked)) {
+                            payload.produtos[index][field] = value;
+                        }
+                        
+                        console.log(`📦 Produto [${index}].${field} = ${value}`);
                     }
+                } else if (parts.length === 2) {
+                    // É um campo direto: pedido.campo
+                    const field = parts[1];
+                    
+                    // Coletar valor com base no tipo de input
+                    if (input.type === 'checkbox') {
+                        payload[field] = input.checked;
+                    } else if (input.type === 'radio') {
+                        if (input.checked) payload[field] = input.value;
+                    } else if (input.type === 'number') {
+                        payload[field] = parseFloat(input.value) || 0;
+                    } else if (input.type === 'date') {
+                        payload[field] = input.value;
+                    } else {
+                        payload[field] = input.value;
+                    }
+                    
+                    console.log(`📝 Campo ${field} = ${payload[field]}`);
                 }
             }
         });
+        
+        // Remover produtos vazios (caso tenha linhas removidas)
+        if (payload.produtos) {
+            payload.produtos = payload.produtos.filter(prod => prod && Object.keys(prod).length > 0);
+        }
         
         // Adicionar data de registro se não existir
         if (!payload.dataRegistro) {
             payload.dataRegistro = new Date().toISOString();
         }
         
+        console.log(`✅ Payload final:`, payload);
+        console.log(`✅ Produtos processados:`, payload.produtos ? payload.produtos.length : 0);
+        
         return payload;
     }
 
     // Inicializar sistema de mensagens
     window.addEventListener('load', () => {
-        console.log('🔧 Engine v5.0 inicializada com sucesso!');
+        console.log('🔧 Engine v5.1 inicializada com sucesso!');
         console.log('🔥 Pronta para salvar no Firebase Online');
+        console.log('🛠️ Suporte completo para produtos estruturados de pedidos');
     });
 });
