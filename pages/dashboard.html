@@ -1090,46 +1090,68 @@
                 
                 let dataInicio, dataFim;
                 
+                // Ajustar para o final do dia (23:59:59.999)
+                const ajustarFimDoDia = (data) => {
+                    const novaData = new Date(data);
+                    novaData.setHours(23, 59, 59, 999);
+                    return novaData;
+                };
+                
                 switch(periodoAtual) {
                     case 'mes_anterior':
                         // Mês anterior completo
                         dataInicio = new Date(anoAtual, mesAtual - 1, 1);
-                        dataFim = new Date(anoAtual, mesAtual, 0);
+                        dataFim = ajustarFimDoDia(new Date(anoAtual, mesAtual, 0));
+                        console.log('📅 Período: Mês Anterior', dataInicio.toLocaleDateString(), 'até', dataFim.toLocaleDateString());
                         break;
+                        
                     case 'trimestre':
-                        // Últimos 3 meses
+                        // Últimos 3 meses completos
                         dataInicio = new Date(anoAtual, mesAtual - 3, 1);
-                        dataFim = new Date(anoAtual, mesAtual + 1, 0);
+                        dataFim = ajustarFimDoDia(new Date(anoAtual, mesAtual + 1, 0));
+                        console.log('📅 Período: Últimos 3 Meses', dataInicio.toLocaleDateString(), 'até', dataFim.toLocaleDateString());
                         break;
+                        
                     case 'ano_atual':
-                        // Desde o início do ano
+                        // Desde o início do ano até o final do mês atual
                         dataInicio = new Date(anoAtual, 0, 1);
-                        dataFim = new Date(anoAtual, 11, 31);
+                        dataFim = ajustarFimDoDia(new Date(anoAtual, mesAtual + 1, 0));
+                        console.log('📅 Período: Ano Atual', dataInicio.toLocaleDateString(), 'até', dataFim.toLocaleDateString());
                         break;
+                        
                     case 'todos':
                         // Todos os dados (sem filtro de data)
                         dataInicio = null;
                         dataFim = null;
+                        console.log('📅 Período: Todo o Período (sem filtro de data)');
                         break;
+                        
                     case 'mes_atual':
                     default:
                         // Mês atual completo
                         dataInicio = new Date(anoAtual, mesAtual, 1);
-                        dataFim = new Date(anoAtual, mesAtual + 1, 0);
+                        dataFim = ajustarFimDoDia(new Date(anoAtual, mesAtual + 1, 0));
+                        console.log('📅 Período: Mês Atual', dataInicio.toLocaleDateString(), 'até', dataFim.toLocaleDateString());
                 }
                 
-                console.log('📅 Datas filtradas:', { 
-                    dataInicio: dataInicio ? dataInicio.toISOString() : 'null',
-                    dataFim: dataFim ? dataFim.toISOString() : 'null'
-                });
-                
                 // Preparar o corpo da requisição
-                const body = { schema: 'all' };
+                const body = { 
+                    schema: 'all',
+                    filters: {}
+                };
                 
                 // Adicionar filtros de data apenas se definidos
                 if (dataInicio && dataFim) {
                     body.filters = {
                         dataInicio: dataInicio.toISOString(),
+                        dataFim: dataFim.toISOString()
+                    };
+                } else if (dataInicio) {
+                    body.filters = {
+                        dataInicio: dataInicio.toISOString()
+                    };
+                } else if (dataFim) {
+                    body.filters = {
                         dataFim: dataFim.toISOString()
                     };
                 }
@@ -1255,13 +1277,20 @@
                     const mesEvento = dataEvento.getMonth();
                     const anoEvento = dataEvento.getFullYear();
                     
-                    // CORREÇÃO CRÍTICA: Processar contas a receber e pagar
+                    // Processar contas a receber e pagar SEM filtro de data, pois precisamos de todos os pendentes
                     if (evento.schema === 'conta_receber') {
                         const valor = parseFloat(evento.payload?.valor || evento.payload?.total || 0);
                         if (!isNaN(valor) && valor > 0) {
                             const status = evento.payload?.status || 'pendente';
                             if (status === 'pendente' || status === 'atrasado') {
-                                totalAReceber += valor;
+                                // Verificar se a data de vencimento é futura ou não tem data definida
+                                const dataVencimento = evento.payload?.dataVencimento || evento.payload?.vencimento;
+                                const hoje = new Date();
+                                hoje.setHours(0, 0, 0, 0);
+                                
+                                if (!dataVencimento || new Date(dataVencimento) >= hoje) {
+                                    totalAReceber += valor;
+                                }
                             }
                         }
                     } else if (evento.schema === 'conta_pagar') {
@@ -1269,7 +1298,14 @@
                         if (!isNaN(valor) && valor > 0) {
                             const status = evento.payload?.status || 'pendente';
                             if (status === 'pendente' || status === 'atrasado') {
-                                totalAPagar += valor;
+                                // Verificar se a data de vencimento é futura ou não tem data definida
+                                const dataVencimento = evento.payload?.dataVencimento || evento.payload?.vencimento;
+                                const hoje = new Date();
+                                hoje.setHours(0, 0, 0, 0);
+                                
+                                if (!dataVencimento || new Date(dataVencimento) >= hoje) {
+                                    totalAPagar += valor;
+                                }
                             }
                         }
                     }
