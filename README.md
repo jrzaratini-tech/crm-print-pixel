@@ -117,6 +117,42 @@ Todos os eventos são auditáveis
 
 Dados sincronizados em tempo real
 
+### 📦 ESTRUTURA DE PRODUTOS EM PEDIDOS
+
+**Para páginas WRITE com arrays de objetos:**
+
+```html
+<!-- Produto individual -->
+<input type="text" data-bind="pedido.produtos.0.nome">
+<input type="number" data-bind="pedido.produtos.0.valor">
+<textarea data-bind="pedido.produtos.0.observacoes"></textarea>
+
+<!-- Segundo produto -->
+<input type="text" data-bind="pedido.produtos.1.nome">
+<input type="number" data-bind="pedido.produtos.1.valor">
+```
+
+**Formato no Firebase:**
+```javascript
+produtos: [
+    { 
+        nome: "Produto 1", 
+        valor: 100, 
+        observacoes: "..." 
+    },
+    { 
+        nome: "Produto 2", 
+        valor: 200, 
+        observacoes: "..." 
+    }
+]
+```
+
+### 🔧 ATUALIZAÇÃO v5.1.1
+- **Correção**: `engine.js` agora processa corretamente `pedido.produtos.X.campo`
+- **Novos eventos**: `coreCommitSuccess` e `coreCommitError`
+- **Compatibilidade**: Mantém dados antigos, novos serão estruturados
+
 📁 ESTRUTURA DO SISTEMA
 text
 CRM_PRINT_PIXEL/
