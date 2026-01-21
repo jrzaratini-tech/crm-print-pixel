@@ -4,6 +4,7 @@
  * Responsável por: Data-binding, Commits, Queries e UI Updates.
  * Atualizado para salvar no Firebase via API Node.js
  * CORREÇÃO: Agora processa corretamente produtos de pedidos com data-bind "pedido.produtos.X.campo"
+ * CORREÇÃO CRÍTICA: Proteção para não limpar tabelas dentro de modais
  */
 document.addEventListener('DOMContentLoaded', () => {
     const pageId = document.body.getAttribute('data-page-id') || 'pagina-sem-id';
@@ -127,67 +128,91 @@ document.addEventListener('DOMContentLoaded', () => {
     if (pageType === "READ") {
         console.log("📊 Página READ detectada - Configurando sistema de dados do Firebase");
         
-        // Função para solicitar dados
-        const solicitarDados = async () => {
-            console.log("🔄 Solicitando dados do Firebase...");
-            try {
-                // Solicitar dados via API
-                const response = await fetch('/api/database/query', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        schema: pageId.includes('pedido') ? 'pedido' : 
-                               pageId.includes('despesa') ? 'despesa' : 'all',
-                        filters: { deleted: false }
-                    })
-                });
-                
-                if (response.ok) {
-                    const result = await response.json();
-                    const events = result.events || [];
-                    
-                    // Atualizar interface com os dados
-                    atualizarInterface(events);
-                    
-                    // Atualizar contadores via data-bind
-                    atualizarContadoresDataBind(events);
-                    
-                    // Enviar dados para o dashboard via postMessage
-                    if (pageId === 'dashboard') {
-                        window.postMessage({
-                            type: "QUERY_RESPONSE",
-                            data: events
-                        }, "*");
-                    }
-                } else {
-                    console.error('❌ Erro ao buscar dados do Firebase');
-                }
-            } catch (error) {
-                console.error('❌ Erro ao carregar dados do Firebase:', error);
-            }
-        };
-
-        // Handler para receber mensagens do dashboard
-        window.addEventListener("message", function(event) {
-            if (event.data.type === "QUERY_REQUEST") {
-                console.log('📨 QUERY_REQUEST recebido do dashboard');
-                solicitarDados();
-            }
-        });
-
-        // Handler para receber dados (compatibilidade)
-        window.addEventListener('coreDataChanged', () => {
-            console.log('🔄 Evento coreDataChanged recebido');
-            solicitarDados();
-        });
-
-        // Auto-refresh a cada 10 segundos
-        setInterval(solicitarDados, 10000);
+        // CORREÇÃO CRÍTICA: Verificar se esta é a página de pedidos que já tem seu próprio sistema
+        // Se for a página de pedidos, DESABILITAMOS o auto-refresh do engine.js
+        // mas mantemos a compatibilidade com eventos
+        const isPedidosPage = pageId === 'pedidos' || window.location.pathname.includes('pedidos');
         
-        // Carregar dados iniciais
-        solicitarDados();
+        if (isPedidosPage) {
+            console.log("🛡️ Página de pedidos detectada - Desativando auto-refresh do engine.js");
+            console.log("ℹ️ A página já tem seu próprio sistema de atualização");
+            
+            // Ainda mantemos o listener para eventos, mas SEM auto-refresh
+            document.addEventListener('coreDataChanged', () => {
+                console.log('🔄 Evento coreDataChanged recebido (página de pedidos)');
+                // A página de pedidos já tem seu próprio listener para este evento
+                // Não precisamos fazer nada aqui
+            });
+            
+            // NÃO configuramos setInterval para esta página
+            // A página já tem seu próprio sistema de atualização
+            
+        } else {
+            // Para outras páginas READ, mantemos o comportamento original
+            console.log("📊 Página READ genérica - Mantendo comportamento padrão");
+            
+            // Função para solicitar dados
+            const solicitarDados = async () => {
+                console.log("🔄 Solicitando dados do Firebase...");
+                try {
+                    // Solicitar dados via API
+                    const response = await fetch('/api/database/query', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            schema: pageId.includes('pedido') ? 'pedido' : 
+                                   pageId.includes('despesa') ? 'despesa' : 'all',
+                            filters: { deleted: false }
+                        })
+                    });
+                    
+                    if (response.ok) {
+                        const result = await response.json();
+                        const events = result.events || [];
+                        
+                        // Atualizar interface com os dados
+                        atualizarInterface(events);
+                        
+                        // Atualizar contadores via data-bind
+                        atualizarContadoresDataBind(events);
+                        
+                        // Enviar dados para o dashboard via postMessage
+                        if (pageId === 'dashboard') {
+                            window.postMessage({
+                                type: "QUERY_RESPONSE",
+                                data: events
+                            }, "*");
+                        }
+                    } else {
+                        console.error('❌ Erro ao buscar dados do Firebase');
+                    }
+                } catch (error) {
+                    console.error('❌ Erro ao carregar dados do Firebase:', error);
+                }
+            };
+
+            // Handler para receber mensagens do dashboard
+            window.addEventListener("message", function(event) {
+                if (event.data.type === "QUERY_REQUEST") {
+                    console.log('📨 QUERY_REQUEST recebido do dashboard');
+                    solicitarDados();
+                }
+            });
+
+            // Handler para receber dados (compatibilidade)
+            window.addEventListener('coreDataChanged', () => {
+                console.log('🔄 Evento coreDataChanged recebido');
+                solicitarDados();
+            });
+
+            // Auto-refresh a cada 10 segundos APENAS para páginas não-pedidos
+            setInterval(solicitarDados, 10000);
+            
+            // Carregar dados iniciais
+            solicitarDados();
+        }
     }
 
     // --- FUNÇÕES AUXILIARES ---
@@ -205,26 +230,66 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function atualizarInterface(events) {
-        // Atualizar tabelas, listas, etc. baseado no tipo de página
+        // CORREÇÃO CRÍTICA: NÃO limpar tabelas que estão dentro de modais!
+        // Identificar e proteger tabelas dentro de modais
+        
+        // Selecionar apenas tabelas que NÃO estão dentro de modais
         const tables = document.querySelectorAll('table tbody');
         const lists = document.querySelectorAll('.data-list');
         
-        // Limpar conteúdo atual
-        tables.forEach(table => table.innerHTML = '');
-        lists.forEach(list => list.innerHTML = '');
+        // Filtrar para excluir elementos dentro de modais
+        const filteredTables = Array.from(tables).filter(table => {
+            // Verificar se a tabela está dentro de um modal
+            let parent = table;
+            while (parent) {
+                if (parent.classList && 
+                    (parent.classList.contains('modal') || 
+                     parent.classList.contains('modal-container') ||
+                     parent.classList.contains('modal-content') ||
+                     parent.id === 'modalContent' ||
+                     parent.id === 'modalOverlay')) {
+                    console.log('🛡️ Protegendo tabela dentro de modal da limpeza');
+                    return false; // Não incluir esta tabela
+                }
+                parent = parent.parentElement;
+            }
+            return true; // Incluir esta tabela
+        });
         
-        // Preencher com dados
+        const filteredLists = Array.from(lists).filter(list => {
+            // Verificar se a lista está dentro de um modal
+            let parent = list;
+            while (parent) {
+                if (parent.classList && 
+                    (parent.classList.contains('modal') || 
+                     parent.classList.contains('modal-container') ||
+                     parent.classList.contains('modal-content') ||
+                     parent.id === 'modalContent' ||
+                     parent.id === 'modalOverlay')) {
+                    console.log('🛡️ Protegendo lista dentro de modal da limpeza');
+                    return false; // Não incluir esta lista
+                }
+                parent = parent.parentElement;
+            }
+            return true; // Incluir esta lista
+        });
+        
+        // Limpar conteúdo atual APENAS de elementos fora de modais
+        filteredTables.forEach(table => table.innerHTML = '');
+        filteredLists.forEach(list => list.innerHTML = '');
+        
+        // Preencher com dados APENAS elementos fora de modais
         events.forEach(event => {
             const row = criarLinhaTabela(event);
             const listItem = criarListItem(event);
             
-            tables.forEach(table => {
+            filteredTables.forEach(table => {
                 if (table.dataset.schema === event.schema || !table.dataset.schema) {
                     table.appendChild(row.cloneNode(true));
                 }
             });
             
-            lists.forEach(list => {
+            filteredLists.forEach(list => {
                 if (list.dataset.schema === event.schema || !list.dataset.schema) {
                     list.appendChild(listItem.cloneNode(true));
                 }
@@ -440,5 +505,6 @@ document.addEventListener('DOMContentLoaded', () => {
         console.log('🔧 Engine v5.1 inicializada com sucesso!');
         console.log('🔥 Pronta para salvar no Firebase Online');
         console.log('🛠️ Suporte completo para produtos estruturados de pedidos');
+        console.log('🛡️ Sistema protegido contra limpeza de modais');
     });
 });
