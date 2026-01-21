@@ -47,5 +47,25 @@
         pos: 5,
         hidden: false,
         deleted: false
+    },
+
+    {
+        id: "nav_novoorcamento",
+        name: "Novo Orçamento",
+        file: "pages/novoorcamento.html",
+        type: "WRITE",
+        pos: 6,
+        hidden: false,
+        deleted: false
+    },
+
+    {
+        id: "nav_orcamentos",
+        name: "Orçamentos",
+        file: "pages/orcamentos.html",
+        type: "READ",
+        pos: 7,
+        hidden: false,
+        deleted: false
     }
 ];
