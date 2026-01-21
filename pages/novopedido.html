@@ -425,8 +425,8 @@
                     
                     <div class="form-group">
                         <label for="numero" class="required">Número do Pedido</label>
-                        <input type="text" id="numero" name="numero" data-bind="pedido.numero" required>
-                        <div class="field-note">Ex: PP-2024-001</div>
+                        <input type="text" id="numero" name="numero" data-bind="pedido.numero" required readonly style="background-color: #f1f5f9;">
+                        <div class="field-note">Formato automático: ANO/SEQUÊNCIA (ex: 2026/0001)</div>
                     </div>
                     
                     <div class="form-group">
@@ -586,6 +586,7 @@
         const saveBtn = document.getElementById('saveBtn');
         const pedidoForm = document.getElementById('pedidoForm');
         const pedidoIdInput = document.getElementById('pedidoId');
+        const numeroPedidoInput = document.getElementById('numero');
         
         // Referências para totais
         const subtotalProdutosEl = document.getElementById('subtotalProdutos');
@@ -837,6 +838,9 @@
             currentPedidoId = '';
             pedidoIdInput.value = '';
             
+            // Gerar novo número de pedido
+            gerarNumeroPedido();
+            
             // Calcular totais iniciais
             calculateTotals();
             
@@ -917,6 +921,10 @@
                 currentPedidoId = pedidoEvento.id;
                 pedidoIdInput.value = currentPedidoId;
                 
+                // Tornar o campo número editável no modo edição
+                numeroPedidoInput.removeAttribute('readonly');
+                numeroPedidoInput.style.backgroundColor = '';
+                
                 // Atualizar texto do botão
                 saveBtn.textContent = 'ATUALIZAR PEDIDO';
                 
@@ -931,6 +939,86 @@
                 setTimeout(() => {
                     window.location.href = 'pedidos.html';
                 }, 2000);
+            }
+        }
+
+        // ============================================
+        // FUNÇÃO PARA GERAR NÚMERO DE PEDIDO AUTOMÁTICO
+        // ============================================
+        
+        async function gerarNumeroPedido() {
+            try {
+                // Obter o ano atual
+                const anoAtual = new Date().getFullYear();
+                
+                // Buscar todos os pedidos do Firebase
+                const response = await fetch('/api/database/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        schema: 'pedido',
+                        filters: { deleted: false }
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Erro ao buscar pedidos');
+                }
+                
+                const result = await response.json();
+                const eventos = result.events || [];
+                
+                // Filtrar apenas eventos de pedidos válidos
+                const pedidos = eventos.filter(event => 
+                    event.schema === 'pedido' && 
+                    !event.deleted &&
+                    event.payload.numero
+                );
+                
+                // Encontrar o maior número de sequência para o ano atual
+                let maiorSequencia = 0;
+                
+                pedidos.forEach(evento => {
+                    const numero = evento.payload.numero;
+                    
+                    // Verificar se o número segue o formato ANO/SEQUÊNCIA (ex: 2026/0001)
+                    const match = numero.match(/^(\d{4})\/(\d{4})$/);
+                    
+                    if (match) {
+                        const ano = parseInt(match[1]);
+                        const sequencia = parseInt(match[2]);
+                        
+                        // Se for do ano atual, verificar se é a maior sequência
+                        if (ano === anoAtual && sequencia > maiorSequencia) {
+                            maiorSequencia = sequencia;
+                        }
+                    }
+                });
+                
+                // Gerar novo número de sequência (incrementar +1)
+                const novaSequencia = maiorSequencia + 1;
+                
+                // Formatar o número com 4 dígitos (ex: 0001, 0012, 0123, 1234)
+                const sequenciaFormatada = novaSequencia.toString().padStart(4, '0');
+                
+                // Gerar número completo no formato ANO/SEQUÊNCIA
+                const numeroPedido = `${anoAtual}/${sequenciaFormatada}`;
+                
+                // Atualizar o campo no formulário
+                numeroPedidoInput.value = numeroPedido;
+                
+                console.log(`Número de pedido gerado: ${numeroPedido}`);
+                
+            } catch (error) {
+                console.error('Erro ao gerar número de pedido:', error);
+                
+                // Fallback: Usar número padrão se houver erro
+                const anoAtual = new Date().getFullYear();
+                numeroPedidoInput.value = `${anoAtual}/0001`;
+                
+                showMessage('Usando número de pedido padrão. Verifique a conexão com o servidor.', 'warning');
             }
         }
 
@@ -996,6 +1084,9 @@
                 
                 document.getElementById('dataEntrega').valueAsDate = tomorrow;
                 document.getElementById('dataEntrada').valueAsDate = today;
+                
+                // Gerar número de pedido automático
+                gerarNumeroPedido();
                 
                 // Adicionar primeiro produto
                 addProductRow();
