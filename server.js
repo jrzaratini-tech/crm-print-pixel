@@ -20,7 +20,7 @@ app.get("/", (req, res) => {
 
 // -------- FIREBASE --------
 const { db } = require("./firebase");
-const { collection, addDoc, serverTimestamp, getDocs, query, where, orderBy, limit } = require("firebase/firestore");
+const { collection, addDoc, serverTimestamp, getDocs, query, where, orderBy } = require("firebase/firestore");
 
 // -------- API --------
 
@@ -41,82 +41,21 @@ app.post("/api/database/init", (req, res) => {
   });
 });
 
-// Função para gerar o próximo número de pedido
-async function getNextOrderNumber() {
-  try {
-    // Buscar o último pedido cadastrado
-    const pedidosRef = collection(db, "events");
-    const q = query(
-      pedidosRef, 
-      where("schema", "==", "pedido"),
-      orderBy("timestamp", "desc"),
-      limit(1)
-    );
-    
-    const querySnapshot = await getDocs(q);
-    
-    let nextNumber = 1; // Número inicial se não houver pedidos
-    
-    if (!querySnapshot.empty) {
-      const lastPedido = querySnapshot.docs[0].data();
-      if (lastPedido.payload && lastPedido.payload.numeroPedido) {
-        // Extrair o número do último pedido (formato: 2026/0001)
-        const lastNumber = parseInt(lastPedido.payload.numeroPedido.split('/')[1]);
-        if (!isNaN(lastNumber)) {
-          nextNumber = lastNumber + 1;
-        }
-      }
-    }
-    
-    // Formatar o número com 4 dígitos
-    return `2026/${String(nextNumber).padStart(4, '0')}`;
-  } catch (error) {
-    console.error('Erro ao gerar número de pedido:', error);
-    // Em caso de erro, retorna um número aleatório como fallback
-    return `2026/${String(Math.floor(Math.random() * 1000) + 1).padStart(4, '0')}`;
-  }
-}
-
-// Endpoint para obter o próximo número de pedido
-app.get("/api/next-order-number", async (req, res) => {
-  try {
-    const nextNumber = await getNextOrderNumber();
-    res.json({ 
-      success: true, 
-      numeroPedido: nextNumber 
-    });
-  } catch (error) {
-    console.error('Erro ao obter próximo número de pedido:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: 'Erro ao gerar número de pedido',
-      numeroPedido: `2026/${String(Math.floor(Math.random() * 1000) + 1).padStart(4, '0')}`
-    });
-  }
-});
-
 // Gravar evento no Firestore
 app.post("/api/database/commit", async (req, res) => {
   try {
     const data = req.body;
-    let payload = { ...data.payload };
-    
-    // Se for um novo pedido, gerar número de pedido
-    if (data.schema === 'pedido' && (!payload.id || payload.id === '')) {
-      payload.numeroPedido = await getNextOrderNumber();
-    }
 
     const docRef = await addDoc(collection(db, "events"), {
       schema: data.schema || "default",
-      payload: payload,
+      payload: data.payload || {},
       pageId: data.pageId || "unknown",
       timestamp: serverTimestamp()
     });
 
     res.json({
       success: true,
-      eventId: docRef.id,
-      payload: payload // Retornar o payload com o número do pedido gerado
+      eventId: docRef.id
     });
 
   } catch (error) {

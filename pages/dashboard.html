@@ -942,7 +942,35 @@
             </div>
             
             <div class="operational-cards">
-                <!-- Operacional metrics cards have been removed as requested -->
+                <div class="operational-card">
+                    <div class="operational-title">
+                        Eficiência de Produção
+                    </div>
+                    <div class="operational-value" data-bind="indicadores.eficiencia">0%</div>
+                    <div class="operational-desc">
+                        Taxa de aproveitamento de materiais e eficiência no processo produtivo
+                    </div>
+                </div>
+                
+                <div class="operational-card">
+                    <div class="operational-title">
+                        Cumprimento de Prazos
+                    </div>
+                    <div class="operational-value" data-bind="indicadores.prazos">0%</div>
+                    <div class="operational-desc">
+                        Percentual de pedidos entregues dentro do prazo estabelecido
+                    </div>
+                </div>
+                
+                <div class="operational-card">
+                    <div class="operational-title">
+                        Satisfação do Cliente
+                    </div>
+                    <div class="operational-value" data-bind="indicadores.satisfacao">0%</div>
+                    <div class="operational-desc">
+                        Índice de satisfação medido através de feedback pós-entrega
+                    </div>
+                </div>
             </div>
         </div>
         
@@ -1062,68 +1090,46 @@
                 
                 let dataInicio, dataFim;
                 
-                // Ajustar para o final do dia (23:59:59.999)
-                const ajustarFimDoDia = (data) => {
-                    const novaData = new Date(data);
-                    novaData.setHours(23, 59, 59, 999);
-                    return novaData;
-                };
-                
                 switch(periodoAtual) {
                     case 'mes_anterior':
                         // Mês anterior completo
                         dataInicio = new Date(anoAtual, mesAtual - 1, 1);
-                        dataFim = ajustarFimDoDia(new Date(anoAtual, mesAtual, 0));
-                        console.log('📅 Período: Mês Anterior', dataInicio.toLocaleDateString(), 'até', dataFim.toLocaleDateString());
+                        dataFim = new Date(anoAtual, mesAtual, 0);
                         break;
-                        
                     case 'trimestre':
-                        // Últimos 3 meses completos
+                        // Últimos 3 meses
                         dataInicio = new Date(anoAtual, mesAtual - 3, 1);
-                        dataFim = ajustarFimDoDia(new Date(anoAtual, mesAtual + 1, 0));
-                        console.log('📅 Período: Últimos 3 Meses', dataInicio.toLocaleDateString(), 'até', dataFim.toLocaleDateString());
+                        dataFim = new Date(anoAtual, mesAtual + 1, 0);
                         break;
-                        
                     case 'ano_atual':
-                        // Desde o início do ano até o final do mês atual
+                        // Desde o início do ano
                         dataInicio = new Date(anoAtual, 0, 1);
-                        dataFim = ajustarFimDoDia(new Date(anoAtual, mesAtual + 1, 0));
-                        console.log('📅 Período: Ano Atual', dataInicio.toLocaleDateString(), 'até', dataFim.toLocaleDateString());
+                        dataFim = new Date(anoAtual, 11, 31);
                         break;
-                        
                     case 'todos':
                         // Todos os dados (sem filtro de data)
                         dataInicio = null;
                         dataFim = null;
-                        console.log('📅 Período: Todo o Período (sem filtro de data)');
                         break;
-                        
                     case 'mes_atual':
                     default:
                         // Mês atual completo
                         dataInicio = new Date(anoAtual, mesAtual, 1);
-                        dataFim = ajustarFimDoDia(new Date(anoAtual, mesAtual + 1, 0));
-                        console.log('📅 Período: Mês Atual', dataInicio.toLocaleDateString(), 'até', dataFim.toLocaleDateString());
+                        dataFim = new Date(anoAtual, mesAtual + 1, 0);
                 }
                 
+                console.log('📅 Datas filtradas:', { 
+                    dataInicio: dataInicio ? dataInicio.toISOString() : 'null',
+                    dataFim: dataFim ? dataFim.toISOString() : 'null'
+                });
+                
                 // Preparar o corpo da requisição
-                const body = { 
-                    schema: 'all',
-                    filters: {}
-                };
+                const body = { schema: 'all' };
                 
                 // Adicionar filtros de data apenas se definidos
                 if (dataInicio && dataFim) {
                     body.filters = {
                         dataInicio: dataInicio.toISOString(),
-                        dataFim: dataFim.toISOString()
-                    };
-                } else if (dataInicio) {
-                    body.filters = {
-                        dataInicio: dataInicio.toISOString()
-                    };
-                } else if (dataFim) {
-                    body.filters = {
                         dataFim: dataFim.toISOString()
                     };
                 }
@@ -1249,20 +1255,13 @@
                     const mesEvento = dataEvento.getMonth();
                     const anoEvento = dataEvento.getFullYear();
                     
-                    // Processar contas a receber e pagar SEM filtro de data, pois precisamos de todos os pendentes
+                    // CORREÇÃO CRÍTICA: Processar contas a receber e pagar
                     if (evento.schema === 'conta_receber') {
                         const valor = parseFloat(evento.payload?.valor || evento.payload?.total || 0);
                         if (!isNaN(valor) && valor > 0) {
                             const status = evento.payload?.status || 'pendente';
                             if (status === 'pendente' || status === 'atrasado') {
-                                // Verificar se a data de vencimento é futura ou não tem data definida
-                                const dataVencimento = evento.payload?.dataVencimento || evento.payload?.vencimento;
-                                const hoje = new Date();
-                                hoje.setHours(0, 0, 0, 0);
-                                
-                                if (!dataVencimento || new Date(dataVencimento) >= hoje) {
-                                    totalAReceber += valor;
-                                }
+                                totalAReceber += valor;
                             }
                         }
                     } else if (evento.schema === 'conta_pagar') {
@@ -1270,14 +1269,7 @@
                         if (!isNaN(valor) && valor > 0) {
                             const status = evento.payload?.status || 'pendente';
                             if (status === 'pendente' || status === 'atrasado') {
-                                // Verificar se a data de vencimento é futura ou não tem data definida
-                                const dataVencimento = evento.payload?.dataVencimento || evento.payload?.vencimento;
-                                const hoje = new Date();
-                                hoje.setHours(0, 0, 0, 0);
-                                
-                                if (!dataVencimento || new Date(dataVencimento) >= hoje) {
-                                    totalAPagar += valor;
-                                }
+                                totalAPagar += valor;
                             }
                         }
                     }
