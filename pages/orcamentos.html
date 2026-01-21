@@ -285,13 +285,14 @@
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 12px;
+            font-size: 14px;
             font-weight: 600;
             transition: all 0.2s;
             display: inline-flex;
             align-items: center;
             gap: 6px;
             white-space: nowrap;
+            min-width: 80px;
         }
         
         .modal-overlay {
@@ -659,19 +660,15 @@
             }
             
             .action-btn {
-                flex: 1;
+                flex: none;
                 min-width: 70px;
                 justify-content: center;
                 padding: 8px 10px;
-                font-size: 11px;
+                font-size: 12px;
             }
             
             .action-btn span {
-                margin-right: 0;
-            }
-            
-            .action-btn:not(:has(span)) {
-                padding: 8px 12px;
+                margin-right: 4px;
             }
             
             .modal {
@@ -734,6 +731,7 @@
                 width: 100%;
                 justify-content: center;
                 padding: 10px;
+                font-size: 13px;
             }
             
             .page-title {
@@ -752,7 +750,7 @@
             }
         }
         
-        /* Estilos para garantir que os ícones fiquem visíveis */
+        /* Estilos para garantir que os ícones e textos fiquem visíveis */
         .action-btn span {
             font-size: 14px;
             display: inline-block;
@@ -761,28 +759,12 @@
         
         /* Garantir que o texto dos botões não desapareça */
         .action-btn {
-            overflow: hidden;
-            text-overflow: ellipsis;
+            overflow: visible;
+            text-overflow: clip;
             position: relative;
-        }
-        
-        /* Melhorar a visualização em telas pequenas */
-        @media (max-width: 600px) {
-            .actions-cell {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            
-            .action-btn {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                text-align: center;
-            }
-            
-            .action-btn span {
-                margin-right: 5px;
-            }
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
     </style>
 </head>
@@ -894,14 +876,11 @@
                 <button class="btn btn-success" onclick="baixarPDF()">
                     <span>📥</span> Baixar PDF
                 </button>
-                <button class="btn btn-warning" id="btnAprovar" onclick="aprovarOrcamento()">
-                    <span>✅</span> Aprovar
-                </button>
-                <button class="btn btn-danger" id="btnRecusar" onclick="recusarOrcamento()">
-                    <span>❌</span> Recusar
-                </button>
                 <button class="btn btn-info" id="btnConverter" onclick="converterParaPedido()">
-                    <span>🔄</span> Converter
+                    <span>🔄</span> Converter em Pedido
+                </button>
+                <button class="btn btn-danger" onclick="recusarOrcamento()">
+                    <span>❌</span> Recusar
                 </button>
             </div>
         </div>
@@ -953,13 +932,52 @@
                 const result = await response.json();
                 const eventos = result.events || [];
                 
-                // Converter eventos em orçamentos
-                orcamentosData = eventos.map(evento => ({
-                    id: evento.id,
-                    ...evento.payload,
-                    created: evento.timestamp
-                })).sort((a, b) => new Date(b.created) - new Date(a.created));
+                // Converter eventos em orçamentos (igual ao processamento de pedidos)
+                orcamentosData = eventos
+                    .filter(evento => evento.schema === 'orcamento' && !evento.deleted)
+                    .map(evento => {
+                        // Garantir que payload seja um objeto válido
+                        let payload = evento.payload;
+                        if (typeof payload === 'string') {
+                            try {
+                                payload = JSON.parse(payload);
+                            } catch (e) {
+                                console.warn('⚠️ Payload não é JSON válido:', payload);
+                                payload = {};
+                            }
+                        }
+                        
+                        // Garantir que temos todos os campos necessários
+                        const orcamentoFormatado = {
+                            id: evento.id,
+                            cliente: payload.cliente || 'Cliente não informado',
+                            empresa: payload.empresa || 'Empresa não informada',
+                            nif: payload.nif || '',
+                            morada: payload.morada || '',
+                            telemovel: payload.telemovel || '',
+                            atendente: payload.atendente || '',
+                            produtos: Array.isArray(payload.produtos) ? payload.produtos : [],
+                            total: parseFloat(payload.total) || 0,
+                            subtotal: parseFloat(payload.subtotal) || 0,
+                            iva: parseFloat(payload.iva) || 0,
+                            instalacao: parseFloat(payload.instalacao) || 0,
+                            comIVA: payload.comIVA || 'sim',
+                            status: payload.status || 'pendente',
+                            validade: payload.validade || '',
+                            observacoes: payload.observacoes || '',
+                            codigo: payload.codigo || `ORC-${evento.id.substring(0, 8)}`,
+                            dataCriacao: payload.dataCriacao || evento.timestamp || new Date().toISOString(),
+                            
+                            // Metadados do evento
+                            createdAt: evento.timestamp || evento.created_at || new Date().toISOString(),
+                            pageId: evento.pageId || 'novo_orcamento'
+                        };
+                        
+                        return orcamentoFormatado;
+                    })
+                    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
                 
+                console.log(`✅ ${orcamentosData.length} orçamentos carregados`);
                 atualizarEstatisticas();
                 filtrarOrcamentos();
                 
@@ -991,7 +1009,7 @@
                 
                 // Filtrar por data
                 if (dataInicio || dataFim) {
-                    const dataOrcamento = new Date(orcamento.dataCriacao || orcamento.created);
+                    const dataOrcamento = new Date(orcamento.dataCriacao || orcamento.createdAt);
                     
                     if (dataInicio && dataOrcamento < new Date(dataInicio)) {
                         return false;
@@ -1013,7 +1031,7 @@
             atualizarPaginacao();
         }
         
-        // Função para renderizar a tabela
+        // Função para renderizar a tabela (CORRIGIDO)
         function renderizarTabela() {
             const tbody = document.getElementById('orcamentosTableBody');
             const container = document.getElementById('orcamentosTableContainer');
@@ -1039,11 +1057,13 @@
                 const row = document.createElement('tr');
                 
                 // Formatar data
-                const dataCriacao = new Date(orcamento.dataCriacao || orcamento.created);
+                const dataCriacao = new Date(orcamento.dataCriacao || orcamento.createdAt);
                 const dataFormatada = dataCriacao.toLocaleDateString('pt-PT');
                 
                 // Formatar validade
-                const dataValidade = orcamento.validade ? new Date(orcamento.validade).toLocaleDateString('pt-PT') : 'Não definida';
+                const dataValidade = orcamento.validade ? 
+                    new Date(orcamento.validade).toLocaleDateString('pt-PT') : 
+                    'Não definida';
                 
                 // Status badge
                 let statusClass = '';
@@ -1073,7 +1093,7 @@
                 }
                 
                 row.innerHTML = `
-                    <td><strong>${orcamento.codigo || orcamento.id.substring(0, 8)}</strong></td>
+                    <td><strong>${orcamento.codigo || `ORC-${orcamento.id.substring(0, 8)}`}</strong></td>
                     <td>${orcamento.cliente || 'N/A'}</td>
                     <td>${orcamento.empresa || 'N/A'}</td>
                     <td><strong>${formatarMoeda(orcamento.total || 0)}</strong></td>
@@ -1091,8 +1111,8 @@
                             <button class="action-btn btn-danger" onclick="excluirOrcamento('${orcamento.id}')" title="Excluir">
                                 <span>🗑️</span> Excluir
                             </button>
-                            ${orcamento.status === 'aprovado' ? `
-                            <button class="action-btn btn-success" onclick="converterOrcamentoParaPedido('${orcamento.id}')" title="Converter em Pedido">
+                            ${orcamento.status === 'pendente' ? `
+                            <button class="action-btn btn-success" onclick="converterOrcamentoDireto('${orcamento.id}')" title="Converter em Pedido">
                                 <span>🔄</span> Converter
                             </button>
                             ` : ''}
@@ -1211,7 +1231,7 @@
                 orcamentoAtual = orcamento;
                 
                 // Atualizar modal
-                document.getElementById('modalCodigo').textContent = orcamento.codigo || orcamento.id.substring(0, 8);
+                document.getElementById('modalCodigo').textContent = orcamento.codigo;
                 
                 // Gerar preview do orçamento
                 document.getElementById('orcamentoPreview').innerHTML = gerarPreviewOrcamento(orcamento);
@@ -1230,9 +1250,9 @@
             }
         }
         
-        // Função para gerar preview do orçamento
+        // Função para gerar preview do orçamento (CORRIGIDO - processa produtos corretamente)
         function gerarPreviewOrcamento(orcamento) {
-            const dataCriacao = new Date(orcamento.dataCriacao || orcamento.created);
+            const dataCriacao = new Date(orcamento.dataCriacao || orcamento.createdAt);
             const dataValidade = orcamento.validade ? new Date(orcamento.validade) : null;
             
             // Calcular dias restantes se houver validade
@@ -1251,17 +1271,26 @@
                 }
             }
             
+            // Processar produtos (igual ao pedidos.html)
             let produtosHTML = '';
             if (orcamento.produtos && Array.isArray(orcamento.produtos)) {
-                produtosHTML = orcamento.produtos.map((produto, index) => `
-                    <tr>
-                        <td>${produto.nome || 'Produto'}</td>
-                        <td>${produto.tamanho || 'N/A'}</td>
-                        <td>${produto.quantidade || 1}</td>
-                        <td>${formatarMoeda(produto.valor || 0)}</td>
-                        <td>${formatarMoeda((produto.valor || 0) * (produto.quantidade || 1))}</td>
-                    </tr>
-                `).join('');
+                produtosHTML = orcamento.produtos.map(produto => {
+                    const valorUnitario = produto.valor || 0;
+                    const quantidade = produto.quantidade || 1;
+                    const subtotal = valorUnitario * quantidade;
+                    
+                    return `
+                        <tr>
+                            <td>${produto.nome || 'Produto'}</td>
+                            <td>${produto.tamanho || 'N/A'}</td>
+                            <td>${quantidade}</td>
+                            <td>${formatarMoeda(valorUnitario)}</td>
+                            <td>${formatarMoeda(subtotal)}</td>
+                        </tr>
+                    `;
+                }).join('');
+            } else {
+                produtosHTML = '<tr><td colspan="5">Nenhum produto informado</td></tr>';
             }
             
             return `
@@ -1275,7 +1304,7 @@
                 </div>
                 
                 <div class="orcamento-title">
-                    ORÇAMENTO #${orcamento.codigo || orcamento.id.substring(0, 8)}
+                    ORÇAMENTO #${orcamento.codigo}
                 </div>
                 
                 <div class="client-info">
@@ -1308,6 +1337,7 @@
                 </div>
                 
                 <div class="products-preview">
+                    <h4 style="margin-bottom: 15px;">Produtos (${orcamento.produtos ? orcamento.produtos.length : 0})</h4>
                     <table class="products-preview-table">
                         <thead>
                             <tr>
@@ -1327,11 +1357,17 @@
                 <div class="totals-preview">
                     <div class="total-row">
                         <span>Subtotal Produtos:</span>
-                        <span>${formatarMoeda(orcamento.subtotal || 0)}</span>
+                        <span>${formatarMoeda(orcamento.subtotal - orcamento.instalacao || 0)}</span>
                     </div>
+                    ${orcamento.instalacao > 0 ? `
                     <div class="total-row">
                         <span>Instalação:</span>
                         <span>${formatarMoeda(orcamento.instalacao || 0)}</span>
+                    </div>
+                    ` : ''}
+                    <div class="total-row">
+                        <span>Subtotal:</span>
+                        <span>${formatarMoeda(orcamento.subtotal || 0)}</span>
                     </div>
                     ${orcamento.comIVA === 'sim' ? `
                     <div class="total-row">
@@ -1370,78 +1406,114 @@
             `;
         }
         
-        // Função para configurar botões baseado no status
+        // Função para configurar botões baseado no status (SIMPLIFICADO)
         function configurarBotoesStatus(status) {
-            const btnAprovar = document.getElementById('btnAprovar');
-            const btnRecusar = document.getElementById('btnRecusar');
             const btnConverter = document.getElementById('btnConverter');
             
-            switch(status) {
-                case 'pendente':
-                    btnAprovar.style.display = 'inline-flex';
-                    btnRecusar.style.display = 'inline-flex';
-                    btnConverter.style.display = 'none';
-                    break;
-                case 'aprovado':
-                    btnAprovar.style.display = 'none';
-                    btnRecusar.style.display = 'none';
-                    btnConverter.style.display = 'inline-flex';
-                    break;
-                case 'recusado':
-                case 'expirado':
-                case 'convertido':
-                    btnAprovar.style.display = 'none';
-                    btnRecusar.style.display = 'none';
-                    btnConverter.style.display = 'none';
-                    break;
+            // Mostrar botão de conversão apenas para orçamentos pendentes
+            if (status === 'pendente') {
+                btnConverter.style.display = 'inline-flex';
+                btnConverter.disabled = false;
+            } else {
+                btnConverter.style.display = 'none';
             }
         }
         
-        // Função para aprovar orçamento
-        async function aprovarOrcamento() {
+        // Função para converter orçamento em pedido (DIRETO - sem aprovação prévia)
+        async function converterParaPedido() {
             if (!orcamentoAtual) return;
             
-            if (!confirm('Deseja aprovar este orçamento?')) return;
+            if (!confirm('Deseja converter este orçamento em pedido?')) return;
             
             mostrarLoading();
             
             try {
-                // Atualizar status do orçamento
+                // Gerar número de pedido automático
+                const numeroPedido = await gerarNumeroPedidoAutomatico();
+                
+                // Criar evento de pedido (igual ao schema de pedidos do README)
                 const response = await fetch('/api/database/commit', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        schema: 'orcamento_status',
+                        schema: 'pedido',
                         payload: {
+                            cliente: orcamentoAtual.cliente,
+                            empresa: orcamentoAtual.empresa,
+                            nif: orcamentoAtual.nif,
+                            morada: orcamentoAtual.morada,
+                            telemovel: orcamentoAtual.telemovel,
+                            numero: numeroPedido,
+                            produtos: orcamentoAtual.produtos || [],
+                            total: orcamentoAtual.total,
+                            subtotal: orcamentoAtual.subtotal,
+                            iva: orcamentoAtual.iva,
+                            instalacao: orcamentoAtual.instalacao,
+                            comIVA: orcamentoAtual.comIVA,
+                            status: 'pendente',
+                            dataEntrega: orcamentoAtual.validade || '',
+                            observacoes: `Convertido do orçamento ${orcamentoAtual.codigo}\n${orcamentoAtual.observacoes || ''}`,
+                            atendente: orcamentoAtual.atendente,
+                            origem: 'orcamento',
                             orcamentoId: orcamentoAtual.id,
-                            codigo: orcamentoAtual.codigo,
-                            status: 'aprovado',
-                            dataAprovacao: new Date().toISOString().split('T')[0]
+                            orcamentoCodigo: orcamentoAtual.codigo,
+                            dataCriacao: new Date().toISOString().split('T')[0]
                         },
                         pageId: 'orcamentos'
                     })
                 });
                 
                 if (!response.ok) {
-                    throw new Error('Erro ao aprovar orçamento');
+                    throw new Error('Erro ao criar pedido');
                 }
                 
-                // Atualizar dados locais
-                orcamentoAtual.status = 'aprovado';
+                // Atualizar status do orçamento para "convertido"
+                const updateResponse = await fetch('/api/database/commit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        schema: 'orcamento',
+                        payload: {
+                            ...orcamentoAtual,
+                            status: 'convertido',
+                            pedidoNumero: numeroPedido,
+                            dataConversao: new Date().toISOString().split('T')[0]
+                        },
+                        pageId: 'orcamentos'
+                    })
+                });
+                
+                if (!updateResponse.ok) {
+                    throw new Error('Erro ao atualizar orçamento');
+                }
+                
+                // Atualizar dados locais IMEDIATAMENTE
+                orcamentoAtual.status = 'convertido';
                 const index = orcamentosData.findIndex(o => o.id === orcamentoAtual.id);
                 if (index !== -1) {
-                    orcamentosData[index].status = 'aprovado';
+                    orcamentosData[index].status = 'convertido';
                 }
                 
-                mostrarMensagem('Orçamento aprovado com sucesso!', 'success');
-                configurarBotoesStatus('aprovado');
-                carregarOrcamentos(); // Recarregar para atualizar estatísticas
+                mostrarMensagem(`Orçamento convertido em pedido ${numeroPedido}!`, 'success');
+                
+                // Fechar modal
+                fecharModal();
+                
+                // Recarregar dados
+                await carregarOrcamentos();
+                
+                // Redirecionar para o pedido após 1 segundo
+                setTimeout(() => {
+                    window.location.href = `pedidos.html`;
+                }, 1000);
                 
             } catch (error) {
-                console.error('Erro ao aprovar orçamento:', error);
-                mostrarMensagem('Erro ao aprovar orçamento', 'error');
+                console.error('Erro ao converter orçamento:', error);
+                mostrarMensagem('Erro ao converter orçamento', 'error');
             } finally {
                 esconderLoading();
             }
@@ -1462,10 +1534,9 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        schema: 'orcamento_status',
+                        schema: 'orcamento',
                         payload: {
-                            orcamentoId: orcamentoAtual.id,
-                            codigo: orcamentoAtual.codigo,
+                            ...orcamentoAtual,
                             status: 'recusado',
                             dataRecusa: new Date().toISOString().split('T')[0]
                         },
@@ -1485,8 +1556,8 @@
                 }
                 
                 mostrarMensagem('Orçamento recusado', 'success');
-                configurarBotoesStatus('recusado');
-                carregarOrcamentos();
+                fecharModal();
+                await carregarOrcamentos();
                 
             } catch (error) {
                 console.error('Erro ao recusar orçamento:', error);
@@ -1496,19 +1567,26 @@
             }
         }
         
-        // Função para converter orçamento em pedido
-        async function converterParaPedido() {
-            if (!orcamentoAtual) return;
-            
-            if (!confirm('Deseja converter este orçamento em pedido?')) return;
-            
+        // Função para converter orçamento diretamente da tabela
+        async function converterOrcamentoDireto(id) {
             mostrarLoading();
             
             try {
+                const orcamento = orcamentosData.find(o => o.id === id);
+                
+                if (!orcamento) {
+                    throw new Error('Orçamento não encontrado');
+                }
+                
+                if (!confirm(`Converter orçamento ${orcamento.codigo} em pedido?`)) {
+                    esconderLoading();
+                    return;
+                }
+                
                 // Gerar número de pedido automático
                 const numeroPedido = await gerarNumeroPedidoAutomatico();
                 
-                // Criar evento de pedido
+                // Criar pedido
                 const response = await fetch('/api/database/commit', {
                     method: 'POST',
                     headers: {
@@ -1517,13 +1595,26 @@
                     body: JSON.stringify({
                         schema: 'pedido',
                         payload: {
-                            ...orcamentoAtual,
+                            cliente: orcamento.cliente,
+                            empresa: orcamento.empresa,
+                            nif: orcamento.nif,
+                            morada: orcamento.morada,
+                            telemovel: orcamento.telemovel,
                             numero: numeroPedido,
+                            produtos: orcamento.produtos || [],
+                            total: orcamento.total,
+                            subtotal: orcamento.subtotal,
+                            iva: orcamento.iva,
+                            instalacao: orcamento.instalacao,
+                            comIVA: orcamento.comIVA,
                             status: 'pendente',
+                            dataEntrega: orcamento.validade || '',
+                            observacoes: `Convertido do orçamento ${orcamento.codigo}\n${orcamento.observacoes || ''}`,
+                            atendente: orcamento.atendente,
                             origem: 'orcamento',
-                            orcamentoId: orcamentoAtual.id,
-                            orcamentoCodigo: orcamentoAtual.codigo,
-                            dataCriacaoPedido: new Date().toISOString().split('T')[0]
+                            orcamentoId: orcamento.id,
+                            orcamentoCodigo: orcamento.codigo,
+                            dataCriacao: new Date().toISOString().split('T')[0]
                         },
                         pageId: 'orcamentos'
                     })
@@ -1533,17 +1624,16 @@
                     throw new Error('Erro ao criar pedido');
                 }
                 
-                // Atualizar status do orçamento
-                await fetch('/api/database/commit', {
+                // Atualizar orçamento para convertido
+                const updateResponse = await fetch('/api/database/commit', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        schema: 'orcamento_status',
+                        schema: 'orcamento',
                         payload: {
-                            orcamentoId: orcamentoAtual.id,
-                            codigo: orcamentoAtual.codigo,
+                            ...orcamento,
                             status: 'convertido',
                             pedidoNumero: numeroPedido,
                             dataConversao: new Date().toISOString().split('T')[0]
@@ -1552,21 +1642,18 @@
                     })
                 });
                 
+                if (!updateResponse.ok) {
+                    throw new Error('Erro ao atualizar orçamento');
+                }
+                
                 // Atualizar dados locais
-                orcamentoAtual.status = 'convertido';
-                const index = orcamentosData.findIndex(o => o.id === orcamentoAtual.id);
+                const index = orcamentosData.findIndex(o => o.id === id);
                 if (index !== -1) {
                     orcamentosData[index].status = 'convertido';
                 }
                 
                 mostrarMensagem(`Orçamento convertido em pedido ${numeroPedido}!`, 'success');
-                configurarBotoesStatus('convertido');
-                carregarOrcamentos();
-                
-                // Redirecionar para o pedido após 2 segundos
-                setTimeout(() => {
-                    window.open(`novopedido.html?edit=${numeroPedido}`, '_blank');
-                }, 2000);
+                await carregarOrcamentos();
                 
             } catch (error) {
                 console.error('Erro ao converter orçamento:', error);
@@ -1605,9 +1692,9 @@
                     event.payload.numero
                 );
                 
-                // Encontrar o maior número de sequência para o ano atual
-                const anoAtual = new Date().getFullYear();
+                // Encontrar o maior número de sequência
                 let maiorSequencia = 0;
+                const anoAtual = new Date().getFullYear();
                 
                 pedidos.forEach(evento => {
                     const numero = evento.payload.numero;
@@ -1639,12 +1726,12 @@
         
         // Função para abrir novo orçamento
         function abrirNovoOrcamento() {
-            window.open('novoorcamento.html', '_blank');
+            window.location.href = 'novoorcamento.html';
         }
         
         // Função para editar orçamento
         function editarOrcamento(id) {
-            window.open(`novoorcamento.html?edit=${id}`, '_blank');
+            window.location.href = `novoorcamento.html?edit=${id}`;
         }
         
         // Função para excluir orçamento
@@ -1654,15 +1741,22 @@
             mostrarLoading();
             
             try {
+                // Buscar o orçamento
+                const orcamento = orcamentosData.find(o => o.id === id);
+                if (!orcamento) {
+                    throw new Error('Orçamento não encontrado');
+                }
+                
+                // Criar evento de soft delete
                 const response = await fetch('/api/database/commit', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
-                        schema: 'orcamento_delete',
+                        schema: 'orcamento',
                         payload: {
-                            orcamentoId: id,
+                            ...orcamento,
                             deleted: true,
                             dataExclusao: new Date().toISOString()
                         },
@@ -1677,25 +1771,17 @@
                 // Remover dos dados locais
                 const index = orcamentosData.findIndex(o => o.id === id);
                 if (index !== -1) {
-                    orcamentosData[index].deleted = true;
+                    orcamentosData.splice(index, 1);
                 }
                 
                 mostrarMensagem('Orçamento excluído com sucesso!', 'success');
-                carregarOrcamentos();
+                await carregarOrcamentos();
                 
             } catch (error) {
                 console.error('Erro ao excluir orçamento:', error);
                 mostrarMensagem('Erro ao excluir orçamento', 'error');
             } finally {
                 esconderLoading();
-            }
-        }
-        
-        // Função para converter orçamento (do botão na tabela)
-        async function converterOrcamentoParaPedido(id) {
-            orcamentoAtual = orcamentosData.find(o => o.id === id);
-            if (orcamentoAtual) {
-                await converterParaPedido();
             }
         }
         
@@ -1718,7 +1804,6 @@
         // Função para baixar PDF (simulação)
         function baixarPDF() {
             mostrarMensagem('Gerando PDF... (simulação)', 'info');
-            // Em produção, você usaria uma biblioteca como jsPDF ou uma API do servidor
             setTimeout(() => {
                 mostrarMensagem('PDF gerado com sucesso!', 'success');
             }, 1500);
@@ -1727,7 +1812,6 @@
         // Função para gerar relatório
         function gerarRelatorio() {
             mostrarMensagem('Gerando relatório... (simulação)', 'info');
-            // Implementar lógica de relatório
         }
         
         // Função para fechar modal
@@ -1765,7 +1849,7 @@
                 currency: 'EUR',
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2
-            }).format(valor);
+            }).format(valor || 0);
         }
         
         // ============================================
@@ -1773,6 +1857,8 @@
         // ============================================
         
         document.addEventListener('DOMContentLoaded', () => {
+            console.log('📋 Página de Orçamentos inicializada (CORE v5.1)');
+            
             // Configurar datas dos filtros
             const hoje = new Date();
             const primeiroDiaMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
@@ -1785,6 +1871,7 @@
             
             // Event listener para atualizar dados quando houver mudanças no Core
             document.addEventListener('coreDataChanged', () => {
+                console.log('🔄 coreDataChanged recebido - recarregando orçamentos');
                 carregarOrcamentos();
             });
         });
