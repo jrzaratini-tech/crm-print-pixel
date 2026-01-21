@@ -401,7 +401,6 @@
                     <div class="form-group">
                         <label for="numeroPedido">Número do Pedido</label>
                         <input type="text" id="numeroPedido" name="numeroPedido" data-bind="pedido.numeroPedido" readonly style="background-color: #f3f4f6;">
-                        <small class="text-gray-500">Gerado automaticamente</small>
                     </div>
                 </div>
                 
@@ -431,12 +430,6 @@
                     <div class="form-group">
                         <label for="telemovel" class="required">Telemóvel</label>
                         <input type="tel" id="telemovel" name="telemovel" data-bind="pedido.telemovel" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="numero" class="required">Número do Pedido</label>
-                        <input type="text" id="numero" name="numero" data-bind="pedido.numero" required>
-                        <div class="field-note">Ex: PP-2024-001</div>
                     </div>
                     
                     <div class="form-group">
@@ -837,6 +830,9 @@
             currentPedidoId = '';
             isEditMode = false;
             
+            // Carregar próximo número de pedido
+            loadNextOrderNumber();
+            
             // Limpar produtos
             productsTableBody.innerHTML = '';
             productIndex = 0;
@@ -1003,11 +999,58 @@
             }
         });
 
+        // Função para carregar o próximo número de pedido
+        async function loadNextOrderNumber() {
+            try {
+                console.log('Carregando próximo número de pedido...');
+                const response = await fetch('/api/next-order-number');
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Resposta da API:', data);
+                    if (data.numeroPedido) {
+                        const numeroPedidoInput = document.getElementById('numeroPedido');
+                        if (numeroPedidoInput) {
+                            numeroPedidoInput.value = data.numeroPedido;
+                            console.log('Número de pedido definido como:', data.numeroPedido);
+                        } else {
+                            console.error('Elemento numeroPedido não encontrado no DOM');
+                        }
+                    } else {
+                        console.error('Número de pedido não retornado na resposta:', data);
+                    }
+                } else {
+                    const errorText = await response.text();
+                    console.error('Erro na resposta da API:', response.status, errorText);
+                    // Tenta usar o fallback do servidor
+                    try {
+                        const errorData = JSON.parse(errorText);
+                        if (errorData.numeroPedido) {
+                            document.getElementById('numeroPedido').value = errorData.numeroPedido;
+                            console.log('Usando número de pedido de fallback:', errorData.numeroPedido);
+                        }
+                    } catch (e) {
+                        console.error('Erro ao processar resposta de erro:', e);
+                    }
+                }
+            } catch (error) {
+                console.error('Erro ao carregar próximo número de pedido:', error);
+                // Tenta um fallback local em caso de erro
+                const today = new Date();
+                const year = today.getFullYear();
+                const randomNum = Math.floor(Math.random() * 1000) + 1;
+                const fallbackNum = `${year}/${String(randomNum).padStart(4, '0')}`;
+                document.getElementById('numeroPedido').value = fallbackNum;
+                console.log('Usando número de pedido de fallback local:', fallbackNum);
+            }
+        }
+
         // ============================================
         // INICIALIZAÇÃO
         // ============================================
 
         document.addEventListener('DOMContentLoaded', () => {
+            // Carregar próximo número de pedido ao abrir o formulário
+            loadNextOrderNumber();
             // Verificar se é modo de edição
             const urlParams = new URLSearchParams(window.location.search);
             const editId = urlParams.get('edit');

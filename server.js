@@ -77,6 +77,24 @@ async function getNextOrderNumber() {
   }
 }
 
+// Endpoint para obter o próximo número de pedido
+app.get("/api/next-order-number", async (req, res) => {
+  try {
+    const nextNumber = await getNextOrderNumber();
+    res.json({ 
+      success: true, 
+      numeroPedido: nextNumber 
+    });
+  } catch (error) {
+    console.error('Erro ao obter próximo número de pedido:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Erro ao gerar número de pedido',
+      numeroPedido: `2026/${String(Math.floor(Math.random() * 1000) + 1).padStart(4, '0')}`
+    });
+  }
+});
+
 // Gravar evento no Firestore
 app.post("/api/database/commit", async (req, res) => {
   try {
