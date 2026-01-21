@@ -395,7 +395,17 @@
             <input type="hidden" id="pedidoId" data-bind="pedido.id" value="">
             
             <div class="form-section">
-                <h2 class="section-title">Informações do Cliente</h2>
+                <h2 class="section-title">Informações do Pedido</h2>
+                
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="numeroPedido">Número do Pedido</label>
+                        <input type="text" id="numeroPedido" name="numeroPedido" data-bind="pedido.numeroPedido" readonly style="background-color: #f3f4f6;">
+                        <small class="text-gray-500">Gerado automaticamente</small>
+                    </div>
+                </div>
+                
+                <h2 class="section-title" style="margin-top: 30px;">Informações do Cliente</h2>
                 
                 <div class="form-grid">
                     <div class="form-group">
@@ -817,30 +827,38 @@
 
         // Função para limpar o formulário
         function clearForm() {
-            pedidoForm.reset();
+            // Limpar campos do formulário
+            const form = document.getElementById('pedidoForm');
+            form.reset();
+            
+            // Limpar ID do pedido e número do pedido
+            pedidoIdInput.value = '';
+            document.getElementById('numeroPedido').value = '';
+            currentPedidoId = '';
+            isEditMode = false;
+            
+            // Limpar produtos
             productsTableBody.innerHTML = '';
             productIndex = 0;
             
-            // Configurar datas padrão
-            const today = new Date();
-            const tomorrow = new Date(today);
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            
-            document.getElementById('dataEntrega').valueAsDate = tomorrow;
-            document.getElementById('dataEntrada').valueAsDate = today;
-            
-            // Adicionar primeira linha de produto
+            // Adicionar uma linha de produto vazia
             addProductRow();
             
-            // Resetar modo de edição
-            isEditMode = false;
-            currentPedidoId = '';
-            pedidoIdInput.value = '';
-            
-            // Calcular totais iniciais
+            // Resetar totais
             calculateTotals();
             
-            showMessage('Formulário limpo. Pronto para novo pedido.', 'info');
+            // Resetar texto do botão
+            saveBtn.textContent = 'SALVAR PEDIDO';
+            
+            // Resetar data de entrega para amanhã
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            document.getElementById('dataEntrega').valueAsDate = tomorrow;
+            
+            // Resetar data de entrada para hoje
+            document.getElementById('dataEntrada').valueAsDate = new Date();
+            
+            showMessage('Formulário limpo. Pronto para novo pedido!', 'info');
         }
 
         // Função para carregar pedido para edição
@@ -976,6 +994,14 @@
         valorInstalacaoInput.addEventListener('input', calculateTotals);
         ivaSimRadio.addEventListener('change', calculateTotals);
         ivaNaoRadio.addEventListener('change', calculateTotals);
+
+        // Atualizar número do pedido após salvar com sucesso
+        document.addEventListener('coreCommitSuccess', (event) => {
+            const { payload } = event.detail || {};
+            if (payload && payload.numeroPedido) {
+                document.getElementById('numeroPedido').value = payload.numeroPedido;
+            }
+        });
 
         // ============================================
         // INICIALIZAÇÃO
