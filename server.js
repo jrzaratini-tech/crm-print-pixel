@@ -30,27 +30,46 @@ app.get('/api/database/init', (req, res) => {
     });
 });
 
-// Rota para SALVAR/ATUALIZAR eventos (CORRIGIDA)
+// Rota para SALVAR/ATUALIZAR eventos (ATUALIZADA)
 app.post('/api/database/commit', async (req, res) => {
     try {
         console.log('📨 Recebendo requisição COMMIT:', {
-            body: req.body,
             temId: !!req.body.id,
-            schema: req.body.schema
+            id: req.body.id,
+            schema: req.body.schema,
+            pageId: req.body.pageId
         });
         
-        const eventData = {
-            ...req.body,
-            timestamp: new Date().toISOString()
-        };
-        
         // Validar dados obrigatórios
-        if (!eventData.schema) {
+        if (!req.body.schema) {
             return res.status(400).json({ 
                 success: false, 
                 error: 'Schema é obrigatório' 
             });
         }
+        
+        // Preparar dados para salvar
+        const eventData = {
+            ...req.body,
+            timestamp: new Date().toISOString()
+        };
+        
+        // Se houver ID no corpo da requisição, garantir que ele seja usado
+        if (req.body.id) {
+            eventData.id = req.body.id;
+        }
+        
+        // Se o payload tiver um ID, movê-lo para o nível superior
+        if (eventData.payload && eventData.payload.id) {
+            eventData.id = eventData.payload.id;
+            delete eventData.payload.id;
+        }
+        
+        console.log('📤 Dados processados para salvar:', {
+            id: eventData.id,
+            schema: eventData.schema,
+            temPayload: !!eventData.payload
+        });
         
         const result = await saveEvent(eventData);
         

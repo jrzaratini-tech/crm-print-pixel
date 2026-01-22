@@ -35,29 +35,64 @@ async function saveEvent(eventData) {
         if (eventData.id && eventData.id.trim() !== '') {
             console.log(`🔄 Modo ATUALIZAÇÃO detectado para ID: ${eventData.id}`);
             
-            // Verificar se o documento existe
             const docRef = eventsCollection.doc(eventData.id);
             const docSnap = await docRef.get();
             
+            // Preparar dados para atualização
+            const updateData = {
+                ...eventData.payload, // Usar apenas o payload para atualização
+                schema: eventData.schema, // Garantir que o schema está atualizado
+                updated_at: admin.firestore.FieldValue.serverTimestamp(),
+                updated: true
+            };
+            
+            // Preservar a data de criação se existir
             if (docSnap.exists) {
-                // Atualizar documento existente
-                await docRef.set({
-                    ...eventData,
-                    updated_at: admin.firestore.FieldValue.serverTimestamp(),
-                    updated: true
-                }, { merge: true }); // merge: true preserva campos não alterados
+                // Documento existe, vamos atualizar
+                console.log(`📝 Atualizando documento existente: ${eventData.id}`);
+                
+                // Manter dados importantes que não devem ser sobrescritos
+                const existingData = docSnap.data();
+                updateData.created_at = existingData.created_at || admin.firestore.FieldValue.serverTimestamp();
+                
+                // Se o documento existente tiver um número, mantê-lo
+                if (existingData.numero) {
+                    updateData.numero = existingData.numero;
+                }
+                
+                // Se o documento existente tiver um status, mantê-lo a menos que seja explicitamente atualizado
+                if (existingData.status && !updateData.status) {
+                    updateData.status = existingData.status;
+                }
+                
+                // Atualizar o documento existente
+                await docRef.update(updateData);
                 
                 console.log(`✅ Documento ATUALIZADO com sucesso: ${eventData.id}`);
-                return { success: true, id: eventData.id, action: 'updated', exists: true };
+                return { 
+                    success: true, 
+                    id: eventData.id, 
+                    action: 'updated',
+                    exists: true 
+                };
             } else {
-                console.log(`⚠️ Documento não encontrado com ID: ${eventData.id}, criando novo...`);
-                // Se não existe, criar novo com o ID fornecido
+                // Documento não existe, mas temos um ID - criar novo documento com o ID fornecido
+                console.log(`⚠️ Documento não encontrado, criando novo com ID fornecido: ${eventData.id}`);
+                
                 await docRef.set({
-                    ...eventData,
+                    ...eventData.payload,
+                    schema: eventData.schema,
                     created_at: admin.firestore.FieldValue.serverTimestamp(),
+                    updated_at: admin.firestore.FieldValue.serverTimestamp(),
                     deleted: false
                 });
-                return { success: true, id: eventData.id, action: 'created_new', exists: false };
+                
+                return { 
+                    success: true, 
+                    id: eventData.id, 
+                    action: 'created',
+                    exists: false
+                };
             }
         } 
         // SE NÃO TEM ID: Criar novo documento
@@ -66,13 +101,19 @@ async function saveEvent(eventData) {
             
             // Criar novo documento com ID automático
             const docRef = await eventsCollection.add({
-                ...eventData,
+                ...eventData.payload,
+                schema: eventData.schema,
                 created_at: admin.firestore.FieldValue.serverTimestamp(),
                 deleted: false
             });
             
             console.log(`✅ Novo documento CRIADO com ID: ${docRef.id}`);
-            return { success: true, id: docRef.id, action: 'created', exists: false };
+            return { 
+                success: true, 
+                id: docRef.id, 
+                action: 'created', 
+                exists: false 
+            };
         }
     } catch (error) {
         console.error('❌ Erro ao salvar evento no Firebase:', error);

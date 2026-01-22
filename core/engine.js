@@ -55,11 +55,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     const idInput = document.getElementById(`${schema}Id`) || 
                                    document.querySelector(`[data-bind$="${schema}.id"]`);
                     
-                    const idPedido = idInput ? idInput.value : null;
-                    const isUpdate = idPedido && idPedido.trim() !== '';
+                    const documentId = idInput ? idInput.value : null;
+                    const isUpdate = documentId && documentId.trim() !== '';
                     
                     console.log(`🔍 Verificando modo: ${isUpdate ? 'ATUALIZAÇÃO' : 'CRIAÇÃO'}`);
-                    console.log(`🔍 ID do pedido: ${idPedido || 'Nenhum (novo pedido)'}`);
+                    console.log(`🔍 ID do documento: ${documentId || 'Nenhum (novo documento)'}`);
                     
                     // Preparar dados para envio
                     const dadosEnvio = {
@@ -69,12 +69,22 @@ document.addEventListener('DOMContentLoaded', () => {
                         timestamp: new Date().toISOString()
                     };
                     
-                    // SE FOR ATUALIZAÇÃO: Adicionar o ID do documento existente
+                    // Se for uma atualização, garantir que o ID esteja no nível superior
                     if (isUpdate) {
-                        dadosEnvio.id = idPedido;
-                        console.log(`🔄 Enviando em MODO ATUALIZAÇÃO com ID: ${idPedido}`);
+                        dadosEnvio.id = documentId;
+                        console.log(`🔄 Enviando em MODO ATUALIZAÇÃO com ID: ${dadosEnvio.id}`);
+                        
+                        // Remover o ID do payload para evitar duplicação
+                        if (payload.id) {
+                            delete payload.id;
+                        }
                     } else {
                         console.log(`🆕 Enviando em MODO CRIAÇÃO (sem ID)`);
+                        
+                        // Garantir que não há ID no payload para novos registros
+                        if (payload.id) {
+                            delete payload.id;
+                        }
                     }
                     
                     // Salvar no Firebase via API
@@ -519,6 +529,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const payload = {};
         
         console.log(`🛠️ Processando ${inputs.length} inputs para ${schema}...`);
+        
+        // Processar o campo ID primeiro, se existir
+        const idInput = document.getElementById(`${schema}Id`) || 
+                       document.querySelector(`[data-bind$="${schema}.id"]`);
+        if (idInput && idInput.value) {
+            payload.id = idInput.value;
+            console.log(`🔑 ID do documento: ${payload.id}`);
+        }
         
         // Primeiro, processar campos diretos
         inputs.forEach(input => {
