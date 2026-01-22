@@ -1203,13 +1203,18 @@
             
             // Verificar se estamos no modo de edição
             const urlParams = new URLSearchParams(window.location.search);
-            const editId = urlParams.get('edit');
+            const despesaId = urlParams.get('id');
             
-            if (editId) {
+            if (despesaId) {
                 // Modo de edição - carregar despesa existente
-                console.log('Modo edição para despesa ID:', editId);
+                console.log('Modo edição para despesa ID:', despesaId);
+                // Set the hidden input field with the ID
+                const despesaIdInput = document.getElementById('despesaId');
+                if (despesaIdInput) {
+                    despesaIdInput.value = despesaId;
+                }
                 showMessage('Carregando despesa para edição...', 'info');
-                loadDespesaForEdit(editId);
+                loadDespesaForEdit(despesaId);
             } else {
                 // Configurar novo formulário
                 inicializarFormulario();

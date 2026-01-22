@@ -1021,14 +1021,18 @@
         document.addEventListener('DOMContentLoaded', async () => {
             // Verificar se é modo de edição
             const urlParams = new URLSearchParams(window.location.search);
-            const editId = urlParams.get('edit');
+            const orcamentoId = urlParams.get('id');
             
             // Gerar código do orçamento
             const codigo = await gerarCodigoOrcamento();
             codigoInput.value = codigo;
             
-            if (editId) {
-                await loadOrcamentoForEdit(editId);
+            if (orcamentoId) {
+                // Set the hidden input field with the ID
+                if (document.getElementById('orcamentoId')) {
+                    document.getElementById('orcamentoId').value = orcamentoId;
+                }
+                await loadOrcamentoForEdit(orcamentoId);
             } else {
                 // Adicionar primeiro produto
                 addProductRow();

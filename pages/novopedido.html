@@ -1001,11 +1001,15 @@
             
             // Verificar se é modo de edição
             const urlParams = new URLSearchParams(window.location.search);
-            const editId = urlParams.get('edit');
+            const pedidoId = urlParams.get('id');
             
-            if (editId) {
-                console.log(`✏️ Modo EDIÇÃO detectado para ID: ${editId}`);
-                loadPedidoForEdit(editId);
+            if (pedidoId) {
+                console.log(`✏️ Modo EDIÇÃO detectado para ID: ${pedidoId}`);
+                // Set the hidden input field with the ID
+                if (pedidoIdInput) {
+                    pedidoIdInput.value = pedidoId;
+                }
+                loadPedidoForEdit(pedidoId);
             } else {
                 console.log('🆕 Modo CRIAÇÃO detectado');
                 setupNewPedido();
