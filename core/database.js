@@ -46,17 +46,27 @@ async function saveEvent(eventData) {
                 updated: true
             };
             
+            // Remover campos que não devem ser atualizados
+            if (updateData.id) delete updateData.id; // Remover ID do payload se existir
+            if (updateData.created_at) delete updateData.created_at; // Não atualizar data de criação
+            
             // Preservar a data de criação se existir
             if (docSnap.exists) {
                 // Documento existe, vamos atualizar
                 console.log(`📝 Atualizando documento existente: ${eventData.id}`);
                 
-                // Manter dados importantes que não devem ser sobrescritos
+                // Obter dados existentes
                 const existingData = docSnap.data();
-                updateData.created_at = existingData.created_at || admin.firestore.FieldValue.serverTimestamp();
+                
+                // Manter dados importantes que não devem ser sobrescritos
+                if (existingData.created_at) {
+                    updateData.created_at = existingData.created_at;
+                } else {
+                    updateData.created_at = admin.firestore.FieldValue.serverTimestamp();
+                }
                 
                 // Se o documento existente tiver um número, mantê-lo
-                if (existingData.numero) {
+                if (existingData.numero && !updateData.numero) {
                     updateData.numero = existingData.numero;
                 }
                 
@@ -79,8 +89,12 @@ async function saveEvent(eventData) {
                 // Documento não existe, mas temos um ID - criar novo documento com o ID fornecido
                 console.log(`⚠️ Documento não encontrado, criando novo com ID fornecido: ${eventData.id}`);
                 
+                // Garantir que não há ID duplicado no payload
+                const payload = { ...eventData.payload };
+                if (payload.id) delete payload.id;
+                
                 await docRef.set({
-                    ...eventData.payload,
+                    ...payload,
                     schema: eventData.schema,
                     created_at: admin.firestore.FieldValue.serverTimestamp(),
                     updated_at: admin.firestore.FieldValue.serverTimestamp(),

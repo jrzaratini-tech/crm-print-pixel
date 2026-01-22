@@ -54,13 +54,15 @@ app.post('/api/database/commit', async (req, res) => {
             timestamp: new Date().toISOString()
         };
         
-        // Se houver ID no corpo da requisição, garantir que ele seja usado
+        // Tratamento consistente do ID
         if (req.body.id) {
+            // Se já houver ID no nível superior, usá-lo e remover do payload se existir
             eventData.id = req.body.id;
-        }
-        
-        // Se o payload tiver um ID, movê-lo para o nível superior
-        if (eventData.payload && eventData.payload.id) {
+            if (eventData.payload && eventData.payload.id) {
+                delete eventData.payload.id;
+            }
+        } else if (eventData.payload && eventData.payload.id) {
+            // Se não houver ID no nível superior, mas houver no payload, movê-lo para o nível superior
             eventData.id = eventData.payload.id;
             delete eventData.payload.id;
         }

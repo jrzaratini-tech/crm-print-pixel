@@ -64,26 +64,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Preparar dados para envio
                     const dadosEnvio = {
                         schema: schema,
-                        payload: payload,
+                        payload: { ...payload }, // Criar cópia do payload para não modificar o original
                         pageId: pageId,
                         timestamp: new Date().toISOString()
                     };
                     
                     // Se for uma atualização, garantir que o ID esteja no nível superior
                     if (isUpdate) {
+                        // Remover o ID do payload para evitar duplicação
+                        if (dadosEnvio.payload.id) {
+                            delete dadosEnvio.payload.id;
+                        }
+                        // Adicionar o ID no nível superior
                         dadosEnvio.id = documentId;
                         console.log(`🔄 Enviando em MODO ATUALIZAÇÃO com ID: ${dadosEnvio.id}`);
-                        
-                        // Remover o ID do payload para evitar duplicação
-                        if (payload.id) {
-                            delete payload.id;
-                        }
                     } else {
                         console.log(`🆕 Enviando em MODO CRIAÇÃO (sem ID)`);
                         
                         // Garantir que não há ID no payload para novos registros
-                        if (payload.id) {
-                            delete payload.id;
+                        if (dadosEnvio.payload.id) {
+                            delete dadosEnvio.payload.id;
                         }
                     }
                     

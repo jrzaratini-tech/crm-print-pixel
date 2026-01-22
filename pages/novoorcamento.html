@@ -4,29 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Novo Orçamento - PrintPixel</title>
+    <link rel="stylesheet" href="../assets/css/orcs.css">
     <style>
-        /* Estilos da página novopedido.html (mantidos) */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-        }
-        
-        body {
-            background-color: #f8fafc;
-            color: #1e293b;
-            padding: 20px;
-            line-height: 1.5;
-        }
-        
+        /* Estilos específicos da página de novo orçamento */
         .container {
             max-width: 1200px;
-            margin: 0 auto;
-            background-color: white;
-            border-radius: 10px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
-            padding: 30px;
         }
         
         .header-section {
@@ -137,9 +119,9 @@
         }
         
         input:focus, select:focus, textarea:focus {
-            border-color: #f59e0b;
+            border-color: var(--primary-color);
             outline: none;
-            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
+            box-shadow: 0 0 0 3px var(--primary-light);
         }
         
         input[type="date"] {
