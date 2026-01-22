@@ -39,16 +39,21 @@ async function saveEvent(eventData) {
             const docSnap = await docRef.get();
             
             // Preparar dados para atualização
-            const updateData = {
-                ...eventData.payload, // Usar apenas o payload para atualização
-                schema: eventData.schema, // Garantir que o schema está atualizado
-                updated_at: admin.firestore.FieldValue.serverTimestamp(),
-                updated: true
-            };
+            const updateData = {};
             
-            // Remover campos que não devem ser atualizados
-            if (updateData.id) delete updateData.id; // Remover ID do payload se existir
-            if (updateData.created_at) delete updateData.created_at; // Não atualizar data de criação
+            // Copiar campos do payload para o updateData, exceto os campos protegidos
+            if (eventData.payload) {
+                Object.keys(eventData.payload).forEach(key => {
+                    if (key !== 'id' && key !== 'created_at' && key !== 'deleted') {
+                        updateData[key] = eventData.payload[key];
+                    }
+                });
+            }
+            
+            // Adicionar campos de controle
+            updateData.schema = eventData.schema;
+            updateData.updated_at = admin.firestore.FieldValue.serverTimestamp();
+            updateData.updated = true;
             
             // Preservar a data de criação se existir
             if (docSnap.exists) {
