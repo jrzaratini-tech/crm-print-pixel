@@ -678,6 +678,7 @@
         </div>
         
         <form id="pedidoForm">
+            <!-- CRÍTICO: Campo oculto para armazenar o ID do documento Firebase -->
             <input type="hidden" id="pedidoId" data-bind="pedido.id" value="">
             
             <div class="form-section">
@@ -955,762 +956,67 @@
 
     <script>
         // ============================================
-        // VARIÁVEIS GLOBAIS E REFERÊNCIAS
+        // SISTEMA DE PEDIDOS - VERSÃO CORRIGIDA
         // ============================================
-        const produtos = [
-            "Logo em Acrílico",
-            "Logo Flutuante para Montra",
-            "Neon LED",
-            "Alto Colante",
-            "Logo 3D com LED",
-            "Logo 3D sem LED",
-            "Brindes",
-            "Painel de ACM",
-            "Caixa de Luz",
-            "Outro"
-        ];
-
-        let productIndex = 0;
-        let paymentIndex = 0;
-        let isEditMode = false;
-        let currentPedidoId = '';
-        let isPaymentEditMode = false;
-        let currentPaymentRow = null;
         
-        // Referências DOM
-        const productsTableBody = document.getElementById('productsTableBody');
-        const paymentsTableBody = document.getElementById('paymentsTableBody');
-        const addProductBtn = document.getElementById('addProductBtn');
-        const addPaymentBtn = document.getElementById('addPaymentBtn');
-        const cancelBtn = document.getElementById('cancelBtn');
-        const saveBtn = document.getElementById('saveBtn');
-        const pedidoForm = document.getElementById('pedidoForm');
-        const pedidoIdInput = document.getElementById('pedidoId');
-        const numeroPedidoInput = document.getElementById('numero');
-        
-        // Referências para totais
-        const subtotalProdutosEl = document.getElementById('subtotalProdutos');
-        const totalInstalacaoEl = document.getElementById('totalInstalacaoDisplay');
-        const valorIVAEl = document.getElementById('valorIVA');
-        const totalFinalEl = document.getElementById('totalFinal');
-        
-        // Referências para resumo
-        const resumoTotalEl = document.getElementById('resumoTotal');
-        const resumoPagoEl = document.getElementById('resumoPago');
-        const resumoPendenteEl = document.getElementById('resumoPendente');
-        
-        // Referências para campos ocultos
-        const pedidoSubtotalInput = document.getElementById('pedidoSubtotal');
-        const pedidoIVAInput = document.getElementById('pedidoIVA');
-        const pedidoTotalInput = document.getElementById('pedidoTotal');
-        const pedidoTotalPagoInput = document.getElementById('pedidoTotalPago');
-        const pedidoSaldoPendenteInput = document.getElementById('pedidoSaldoPendente');
-        const pedidoStatusPagamentoInput = document.getElementById('pedidoStatusPagamento');
-        
-        // Referências para campos de entrada
-        const ivaSimRadio = document.getElementById('ivaSim');
-        const ivaNaoRadio = document.getElementById('ivaNao');
-        const valorInstalacaoInput = document.getElementById('valorInstalacao');
-        const dataFechamentoInput = document.getElementById('dataFechamento');
-
-        // Referências do Modal de Pagamento
-        const paymentModal = document.getElementById('paymentModal');
-        const paymentForm = document.getElementById('paymentForm');
-        const paymentIdInput = document.getElementById('paymentId');
-        const paymentTypeInput = document.getElementById('paymentType');
-        const paymentDateInput = document.getElementById('paymentDate');
-        const paymentAmountInput = document.getElementById('paymentAmount');
-        const paymentMethodInput = document.getElementById('paymentMethod');
-        const paymentStatusInput = document.getElementById('paymentStatus');
-        const paymentObservationsInput = document.getElementById('paymentObservations');
-        const paymentReferenceInput = document.getElementById('paymentReference');
-        const closePaymentModalBtn = document.getElementById('closePaymentModal');
-        const cancelPaymentBtn = document.getElementById('cancelPaymentBtn');
-        const savePaymentBtn = document.getElementById('savePaymentBtn');
-
-        // ============================================
-        // FUNÇÕES DE PRODUTOS (mantidas da versão anterior)
-        // ============================================
-
-        function addProductRow(productData = null) {
-            const row = document.createElement('tr');
-            const index = productIndex++;
-            
-            row.innerHTML = `
-                <td>
-                    <select class="product-select" data-bind="pedido.produtos.${index}.nome" required>
-                        <option value="">Selecione um produto</option>
-                        ${produtos.map(p => `<option value="${p}" ${productData && productData.nome === p ? 'selected' : ''}>${p}</option>`).join('')}
-                    </select>
-                </td>
-                <td>
-                    <input type="text" class="tamanho-input" data-bind="pedido.produtos.${index}.tamanho" 
-                           placeholder="Ex: 30x40cm" value="${productData ? (productData.tamanho || '') : ''}">
-                </td>
-                <td>
-                    <input type="number" class="quantidade-input" data-bind="pedido.produtos.${index}.quantidade" 
-                           min="1" value="${productData ? (productData.quantidade || 1) : 1}" required>
-                </td>
-                <td>
-                    <input type="number" class="valor-input" data-bind="pedido.produtos.${index}.valor" 
-                           min="0" step="0.01" value="${productData ? (productData.valor || '0.00') : '0.00'}" required>
-                </td>
-                <td>
-                    <textarea class="obs-input" data-bind="pedido.produtos.${index}.observacoes" 
-                              placeholder="Observações do produto..." rows="2">${productData ? (productData.observacoes || '') : ''}</textarea>
-                </td>
-                <td>
-                    <button type="button" class="remove-btn" title="Remover produto">
-                        🗑️
-                    </button>
-                </td>
-            `;
-            
-            productsTableBody.appendChild(row);
-            
-            // Adicionar event listeners
-            const removeBtn = row.querySelector('.remove-btn');
-            const valorInput = row.querySelector('.valor-input');
-            const quantidadeInput = row.querySelector('.quantidade-input');
-            
-            removeBtn.addEventListener('click', () => removeProductRow(row));
-            valorInput.addEventListener('input', calculateTotals);
-            quantidadeInput.addEventListener('input', calculateTotals);
-            
-            return row;
-        }
-
-        function removeProductRow(row) {
-            const totalRows = productsTableBody.querySelectorAll('tr').length;
-            if (totalRows <= 1) {
-                showMessage('O pedido deve ter pelo menos um produto.', 'warning');
-                return;
-            }
-            
-            row.remove();
-            reindexProducts();
-            calculateTotals();
-        }
-
-        function reindexProducts() {
-            const rows = productsTableBody.querySelectorAll('tr');
-            productIndex = 0;
-            
-            rows.forEach((row, index) => {
-                const select = row.querySelector('.product-select');
-                const tamanho = row.querySelector('.tamanho-input');
-                const quantidade = row.querySelector('.quantidade-input');
-                const valor = row.querySelector('.valor-input');
-                const obs = row.querySelector('.obs-input');
-                
-                if (select) select.setAttribute('data-bind', `pedido.produtos.${index}.nome`);
-                if (tamanho) tamanho.setAttribute('data-bind', `pedido.produtos.${index}.tamanho`);
-                if (quantidade) quantidade.setAttribute('data-bind', `pedido.produtos.${index}.quantidade`);
-                if (valor) valor.setAttribute('data-bind', `pedido.produtos.${index}.valor`);
-                if (obs) obs.setAttribute('data-bind', `pedido.produtos.${index}.observacoes`);
-                
-                productIndex = index + 1;
-            });
-        }
-
-        // ============================================
-        // FUNÇÕES DE PAGAMENTOS (CORRIGIDAS)
-        // ============================================
-
-        function openPaymentModal(paymentData = null) {
-            // Resetar formulário
-            paymentForm.reset();
-            
-            // Configurar data padrão para hoje
-            const hoje = new Date().toISOString().split('T')[0];
-            paymentDateInput.value = hoje;
-            
-            if (paymentData) {
-                // Modo edição
-                isPaymentEditMode = true;
-                currentPaymentRow = paymentData.row;
-                paymentIdInput.value = paymentData.id || '';
-                paymentTypeInput.value = paymentData.tipo || 'entrada';
-                paymentDateInput.value = paymentData.data || hoje;
-                paymentAmountInput.value = paymentData.valor || '0.00';
-                paymentMethodInput.value = paymentData.formaPagamento || '';
-                paymentStatusInput.value = paymentData.status || 'pago';
-                paymentObservationsInput.value = paymentData.observacoes || '';
-                paymentReferenceInput.value = paymentData.referencia || '';
-                
-                savePaymentBtn.textContent = 'ATUALIZAR PAGAMENTO';
-            } else {
-                // Modo criação
-                isPaymentEditMode = false;
-                currentPaymentRow = null;
-                paymentIdInput.value = '';
-                savePaymentBtn.textContent = 'SALVAR PAGAMENTO';
-            }
-            
-            // Mostrar modal
-            paymentModal.style.display = 'flex';
-            paymentAmountInput.focus();
-        }
-
-        function closePaymentModal() {
-            paymentModal.style.display = 'none';
-            isPaymentEditMode = false;
-            currentPaymentRow = null;
-            paymentForm.reset();
-        }
-
-        function addPaymentRow(paymentData) {
-            const row = document.createElement('tr');
-            const index = paymentIndex++;
-            
-            // Determinar label do tipo
-            let tipoLabel = '';
-            switch(paymentData.tipo) {
-                case 'entrada': tipoLabel = 'Entrada'; break;
-                case 'parcela': tipoLabel = 'Parcela'; break;
-                case 'final': tipoLabel = 'Final'; break;
-                default: tipoLabel = paymentData.tipo;
-            }
-            
-            // Determinar classe do status
-            let statusClass = '';
-            let statusLabel = '';
-            switch(paymentData.status) {
-                case 'pago': 
-                    statusClass = 'pago';
-                    statusLabel = 'Pago';
-                    break;
-                case 'pendente': 
-                    statusClass = 'pendente';
-                    statusLabel = 'Pendente';
-                    break;
-                case 'atrasado': 
-                    statusClass = 'atrasado';
-                    statusLabel = 'Atrasado';
-                    break;
-                default: 
-                    statusClass = 'pendente';
-                    statusLabel = 'Pendente';
-            }
-            
-            // Gerar um ID único para o pagamento se não existir
-            const paymentId = paymentData.id || `payment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-            
-            row.innerHTML = `
-                <td>
-                    <span>${tipoLabel}</span>
-                    <input type="hidden" class="payment-id-input" data-bind="pedido.pagamentos.${index}.id" value="${paymentId}">
-                    <input type="hidden" class="payment-tipo-input" data-bind="pedido.pagamentos.${index}.tipo" value="${paymentData.tipo}">
-                </td>
-                <td>
-                    <span>${formatarData(paymentData.data)}</span>
-                    <input type="hidden" class="payment-data-input" data-bind="pedido.pagamentos.${index}.data" value="${paymentData.data}">
-                </td>
-                <td>
-                    <span>${formatarMoeda(paymentData.valor)}</span>
-                    <input type="hidden" class="payment-valor-input" data-bind="pedido.pagamentos.${index}.valor" value="${paymentData.valor}">
-                </td>
-                <td>
-                    <span>${getFormaPagamentoLabel(paymentData.formaPagamento)}</span>
-                    <input type="hidden" class="payment-forma-input" data-bind="pedido.pagamentos.${index}.formaPagamento" value="${paymentData.formaPagamento}">
-                </td>
-                <td>
-                    <span title="${paymentData.observacoes || ''}">${(paymentData.observacoes || '').substring(0, 30)}${paymentData.observacoes && paymentData.observacoes.length > 30 ? '...' : ''}</span>
-                    <input type="hidden" class="payment-obs-input" data-bind="pedido.pagamentos.${index}.observacoes" value="${paymentData.observacoes || ''}">
-                    <input type="hidden" class="payment-ref-input" data-bind="pedido.pagamentos.${index}.referencia" value="${paymentData.referencia || ''}">
-                </td>
-                <td>
-                    <span class="payment-status ${statusClass}">${statusLabel}</span>
-                    <input type="hidden" class="payment-status-input" data-bind="pedido.pagamentos.${index}.status" value="${paymentData.status}">
-                </td>
-                <td>
-                    <button type="button" class="remove-btn edit-payment-btn" title="Editar pagamento">
-                        ✏️
-                    </button>
-                    <button type="button" class="remove-btn" title="Remover pagamento">
-                        🗑️
-                    </button>
-                </td>
-            `;
-            
-            paymentsTableBody.appendChild(row);
-            
-            // Adicionar event listeners
-            const removeBtn = row.querySelectorAll('.remove-btn')[1];
-            const editBtn = row.querySelector('.edit-payment-btn');
-            
-            removeBtn.addEventListener('click', () => removePaymentRow(row));
-            editBtn.addEventListener('click', () => {
-                const paymentRowData = {
-                    id: row.querySelector('.payment-id-input').value,
-                    row: row,
-                    tipo: row.querySelector('.payment-tipo-input').value,
-                    data: row.querySelector('.payment-data-input').value,
-                    valor: parseFloat(row.querySelector('.payment-valor-input').value),
-                    formaPagamento: row.querySelector('.payment-forma-input').value,
-                    status: row.querySelector('.payment-status-input').value,
-                    observacoes: row.querySelector('.payment-obs-input').value,
-                    referencia: row.querySelector('.payment-ref-input').value
-                };
-                openPaymentModal(paymentRowData);
-            });
-            
-            return row;
-        }
-
-        function removePaymentRow(row) {
-            const totalRows = paymentsTableBody.querySelectorAll('tr').length;
-            if (totalRows <= 1) {
-                showMessage('O pedido deve ter pelo menos um pagamento.', 'warning');
-                return;
-            }
-            
-            if (confirm('Tem certeza que deseja remover este pagamento?')) {
-                row.remove();
-                reindexPayments();
-                updatePaymentSummary();
-            }
-        }
-
-        function reindexPayments() {
-            const rows = paymentsTableBody.querySelectorAll('tr');
-            paymentIndex = 0;
-            
-            rows.forEach((row, index) => {
-                const idInput = row.querySelector('.payment-id-input');
-                const tipoInput = row.querySelector('.payment-tipo-input');
-                const dataInput = row.querySelector('.payment-data-input');
-                const valorInput = row.querySelector('.payment-valor-input');
-                const formaInput = row.querySelector('.payment-forma-input');
-                const obsInput = row.querySelector('.payment-obs-input');
-                const refInput = row.querySelector('.payment-ref-input');
-                const statusInput = row.querySelector('.payment-status-input');
-                
-                if (idInput) idInput.setAttribute('data-bind', `pedido.pagamentos.${index}.id`);
-                if (tipoInput) tipoInput.setAttribute('data-bind', `pedido.pagamentos.${index}.tipo`);
-                if (dataInput) dataInput.setAttribute('data-bind', `pedido.pagamentos.${index}.data`);
-                if (valorInput) valorInput.setAttribute('data-bind', `pedido.pagamentos.${index}.valor`);
-                if (formaInput) formaInput.setAttribute('data-bind', `pedido.pagamentos.${index}.formaPagamento`);
-                if (obsInput) obsInput.setAttribute('data-bind', `pedido.pagamentos.${index}.observacoes`);
-                if (refInput) refInput.setAttribute('data-bind', `pedido.pagamentos.${index}.referencia`);
-                if (statusInput) statusInput.setAttribute('data-bind', `pedido.pagamentos.${index}.status`);
-                
-                paymentIndex = index + 1;
-            });
-        }
-
-        function getFormaPagamentoLabel(valor) {
-            const formas = {
-                'dinheiro': 'Dinheiro',
-                'mbway': 'MBWay',
-                'transferencia': 'Transferência',
-                'cartao': 'Cartão',
-                'cheque': 'Cheque',
-                'outro': 'Outro'
-            };
-            return formas[valor] || valor;
-        }
-
-        function updatePaymentSummary() {
-            const totalPedido = parseFloat(pedidoTotalInput.value) || 0;
-            let totalPago = 0;
-            
-            // Calcular total pago somando todos os pagamentos
-            document.querySelectorAll('.payment-valor-input').forEach(input => {
-                const valor = parseFloat(input.value) || 0;
-                totalPago += valor;
-            });
-            
-            const saldoPendente = totalPedido - totalPago;
-            
-            // Atualizar displays
-            resumoTotalEl.textContent = formatarMoeda(totalPedido);
-            resumoPagoEl.textContent = formatarMoeda(totalPago);
-            resumoPendenteEl.textContent = formatarMoeda(saldoPendente);
-            
-            // Atualizar cores do saldo pendente
-            if (saldoPendente > 0) {
-                resumoPendenteEl.style.color = '#dc2626';
-            } else if (saldoPendente < 0) {
-                resumoPendenteEl.style.color = '#f59e0b'; // Pagamento a mais
-            } else {
-                resumoPendenteEl.style.color = '#059669'; // Totalmente pago
-            }
-            
-            // Atualizar campos ocultos
-            pedidoTotalPagoInput.value = totalPago.toFixed(2);
-            pedidoSaldoPendenteInput.value = saldoPendente.toFixed(2);
-            
-            // Atualizar status do pagamento
-            if (totalPago === 0) {
-                pedidoStatusPagamentoInput.value = 'pendente';
-            } else if (totalPago > 0 && totalPago < totalPedido) {
-                pedidoStatusPagamentoInput.value = 'parcial';
-            } else if (totalPago >= totalPedido) {
-                pedidoStatusPagamentoInput.value = 'pago';
-            }
-        }
-
-        // ============================================
-        // FUNÇÕES COMPARTILHADAS
-        // ============================================
-
-        function calculateTotals() {
-            let subtotalProdutos = 0;
-            
-            // Calcular subtotal dos produtos
-            document.querySelectorAll('#productsTableBody tr').forEach(row => {
-                const valorInput = row.querySelector('.valor-input');
-                const quantidadeInput = row.querySelector('.quantidade-input');
-                
-                const valor = parseFloat(valorInput.value) || 0;
-                const quantidade = parseInt(quantidadeInput.value) || 0;
-                
-                subtotalProdutos += valor * quantidade;
-            });
-            
-            // Calcular valor de instalação
-            const instalacao = parseFloat(valorInstalacaoInput.value) || 0;
-            
-            // Calcular subtotal geral
-            const subtotalGeral = subtotalProdutos + instalacao;
-            
-            // Calcular IVA
-            let iva = 0;
-            if (ivaSimRadio.checked) {
-                iva = subtotalGeral * 0.23;
-            }
-            
-            // Calcular total final
-            const totalFinal = subtotalGeral + iva;
-            
-            // Atualizar exibição
-            subtotalProdutosEl.textContent = formatarMoeda(subtotalProdutos);
-            totalInstalacaoEl.textContent = formatarMoeda(instalacao);
-            valorIVAEl.textContent = formatarMoeda(iva);
-            totalFinalEl.textContent = formatarMoeda(totalFinal);
-            
-            // Atualizar campos ocultos (usados pelo engine.js)
-            pedidoSubtotalInput.value = subtotalGeral;
-            pedidoIVAInput.value = iva;
-            pedidoTotalInput.value = totalFinal;
-            
-            // Atualizar resumo de pagamentos
-            updatePaymentSummary();
-        }
-
-        function formatarMoeda(value) {
-            return new Intl.NumberFormat('pt-PT', {
-                style: 'currency',
-                currency: 'EUR',
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2
-            }).format(value);
-        }
-
-        function formatarData(dataString) {
-            if (!dataString) return '';
-            const data = new Date(dataString);
-            return data.toLocaleDateString('pt-PT');
-        }
-
-        function showMessage(message, type = 'info') {
-            // Remover mensagens anteriores
-            const existingMessages = document.querySelectorAll('.success-message');
-            existingMessages.forEach(msg => msg.remove());
-            
-            const messageDiv = document.createElement('div');
-            messageDiv.className = 'success-message';
-            messageDiv.textContent = message;
-            
-            // Cor baseada no tipo
-            if (type === 'warning') {
-                messageDiv.style.backgroundColor = '#f59e0b';
-            } else if (type === 'error') {
-                messageDiv.style.backgroundColor = '#ef4444';
-            } else if (type === 'success') {
-                messageDiv.style.backgroundColor = '#10b981';
-            }
-            
-            document.body.appendChild(messageDiv);
-            
-            setTimeout(() => {
-                messageDiv.remove();
-            }, 3000);
-        }
-
-        function validateForm() {
-            // Verificar campos obrigatórios básicos
-            const requiredFields = ['cliente', 'empresa', 'nif', 'morada', 'telemovel', 'numero', 'dataEntrega', 'atendente'];
-            for (const fieldId of requiredFields) {
-                const field = document.getElementById(fieldId);
-                if (!field.value.trim()) {
-                    showMessage(`O campo "${field.previousElementSibling.textContent.replace(' *', '')}" é obrigatório.`, 'warning');
-                    field.focus();
-                    return false;
-                }
-            }
-            
-            // Verificar se há pelo menos um produto
-            const productRows = productsTableBody.querySelectorAll('tr');
-            if (productRows.length === 0) {
-                showMessage('Adicione pelo menos um produto ao pedido.', 'warning');
-                return false;
-            }
-            
-            // Verificar se todos os produtos têm nome selecionado
-            const productSelects = document.querySelectorAll('.product-select');
-            for (const select of productSelects) {
-                if (!select.value) {
-                    showMessage('Selecione um produto para todos os itens.', 'warning');
-                    select.focus();
-                    return false;
-                }
-            }
-            
-            // Verificar se todos os produtos têm valor válido
-            const valorInputs = document.querySelectorAll('.valor-input');
-            for (const input of valorInputs) {
-                const valor = parseFloat(input.value);
-                if (isNaN(valor) || valor < 0) {
-                    showMessage('Insira um valor válido para todos os produtos.', 'warning');
-                    input.focus();
-                    return false;
-                }
-            }
-            
-            // Verificar se há pelo menos um pagamento
-            const paymentRows = paymentsTableBody.querySelectorAll('tr');
-            if (paymentRows.length === 0) {
-                showMessage('Adicione pelo menos um pagamento (entrada).', 'warning');
-                addPaymentBtn.focus();
-                return false;
-            }
-            
-            return true;
-        }
-
-        async function gerarNumeroPedido() {
-            try {
-                const anoAtual = new Date().getFullYear();
-                
-                const response = await fetch('/api/database/query', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        schema: 'pedido',
-                        filters: { deleted: false }
-                    })
-                });
-                
-                if (!response.ok) {
-                    throw new Error('Erro ao buscar pedidos');
-                }
-                
-                const result = await response.json();
-                const eventos = result.events || [];
-                
-                let maiorSequencia = 0;
-                
-                eventos.forEach(evento => {
-                    const numero = evento.payload.numero;
-                    const match = numero.match(/^(\d{4})\/(\d{4})$/);
-                    
-                    if (match) {
-                        const ano = parseInt(match[1]);
-                        const sequencia = parseInt(match[2]);
-                        
-                        if (ano === anoAtual && sequencia > maiorSequencia) {
-                            maiorSequencia = sequencia;
-                        }
-                    }
-                });
-                
-                const novaSequencia = maiorSequencia + 1;
-                const sequenciaFormatada = novaSequencia.toString().padStart(4, '0');
-                const numeroPedido = `${anoAtual}/${sequenciaFormatada}`;
-                
-                numeroPedidoInput.value = numeroPedido;
-                
-            } catch (error) {
-                console.error('Erro ao gerar número de pedido:', error);
-                const anoAtual = new Date().getFullYear();
-                numeroPedidoInput.value = `${anoAtual}/0001`;
-            }
-        }
-
-        async function loadPedidoForEdit(pedidoId) {
-            try {
-                const response = await fetch('/api/database/query', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        schema: 'pedido',
-                        filters: { id: pedidoId }
-                    })
-                });
-                
-                if (!response.ok) {
-                    throw new Error('Erro ao buscar pedido');
-                }
-                
-                const result = await response.json();
-                const eventos = result.events || [];
-                
-                if (eventos.length === 0) {
-                    showMessage('Pedido não encontrado.', 'error');
-                    window.location.href = 'pedidos.html';
-                    return;
-                }
-                
-                const pedidoEvento = eventos[0];
-                const pedido = pedidoEvento.payload;
-                
-                // Preencher campos do formulário
-                document.getElementById('cliente').value = pedido.cliente || '';
-                document.getElementById('empresa').value = pedido.empresa || '';
-                document.getElementById('nif').value = pedido.nif || '';
-                document.getElementById('morada').value = pedido.morada || '';
-                document.getElementById('telemovel').value = pedido.telemovel || '';
-                document.getElementById('numero').value = pedido.numero || '';
-                document.getElementById('dataEntrega').value = pedido.dataEntrega || '';
-                document.getElementById('dataFechamento').value = pedido.dataFechamento || '';
-                document.getElementById('valorInstalacao').value = pedido.instalacao || '0';
-                document.getElementById('atendente').value = pedido.atendente || '';
-                document.getElementById('observacoes').value = pedido.observacoes || '';
-                
-                // Status
-                if (pedido.status) {
-                    const statusRadio = document.querySelector(`input[name="status"][value="${pedido.status}"]`);
-                    if (statusRadio) statusRadio.checked = true;
-                }
-                
-                // IVA
-                if (pedido.comIVA) {
-                    const ivaRadio = document.querySelector(`input[name="ivaOption"][value="${pedido.comIVA}"]`);
-                    if (ivaRadio) ivaRadio.checked = true;
-                }
-                
-                // Produtos
-                productsTableBody.innerHTML = '';
-                productIndex = 0;
-                
-                if (pedido.produtos && Array.isArray(pedido.produtos)) {
-                    pedido.produtos.forEach(produto => {
-                        addProductRow(produto);
-                    });
-                } else {
-                    addProductRow();
-                }
-                
-                // Pagamentos
-                paymentsTableBody.innerHTML = '';
-                paymentIndex = 0;
-                
-                if (pedido.pagamentos && Array.isArray(pedido.pagamentos)) {
-                    pedido.pagamentos.forEach(pagamento => {
-                        addPaymentRow(pagamento);
-                    });
-                } else {
-                    // Se não tem pagamentos, criar um padrão com entrada
-                    const hoje = new Date().toISOString().split('T')[0];
-                    addPaymentRow({
-                        tipo: 'entrada',
-                        data: hoje,
-                        valor: 0,
-                        formaPagamento: 'dinheiro',
-                        status: 'pendente',
-                        observacoes: 'Entrada inicial'
-                    });
-                }
-                
-                // Configurar modo de edição
-                isEditMode = true;
-                currentPedidoId = pedidoEvento.id;
-                pedidoIdInput.value = currentPedidoId;
-                
-                // Tornar o campo número editável no modo edição
-                numeroPedidoInput.removeAttribute('readonly');
-                numeroPedidoInput.style.backgroundColor = '';
-                
-                // Atualizar texto do botão
-                saveBtn.textContent = 'ATUALIZAR PEDIDO';
-                
-                // Calcular totais
-                calculateTotals();
-                
-                showMessage('Pedido carregado para edição.', 'info');
-                
-            } catch (error) {
-                console.error('Erro ao carregar pedido:', error);
-                showMessage('Erro ao carregar pedido. Redirecionando...', 'error');
-                setTimeout(() => {
-                    window.location.href = 'pedidos.html';
-                }, 2000);
-            }
-        }
-
-        function clearForm() {
-            pedidoForm.reset();
-            productsTableBody.innerHTML = '';
-            paymentsTableBody.innerHTML = '';
-            productIndex = 0;
-            paymentIndex = 0;
-            
-            // Configurar datas padrão
-            const today = new Date();
-            const tomorrow = new Date(today);
-            tomorrow.setDate(tomorrow.getDate() + 1);
-            
-            document.getElementById('dataEntrega').valueAsDate = tomorrow;
-            document.getElementById('dataFechamento').valueAsDate = null;
-            document.getElementById('valorInstalacao').value = '0';
-            
-            // Adicionar primeira linha de produto
-            addProductRow();
-            
-            // Adicionar primeira linha de pagamento (entrada)
-            const hoje = new Date().toISOString().split('T')[0];
-            addPaymentRow({
-                tipo: 'entrada',
-                data: hoje,
-                valor: 0,
-                formaPagamento: 'dinheiro',
-                status: 'pendente',
-                observacoes: 'Entrada inicial'
-            });
-            
-            // Resetar modo de edição
-            isEditMode = false;
-            currentPedidoId = '';
-            pedidoIdInput.value = '';
-            
-            // Gerar novo número de pedido
-            gerarNumeroPedido();
-            
-            // Calcular totais iniciais
-            calculateTotals();
-            
-            showMessage('Formulário limpo. Pronto para novo pedido.', 'info');
-        }
-
-        // ============================================
-        // EVENT LISTENERS
-        // ============================================
-
         document.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 Sistema de pedidos inicializado v5.2.2');
+            
+            // Configurações iniciais
+            const produtos = [
+                "Logo em Acrílico", "Logo Flutuante para Montra", "Neon LED", "Alto Colante",
+                "Logo 3D com LED", "Logo 3D sem LED", "Brindes", "Painel de ACM",
+                "Caixa de Luz", "Outro"
+            ];
+            
+            let productIndex = 0;
+            let paymentIndex = 0;
+            let isEditMode = false;
+            let currentPedidoId = '';
+            
+            // Referências DOM
+            const productsTableBody = document.getElementById('productsTableBody');
+            const paymentsTableBody = document.getElementById('paymentsTableBody');
+            const pedidoIdInput = document.getElementById('pedidoId');
+            const numeroPedidoInput = document.getElementById('numero');
+            const valorInstalacaoInput = document.getElementById('valorInstalacao');
+            const dataFechamentoInput = document.getElementById('dataFechamento');
+            
+            // Elementos de exibição de totais
+            const subtotalProdutosEl = document.getElementById('subtotalProdutos');
+            const totalInstalacaoEl = document.getElementById('totalInstalacaoDisplay');
+            const valorIVAEl = document.getElementById('valorIVA');
+            const totalFinalEl = document.getElementById('totalFinal');
+            const resumoTotalEl = document.getElementById('resumoTotal');
+            const resumoPagoEl = document.getElementById('resumoPago');
+            const resumoPendenteEl = document.getElementById('resumoPendente');
+            
+            // Campos ocultos para engine.js
+            const pedidoSubtotalInput = document.getElementById('pedidoSubtotal');
+            const pedidoIVAInput = document.getElementById('pedidoIVA');
+            const pedidoTotalInput = document.getElementById('pedidoTotal');
+            const pedidoTotalPagoInput = document.getElementById('pedidoTotalPago');
+            const pedidoSaldoPendenteInput = document.getElementById('pedidoSaldoPendente');
+            const pedidoStatusPagamentoInput = document.getElementById('pedidoStatusPagamento');
+            
             // Verificar se é modo de edição
             const urlParams = new URLSearchParams(window.location.search);
             const editId = urlParams.get('edit');
             
             if (editId) {
+                console.log(`✏️ Modo EDIÇÃO detectado para ID: ${editId}`);
                 loadPedidoForEdit(editId);
             } else {
-                // Configurar novo pedido
+                console.log('🆕 Modo CRIAÇÃO detectado');
+                setupNewPedido();
+            }
+            
+            // ============================================
+            // FUNÇÕES PRINCIPAIS
+            // ============================================
+            
+            function setupNewPedido() {
+                // Configurar datas padrão
                 const today = new Date();
                 const tomorrow = new Date(today);
                 tomorrow.setDate(tomorrow.getDate() + 1);
@@ -1740,124 +1046,262 @@
                 calculateTotals();
             }
             
-            // Configurar listener para evento do engine.js
-            document.addEventListener('coreCommitSuccess', (event) => {
-                const detail = event.detail || {};
-                
-                if (detail.schema === 'pedido') {
-                    // Feedback de sucesso
-                    saveBtn.classList.remove('saving');
-                    saveBtn.textContent = detail.isUpdate ? '✓ ATUALIZADO!' : '✓ SALVO!';
+            async function loadPedidoForEdit(pedidoId) {
+                try {
+                    console.log(`📥 Carregando pedido para edição: ${pedidoId}`);
                     
-                    showMessage(`Pedido ${detail.isUpdate ? 'atualizado' : 'criado'} com sucesso!`, 'success');
+                    const response = await fetch('/api/database/query', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            schema: 'pedido',
+                            filters: { id: pedidoId }
+                        })
+                    });
                     
-                    // Redirecionar após 2 segundos
+                    if (!response.ok) {
+                        throw new Error('Erro ao buscar pedido');
+                    }
+                    
+                    const result = await response.json();
+                    const eventos = result.events || [];
+                    
+                    if (eventos.length === 0) {
+                        throw new Error('Pedido não encontrado');
+                    }
+                    
+                    const pedidoEvento = eventos[0];
+                    const pedido = pedidoEvento.payload;
+                    
+                    console.log('📦 Pedido carregado:', pedido);
+                    
+                    // Preencher campos do formulário
+                    document.getElementById('cliente').value = pedido.cliente || '';
+                    document.getElementById('empresa').value = pedido.empresa || '';
+                    document.getElementById('nif').value = pedido.nif || '';
+                    document.getElementById('morada').value = pedido.morada || '';
+                    document.getElementById('telemovel').value = pedido.telemovel || '';
+                    document.getElementById('numero').value = pedido.numero || '';
+                    document.getElementById('dataEntrega').value = pedido.dataEntrega || '';
+                    document.getElementById('dataFechamento').value = pedido.dataFechamento || '';
+                    document.getElementById('valorInstalacao').value = pedido.instalacao || '0';
+                    document.getElementById('atendente').value = pedido.atendente || '';
+                    document.getElementById('observacoes').value = pedido.observacoes || '';
+                    
+                    // Status
+                    if (pedido.status) {
+                        const statusRadio = document.querySelector(`input[name="status"][value="${pedido.status}"]`);
+                        if (statusRadio) statusRadio.checked = true;
+                    }
+                    
+                    // IVA
+                    if (pedido.comIVA) {
+                        const ivaRadio = document.querySelector(`input[name="ivaOption"][value="${pedido.comIVA}"]`);
+                        if (ivaRadio) ivaRadio.checked = true;
+                    }
+                    
+                    // Produtos
+                    productsTableBody.innerHTML = '';
+                    productIndex = 0;
+                    
+                    if (pedido.produtos && Array.isArray(pedido.produtos)) {
+                        pedido.produtos.forEach(produto => {
+                            addProductRow(produto);
+                        });
+                    } else {
+                        addProductRow();
+                    }
+                    
+                    // Pagamentos
+                    paymentsTableBody.innerHTML = '';
+                    paymentIndex = 0;
+                    
+                    if (pedido.pagamentos && Array.isArray(pedido.pagamentos)) {
+                        pedido.pagamentos.forEach(pagamento => {
+                            addPaymentRow(pagamento);
+                        });
+                    } else {
+                        // Se não tem pagamentos, criar um padrão com entrada
+                        const hoje = new Date().toISOString().split('T')[0];
+                        addPaymentRow({
+                            tipo: 'entrada',
+                            data: hoje,
+                            valor: 0,
+                            formaPagamento: 'dinheiro',
+                            status: 'pendente',
+                            observacoes: 'Entrada inicial'
+                        });
+                    }
+                    
+                    // Configurar modo de edição
+                    isEditMode = true;
+                    currentPedidoId = pedidoEvento.id;
+                    pedidoIdInput.value = currentPedidoId;
+                    
+                    // Tornar o campo número editável no modo edição
+                    numeroPedidoInput.removeAttribute('readonly');
+                    numeroPedidoInput.style.backgroundColor = '';
+                    
+                    // Atualizar texto do botão
+                    document.getElementById('saveBtn').textContent = 'ATUALIZAR PEDIDO';
+                    
+                    // Calcular totais
+                    calculateTotals();
+                    
+                    showMessage('Pedido carregado para edição.', 'info');
+                    
+                } catch (error) {
+                    console.error('❌ Erro ao carregar pedido:', error);
+                    showMessage('Erro ao carregar pedido. Redirecionando...', 'error');
                     setTimeout(() => {
-                        if (confirm(`Pedido ${detail.isUpdate ? 'atualizado' : 'criado'} com sucesso! Deseja criar um novo pedido?`)) {
-                            clearForm();
-                        } else {
-                            window.location.href = 'pedidos.html';
-                        }
+                        window.location.href = 'pedidos.html';
                     }, 2000);
                 }
-            });
+            }
             
-            document.addEventListener('coreCommitError', (event) => {
-                console.error('Erro no commit:', event.detail);
-                saveBtn.classList.remove('saving');
-                saveBtn.textContent = isEditMode ? 'ATUALIZAR PEDIDO' : 'SALVAR PEDIDO';
-                saveBtn.disabled = false;
-                
-                showMessage('Erro ao salvar pedido. Tente novamente.', 'error');
-            });
-        });
-
-        // Adicionar produto
-        addProductBtn.addEventListener('click', () => {
-            addProductRow();
-            calculateTotals();
-        });
-
-        // Adicionar pagamento
-        addPaymentBtn.addEventListener('click', () => {
-            openPaymentModal();
-        });
-
-        // Cancelar pedido
-        cancelBtn.addEventListener('click', () => {
-            if (confirm(isEditMode ? 'Tem certeza que deseja cancelar a edição?' : 'Tem certeza que deseja cancelar este pedido?')) {
-                if (isEditMode) {
-                    window.location.href = 'pedidos.html';
-                } else {
-                    clearForm();
+            async function gerarNumeroPedido() {
+                try {
+                    const anoAtual = new Date().getFullYear();
+                    
+                    const response = await fetch('/api/database/query', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            schema: 'pedido',
+                            filters: { deleted: false }
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('Erro ao buscar pedidos');
+                    }
+                    
+                    const result = await response.json();
+                    const eventos = result.events || [];
+                    
+                    let maiorSequencia = 0;
+                    
+                    eventos.forEach(evento => {
+                        const numero = evento.payload.numero;
+                        const match = numero.match(/^(\d{4})\/(\d{4})$/);
+                        
+                        if (match) {
+                            const ano = parseInt(match[1]);
+                            const sequencia = parseInt(match[2]);
+                            
+                            if (ano === anoAtual && sequencia > maiorSequencia) {
+                                maiorSequencia = sequencia;
+                            }
+                        }
+                    });
+                    
+                    const novaSequencia = maiorSequencia + 1;
+                    const sequenciaFormatada = novaSequencia.toString().padStart(4, '0');
+                    const numeroPedido = `${anoAtual}/${sequenciaFormatada}`;
+                    
+                    numeroPedidoInput.value = numeroPedido;
+                    
+                } catch (error) {
+                    console.error('Erro ao gerar número de pedido:', error);
+                    const anoAtual = new Date().getFullYear();
+                    numeroPedidoInput.value = `${anoAtual}/0001`;
                 }
             }
-        });
-
-        // Salvar pedido
-        saveBtn.addEventListener('click', (e) => {
-            e.preventDefault();
             
-            if (!validateForm()) {
-                return;
-            }
+            // ============================================
+            // FUNÇÕES DE PRODUTOS
+            // ============================================
             
-            // Feedback visual
-            saveBtn.classList.add('saving');
-            saveBtn.textContent = isEditMode ? 'ATUALIZANDO...' : 'SALVANDO...';
-            saveBtn.disabled = true;
-        });
-
-        // Modal de pagamento
-        closePaymentModalBtn.addEventListener('click', closePaymentModal);
-        cancelPaymentBtn.addEventListener('click', closePaymentModal);
-        
-        savePaymentBtn.addEventListener('click', () => {
-            // Validar formulário de pagamento
-            if (!paymentDateInput.value) {
-                showMessage('A data do pagamento é obrigatória.', 'warning');
-                paymentDateInput.focus();
-                return;
-            }
-            
-            if (!paymentAmountInput.value || parseFloat(paymentAmountInput.value) <= 0) {
-                showMessage('O valor do pagamento deve ser maior que zero.', 'warning');
-                paymentAmountInput.focus();
-                return;
-            }
-            
-            if (!paymentMethodInput.value) {
-                showMessage('A forma de pagamento é obrigatória.', 'warning');
-                paymentMethodInput.focus();
-                return;
-            }
-            
-            // Criar objeto do pagamento
-            const paymentData = {
-                tipo: paymentTypeInput.value,
-                data: paymentDateInput.value,
-                valor: parseFloat(paymentAmountInput.value),
-                formaPagamento: paymentMethodInput.value,
-                status: paymentStatusInput.value,
-                observacoes: paymentObservationsInput.value,
-                referencia: paymentReferenceInput.value
-            };
-            
-            if (isPaymentEditMode && currentPaymentRow) {
-                // Atualizar linha existente
-                const row = currentPaymentRow;
-                const paymentId = paymentIdInput.value || row.querySelector('.payment-id-input').value;
+            function addProductRow(productData = null) {
+                const row = document.createElement('tr');
+                const index = productIndex++;
                 
-                paymentData.id = paymentId;
-                row.querySelector('.payment-tipo-input').value = paymentData.tipo;
-                row.querySelector('.payment-data-input').value = paymentData.data;
-                row.querySelector('.payment-valor-input').value = paymentData.valor;
-                row.querySelector('.payment-forma-input').value = paymentData.formaPagamento;
-                row.querySelector('.payment-status-input').value = paymentData.status;
-                row.querySelector('.payment-obs-input').value = paymentData.observacoes;
-                row.querySelector('.payment-ref-input').value = paymentData.referencia;
+                row.innerHTML = `
+                    <td>
+                        <select class="product-select" data-bind="pedido.produtos.${index}.nome" required>
+                            <option value="">Selecione um produto</option>
+                            ${produtos.map(p => `<option value="${p}" ${productData && productData.nome === p ? 'selected' : ''}>${p}</option>`).join('')}
+                        </select>
+                    </td>
+                    <td>
+                        <input type="text" class="tamanho-input" data-bind="pedido.produtos.${index}.tamanho" 
+                               placeholder="Ex: 30x40cm" value="${productData ? (productData.tamanho || '') : ''}">
+                    </td>
+                    <td>
+                        <input type="number" class="quantidade-input" data-bind="pedido.produtos.${index}.quantidade" 
+                               min="1" value="${productData ? (productData.quantidade || 1) : 1}" required>
+                    </td>
+                    <td>
+                        <input type="number" class="valor-input" data-bind="pedido.produtos.${index}.valor" 
+                               min="0" step="0.01" value="${productData ? (productData.valor || '0.00') : '0.00'}" required>
+                    </td>
+                    <td>
+                        <textarea class="obs-input" data-bind="pedido.produtos.${index}.observacoes" 
+                                  placeholder="Observações do produto..." rows="2">${productData ? (productData.observacoes || '') : ''}</textarea>
+                    </td>
+                    <td>
+                        <button type="button" class="remove-btn" title="Remover produto">
+                            🗑️
+                        </button>
+                    </td>
+                `;
                 
-                // Atualizar exibição
+                productsTableBody.appendChild(row);
+                
+                // Event listeners
+                const removeBtn = row.querySelector('.remove-btn');
+                const valorInput = row.querySelector('.valor-input');
+                const quantidadeInput = row.querySelector('.quantidade-input');
+                
+                removeBtn.addEventListener('click', () => removeProductRow(row));
+                valorInput.addEventListener('input', calculateTotals);
+                quantidadeInput.addEventListener('input', calculateTotals);
+                
+                return row;
+            }
+            
+            function removeProductRow(row) {
+                const totalRows = productsTableBody.querySelectorAll('tr').length;
+                if (totalRows <= 1) {
+                    showMessage('O pedido deve ter pelo menos um produto.', 'warning');
+                    return;
+                }
+                
+                row.remove();
+                reindexProducts();
+                calculateTotals();
+            }
+            
+            function reindexProducts() {
+                const rows = productsTableBody.querySelectorAll('tr');
+                productIndex = 0;
+                
+                rows.forEach((row, index) => {
+                    const select = row.querySelector('.product-select');
+                    const tamanho = row.querySelector('.tamanho-input');
+                    const quantidade = row.querySelector('.quantidade-input');
+                    const valor = row.querySelector('.valor-input');
+                    const obs = row.querySelector('.obs-input');
+                    
+                    if (select) select.setAttribute('data-bind', `pedido.produtos.${index}.nome`);
+                    if (tamanho) tamanho.setAttribute('data-bind', `pedido.produtos.${index}.tamanho`);
+                    if (quantidade) quantidade.setAttribute('data-bind', `pedido.produtos.${index}.quantidade`);
+                    if (valor) valor.setAttribute('data-bind', `pedido.produtos.${index}.valor`);
+                    if (obs) obs.setAttribute('data-bind', `pedido.produtos.${index}.observacoes`);
+                    
+                    productIndex = index + 1;
+                });
+            }
+            
+            // ============================================
+            // FUNÇÕES DE PAGAMENTOS
+            // ============================================
+            
+            function addPaymentRow(paymentData) {
+                const row = document.createElement('tr');
+                const index = paymentIndex++;
+                
+                // Determinar label do tipo
                 let tipoLabel = '';
                 switch(paymentData.tipo) {
                     case 'entrada': tipoLabel = 'Entrada'; break;
@@ -1866,6 +1310,7 @@
                     default: tipoLabel = paymentData.tipo;
                 }
                 
+                // Determinar classe do status
                 let statusClass = '';
                 let statusLabel = '';
                 switch(paymentData.status) {
@@ -1881,33 +1326,561 @@
                         statusClass = 'atrasado';
                         statusLabel = 'Atrasado';
                         break;
+                    default: 
+                        statusClass = 'pendente';
+                        statusLabel = 'Pendente';
                 }
                 
-                row.cells[0].querySelector('span').textContent = tipoLabel;
-                row.cells[1].querySelector('span').textContent = formatarData(paymentData.data);
-                row.cells[2].querySelector('span').textContent = formatarMoeda(paymentData.valor);
-                row.cells[3].querySelector('span').textContent = getFormaPagamentoLabel(paymentData.formaPagamento);
-                row.cells[4].querySelector('span').textContent = (paymentData.observacoes || '').substring(0, 30) + (paymentData.observacoes && paymentData.observacoes.length > 30 ? '...' : '');
-                row.cells[4].querySelector('span').title = paymentData.observacoes || '';
-                row.cells[5].querySelector('span').className = `payment-status ${statusClass}`;
-                row.cells[5].querySelector('span').textContent = statusLabel;
+                // Gerar um ID único para o pagamento
+                const paymentId = paymentData.id || `payment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
                 
-                showMessage('Pagamento atualizado com sucesso!', 'success');
-            } else {
-                // Adicionar nova linha
-                addPaymentRow(paymentData);
-                showMessage('Pagamento adicionado com sucesso!', 'success');
+                row.innerHTML = `
+                    <td>
+                        <span>${tipoLabel}</span>
+                        <input type="hidden" class="payment-id-input" data-bind="pedido.pagamentos.${index}.id" value="${paymentId}">
+                        <input type="hidden" class="payment-tipo-input" data-bind="pedido.pagamentos.${index}.tipo" value="${paymentData.tipo}">
+                    </td>
+                    <td>
+                        <span>${formatarData(paymentData.data)}</span>
+                        <input type="hidden" class="payment-data-input" data-bind="pedido.pagamentos.${index}.data" value="${paymentData.data}">
+                    </td>
+                    <td>
+                        <span>${formatarMoeda(paymentData.valor)}</span>
+                        <input type="hidden" class="payment-valor-input" data-bind="pedido.pagamentos.${index}.valor" value="${paymentData.valor}">
+                    </td>
+                    <td>
+                        <span>${getFormaPagamentoLabel(paymentData.formaPagamento)}</span>
+                        <input type="hidden" class="payment-forma-input" data-bind="pedido.pagamentos.${index}.formaPagamento" value="${paymentData.formaPagamento}">
+                    </td>
+                    <td>
+                        <span title="${paymentData.observacoes || ''}">${(paymentData.observacoes || '').substring(0, 30)}${paymentData.observacoes && paymentData.observacoes.length > 30 ? '...' : ''}</span>
+                        <input type="hidden" class="payment-obs-input" data-bind="pedido.pagamentos.${index}.observacoes" value="${paymentData.observacoes || ''}">
+                        <input type="hidden" class="payment-ref-input" data-bind="pedido.pagamentos.${index}.referencia" value="${paymentData.referencia || ''}">
+                    </td>
+                    <td>
+                        <span class="payment-status ${statusClass}">${statusLabel}</span>
+                        <input type="hidden" class="payment-status-input" data-bind="pedido.pagamentos.${index}.status" value="${paymentData.status}">
+                    </td>
+                    <td>
+                        <button type="button" class="remove-btn edit-payment-btn" title="Editar pagamento">
+                            ✏️
+                        </button>
+                        <button type="button" class="remove-btn" title="Remover pagamento">
+                            🗑️
+                        </button>
+                    </td>
+                `;
+                
+                paymentsTableBody.appendChild(row);
+                
+                // Event listeners
+                const removeBtn = row.querySelectorAll('.remove-btn')[1];
+                const editBtn = row.querySelector('.edit-payment-btn');
+                
+                removeBtn.addEventListener('click', () => removePaymentRow(row));
+                editBtn.addEventListener('click', () => {
+                    const paymentRowData = {
+                        id: row.querySelector('.payment-id-input').value,
+                        row: row,
+                        tipo: row.querySelector('.payment-tipo-input').value,
+                        data: row.querySelector('.payment-data-input').value,
+                        valor: parseFloat(row.querySelector('.payment-valor-input').value),
+                        formaPagamento: row.querySelector('.payment-forma-input').value,
+                        status: row.querySelector('.payment-status-input').value,
+                        observacoes: row.querySelector('.payment-obs-input').value,
+                        referencia: row.querySelector('.payment-ref-input').value
+                    };
+                    openPaymentModal(paymentRowData);
+                });
+                
+                return row;
             }
             
-            // Atualizar resumo e fechar modal
-            updatePaymentSummary();
-            closePaymentModal();
+            function removePaymentRow(row) {
+                const totalRows = paymentsTableBody.querySelectorAll('tr').length;
+                if (totalRows <= 1) {
+                    showMessage('O pedido deve ter pelo menos um pagamento.', 'warning');
+                    return;
+                }
+                
+                if (confirm('Tem certeza que deseja remover este pagamento?')) {
+                    row.remove();
+                    reindexPayments();
+                    updatePaymentSummary();
+                }
+            }
+            
+            function reindexPayments() {
+                const rows = paymentsTableBody.querySelectorAll('tr');
+                paymentIndex = 0;
+                
+                rows.forEach((row, index) => {
+                    const idInput = row.querySelector('.payment-id-input');
+                    const tipoInput = row.querySelector('.payment-tipo-input');
+                    const dataInput = row.querySelector('.payment-data-input');
+                    const valorInput = row.querySelector('.payment-valor-input');
+                    const formaInput = row.querySelector('.payment-forma-input');
+                    const obsInput = row.querySelector('.payment-obs-input');
+                    const refInput = row.querySelector('.payment-ref-input');
+                    const statusInput = row.querySelector('.payment-status-input');
+                    
+                    if (idInput) idInput.setAttribute('data-bind', `pedido.pagamentos.${index}.id`);
+                    if (tipoInput) tipoInput.setAttribute('data-bind', `pedido.pagamentos.${index}.tipo`);
+                    if (dataInput) dataInput.setAttribute('data-bind', `pedido.pagamentos.${index}.data`);
+                    if (valorInput) valorInput.setAttribute('data-bind', `pedido.pagamentos.${index}.valor`);
+                    if (formaInput) formaInput.setAttribute('data-bind', `pedido.pagamentos.${index}.formaPagamento`);
+                    if (obsInput) obsInput.setAttribute('data-bind', `pedido.pagamentos.${index}.observacoes`);
+                    if (refInput) refInput.setAttribute('data-bind', `pedido.pagamentos.${index}.referencia`);
+                    if (statusInput) statusInput.setAttribute('data-bind', `pedido.pagamentos.${index}.status`);
+                    
+                    paymentIndex = index + 1;
+                });
+            }
+            
+            function getFormaPagamentoLabel(valor) {
+                const formas = {
+                    'dinheiro': 'Dinheiro',
+                    'mbway': 'MBWay',
+                    'transferencia': 'Transferência',
+                    'cartao': 'Cartão',
+                    'cheque': 'Cheque',
+                    'outro': 'Outro'
+                };
+                return formas[valor] || valor;
+            }
+            
+            function updatePaymentSummary() {
+                const totalPedido = parseFloat(pedidoTotalInput.value) || 0;
+                let totalPago = 0;
+                
+                // Calcular total pago
+                document.querySelectorAll('.payment-valor-input').forEach(input => {
+                    const valor = parseFloat(input.value) || 0;
+                    totalPago += valor;
+                });
+                
+                const saldoPendente = totalPedido - totalPago;
+                
+                // Atualizar displays
+                resumoTotalEl.textContent = formatarMoeda(totalPedido);
+                resumoPagoEl.textContent = formatarMoeda(totalPago);
+                resumoPendenteEl.textContent = formatarMoeda(saldoPendente);
+                
+                // Atualizar cores
+                if (saldoPendente > 0) {
+                    resumoPendenteEl.style.color = '#dc2626';
+                } else if (saldoPendente < 0) {
+                    resumoPendenteEl.style.color = '#f59e0b';
+                } else {
+                    resumoPendenteEl.style.color = '#059669';
+                }
+                
+                // Atualizar campos ocultos
+                pedidoTotalPagoInput.value = totalPago.toFixed(2);
+                pedidoSaldoPendenteInput.value = saldoPendente.toFixed(2);
+                
+                // Atualizar status do pagamento
+                if (totalPago === 0) {
+                    pedidoStatusPagamentoInput.value = 'pendente';
+                } else if (totalPago > 0 && totalPago < totalPedido) {
+                    pedidoStatusPagamentoInput.value = 'parcial';
+                } else if (totalPago >= totalPedido) {
+                    pedidoStatusPagamentoInput.value = 'pago';
+                }
+            }
+            
+            // ============================================
+            // FUNÇÕES COMPARTILHADAS
+            // ============================================
+            
+            function calculateTotals() {
+                let subtotalProdutos = 0;
+                
+                // Calcular subtotal dos produtos
+                document.querySelectorAll('#productsTableBody tr').forEach(row => {
+                    const valorInput = row.querySelector('.valor-input');
+                    const quantidadeInput = row.querySelector('.quantidade-input');
+                    
+                    const valor = parseFloat(valorInput.value) || 0;
+                    const quantidade = parseInt(quantidadeInput.value) || 0;
+                    
+                    subtotalProdutos += valor * quantidade;
+                });
+                
+                // Calcular valor de instalação
+                const instalacao = parseFloat(valorInstalacaoInput.value) || 0;
+                
+                // Calcular subtotal geral
+                const subtotalGeral = subtotalProdutos + instalacao;
+                
+                // Calcular IVA
+                const ivaSimRadio = document.getElementById('ivaSim');
+                let iva = 0;
+                if (ivaSimRadio.checked) {
+                    iva = subtotalGeral * 0.23;
+                }
+                
+                // Calcular total final
+                const totalFinal = subtotalGeral + iva;
+                
+                // Atualizar exibição
+                subtotalProdutosEl.textContent = formatarMoeda(subtotalProdutos);
+                totalInstalacaoEl.textContent = formatarMoeda(instalacao);
+                valorIVAEl.textContent = formatarMoeda(iva);
+                totalFinalEl.textContent = formatarMoeda(totalFinal);
+                
+                // Atualizar campos ocultos
+                pedidoSubtotalInput.value = subtotalGeral;
+                pedidoIVAInput.value = iva;
+                pedidoTotalInput.value = totalFinal;
+                
+                // Atualizar resumo de pagamentos
+                updatePaymentSummary();
+            }
+            
+            function formatarMoeda(value) {
+                return new Intl.NumberFormat('pt-PT', {
+                    style: 'currency',
+                    currency: 'EUR',
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                }).format(value);
+            }
+            
+            function formatarData(dataString) {
+                if (!dataString) return '';
+                const data = new Date(dataString);
+                return data.toLocaleDateString('pt-PT');
+            }
+            
+            function showMessage(message, type = 'info') {
+                // Remover mensagens anteriores
+                const existingMessages = document.querySelectorAll('.success-message');
+                existingMessages.forEach(msg => msg.remove());
+                
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'success-message';
+                messageDiv.textContent = message;
+                
+                if (type === 'warning') {
+                    messageDiv.style.backgroundColor = '#f59e0b';
+                } else if (type === 'error') {
+                    messageDiv.style.backgroundColor = '#ef4444';
+                } else if (type === 'success') {
+                    messageDiv.style.backgroundColor = '#10b981';
+                }
+                
+                document.body.appendChild(messageDiv);
+                
+                setTimeout(() => {
+                    messageDiv.remove();
+                }, 3000);
+            }
+            
+            function validateForm() {
+                // Verificar campos obrigatórios
+                const requiredFields = ['cliente', 'empresa', 'nif', 'morada', 'telemovel', 'numero', 'dataEntrega', 'atendente'];
+                for (const fieldId of requiredFields) {
+                    const field = document.getElementById(fieldId);
+                    if (!field.value.trim()) {
+                        showMessage(`O campo "${field.previousElementSibling.textContent.replace(' *', '')}" é obrigatório.`, 'warning');
+                        field.focus();
+                        return false;
+                    }
+                }
+                
+                // Verificar se há produtos
+                const productRows = productsTableBody.querySelectorAll('tr');
+                if (productRows.length === 0) {
+                    showMessage('Adicione pelo menos um produto ao pedido.', 'warning');
+                    return false;
+                }
+                
+                // Verificar produtos
+                const productSelects = document.querySelectorAll('.product-select');
+                for (const select of productSelects) {
+                    if (!select.value) {
+                        showMessage('Selecione um produto para todos os itens.', 'warning');
+                        select.focus();
+                        return false;
+                    }
+                }
+                
+                // Verificar valores dos produtos
+                const valorInputs = document.querySelectorAll('.valor-input');
+                for (const input of valorInputs) {
+                    const valor = parseFloat(input.value);
+                    if (isNaN(valor) || valor < 0) {
+                        showMessage('Insira um valor válido para todos os produtos.', 'warning');
+                        input.focus();
+                        return false;
+                    }
+                }
+                
+                // Verificar pagamentos
+                const paymentRows = paymentsTableBody.querySelectorAll('tr');
+                if (paymentRows.length === 0) {
+                    showMessage('Adicione pelo menos um pagamento.', 'warning');
+                    document.getElementById('addPaymentBtn').focus();
+                    return false;
+                }
+                
+                return true;
+            }
+            
+            // ============================================
+            // MODAL DE PAGAMENTOS
+            // ============================================
+            
+            const paymentModal = document.getElementById('paymentModal');
+            const paymentForm = document.getElementById('paymentForm');
+            const paymentIdInput = document.getElementById('paymentId');
+            const paymentTypeInput = document.getElementById('paymentType');
+            const paymentDateInput = document.getElementById('paymentDate');
+            const paymentAmountInput = document.getElementById('paymentAmount');
+            const paymentMethodInput = document.getElementById('paymentMethod');
+            const paymentStatusInput = document.getElementById('paymentStatus');
+            const paymentObservationsInput = document.getElementById('paymentObservations');
+            const paymentReferenceInput = document.getElementById('paymentReference');
+            
+            let isPaymentEditMode = false;
+            let currentPaymentRow = null;
+            
+            function openPaymentModal(paymentData = null) {
+                // Resetar formulário
+                paymentForm.reset();
+                
+                // Data padrão para hoje
+                const hoje = new Date().toISOString().split('T')[0];
+                paymentDateInput.value = hoje;
+                
+                if (paymentData) {
+                    // Modo edição
+                    isPaymentEditMode = true;
+                    currentPaymentRow = paymentData.row;
+                    paymentIdInput.value = paymentData.id || '';
+                    paymentTypeInput.value = paymentData.tipo || 'entrada';
+                    paymentDateInput.value = paymentData.data || hoje;
+                    paymentAmountInput.value = paymentData.valor || '0.00';
+                    paymentMethodInput.value = paymentData.formaPagamento || '';
+                    paymentStatusInput.value = paymentData.status || 'pago';
+                    paymentObservationsInput.value = paymentData.observacoes || '';
+                    paymentReferenceInput.value = paymentData.referencia || '';
+                    
+                    document.getElementById('savePaymentBtn').textContent = 'ATUALIZAR PAGAMENTO';
+                } else {
+                    // Modo criação
+                    isPaymentEditMode = false;
+                    currentPaymentRow = null;
+                    paymentIdInput.value = '';
+                    document.getElementById('savePaymentBtn').textContent = 'SALVAR PAGAMENTO';
+                }
+                
+                // Mostrar modal
+                paymentModal.style.display = 'flex';
+                paymentAmountInput.focus();
+            }
+            
+            function closePaymentModal() {
+                paymentModal.style.display = 'none';
+                isPaymentEditMode = false;
+                currentPaymentRow = null;
+                paymentForm.reset();
+            }
+            
+            // ============================================
+            // EVENT LISTENERS
+            // ============================================
+            
+            // Adicionar produto
+            document.getElementById('addProductBtn').addEventListener('click', () => {
+                addProductRow();
+                calculateTotals();
+            });
+            
+            // Adicionar pagamento
+            document.getElementById('addPaymentBtn').addEventListener('click', () => {
+                openPaymentModal();
+            });
+            
+            // Cancelar pedido
+            document.getElementById('cancelBtn').addEventListener('click', () => {
+                if (confirm(isEditMode ? 'Tem certeza que deseja cancelar a edição?' : 'Tem certeza que deseja cancelar este pedido?')) {
+                    if (isEditMode) {
+                        window.location.href = 'pedidos.html';
+                    } else {
+                        // Limpar formulário
+                        document.getElementById('pedidoForm').reset();
+                        productsTableBody.innerHTML = '';
+                        paymentsTableBody.innerHTML = '';
+                        productIndex = 0;
+                        paymentIndex = 0;
+                        pedidoIdInput.value = '';
+                        
+                        setupNewPedido();
+                        showMessage('Formulário limpo. Pronto para novo pedido.', 'info');
+                    }
+                }
+            });
+            
+            // Salvar pagamento
+            document.getElementById('savePaymentBtn').addEventListener('click', () => {
+                // Validar
+                if (!paymentDateInput.value) {
+                    showMessage('A data do pagamento é obrigatória.', 'warning');
+                    paymentDateInput.focus();
+                    return;
+                }
+                
+                if (!paymentAmountInput.value || parseFloat(paymentAmountInput.value) <= 0) {
+                    showMessage('O valor do pagamento deve ser maior que zero.', 'warning');
+                    paymentAmountInput.focus();
+                    return;
+                }
+                
+                if (!paymentMethodInput.value) {
+                    showMessage('A forma de pagamento é obrigatória.', 'warning');
+                    paymentMethodInput.focus();
+                    return;
+                }
+                
+                // Criar objeto do pagamento
+                const paymentData = {
+                    tipo: paymentTypeInput.value,
+                    data: paymentDateInput.value,
+                    valor: parseFloat(paymentAmountInput.value),
+                    formaPagamento: paymentMethodInput.value,
+                    status: paymentStatusInput.value,
+                    observacoes: paymentObservationsInput.value,
+                    referencia: paymentReferenceInput.value
+                };
+                
+                if (isPaymentEditMode && currentPaymentRow) {
+                    // Atualizar linha existente
+                    const row = currentPaymentRow;
+                    const paymentId = paymentIdInput.value || row.querySelector('.payment-id-input').value;
+                    
+                    paymentData.id = paymentId;
+                    row.querySelector('.payment-tipo-input').value = paymentData.tipo;
+                    row.querySelector('.payment-data-input').value = paymentData.data;
+                    row.querySelector('.payment-valor-input').value = paymentData.valor;
+                    row.querySelector('.payment-forma-input').value = paymentData.formaPagamento;
+                    row.querySelector('.payment-status-input').value = paymentData.status;
+                    row.querySelector('.payment-obs-input').value = paymentData.observacoes;
+                    row.querySelector('.payment-ref-input').value = paymentData.referencia;
+                    
+                    // Atualizar exibição
+                    let tipoLabel = '';
+                    switch(paymentData.tipo) {
+                        case 'entrada': tipoLabel = 'Entrada'; break;
+                        case 'parcela': tipoLabel = 'Parcela'; break;
+                        case 'final': tipoLabel = 'Final'; break;
+                        default: tipoLabel = paymentData.tipo;
+                    }
+                    
+                    let statusClass = '';
+                    let statusLabel = '';
+                    switch(paymentData.status) {
+                        case 'pago': 
+                            statusClass = 'pago';
+                            statusLabel = 'Pago';
+                            break;
+                        case 'pendente': 
+                            statusClass = 'pendente';
+                            statusLabel = 'Pendente';
+                            break;
+                        case 'atrasado': 
+                            statusClass = 'atrasado';
+                            statusLabel = 'Atrasado';
+                            break;
+                    }
+                    
+                    row.cells[0].querySelector('span').textContent = tipoLabel;
+                    row.cells[1].querySelector('span').textContent = formatarData(paymentData.data);
+                    row.cells[2].querySelector('span').textContent = formatarMoeda(paymentData.valor);
+                    row.cells[3].querySelector('span').textContent = getFormaPagamentoLabel(paymentData.formaPagamento);
+                    row.cells[4].querySelector('span').textContent = (paymentData.observacoes || '').substring(0, 30) + (paymentData.observacoes && paymentData.observacoes.length > 30 ? '...' : '');
+                    row.cells[4].querySelector('span').title = paymentData.observacoes || '';
+                    row.cells[5].querySelector('span').className = `payment-status ${statusClass}`;
+                    row.cells[5].querySelector('span').textContent = statusLabel;
+                    
+                    showMessage('Pagamento atualizado com sucesso!', 'success');
+                } else {
+                    // Adicionar nova linha
+                    addPaymentRow(paymentData);
+                    showMessage('Pagamento adicionado com sucesso!', 'success');
+                }
+                
+                // Atualizar resumo e fechar modal
+                updatePaymentSummary();
+                closePaymentModal();
+            });
+            
+            // Fechar modal
+            document.getElementById('closePaymentModal').addEventListener('click', closePaymentModal);
+            document.getElementById('cancelPaymentBtn').addEventListener('click', closePaymentModal);
+            
+            // Listeners para cálculo automático
+            document.getElementById('ivaSim').addEventListener('change', calculateTotals);
+            document.getElementById('ivaNao').addEventListener('change', calculateTotals);
+            valorInstalacaoInput.addEventListener('input', calculateTotals);
+            
+            // Configurar listener para evento do engine.js
+            document.addEventListener('coreCommitSuccess', (event) => {
+                const detail = event.detail || {};
+                
+                if (detail.schema === 'pedido') {
+                    const saveBtn = document.getElementById('saveBtn');
+                    saveBtn.classList.remove('saving');
+                    
+                    if (detail.isUpdate) {
+                        saveBtn.textContent = '✓ ATUALIZADO!';
+                        showMessage('Pedido atualizado com sucesso!', 'success');
+                    } else {
+                        saveBtn.textContent = '✓ SALVO!';
+                        showMessage('Pedido criado com sucesso!', 'success');
+                        
+                        // Se for criação, armazenar o ID gerado
+                        if (detail.documentId && pedidoIdInput) {
+                            pedidoIdInput.value = detail.documentId;
+                            isEditMode = true;
+                            saveBtn.textContent = 'ATUALIZAR PEDIDO';
+                        }
+                    }
+                    
+                    // Redirecionar após 2 segundos se for criação
+                    setTimeout(() => {
+                        if (!detail.isUpdate) {
+                            if (confirm('Pedido salvo com sucesso! Deseja criar um novo pedido?')) {
+                                // Limpar e criar novo
+                                document.getElementById('pedidoForm').reset();
+                                productsTableBody.innerHTML = '';
+                                paymentsTableBody.innerHTML = '';
+                                productIndex = 0;
+                                paymentIndex = 0;
+                                pedidoIdInput.value = '';
+                                isEditMode = false;
+                                saveBtn.textContent = 'SALVAR PEDIDO';
+                                
+                                setupNewPedido();
+                            } else {
+                                window.location.href = 'pedidos.html';
+                            }
+                        }
+                    }, 2000);
+                }
+            });
+            
+            document.addEventListener('coreCommitError', (event) => {
+                console.error('Erro no commit:', event.detail);
+                const saveBtn = document.getElementById('saveBtn');
+                saveBtn.classList.remove('saving');
+                saveBtn.textContent = isEditMode ? 'ATUALIZAR PEDIDO' : 'SALVAR PEDIDO';
+                saveBtn.disabled = false;
+                
+                showMessage('Erro ao salvar pedido. Tente novamente.', 'error');
+            });
         });
-
-        // Listeners para cálculo automático de totais
-        ivaSimRadio.addEventListener('change', calculateTotals);
-        ivaNaoRadio.addEventListener('change', calculateTotals);
-        valorInstalacaoInput.addEventListener('input', calculateTotals);
     </script>
     
     <!-- CONEXÃO COM O CORE ENGINE -->

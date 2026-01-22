@@ -1,19 +1,18 @@
 /**
- * ENGINE.JS v5.2.1 - MOTOR DE COMUNICAÇÃO UNIVERSAL
+ * ENGINE.JS v5.2.2 - MOTOR DE COMUNICAÇÃO UNIVERSAL
  * Localização: /core/engine.js
  * Responsável por: Data-binding, Commits, Queries e UI Updates.
- * ATUALIZAÇÃO v5.2.1: Correção de duplicação e suporte para campos adicionais
- * Agora processa: pedido, orcamento, venda, despesa e qualquer outro schema
- * Mantém compatibilidade total com versões anteriores
+ * ATUALIZAÇÃO v5.2.2: Correção DEFINITIVA da duplicação na edição
+ * Agora detecta corretamente se é atualização e envia ID para o backend
  */
 
 document.addEventListener('DOMContentLoaded', () => {
     const pageId = document.body.getAttribute('data-page-id') || 'pagina-sem-id';
     const pageType = document.body.getAttribute('data-page-type') || 'NEUTRAL';
 
-    console.log(`🚀 Engine v5.2.1 Ativa: ${pageId} [Tipo: ${pageType}]`);
-    console.log(`💾 Modo: Salvamento no Firebase Online`);
-    console.log(`🔄 Suporte universal para schemas com produtos`);
+    console.log(`🚀 Engine v5.2.2 Ativa: ${pageId} [Tipo: ${pageType}]`);
+    console.log(`💾 Modo: Salvamento/Atualização no Firebase`);
+    console.log(`🔄 Suporte universal para todos os schemas`);
 
     // --- MODO ESCRITA (WRITE) ---
     const commitBtn = document.querySelector('[data-action="commit"]');
@@ -52,10 +51,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (schema && Object.keys(payload).length > 0) {
                 try {
-                    // Verificar se é uma atualização (tem ID)
-                    const temId = document.getElementById(`${schema}Id`) || 
-                                  document.querySelector(`[data-bind$="${schema}.id"]`);
-                    const idPedido = temId ? temId.value : null;
+                    // CRÍTICO: Verificar se é uma atualização (tem ID no formulário)
+                    const idInput = document.getElementById(`${schema}Id`) || 
+                                   document.querySelector(`[data-bind$="${schema}.id"]`);
+                    
+                    const idPedido = idInput ? idInput.value : null;
+                    const isUpdate = idPedido && idPedido.trim() !== '';
+                    
+                    console.log(`🔍 Verificando modo: ${isUpdate ? 'ATUALIZAÇÃO' : 'CRIAÇÃO'}`);
+                    console.log(`🔍 ID do pedido: ${idPedido || 'Nenhum (novo pedido)'}`);
                     
                     // Preparar dados para envio
                     const dadosEnvio = {
@@ -65,10 +69,12 @@ document.addEventListener('DOMContentLoaded', () => {
                         timestamp: new Date().toISOString()
                     };
                     
-                    // Se tem ID, adicionar ao payload para identificar como atualização
-                    if (idPedido && idPedido.trim() !== '') {
+                    // SE FOR ATUALIZAÇÃO: Adicionar o ID do documento existente
+                    if (isUpdate) {
                         dadosEnvio.id = idPedido;
-                        console.log(`🔄 Modo atualização detectado para ID: ${idPedido}`);
+                        console.log(`🔄 Enviando em MODO ATUALIZAÇÃO com ID: ${idPedido}`);
+                    } else {
+                        console.log(`🆕 Enviando em MODO CRIAÇÃO (sem ID)`);
                     }
                     
                     // Salvar no Firebase via API
@@ -82,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     if (response.ok) {
                         const result = await response.json();
-                        console.log('✅ Dados salvos no Firebase:', result);
+                        console.log('✅ Resposta do Firebase:', result);
                         
                         // Disparar evento de sucesso
                         window.dispatchEvent(new CustomEvent('coreCommitSuccess', {
@@ -90,13 +96,14 @@ document.addEventListener('DOMContentLoaded', () => {
                                 schema: schema, 
                                 payload: payload, 
                                 result: result,
-                                isUpdate: !!idPedido
+                                isUpdate: isUpdate,
+                                documentId: result.id
                             }
                         }));
                         
                         // Feedback visual
-                        commitBtn.style.backgroundColor = "#27ae60";
-                        commitBtn.textContent = idPedido ? "✓ Atualizado!" : "✓ Salvo Online!";
+                        commitBtn.style.backgroundColor = isUpdate ? "#3b82f6" : "#27ae60";
+                        commitBtn.textContent = isUpdate ? "✓ Atualizado!" : "✓ Salvo!";
                         commitBtn.disabled = true;
                         
                         setTimeout(() => {
@@ -108,26 +115,52 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Disparar evento de mudança de dados
                         window.dispatchEvent(new CustomEvent('coreDataChanged'));
                         
-                        // Limpar formulário apenas se não for atualização e não tiver ID
-                        const temIdField = document.querySelector('[data-bind$=".id"]') || 
-                                         document.getElementById(`${schema}Id`);
-                        if (!temIdField || !temIdField.value) {
-                            limparFormulario(inputs);
+                        // Se for criação, guardar o ID gerado no campo oculto
+                        if (!isUpdate && result.id && idInput) {
+                            idInput.value = result.id;
+                            console.log(`💾 ID gerado armazenado: ${result.id}`);
+                        }
+                        
+                        // NÃO limpar formulário se for atualização
+                        if (!isUpdate) {
+                            const temIdField = document.querySelector('[data-bind$=".id"]') || 
+                                             document.getElementById(`${schema}Id`);
+                            if (!temIdField || !temIdField.value) {
+                                setTimeout(() => {
+                                    if (confirm('Deseja criar um novo pedido?')) {
+                                        limparFormulario(inputs);
+                                    }
+                                }, 1000);
+                            }
                         }
                         
                     } else {
                         const errorText = await response.text();
-                        throw new Error(`Falha ao salvar no Firebase: ${errorText}`);
+                        throw new Error(`Falha na API: ${errorText}`);
                     }
                 } catch (error) {
                     console.error('❌ Erro ao salvar no Firebase:', error);
                     
                     // Disparar evento de erro
                     window.dispatchEvent(new CustomEvent('coreCommitError', {
-                        detail: { error: error.message, schema: schema }
+                        detail: { 
+                            error: error.message, 
+                            schema: schema,
+                            isUpdate: isUpdate
+                        }
                     }));
                     
-                    alert('❌ Erro ao salvar dados online! Verifique o console.');
+                    // Feedback de erro
+                    commitBtn.style.backgroundColor = "#ef4444";
+                    commitBtn.textContent = "❌ Erro!";
+                    
+                    setTimeout(() => {
+                        commitBtn.style.backgroundColor = "";
+                        commitBtn.textContent = commitBtn.getAttribute('data-original-text') || "Salvar";
+                        commitBtn.disabled = false;
+                    }, 2000);
+                    
+                    alert('❌ Erro ao salvar dados! Verifique o console para detalhes.');
                 }
             } else {
                 console.error('❌ Erro: Schema não identificado ou payload vazio');
@@ -220,28 +253,41 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- FUNÇÕES AUXILIARES ---
     
     function limparFormulario(inputs) {
+        console.log('🧹 Limpando formulário...');
+        
+        // Não limpar campos com data-bind que contém "id"
         inputs.forEach(input => {
+            const bindPath = input.getAttribute('data-bind');
+            
+            // NUNCA limpar campos que têm .id no data-bind
+            if (bindPath && bindPath.endsWith('.id')) {
+                console.log(`🛡️ Protegendo campo ID: ${bindPath}`);
+                return;
+            }
+            
             if (input.type === 'checkbox' || input.type === 'radio') {
                 input.checked = false;
             } else if (input.tagName === 'SELECT') {
                 input.selectedIndex = 0;
-            } else if (input.hasAttribute('readonly')) {
-                // Não limpar campos readonly (como códigos automáticos)
+            } else if (input.hasAttribute('readonly') && !input.id.includes('numero')) {
+                // Não limpar campos readonly (exceto número do pedido)
+                return;
             } else {
                 input.value = '';
             }
         });
+        
+        // Disparar evento de formulário limpo
+        window.dispatchEvent(new CustomEvent('coreFormCleared'));
     }
 
     function atualizarInterface(events) {
         // CORREÇÃO: NÃO limpar tabelas que estão dentro de modais!
-        // Selecionar apenas tabelas que NÃO estão dentro de modais
         const tables = document.querySelectorAll('table tbody');
         const lists = document.querySelectorAll('.data-list');
         
         // Filtrar para excluir elementos dentro de modais
         const filteredTables = Array.from(tables).filter(table => {
-            // Verificar se a tabela está dentro de um modal
             let parent = table;
             while (parent) {
                 if (parent.classList && 
@@ -259,7 +305,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         
         const filteredLists = Array.from(lists).filter(list => {
-            // Verificar se a lista está dentro de um modal
             let parent = list;
             while (parent) {
                 if (parent.classList && 
@@ -335,12 +380,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 const produtosCount = Array.isArray(event.payload.produtos) ? event.payload.produtos.length : 0;
                 const codigo = event.payload.codigo || event.payload.numero || '-';
                 const schemaLabel = schema === 'orcamento' ? 'Orçamento' : 'Pedido';
+                const instalacao = event.payload.instalacao || 0;
+                const temInstalacao = instalacao > 0;
                 
                 content = `
                     <td>${data}</td>
                     <td>${event.payload.cliente || '-'}</td>
                     <td>${codigo}</td>
-                    <td>${produtosCount} itens</td>
+                    <td>${produtosCount} itens ${temInstalacao ? '+ instalação' : ''}</td>
                     <td>R$ ${(event.payload.total || 0).toFixed(2)}</td>
                     <td><span class="status-badge ${event.payload.status || 'pending'}">${event.payload.status || 'Pendente'}</span></td>
                 `;
@@ -382,13 +429,17 @@ document.addEventListener('DOMContentLoaded', () => {
             case 'pedido':
                 icon = '📦';
                 const produtosCountPedido = Array.isArray(event.payload.produtos) ? event.payload.produtos.length : 0;
-                text = `Pedido: ${event.payload.cliente} - ${produtosCountPedido} produtos - R$ ${event.payload.total}`;
+                const instalacaoPedido = event.payload.instalacao || 0;
+                const extra = instalacaoPedido > 0 ? ` + R$ ${instalacaoPedido} instalação` : '';
+                text = `Pedido: ${event.payload.cliente} - ${produtosCountPedido} produtos${extra} - R$ ${event.payload.total}`;
                 break;
                 
             case 'orcamento':
                 icon = '📋';
                 const produtosCountOrcamento = Array.isArray(event.payload.produtos) ? event.payload.produtos.length : 0;
-                text = `Orçamento: ${event.payload.cliente} - ${produtosCountOrcamento} produtos - R$ ${event.payload.total}`;
+                const instalacaoOrcamento = event.payload.instalacao || 0;
+                const extraOrc = instalacaoOrcamento > 0 ? ` + R$ ${instalacaoOrcamento} instalação` : '';
+                text = `Orçamento: ${event.payload.cliente} - ${produtosCountOrcamento} produtos${extraOrc} - R$ ${event.payload.total}`;
                 break;
                 
             default:
@@ -407,13 +458,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function atualizarContadores(events) {
-        // Atualizar contadores de estatísticas
         const vendasCount = events.filter(e => e.schema === 'venda').length;
         const despesasCount = events.filter(e => e.schema === 'despesa').length;
         const pedidosCount = events.filter(e => e.schema === 'pedido').length;
         const orcamentosCount = events.filter(e => e.schema === 'orcamento').length;
         
-        // Atualizar elementos com contadores
         const vendasElement = document.querySelector('[data-counter="vendas"]');
         const despesasElement = document.querySelector('[data-counter="despesas"]');
         const pedidosElement = document.querySelector('[data-counter="pedidos"]');
@@ -426,7 +475,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function atualizarContadoresDataBind(events) {
-        // Atualizar contadores via data-bind (para páginas READ)
         const pedidos = events.filter(e => e.schema === 'pedido');
         const orcamentos = events.filter(e => e.schema === 'orcamento');
         
@@ -439,7 +487,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const pendentesOrcamentos = orcamentos.filter(o => o.payload.status === 'pendente').length;
         const convertidosOrcamentos = orcamentos.filter(o => o.payload.status === 'convertido').length;
         
-        // Atualizar elementos com data-bind para pedidos
         if (document.querySelector('[data-bind="pedidos.total"]')) {
             document.querySelector('[data-bind="pedidos.total"]').textContent = totalPedidos;
         }
@@ -453,7 +500,6 @@ document.addEventListener('DOMContentLoaded', () => {
             document.querySelector('[data-bind="pedidos.concluidos"]').textContent = concluidosPedidos;
         }
         
-        // Atualizar elementos com data-bind para orçamentos
         if (document.querySelector('[data-bind="orcamentos.total"]')) {
             document.querySelector('[data-bind="orcamentos.total"]').textContent = totalOrcamentos;
         }
@@ -482,10 +528,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const parts = bindPath.split('.');
             
             if (parts[0] === schema && parts.length === 2) {
-                // É um campo direto: schema.campo
                 const field = parts[1];
                 
-                // Coletar valor baseado no tipo de input
                 if (input.type === 'checkbox') {
                     payload[field] = input.checked;
                 } else if (input.type === 'radio') {
@@ -503,8 +547,6 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         
         // Segundo, processar produtos
-        const produtosMap = new Map();
-        
         inputs.forEach(input => {
             const bindPath = input.getAttribute('data-bind');
             if (!bindPath) return;
@@ -512,22 +554,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const parts = bindPath.split('.');
             
             if (parts[0] === schema && parts[1] === 'produtos' && parts.length >= 3) {
-                // É um produto: schema.produtos.X.campo
                 const index = parseInt(parts[2]);
                 const field = parts[3];
                 
                 if (!isNaN(index) && field) {
-                    // Inicializar array se necessário
                     if (!payload.produtos) {
                         payload.produtos = [];
                     }
                     
-                    // Garantir que existe objeto no índice
                     if (!payload.produtos[index]) {
                         payload.produtos[index] = {};
                     }
                     
-                    // Coletar valor baseado no tipo de input
                     let value;
                     if (input.type === 'checkbox') {
                         value = input.checked;
@@ -541,7 +579,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         value = input.value;
                     }
                     
-                    // Se for radio e não está checked, não adicionar
                     if (!(input.type === 'radio' && !input.checked)) {
                         payload.produtos[index][field] = value;
                     }
@@ -551,7 +588,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
-        // Remover produtos vazios (caso tenha linhas removidas)
+        // Remover produtos vazios
         if (payload.produtos) {
             payload.produtos = payload.produtos.filter(prod => prod && Object.keys(prod).length > 0);
         }
@@ -560,6 +597,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!payload.dataCriacao) {
             payload.dataCriacao = new Date().toISOString().split('T')[0];
         }
+        
+        // Garantir que campos numéricos sejam números, não strings
+        if (payload.instalacao) payload.instalacao = parseFloat(payload.instalacao) || 0;
+        if (payload.subtotal) payload.subtotal = parseFloat(payload.subtotal) || 0;
+        if (payload.iva) payload.iva = parseFloat(payload.iva) || 0;
+        if (payload.total) payload.total = parseFloat(payload.total) || 0;
+        if (payload.totalPago) payload.totalPago = parseFloat(payload.totalPago) || 0;
+        if (payload.saldoPendente) payload.saldoPendente = parseFloat(payload.saldoPendente) || 0;
         
         console.log(`✅ Payload final para ${schema}:`, payload);
         console.log(`✅ Produtos processados:`, payload.produtos ? payload.produtos.length : 0);
@@ -578,7 +623,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const field = bindPath[1];
             
             if (currentSchema === schema) {
-                // Suporte para diferentes tipos de input
                 if (input.type === 'checkbox') payload[field] = input.checked;
                 else if (input.type === 'radio') {
                     if (input.checked) payload[field] = input.value;
@@ -589,7 +633,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
-        // Adicionar data de registro se não existir
         if (!payload.dataRegistro) {
             payload.dataRegistro = new Date().toISOString();
         }
@@ -599,11 +642,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Inicializar sistema de mensagens
     window.addEventListener('load', () => {
-        console.log('🔧 Engine v5.2.1 inicializada com sucesso!');
-        console.log('🔥 Pronta para salvar no Firebase Online');
-        console.log('🔄 Suporte universal para todos os schemas');
-        console.log('📦 Processamento de produtos para: pedido, orcamento, etc.');
-        console.log('🛡️ Sistema protegido contra limpeza de modais');
-        console.log('⚡ Modo atualização corrigido para evitar duplicação');
+        console.log('🔧 Engine v5.2.2 inicializada com sucesso!');
+        console.log('🔥 Sistema de atualização corrigido');
+        console.log('🔄 Agora detecta corretamente modo ATUALIZAÇÃO vs CRIAÇÃO');
+        console.log('📦 Processamento de produtos otimizado');
+        console.log('🛡️ Sistema protegido contra duplicação');
     });
 });
