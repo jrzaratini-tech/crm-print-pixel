@@ -1,17 +1,19 @@
 /**
- * ENGINE.JS v5.1 - MOTOR DE COMUNICAÇÃO ATUALIZADO
+ * ENGINE.JS v5.2 - MOTOR DE COMUNICAÇÃO UNIVERSAL
  * Localização: /core/engine.js
  * Responsável por: Data-binding, Commits, Queries e UI Updates.
- * Atualizado para salvar no Firebase via API Node.js
- * CORREÇÃO: Agora processa corretamente produtos de pedidos com data-bind "pedido.produtos.X.campo"
- * CORREÇÃO CRÍTICA: Proteção para não limpar tabelas dentro de modais
+ * ATUALIZAÇÃO v5.2: Suporte universal para todos os schemas com produtos
+ * Agora processa: pedido, orcamento, venda, despesa e qualquer outro schema
+ * Mantém compatibilidade total com versões anteriores
  */
+
 document.addEventListener('DOMContentLoaded', () => {
     const pageId = document.body.getAttribute('data-page-id') || 'pagina-sem-id';
     const pageType = document.body.getAttribute('data-page-type') || 'NEUTRAL';
 
-    console.log(`🚀 Engine v5.1 Ativa: ${pageId} [Tipo: ${pageType}]`);
+    console.log(`🚀 Engine v5.2 Ativa: ${pageId} [Tipo: ${pageType}]`);
     console.log(`💾 Modo: Salvamento no Firebase Online`);
+    console.log(`🔄 Suporte universal para schemas com produtos`);
 
     // --- MODO ESCRITA (WRITE) ---
     const commitBtn = document.querySelector('[data-action="commit"]');
@@ -32,28 +34,20 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
             
-            // Processar dados estruturados (especial para pedidos)
-            if (schema === 'pedido') {
-                payload = processarPedidoCompleto(inputs);
-                console.log('📦 Pedido processado:', payload);
+            // Verificar se há estrutura de produtos neste schema
+            const temProdutos = Array.from(inputs).some(input => {
+                const bindPath = input.getAttribute('data-bind');
+                return bindPath && bindPath.startsWith(`${schema}.produtos.`);
+            });
+            
+            // Processar dados com suporte universal para produtos
+            if (temProdutos) {
+                payload = processarSchemaComProdutos(inputs, schema);
+                console.log(`📦 ${schema} com produtos processado:`, payload);
             } else {
-                // Processamento padrão para outros schemas
-                inputs.forEach(input => {
-                    const bindPath = input.getAttribute('data-bind').split('.');
-                    const currentSchema = bindPath[0];
-                    const field = bindPath[1];
-                    
-                    if (currentSchema === schema) {
-                        // Suporte para diferentes tipos de input
-                        if (input.type === 'checkbox') payload[field] = input.checked;
-                        else if (input.type === 'radio') {
-                            if (input.checked) payload[field] = input.value;
-                        }
-                        else if (input.type === 'number') payload[field] = parseFloat(input.value) || 0;
-                        else if (input.type === 'date') payload[field] = input.value;
-                        else payload[field] = input.value;
-                    }
-                });
+                // Processamento padrão para schemas sem produtos
+                payload = processarSchemaPadrao(inputs, schema);
+                console.log(`📄 ${schema} padrão processado:`, payload);
             }
 
             if (schema && Object.keys(payload).length > 0) {
@@ -96,7 +90,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         window.dispatchEvent(new CustomEvent('coreDataChanged'));
                         
                         // Limpar formulário se não estiver em modo de edição
-                        if (!document.getElementById('pedidoId')?.value) {
+                        const temIdField = document.querySelector('[data-bind$=".id"]') || 
+                                         document.getElementById(`${schema}Id`);
+                        if (!temIdField || !temIdField.value) {
                             limparFormulario(inputs);
                         }
                         
@@ -128,24 +124,20 @@ document.addEventListener('DOMContentLoaded', () => {
     if (pageType === "READ") {
         console.log("📊 Página READ detectada - Configurando sistema de dados do Firebase");
         
-        // CORREÇÃO CRÍTICA: Verificar se esta é a página de pedidos que já tem seu próprio sistema
-        // Se for a página de pedidos, DESABILITAMOS o auto-refresh do engine.js
-        // mas mantemos a compatibilidade com eventos
-        const isPedidosPage = pageId === 'pedidos' || window.location.pathname.includes('pedidos');
+        // Verificar se esta página já tem seu próprio sistema de atualização
+        const paginasComSistemaProprio = ['pedidos', 'orcamentos', 'vendas', 'despesas'];
+        const temSistemaProprio = paginasComSistemaProprio.some(pagina => 
+            pageId.includes(pagina) || window.location.pathname.includes(pagina)
+        );
         
-        if (isPedidosPage) {
-            console.log("🛡️ Página de pedidos detectada - Desativando auto-refresh do engine.js");
+        if (temSistemaProprio) {
+            console.log(`🛡️ Página ${pageId} detectada - Desativando auto-refresh do engine.js`);
             console.log("ℹ️ A página já tem seu próprio sistema de atualização");
             
-            // Ainda mantemos o listener para eventos, mas SEM auto-refresh
+            // Ainda mantemos o listener para eventos
             document.addEventListener('coreDataChanged', () => {
-                console.log('🔄 Evento coreDataChanged recebido (página de pedidos)');
-                // A página de pedidos já tem seu próprio listener para este evento
-                // Não precisamos fazer nada aqui
+                console.log('🔄 Evento coreDataChanged recebido (página com sistema próprio)');
             });
-            
-            // NÃO configuramos setInterval para esta página
-            // A página já tem seu próprio sistema de atualização
             
         } else {
             // Para outras páginas READ, mantemos o comportamento original
@@ -155,6 +147,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const solicitarDados = async () => {
                 console.log("🔄 Solicitando dados do Firebase...");
                 try {
+                    // Determinar schema baseado no pageId
+                    let schema = 'all';
+                    if (pageId.includes('pedido')) schema = 'pedido';
+                    else if (pageId.includes('orcamento')) schema = 'orcamento';
+                    else if (pageId.includes('venda')) schema = 'venda';
+                    else if (pageId.includes('despesa')) schema = 'despesa';
+                    
                     // Solicitar dados via API
                     const response = await fetch('/api/database/query', {
                         method: 'POST',
@@ -162,8 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({
-                            schema: pageId.includes('pedido') ? 'pedido' : 
-                                   pageId.includes('despesa') ? 'despesa' : 'all',
+                            schema: schema,
                             filters: { deleted: false }
                         })
                     });
@@ -178,13 +176,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Atualizar contadores via data-bind
                         atualizarContadoresDataBind(events);
                         
-                        // Enviar dados para o dashboard via postMessage
-                        if (pageId === 'dashboard') {
-                            window.postMessage({
-                                type: "QUERY_RESPONSE",
-                                data: events
-                            }, "*");
-                        }
                     } else {
                         console.error('❌ Erro ao buscar dados do Firebase');
                     }
@@ -193,21 +184,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             };
 
-            // Handler para receber mensagens do dashboard
-            window.addEventListener("message", function(event) {
-                if (event.data.type === "QUERY_REQUEST") {
-                    console.log('📨 QUERY_REQUEST recebido do dashboard');
-                    solicitarDados();
-                }
-            });
-
             // Handler para receber dados (compatibilidade)
             window.addEventListener('coreDataChanged', () => {
                 console.log('🔄 Evento coreDataChanged recebido');
                 solicitarDados();
             });
 
-            // Auto-refresh a cada 10 segundos APENAS para páginas não-pedidos
+            // Auto-refresh a cada 10 segundos APENAS para páginas genéricas
             setInterval(solicitarDados, 10000);
             
             // Carregar dados iniciais
@@ -223,6 +206,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 input.checked = false;
             } else if (input.tagName === 'SELECT') {
                 input.selectedIndex = 0;
+            } else if (input.hasAttribute('readonly')) {
+                // Não limpar campos readonly (como códigos automáticos)
             } else {
                 input.value = '';
             }
@@ -230,9 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function atualizarInterface(events) {
-        // CORREÇÃO CRÍTICA: NÃO limpar tabelas que estão dentro de modais!
-        // Identificar e proteger tabelas dentro de modais
-        
+        // CORREÇÃO: NÃO limpar tabelas que estão dentro de modais!
         // Selecionar apenas tabelas que NÃO estão dentro de modais
         const tables = document.querySelectorAll('table tbody');
         const lists = document.querySelectorAll('.data-list');
@@ -249,11 +232,11 @@ document.addEventListener('DOMContentLoaded', () => {
                      parent.id === 'modalContent' ||
                      parent.id === 'modalOverlay')) {
                     console.log('🛡️ Protegendo tabela dentro de modal da limpeza');
-                    return false; // Não incluir esta tabela
+                    return false;
                 }
                 parent = parent.parentElement;
             }
-            return true; // Incluir esta tabela
+            return true;
         });
         
         const filteredLists = Array.from(lists).filter(list => {
@@ -267,11 +250,11 @@ document.addEventListener('DOMContentLoaded', () => {
                      parent.id === 'modalContent' ||
                      parent.id === 'modalOverlay')) {
                     console.log('🛡️ Protegendo lista dentro de modal da limpeza');
-                    return false; // Não incluir esta lista
+                    return false;
                 }
                 parent = parent.parentElement;
             }
-            return true; // Incluir esta lista
+            return true;
         });
         
         // Limpar conteúdo atual APENAS de elementos fora de modais
@@ -305,39 +288,53 @@ document.addEventListener('DOMContentLoaded', () => {
         const data = new Date(event.timestamp || event.created_at).toLocaleString('pt-BR');
         
         let content = '';
-        if (event.schema === 'venda') {
-            content = `
-                <td>${data}</td>
-                <td>${event.payload.cliente || '-'}</td>
-                <td>${event.payload.produto || '-'}</td>
-                <td>R$ ${(event.payload.valor || 0).toFixed(2)}</td>
-                <td><span class="status-badge success">Concluída</span></td>
-            `;
-        } else if (event.schema === 'despesa') {
-            content = `
-                <td>${data}</td>
-                <td>${event.payload.descricao || event.payload.categoria || '-'}</td>
-                <td>${event.payload.categoria || '-'}</td>
-                <td>R$ ${(event.payload.valor || 0).toFixed(2)}</td>
-                <td><span class="status-badge warning">Registrada</span></td>
-            `;
-        } else if (event.schema === 'pedido') {
-            const produtosCount = Array.isArray(event.payload.produtos) ? event.payload.produtos.length : 0;
-            content = `
-                <td>${data}</td>
-                <td>${event.payload.cliente || '-'}</td>
-                <td>${produtosCount} itens</td>
-                <td>R$ ${(event.payload.total || 0).toFixed(2)}</td>
-                <td><span class="status-badge ${event.payload.status || 'pending'}">${event.payload.status || 'Pendente'}</span></td>
-            `;
-        } else {
-            content = `
-                <td>${data}</td>
-                <td>${event.schema}</td>
-                <td>${JSON.stringify(event.payload).substring(0, 50)}...</td>
-                <td>-</td>
-                <td><span class="status-badge info">Registro</span></td>
-            `;
+        const schema = event.schema || 'desconhecido';
+        
+        switch(schema) {
+            case 'venda':
+                content = `
+                    <td>${data}</td>
+                    <td>${event.payload.cliente || '-'}</td>
+                    <td>${event.payload.produto || '-'}</td>
+                    <td>R$ ${(event.payload.valor || 0).toFixed(2)}</td>
+                    <td><span class="status-badge success">Concluída</span></td>
+                `;
+                break;
+                
+            case 'despesa':
+                content = `
+                    <td>${data}</td>
+                    <td>${event.payload.descricao || event.payload.categoria || '-'}</td>
+                    <td>${event.payload.categoria || '-'}</td>
+                    <td>R$ ${(event.payload.valor || 0).toFixed(2)}</td>
+                    <td><span class="status-badge warning">Registrada</span></td>
+                `;
+                break;
+                
+            case 'pedido':
+            case 'orcamento':
+                const produtosCount = Array.isArray(event.payload.produtos) ? event.payload.produtos.length : 0;
+                const codigo = event.payload.codigo || event.payload.numero || '-';
+                const schemaLabel = schema === 'orcamento' ? 'Orçamento' : 'Pedido';
+                
+                content = `
+                    <td>${data}</td>
+                    <td>${event.payload.cliente || '-'}</td>
+                    <td>${codigo}</td>
+                    <td>${produtosCount} itens</td>
+                    <td>R$ ${(event.payload.total || 0).toFixed(2)}</td>
+                    <td><span class="status-badge ${event.payload.status || 'pending'}">${event.payload.status || 'Pendente'}</span></td>
+                `;
+                break;
+                
+            default:
+                content = `
+                    <td>${data}</td>
+                    <td>${schema}</td>
+                    <td>${JSON.stringify(event.payload).substring(0, 50)}...</td>
+                    <td>-</td>
+                    <td><span class="status-badge info">Registro</span></td>
+                `;
         }
         
         tr.innerHTML = content;
@@ -350,20 +347,34 @@ document.addEventListener('DOMContentLoaded', () => {
         
         let icon = '';
         let text = '';
+        const schema = event.schema || 'desconhecido';
         
-        if (event.schema === 'venda') {
-            icon = '💰';
-            text = `Venda: ${event.payload.cliente} - R$ ${event.payload.valor}`;
-        } else if (event.schema === 'despesa') {
-            icon = '💸';
-            text = `Despesa: ${event.payload.descricao || event.payload.categoria} - R$ ${event.payload.valor}`;
-        } else if (event.schema === 'pedido') {
-            icon = '📦';
-            const produtosCount = Array.isArray(event.payload.produtos) ? event.payload.produtos.length : 0;
-            text = `Pedido: ${event.payload.cliente} - ${produtosCount} produtos - R$ ${event.payload.total}`;
-        } else {
-            icon = '📄';
-            text = `${event.schema}: ${JSON.stringify(event.payload).substring(0, 30)}...`;
+        switch(schema) {
+            case 'venda':
+                icon = '💰';
+                text = `Venda: ${event.payload.cliente} - R$ ${event.payload.valor}`;
+                break;
+                
+            case 'despesa':
+                icon = '💸';
+                text = `Despesa: ${event.payload.descricao || event.payload.categoria} - R$ ${event.payload.valor}`;
+                break;
+                
+            case 'pedido':
+                icon = '📦';
+                const produtosCountPedido = Array.isArray(event.payload.produtos) ? event.payload.produtos.length : 0;
+                text = `Pedido: ${event.payload.cliente} - ${produtosCountPedido} produtos - R$ ${event.payload.total}`;
+                break;
+                
+            case 'orcamento':
+                icon = '📋';
+                const produtosCountOrcamento = Array.isArray(event.payload.produtos) ? event.payload.produtos.length : 0;
+                text = `Orçamento: ${event.payload.cliente} - ${produtosCountOrcamento} produtos - R$ ${event.payload.total}`;
+                break;
+                
+            default:
+                icon = '📄';
+                text = `${schema}: ${JSON.stringify(event.payload).substring(0, 30)}...`;
         }
         
         li.innerHTML = `
@@ -381,42 +392,99 @@ document.addEventListener('DOMContentLoaded', () => {
         const vendasCount = events.filter(e => e.schema === 'venda').length;
         const despesasCount = events.filter(e => e.schema === 'despesa').length;
         const pedidosCount = events.filter(e => e.schema === 'pedido').length;
+        const orcamentosCount = events.filter(e => e.schema === 'orcamento').length;
         
         // Atualizar elementos com contadores
         const vendasElement = document.querySelector('[data-counter="vendas"]');
         const despesasElement = document.querySelector('[data-counter="despesas"]');
         const pedidosElement = document.querySelector('[data-counter="pedidos"]');
+        const orcamentosElement = document.querySelector('[data-counter="orcamentos"]');
         
         if (vendasElement) vendasElement.textContent = vendasCount;
         if (despesasElement) despesasElement.textContent = despesasCount;
         if (pedidosElement) pedidosElement.textContent = pedidosCount;
+        if (orcamentosElement) orcamentosElement.textContent = orcamentosCount;
     }
 
     function atualizarContadoresDataBind(events) {
         // Atualizar contadores via data-bind (para páginas READ)
         const pedidos = events.filter(e => e.schema === 'pedido');
+        const orcamentos = events.filter(e => e.schema === 'orcamento');
+        
         const totalPedidos = pedidos.length;
-        const pendentes = pedidos.filter(p => p.payload.status === 'pendente').length;
-        const processamento = pedidos.filter(p => p.payload.status === 'processamento').length;
-        const concluidos = pedidos.filter(p => p.payload.status === 'concluido').length;
+        const pendentesPedidos = pedidos.filter(p => p.payload.status === 'pendente').length;
+        const processamentoPedidos = pedidos.filter(p => p.payload.status === 'processamento').length;
+        const concluidosPedidos = pedidos.filter(p => p.payload.status === 'concluido').length;
         
-        // Atualizar elementos com data-bind
-        const totalElement = document.querySelector('[data-bind="pedidos.total"]');
-        const pendentesElement = document.querySelector('[data-bind="pedidos.pendentes"]');
-        const processamentoElement = document.querySelector('[data-bind="pedidos.processamento"]');
-        const concluidosElement = document.querySelector('[data-bind="pedidos.concluidos"]');
+        const totalOrcamentos = orcamentos.length;
+        const pendentesOrcamentos = orcamentos.filter(o => o.payload.status === 'pendente').length;
+        const convertidosOrcamentos = orcamentos.filter(o => o.payload.status === 'convertido').length;
         
-        if (totalElement) totalElement.textContent = totalPedidos;
-        if (pendentesElement) pendentesElement.textContent = pendentes;
-        if (processamentoElement) processamentoElement.textContent = processamento;
-        if (concluidosElement) concluidosElement.textContent = concluidos;
+        // Atualizar elementos com data-bind para pedidos
+        if (document.querySelector('[data-bind="pedidos.total"]')) {
+            document.querySelector('[data-bind="pedidos.total"]').textContent = totalPedidos;
+        }
+        if (document.querySelector('[data-bind="pedidos.pendentes"]')) {
+            document.querySelector('[data-bind="pedidos.pendentes"]').textContent = pendentesPedidos;
+        }
+        if (document.querySelector('[data-bind="pedidos.processamento"]')) {
+            document.querySelector('[data-bind="pedidos.processamento"]').textContent = processamentoPedidos;
+        }
+        if (document.querySelector('[data-bind="pedidos.concluidos"]')) {
+            document.querySelector('[data-bind="pedidos.concluidos"]').textContent = concluidosPedidos;
+        }
+        
+        // Atualizar elementos com data-bind para orçamentos
+        if (document.querySelector('[data-bind="orcamentos.total"]')) {
+            document.querySelector('[data-bind="orcamentos.total"]').textContent = totalOrcamentos;
+        }
+        if (document.querySelector('[data-bind="orcamentos.pendentes"]')) {
+            document.querySelector('[data-bind="orcamentos.pendentes"]').textContent = pendentesOrcamentos;
+        }
+        if (document.querySelector('[data-bind="orcamentos.convertidos"]')) {
+            document.querySelector('[data-bind="orcamentos.convertidos"]').textContent = convertidosOrcamentos;
+        }
     }
 
-    function processarPedidoCompleto(inputs) {
+    // ============================================
+    // FUNÇÕES DE PROCESSAMENTO UNIVERSAL
+    // ============================================
+
+    function processarSchemaComProdutos(inputs, schema) {
         const payload = {};
-        const produtosMap = new Map(); // Para agrupar produtos por índice
         
-        console.log(`🛠️ Processando ${inputs.length} inputs para pedido...`);
+        console.log(`🛠️ Processando ${inputs.length} inputs para ${schema}...`);
+        
+        // Primeiro, processar campos diretos
+        inputs.forEach(input => {
+            const bindPath = input.getAttribute('data-bind');
+            if (!bindPath) return;
+            
+            const parts = bindPath.split('.');
+            
+            if (parts[0] === schema && parts.length === 2) {
+                // É um campo direto: schema.campo
+                const field = parts[1];
+                
+                // Coletar valor baseado no tipo de input
+                if (input.type === 'checkbox') {
+                    payload[field] = input.checked;
+                } else if (input.type === 'radio') {
+                    if (input.checked) payload[field] = input.value;
+                } else if (input.type === 'number') {
+                    payload[field] = parseFloat(input.value) || 0;
+                } else if (input.type === 'date') {
+                    payload[field] = input.value;
+                } else {
+                    payload[field] = input.value;
+                }
+                
+                console.log(`📝 Campo ${field} = ${payload[field]}`);
+            }
+        });
+        
+        // Segundo, processar produtos
+        const produtosMap = new Map();
         
         inputs.forEach(input => {
             const bindPath = input.getAttribute('data-bind');
@@ -424,62 +492,42 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const parts = bindPath.split('.');
             
-            if (parts[0] === 'pedido') {
-                if (parts[1] === 'produtos' && parts.length >= 3) {
-                    // É um produto: pedido.produtos.X.campo
-                    const index = parseInt(parts[2]);
-                    const field = parts[3];
-                    
-                    if (!isNaN(index) && field) {
-                        // Inicializar array se necessário
-                        if (!payload.produtos) {
-                            payload.produtos = [];
-                        }
-                        
-                        // Garantir que existe objeto no índice
-                        if (!payload.produtos[index]) {
-                            payload.produtos[index] = {};
-                        }
-                        
-                        // Coletar valor com base no tipo de input
-                        let value;
-                        if (input.type === 'checkbox') {
-                            value = input.checked;
-                        } else if (input.type === 'radio') {
-                            value = input.checked ? input.value : undefined;
-                        } else if (input.type === 'number') {
-                            value = parseFloat(input.value) || 0;
-                        } else if (input.type === 'date') {
-                            value = input.value;
-                        } else {
-                            value = input.value;
-                        }
-                        
-                        // Se for radio e não está checked, não adicionar
-                        if (!(input.type === 'radio' && !input.checked)) {
-                            payload.produtos[index][field] = value;
-                        }
-                        
-                        console.log(`📦 Produto [${index}].${field} = ${value}`);
+            if (parts[0] === schema && parts[1] === 'produtos' && parts.length >= 3) {
+                // É um produto: schema.produtos.X.campo
+                const index = parseInt(parts[2]);
+                const field = parts[3];
+                
+                if (!isNaN(index) && field) {
+                    // Inicializar array se necessário
+                    if (!payload.produtos) {
+                        payload.produtos = [];
                     }
-                } else if (parts.length === 2) {
-                    // É um campo direto: pedido.campo
-                    const field = parts[1];
                     
-                    // Coletar valor com base no tipo de input
+                    // Garantir que existe objeto no índice
+                    if (!payload.produtos[index]) {
+                        payload.produtos[index] = {};
+                    }
+                    
+                    // Coletar valor baseado no tipo de input
+                    let value;
                     if (input.type === 'checkbox') {
-                        payload[field] = input.checked;
+                        value = input.checked;
                     } else if (input.type === 'radio') {
-                        if (input.checked) payload[field] = input.value;
+                        value = input.checked ? input.value : undefined;
                     } else if (input.type === 'number') {
-                        payload[field] = parseFloat(input.value) || 0;
+                        value = parseFloat(input.value) || 0;
                     } else if (input.type === 'date') {
-                        payload[field] = input.value;
+                        value = input.value;
                     } else {
-                        payload[field] = input.value;
+                        value = input.value;
                     }
                     
-                    console.log(`📝 Campo ${field} = ${payload[field]}`);
+                    // Se for radio e não está checked, não adicionar
+                    if (!(input.type === 'radio' && !input.checked)) {
+                        payload.produtos[index][field] = value;
+                    }
+                    
+                    console.log(`📦 Produto [${index}].${field} = ${value}`);
                 }
             }
         });
@@ -489,22 +537,53 @@ document.addEventListener('DOMContentLoaded', () => {
             payload.produtos = payload.produtos.filter(prod => prod && Object.keys(prod).length > 0);
         }
         
+        // Adicionar data de criação se não existir
+        if (!payload.dataCriacao) {
+            payload.dataCriacao = new Date().toISOString().split('T')[0];
+        }
+        
+        console.log(`✅ Payload final para ${schema}:`, payload);
+        console.log(`✅ Produtos processados:`, payload.produtos ? payload.produtos.length : 0);
+        
+        return payload;
+    }
+
+    function processarSchemaPadrao(inputs, schema) {
+        const payload = {};
+        
+        console.log(`📄 Processando schema padrão: ${schema}`);
+        
+        inputs.forEach(input => {
+            const bindPath = input.getAttribute('data-bind').split('.');
+            const currentSchema = bindPath[0];
+            const field = bindPath[1];
+            
+            if (currentSchema === schema) {
+                // Suporte para diferentes tipos de input
+                if (input.type === 'checkbox') payload[field] = input.checked;
+                else if (input.type === 'radio') {
+                    if (input.checked) payload[field] = input.value;
+                }
+                else if (input.type === 'number') payload[field] = parseFloat(input.value) || 0;
+                else if (input.type === 'date') payload[field] = input.value;
+                else payload[field] = input.value;
+            }
+        });
+        
         // Adicionar data de registro se não existir
         if (!payload.dataRegistro) {
             payload.dataRegistro = new Date().toISOString();
         }
-        
-        console.log(`✅ Payload final:`, payload);
-        console.log(`✅ Produtos processados:`, payload.produtos ? payload.produtos.length : 0);
         
         return payload;
     }
 
     // Inicializar sistema de mensagens
     window.addEventListener('load', () => {
-        console.log('🔧 Engine v5.1 inicializada com sucesso!');
+        console.log('🔧 Engine v5.2 inicializada com sucesso!');
         console.log('🔥 Pronta para salvar no Firebase Online');
-        console.log('🛠️ Suporte completo para produtos estruturados de pedidos');
+        console.log('🔄 Suporte universal para todos os schemas');
+        console.log('📦 Processamento de produtos para: pedido, orcamento, etc.');
         console.log('🛡️ Sistema protegido contra limpeza de modais');
     });
 });

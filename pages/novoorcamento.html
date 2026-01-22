@@ -534,6 +534,24 @@
                         <label for="atendente" class="required">Atendente</label>
                         <input type="text" id="atendente" name="atendente" data-bind="orcamento.atendente" required>
                     </div>
+                    
+                    <div class="form-group">
+                        <label class="required">Status</label>
+                        <div class="status-group">
+                            <div class="status-option">
+                                <input type="radio" id="statusPendente" name="status" value="pendente" data-bind="orcamento.status" checked>
+                                <label for="statusPendente">Pendente</label>
+                            </div>
+                            <div class="status-option">
+                                <input type="radio" id="statusConvertido" name="status" value="convertido" data-bind="orcamento.status">
+                                <label for="statusConvertido">Convertido</label>
+                            </div>
+                            <div class="status-option">
+                                <input type="radio" id="statusCancelado" name="status" value="cancelado" data-bind="orcamento.status">
+                                <label for="statusCancelado">Cancelado</label>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="form-group">
@@ -782,13 +800,19 @@
                     document.getElementById('validade').value = orcamento.validadeDias;
                 }
                 
+                // Status
+                if (orcamento.status) {
+                    const statusRadio = document.querySelector(`input[name="status"][value="${orcamento.status}"]`);
+                    if (statusRadio) statusRadio.checked = true;
+                }
+                
                 // IVA
                 if (orcamento.comIVA) {
                     const ivaRadio = document.querySelector(`input[name="ivaOption"][value="${orcamento.comIVA}"]`);
                     if (ivaRadio) ivaRadio.checked = true;
                 }
                 
-                // CORREÇÃO: Processar produtos corretamente
+                // Processar produtos
                 productsTableBody.innerHTML = '';
                 productIndex = 0;
                 
@@ -797,7 +821,6 @@
                     if (Array.isArray(orcamento.produtos)) {
                         produtosArray = orcamento.produtos;
                     } else if (typeof orcamento.produtos === 'object') {
-                        // Converter objeto para array se necessário
                         produtosArray = Object.values(orcamento.produtos);
                     }
                 }
@@ -828,7 +851,7 @@
         }
         
         // ============================================
-        // FUNÇÕES REUTILIZÁVEIS (CORRIGIDAS)
+        // FUNÇÕES REUTILIZÁVEIS
         // ============================================
         
         function addProductRow(productData = null) {
@@ -1007,33 +1030,8 @@
             return true;
         }
         
-        // CORREÇÃO: Função para garantir estrutura correta dos produtos
-        function prepararProdutosParaSalvar() {
-            const produtosArray = [];
-            
-            document.querySelectorAll('#productsTableBody tr').forEach((row, index) => {
-                const nome = row.querySelector('.product-select').value;
-                const tamanho = row.querySelector('.tamanho-input').value;
-                const quantidade = parseInt(row.querySelector('.quantidade-input').value) || 1;
-                const valor = parseFloat(row.querySelector('.valor-input').value) || 0;
-                const observacoes = row.querySelector('.obs-input').value;
-                
-                if (nome) {
-                    produtosArray.push({
-                        nome: nome,
-                        tamanho: tamanho,
-                        quantidade: quantidade,
-                        valor: valor,
-                        observacoes: observacoes
-                    });
-                }
-            });
-            
-            return produtosArray;
-        }
-        
         // ============================================
-        // EVENT LISTENERS (CORRIGIDOS)
+        // EVENT LISTENERS
         // ============================================
         
         document.addEventListener('DOMContentLoaded', async () => {
@@ -1094,68 +1092,18 @@
             }
         });
         
-        // CORREÇÃO: Evento de save melhorado
-        saveBtn.addEventListener('click', async (e) => {
+        saveBtn.addEventListener('click', (e) => {
             e.preventDefault();
             
             if (!validateForm()) return;
             
-            try {
-                // Preparar produtos estruturados
-                const produtosArray = prepararProdutosParaSalvar();
-                
-                // Preparar dados do orçamento
-                const validadeDias = document.getElementById('validade').value;
-                const validadeData = calcularDataValidade(validadeDias);
-                
-                const dadosOrcamento = {
-                    cliente: document.getElementById('cliente').value,
-                    empresa: document.getElementById('empresa').value,
-                    nif: document.getElementById('nif').value,
-                    morada: document.getElementById('morada').value,
-                    telemovel: document.getElementById('telemovel').value,
-                    email: document.getElementById('email').value,
-                    codigo: document.getElementById('codigo').value,
-                    atendente: document.getElementById('atendente').value,
-                    observacoes: document.getElementById('observacoes').value,
-                    produtos: produtosArray, // CORREÇÃO: Array estruturado
-                    subtotal: parseFloat(document.getElementById('orcamentoSubtotal').value) || 0,
-                    iva: parseFloat(document.getElementById('orcamentoIVA').value) || 0,
-                    total: parseFloat(document.getElementById('orcamentoTotal').value) || 0,
-                    comIVA: document.querySelector('input[name="ivaOption"]:checked').value,
-                    status: 'pendente',
-                    validade: validadeData,
-                    validadeDias: validadeDias,
-                    dataCriacao: new Date().toISOString().split('T')[0],
-                    instalacao: 0 // Orçamento não tem instalação
-                };
-                
-                // Adicionar id se for edição
-                if (isEditMode && currentOrcamentoId) {
-                    dadosOrcamento.id = currentOrcamentoId;
-                }
-                
-                // Criar input oculto com dados completos (para o engine.js)
-                const hiddenData = document.createElement('input');
-                hiddenData.type = 'hidden';
-                hiddenData.name = 'orcamentoData';
-                hiddenData.value = JSON.stringify(dadosOrcamento);
-                hiddenData.setAttribute('data-bind', 'orcamento.completeData');
-                document.getElementById('orcamentoForm').appendChild(hiddenData);
-                
-                // Feedback visual
-                saveBtn.classList.add('saving');
-                saveBtn.textContent = 'SALVANDO...';
-                saveBtn.disabled = true;
-                
-                // O engine.js fará o commit automaticamente
-                
-            } catch (error) {
-                console.error('Erro ao preparar dados:', error);
-                mostrarMensagem('Erro ao preparar dados do orçamento', 'error');
-                saveBtn.classList.remove('saving');
-                saveBtn.disabled = false;
-            }
+            // Feedback visual
+            saveBtn.classList.add('saving');
+            saveBtn.textContent = 'SALVANDO...';
+            saveBtn.disabled = true;
+            
+            // O engine.js fará todo o processamento automaticamente
+            // Não é necessário criar inputs ocultos ou processar dados manualmente
         });
         
         // Listeners para cálculo automático
