@@ -273,11 +273,12 @@
             background-color: #f8fafc;
         }
         
+        /* CORREÇÃO AQUI: Botões agora ajustam automaticamente */
         .actions-cell {
             display: flex;
             gap: 8px;
-            flex-wrap: nowrap;
-            min-width: 300px;
+            flex-wrap: wrap;
+            min-width: 150px;
         }
         
         .action-btn {
@@ -293,6 +294,13 @@
             gap: 6px;
             white-space: nowrap;
             min-width: 80px;
+            justify-content: center;
+        }
+        
+        /* CORREÇÃO: Garantir visibilidade dos textos */
+        .action-btn span {
+            display: inline-block;
+            min-width: 20px;
         }
         
         .modal-overlay {
@@ -656,7 +664,7 @@
                 flex-direction: row;
                 flex-wrap: wrap;
                 gap: 6px;
-                min-width: 250px;
+                min-width: 150px;
             }
             
             .action-btn {
@@ -748,23 +756,6 @@
                 padding: 6px 12px;
                 font-size: 14px;
             }
-        }
-        
-        /* Estilos para garantir que os ícones e textos fiquem visíveis */
-        .action-btn span {
-            font-size: 14px;
-            display: inline-block;
-            min-width: 20px;
-        }
-        
-        /* Garantir que o texto dos botões não desapareça */
-        .action-btn {
-            overflow: visible;
-            text-overflow: clip;
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
     </style>
 </head>
@@ -932,11 +923,11 @@
                 const result = await response.json();
                 const eventos = result.events || [];
                 
-                // Converter eventos em orçamentos (igual ao processamento de pedidos)
+                // Converter eventos em orçamentos
                 orcamentosData = eventos
                     .filter(evento => evento.schema === 'orcamento' && !evento.deleted)
                     .map(evento => {
-                        // Garantir que payload seja um objeto válido
+                        // CORREÇÃO: Processamento de payload igual ao pedidos.html
                         let payload = evento.payload;
                         if (typeof payload === 'string') {
                             try {
@@ -947,7 +938,20 @@
                             }
                         }
                         
-                        // Garantir que temos todos os campos necessários
+                        // CORREÇÃO: Garantir estrutura correta dos produtos
+                        let produtos = [];
+                        if (payload.produtos) {
+                            if (Array.isArray(payload.produtos)) {
+                                produtos = payload.produtos.map(prod => ({
+                                    nome: prod.nome || 'Produto',
+                                    tamanho: prod.tamanho || '',
+                                    quantidade: parseInt(prod.quantidade) || 1,
+                                    valor: parseFloat(prod.valor) || 0,
+                                    observacoes: prod.observacoes || ''
+                                }));
+                            }
+                        }
+                        
                         const orcamentoFormatado = {
                             id: evento.id,
                             cliente: payload.cliente || 'Cliente não informado',
@@ -955,8 +959,9 @@
                             nif: payload.nif || '',
                             morada: payload.morada || '',
                             telemovel: payload.telemovel || '',
+                            email: payload.email || '',
                             atendente: payload.atendente || '',
-                            produtos: Array.isArray(payload.produtos) ? payload.produtos : [],
+                            produtos: produtos, // CORREÇÃO: Usar produtos processados
                             total: parseFloat(payload.total) || 0,
                             subtotal: parseFloat(payload.subtotal) || 0,
                             iva: parseFloat(payload.iva) || 0,
@@ -964,11 +969,14 @@
                             comIVA: payload.comIVA || 'sim',
                             status: payload.status || 'pendente',
                             validade: payload.validade || '',
+                            validadeDias: payload.validadeDias || '15',
                             observacoes: payload.observacoes || '',
                             codigo: payload.codigo || `ORC-${evento.id.substring(0, 8)}`,
                             dataCriacao: payload.dataCriacao || evento.timestamp || new Date().toISOString(),
+                            pedidoNumero: payload.pedidoNumero || '',
+                            dataConversao: payload.dataConversao || '',
                             
-                            // Metadados do evento
+                            // Metadados
                             createdAt: evento.timestamp || evento.created_at || new Date().toISOString(),
                             pageId: evento.pageId || 'novo_orcamento'
                         };
@@ -978,6 +986,7 @@
                     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
                 
                 console.log(`✅ ${orcamentosData.length} orçamentos carregados`);
+                console.log('📦 Exemplo de produtos:', orcamentosData[0]?.produtos || 'Nenhum');
                 atualizarEstatisticas();
                 filtrarOrcamentos();
                 
@@ -1092,6 +1101,16 @@
                         break;
                 }
                 
+                // CORREÇÃO: Renderizar botões condicionais
+                let botoesHTML = '';
+                if (orcamento.status === 'pendente') {
+                    botoesHTML = `
+                        <button class="action-btn btn-success" onclick="converterOrcamentoDireto('${orcamento.id}')" title="Converter em Pedido">
+                            <span>🔄</span> Converter
+                        </button>
+                    `;
+                }
+                
                 row.innerHTML = `
                     <td><strong>${orcamento.codigo || `ORC-${orcamento.id.substring(0, 8)}`}</strong></td>
                     <td>${orcamento.cliente || 'N/A'}</td>
@@ -1111,11 +1130,7 @@
                             <button class="action-btn btn-danger" onclick="excluirOrcamento('${orcamento.id}')" title="Excluir">
                                 <span>🗑️</span> Excluir
                             </button>
-                            ${orcamento.status === 'pendente' ? `
-                            <button class="action-btn btn-success" onclick="converterOrcamentoDireto('${orcamento.id}')" title="Converter em Pedido">
-                                <span>🔄</span> Converter
-                            </button>
-                            ` : ''}
+                            ${botoesHTML}
                         </div>
                     </td>
                 `;
@@ -1250,12 +1265,12 @@
             }
         }
         
-        // Função para gerar preview do orçamento (CORRIGIDO - processa produtos corretamente)
+        // Função para gerar preview do orçamento (CORRIGIDO)
         function gerarPreviewOrcamento(orcamento) {
             const dataCriacao = new Date(orcamento.dataCriacao || orcamento.createdAt);
             const dataValidade = orcamento.validade ? new Date(orcamento.validade) : null;
             
-            // Calcular dias restantes se houver validade
+            // Calcular dias restantes
             let diasRestantes = '';
             if (dataValidade) {
                 const hoje = new Date();
@@ -1271,12 +1286,12 @@
                 }
             }
             
-            // Processar produtos (igual ao pedidos.html)
+            // CORREÇÃO CRÍTICA: Processar produtos corretamente
             let produtosHTML = '';
             if (orcamento.produtos && Array.isArray(orcamento.produtos)) {
                 produtosHTML = orcamento.produtos.map(produto => {
-                    const valorUnitario = produto.valor || 0;
-                    const quantidade = produto.quantidade || 1;
+                    const valorUnitario = parseFloat(produto.valor) || 0;
+                    const quantidade = parseInt(produto.quantidade) || 1;
                     const subtotal = valorUnitario * quantidade;
                     
                     return `
@@ -1357,18 +1372,14 @@
                 <div class="totals-preview">
                     <div class="total-row">
                         <span>Subtotal Produtos:</span>
-                        <span>${formatarMoeda(orcamento.subtotal - orcamento.instalacao || 0)}</span>
+                        <span>${formatarMoeda(orcamento.subtotal || 0)}</span>
                     </div>
-                    ${orcamento.instalacao > 0 ? `
+                    ${(orcamento.instalacao || 0) > 0 ? `
                     <div class="total-row">
                         <span>Instalação:</span>
                         <span>${formatarMoeda(orcamento.instalacao || 0)}</span>
                     </div>
                     ` : ''}
-                    <div class="total-row">
-                        <span>Subtotal:</span>
-                        <span>${formatarMoeda(orcamento.subtotal || 0)}</span>
-                    </div>
                     ${orcamento.comIVA === 'sim' ? `
                     <div class="total-row">
                         <span>IVA (23%):</span>
@@ -1385,6 +1396,7 @@
                     <p>
                         <strong>Data de Criação:</strong> ${dataCriacao.toLocaleDateString('pt-PT')}
                         ${dataValidade ? `<br><strong>Validade:</strong> ${dataValidade.toLocaleDateString('pt-PT')} (${diasRestantes})` : ''}
+                        ${orcamento.pedidoNumero ? `<br><strong>Pedido Gerado:</strong> ${orcamento.pedidoNumero}` : ''}
                     </p>
                     ${orcamento.observacoes ? `
                     <p><strong>Observações:</strong> ${orcamento.observacoes}</p>
@@ -1406,11 +1418,10 @@
             `;
         }
         
-        // Função para configurar botões baseado no status (SIMPLIFICADO)
+        // Função para configurar botões baseado no status
         function configurarBotoesStatus(status) {
             const btnConverter = document.getElementById('btnConverter');
             
-            // Mostrar botão de conversão apenas para orçamentos pendentes
             if (status === 'pendente') {
                 btnConverter.style.display = 'inline-flex';
                 btnConverter.disabled = false;
@@ -1419,7 +1430,7 @@
             }
         }
         
-        // Função para converter orçamento em pedido (DIRETO - sem aprovação prévia)
+        // Função para converter orçamento em pedido
         async function converterParaPedido() {
             if (!orcamentoAtual) return;
             
@@ -1431,7 +1442,7 @@
                 // Gerar número de pedido automático
                 const numeroPedido = await gerarNumeroPedidoAutomatico();
                 
-                // Criar evento de pedido (igual ao schema de pedidos do README)
+                // Criar evento de pedido
                 const response = await fetch('/api/database/commit', {
                     method: 'POST',
                     headers: {
@@ -1491,22 +1502,25 @@
                     throw new Error('Erro ao atualizar orçamento');
                 }
                 
-                // Atualizar dados locais IMEDIATAMENTE
-                orcamentoAtual.status = 'convertido';
+                // CORREÇÃO: Atualizar dados locais IMEDIATAMENTE
                 const index = orcamentosData.findIndex(o => o.id === orcamentoAtual.id);
                 if (index !== -1) {
                     orcamentosData[index].status = 'convertido';
+                    orcamentosData[index].pedidoNumero = numeroPedido;
+                    orcamentosData[index].dataConversao = new Date().toISOString().split('T')[0];
                 }
+                
+                // Atualizar estatísticas e tabela
+                atualizarEstatisticas();
+                filtrarOrcamentos();
+                renderizarTabela();
                 
                 mostrarMensagem(`Orçamento convertido em pedido ${numeroPedido}!`, 'success');
                 
                 // Fechar modal
                 fecharModal();
                 
-                // Recarregar dados
-                await carregarOrcamentos();
-                
-                // Redirecionar para o pedido após 1 segundo
+                // Redirecionar para pedidos após 1 segundo
                 setTimeout(() => {
                     window.location.href = `pedidos.html`;
                 }, 1000);
@@ -1549,15 +1563,17 @@
                 }
                 
                 // Atualizar dados locais
-                orcamentoAtual.status = 'recusado';
                 const index = orcamentosData.findIndex(o => o.id === orcamentoAtual.id);
                 if (index !== -1) {
                     orcamentosData[index].status = 'recusado';
+                    orcamentosData[index].dataRecusa = new Date().toISOString().split('T')[0];
                 }
                 
                 mostrarMensagem('Orçamento recusado', 'success');
                 fecharModal();
-                await carregarOrcamentos();
+                atualizarEstatisticas();
+                filtrarOrcamentos();
+                renderizarTabela();
                 
             } catch (error) {
                 console.error('Erro ao recusar orçamento:', error);
@@ -1646,14 +1662,18 @@
                     throw new Error('Erro ao atualizar orçamento');
                 }
                 
-                // Atualizar dados locais
+                // CORREÇÃO: Atualizar dados locais IMEDIATAMENTE
                 const index = orcamentosData.findIndex(o => o.id === id);
                 if (index !== -1) {
                     orcamentosData[index].status = 'convertido';
+                    orcamentosData[index].pedidoNumero = numeroPedido;
+                    orcamentosData[index].dataConversao = new Date().toISOString().split('T')[0];
                 }
                 
                 mostrarMensagem(`Orçamento convertido em pedido ${numeroPedido}!`, 'success');
-                await carregarOrcamentos();
+                atualizarEstatisticas();
+                filtrarOrcamentos();
+                renderizarTabela();
                 
             } catch (error) {
                 console.error('Erro ao converter orçamento:', error);
@@ -1666,7 +1686,6 @@
         // Função para gerar número de pedido automático
         async function gerarNumeroPedidoAutomatico() {
             try {
-                // Buscar todos os pedidos do Firebase
                 const response = await fetch('/api/database/query', {
                     method: 'POST',
                     headers: {
@@ -1685,14 +1704,12 @@
                 const result = await response.json();
                 const eventos = result.events || [];
                 
-                // Filtrar apenas eventos de pedidos válidos
                 const pedidos = eventos.filter(event => 
                     event.schema === 'pedido' && 
                     !event.deleted &&
                     event.payload.numero
                 );
                 
-                // Encontrar o maior número de sequência
                 let maiorSequencia = 0;
                 const anoAtual = new Date().getFullYear();
                 
@@ -1710,7 +1727,6 @@
                     }
                 });
                 
-                // Gerar novo número de sequência
                 const novaSequencia = maiorSequencia + 1;
                 const sequenciaFormatada = novaSequencia.toString().padStart(4, '0');
                 
@@ -1718,7 +1734,6 @@
                 
             } catch (error) {
                 console.error('Erro ao gerar número de pedido:', error);
-                // Fallback
                 const anoAtual = new Date().getFullYear();
                 return `${anoAtual}/0001`;
             }
@@ -1741,13 +1756,11 @@
             mostrarLoading();
             
             try {
-                // Buscar o orçamento
                 const orcamento = orcamentosData.find(o => o.id === id);
                 if (!orcamento) {
                     throw new Error('Orçamento não encontrado');
                 }
                 
-                // Criar evento de soft delete
                 const response = await fetch('/api/database/commit', {
                     method: 'POST',
                     headers: {
@@ -1768,14 +1781,15 @@
                     throw new Error('Erro ao excluir orçamento');
                 }
                 
-                // Remover dos dados locais
                 const index = orcamentosData.findIndex(o => o.id === id);
                 if (index !== -1) {
                     orcamentosData.splice(index, 1);
                 }
                 
                 mostrarMensagem('Orçamento excluído com sucesso!', 'success');
-                await carregarOrcamentos();
+                atualizarEstatisticas();
+                filtrarOrcamentos();
+                renderizarTabela();
                 
             } catch (error) {
                 console.error('Erro ao excluir orçamento:', error);
@@ -1801,7 +1815,7 @@
             window.location.reload();
         }
         
-        // Função para baixar PDF (simulação)
+        // Função para baixar PDF
         function baixarPDF() {
             mostrarMensagem('Gerando PDF... (simulação)', 'info');
             setTimeout(() => {
@@ -1857,7 +1871,7 @@
         // ============================================
         
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('📋 Página de Orçamentos inicializada (CORE v5.1)');
+            console.log('📋 Página de Orçamentos inicializada (CORRIGIDA)');
             
             // Configurar datas dos filtros
             const hoje = new Date();
@@ -1869,7 +1883,7 @@
             // Carregar orçamentos
             carregarOrcamentos();
             
-            // Event listener para atualizar dados quando houver mudanças no Core
+            // Event listener para atualizar dados
             document.addEventListener('coreDataChanged', () => {
                 console.log('🔄 coreDataChanged recebido - recarregando orçamentos');
                 carregarOrcamentos();

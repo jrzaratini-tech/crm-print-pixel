@@ -650,7 +650,6 @@
         // Gerar código de orçamento automático
         async function gerarCodigoOrcamento() {
             try {
-                // Buscar todos os orçamentos
                 const response = await fetch('/api/database/query', {
                     method: 'POST',
                     headers: {
@@ -669,7 +668,6 @@
                 const result = await response.json();
                 const eventos = result.events || [];
                 
-                // Encontrar maior sequência
                 const anoAtual = new Date().getFullYear();
                 let maiorSequencia = 0;
                 
@@ -689,7 +687,6 @@
                     }
                 });
                 
-                // Gerar novo código
                 const novaSequencia = maiorSequencia + 1;
                 const sequenciaFormatada = novaSequencia.toString().padStart(4, '0');
                 
@@ -717,10 +714,8 @@
                 empresa: document.getElementById('empresa').value,
                 codigo: document.getElementById('codigo').value,
                 total: document.getElementById('orcamentoTotal').value,
-                // Adicionar mais dados conforme necessário
             };
             
-            // Abrir modal de preview (simplificado)
             const previewHTML = `
                 <h2>Pré-visualização do Orçamento ${dados.codigo}</h2>
                 <p><strong>Cliente:</strong> ${dados.cliente}</p>
@@ -759,7 +754,17 @@
                 }
                 
                 const orcamentoEvento = eventos[0];
-                const orcamento = orcamentoEvento.payload;
+                let orcamento = orcamentoEvento.payload;
+                
+                // Processar payload se for string
+                if (typeof orcamento === 'string') {
+                    try {
+                        orcamento = JSON.parse(orcamento);
+                    } catch (e) {
+                        console.warn('Payload não é JSON válido');
+                        orcamento = {};
+                    }
+                }
                 
                 // Preencher formulário
                 document.getElementById('cliente').value = orcamento.cliente || '';
@@ -783,12 +788,22 @@
                     if (ivaRadio) ivaRadio.checked = true;
                 }
                 
-                // Produtos
+                // CORREÇÃO: Processar produtos corretamente
                 productsTableBody.innerHTML = '';
                 productIndex = 0;
                 
-                if (orcamento.produtos && Array.isArray(orcamento.produtos)) {
-                    orcamento.produtos.forEach(produto => {
+                let produtosArray = [];
+                if (orcamento.produtos) {
+                    if (Array.isArray(orcamento.produtos)) {
+                        produtosArray = orcamento.produtos;
+                    } else if (typeof orcamento.produtos === 'object') {
+                        // Converter objeto para array se necessário
+                        produtosArray = Object.values(orcamento.produtos);
+                    }
+                }
+                
+                if (produtosArray.length > 0) {
+                    produtosArray.forEach(produto => {
                         addProductRow(produto);
                     });
                 } else {
@@ -813,7 +828,7 @@
         }
         
         // ============================================
-        // FUNÇÕES REUTILIZÁVEIS (da página novopedido)
+        // FUNÇÕES REUTILIZÁVEIS (CORRIGIDAS)
         // ============================================
         
         function addProductRow(productData = null) {
@@ -910,8 +925,7 @@
                 subtotalProdutos += valor * quantidade;
             });
             
-            const instalacao = 0; // Orçamento não tem instalação
-            
+            const instalacao = 0;
             const subtotalGeral = subtotalProdutos + instalacao;
             
             let iva = 0;
@@ -955,7 +969,6 @@
                 messageDiv.style.backgroundColor = '#10b981';
             }
             
-            // Remover mensagens anteriores
             document.querySelectorAll('.success-message').forEach(msg => msg.remove());
             
             document.body.appendChild(messageDiv);
@@ -994,8 +1007,33 @@
             return true;
         }
         
+        // CORREÇÃO: Função para garantir estrutura correta dos produtos
+        function prepararProdutosParaSalvar() {
+            const produtosArray = [];
+            
+            document.querySelectorAll('#productsTableBody tr').forEach((row, index) => {
+                const nome = row.querySelector('.product-select').value;
+                const tamanho = row.querySelector('.tamanho-input').value;
+                const quantidade = parseInt(row.querySelector('.quantidade-input').value) || 1;
+                const valor = parseFloat(row.querySelector('.valor-input').value) || 0;
+                const observacoes = row.querySelector('.obs-input').value;
+                
+                if (nome) {
+                    produtosArray.push({
+                        nome: nome,
+                        tamanho: tamanho,
+                        quantidade: quantidade,
+                        valor: valor,
+                        observacoes: observacoes
+                    });
+                }
+            });
+            
+            return produtosArray;
+        }
+        
         // ============================================
-        // EVENT LISTENERS
+        // EVENT LISTENERS (CORRIGIDOS)
         // ============================================
         
         document.addEventListener('DOMContentLoaded', async () => {
@@ -1056,53 +1094,73 @@
             }
         });
         
-        saveBtn.addEventListener('click', (e) => {
+        // CORREÇÃO: Evento de save melhorado
+        saveBtn.addEventListener('click', async (e) => {
             e.preventDefault();
             
             if (!validateForm()) return;
             
-            // Preparar dados adicionais específicos do orçamento
-            const validadeDias = document.getElementById('validade').value;
-            const validadeData = calcularDataValidade(validadeDias);
-            
-            // Adicionar campos específicos ao formulário (serão capturados pelo engine.js)
-            const hiddenValidade = document.createElement('input');
-            hiddenValidade.type = 'hidden';
-            hiddenValidade.name = 'validade';
-            hiddenValidade.value = validadeData;
-            hiddenValidade.setAttribute('data-bind', 'orcamento.validade');
-            document.getElementById('orcamentoForm').appendChild(hiddenValidade);
-            
-            const hiddenValidadeDias = document.createElement('input');
-            hiddenValidadeDias.type = 'hidden';
-            hiddenValidadeDias.name = 'validadeDias';
-            hiddenValidadeDias.value = validadeDias;
-            hiddenValidadeDias.setAttribute('data-bind', 'orcamento.validadeDias');
-            document.getElementById('orcamentoForm').appendChild(hiddenValidadeDias);
-            
-            // Status inicial
-            const hiddenStatus = document.createElement('input');
-            hiddenStatus.type = 'hidden';
-            hiddenStatus.name = 'status';
-            hiddenStatus.value = 'pendente';
-            hiddenStatus.setAttribute('data-bind', 'orcamento.status');
-            document.getElementById('orcamentoForm').appendChild(hiddenStatus);
-            
-            // Data de criação
-            const hiddenDataCriacao = document.createElement('input');
-            hiddenDataCriacao.type = 'hidden';
-            hiddenDataCriacao.name = 'dataCriacao';
-            hiddenDataCriacao.value = new Date().toISOString().split('T')[0];
-            hiddenDataCriacao.setAttribute('data-bind', 'orcamento.dataCriacao');
-            document.getElementById('orcamentoForm').appendChild(hiddenDataCriacao);
-            
-            // Feedback visual
-            saveBtn.classList.add('saving');
-            saveBtn.textContent = 'SALVANDO...';
-            saveBtn.disabled = true;
-            
-            // O engine.js fará o commit automaticamente
+            try {
+                // Preparar produtos estruturados
+                const produtosArray = prepararProdutosParaSalvar();
+                
+                // Preparar dados do orçamento
+                const validadeDias = document.getElementById('validade').value;
+                const validadeData = calcularDataValidade(validadeDias);
+                
+                const dadosOrcamento = {
+                    cliente: document.getElementById('cliente').value,
+                    empresa: document.getElementById('empresa').value,
+                    nif: document.getElementById('nif').value,
+                    morada: document.getElementById('morada').value,
+                    telemovel: document.getElementById('telemovel').value,
+                    email: document.getElementById('email').value,
+                    codigo: document.getElementById('codigo').value,
+                    atendente: document.getElementById('atendente').value,
+                    observacoes: document.getElementById('observacoes').value,
+                    produtos: produtosArray, // CORREÇÃO: Array estruturado
+                    subtotal: parseFloat(document.getElementById('orcamentoSubtotal').value) || 0,
+                    iva: parseFloat(document.getElementById('orcamentoIVA').value) || 0,
+                    total: parseFloat(document.getElementById('orcamentoTotal').value) || 0,
+                    comIVA: document.querySelector('input[name="ivaOption"]:checked').value,
+                    status: 'pendente',
+                    validade: validadeData,
+                    validadeDias: validadeDias,
+                    dataCriacao: new Date().toISOString().split('T')[0],
+                    instalacao: 0 // Orçamento não tem instalação
+                };
+                
+                // Adicionar id se for edição
+                if (isEditMode && currentOrcamentoId) {
+                    dadosOrcamento.id = currentOrcamentoId;
+                }
+                
+                // Criar input oculto com dados completos (para o engine.js)
+                const hiddenData = document.createElement('input');
+                hiddenData.type = 'hidden';
+                hiddenData.name = 'orcamentoData';
+                hiddenData.value = JSON.stringify(dadosOrcamento);
+                hiddenData.setAttribute('data-bind', 'orcamento.completeData');
+                document.getElementById('orcamentoForm').appendChild(hiddenData);
+                
+                // Feedback visual
+                saveBtn.classList.add('saving');
+                saveBtn.textContent = 'SALVANDO...';
+                saveBtn.disabled = true;
+                
+                // O engine.js fará o commit automaticamente
+                
+            } catch (error) {
+                console.error('Erro ao preparar dados:', error);
+                mostrarMensagem('Erro ao preparar dados do orçamento', 'error');
+                saveBtn.classList.remove('saving');
+                saveBtn.disabled = false;
+            }
         });
+        
+        // Listeners para cálculo automático
+        document.getElementById('ivaSim').addEventListener('change', calculateTotals);
+        document.getElementById('ivaNao').addEventListener('change', calculateTotals);
     </script>
     
     <!-- CONEXÃO COM O CORE ENGINE -->
