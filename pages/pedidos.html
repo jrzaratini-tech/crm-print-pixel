@@ -316,6 +316,16 @@
             color: #065f46;
         }
         
+        .status-pago {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-parcial {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
         .search-box {
             flex: 1;
             max-width: 400px;
@@ -594,6 +604,14 @@
             min-width: 150px;
         }
         
+        .payment-status-badge {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
         /* ============================================
            MODAL DE DETALHES
            ============================================ */
@@ -619,7 +637,7 @@
             background: var(--card-bg);
             border-radius: var(--radius-lg);
             width: 90%;
-            max-width: 800px;
+            max-width: 1000px;
             max-height: 90vh;
             overflow-y: auto;
             box-shadow: var(--shadow-lg);
@@ -713,14 +731,14 @@
             font-weight: 500;
         }
         
-        /* SOLUÇÃO: Adicionar data-schema para proteger da limpeza do engine.js */
-        .modal-content table.produtos-table {
+        /* TABELAS DO MODAL */
+        .modal-content table {
             margin-top: 12px;
             border-collapse: collapse;
             width: 100%;
         }
         
-        .modal-content table.produtos-table th {
+        .modal-content table th {
             background: var(--hover-bg);
             padding: 12px;
             text-align: left;
@@ -731,7 +749,7 @@
             letter-spacing: 0.5px;
         }
         
-        .modal-content table.produtos-table td {
+        .modal-content table td {
             padding: 12px;
             border-bottom: 1px solid var(--border-color);
             font-size: 14px;
@@ -744,7 +762,7 @@
         }
         
         .total-box {
-            width: 250px;
+            width: 300px;
             background: var(--light-bg);
             padding: 20px;
             border-radius: var(--radius-md);
@@ -1022,14 +1040,11 @@
 
     <script>
         // ============================================
-        // SISTEMA DE GESTÃO DE PEDIDOS - CORE v5.1 COMPATÍVEL
+        // SISTEMA DE GESTÃO DE PEDIDOS - COMPATÍVEL COM NOVO FORMULÁRIO
         // ============================================
         
-        // FLAG para controlar se estamos em modo de atualização do engine.js
-        let engineRefreshInProgress = false;
-        
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('📋 Página de Gestão de Pedidos (CORE v5.1) carregada');
+            console.log('📋 Página de Gestão de Pedidos carregada');
             
             // Elementos do DOM
             const pedidosGrid = document.getElementById('pedidosGrid');
@@ -1045,18 +1060,17 @@
             let todosPedidos = [];
             let filtroAtual = 'all';
             let termoBusca = '';
-            let modalPedidoAtual = null; // Guardar pedido atual no modal
+            let modalPedidoAtual = null;
             
             // ============================================
-            // FUNÇÕES PRINCIPAIS - SIGA PROTOCOLO CORE
+            // FUNÇÕES PRINCIPAIS
             // ============================================
             
             // Carregar pedidos do Firebase via API Core
             async function carregarPedidos() {
                 try {
-                    console.log('🔄 Carregando pedidos do Firebase (CORE v5.1)...');
+                    console.log('🔄 Carregando pedidos do Firebase...');
                     
-                    // Usar API REST do servidor CORE
                     const response = await fetch('/api/database/query', {
                         method: 'POST',
                         headers: {
@@ -1088,11 +1102,8 @@
                 }
             }
             
-            // Processar pedidos seguindo schema do README
+            // Processar pedidos seguindo o schema atualizado
             function processarPedidos(events) {
-                // Marcar que estamos em processo de atualização
-                engineRefreshInProgress = true;
-                
                 console.log('📦 Processando eventos do Firebase:', events.length);
                 
                 // Filtrar apenas eventos do schema "pedido" e não deletados
@@ -1113,9 +1124,31 @@
                             }
                         }
                         
+                        // Calcular total pago baseado nos pagamentos
+                        let totalPago = 0;
+                        let saldoPendente = 0;
+                        let statusPagamento = 'pendente';
+                        
+                        if (payload.pagamentos && Array.isArray(payload.pagamentos)) {
+                            totalPago = payload.pagamentos
+                                .filter(p => p.status === 'pago')
+                                .reduce((sum, p) => sum + (parseFloat(p.valor) || 0), 0);
+                            
+                            const totalPedido = parseFloat(payload.total) || 0;
+                            saldoPendente = totalPedido - totalPago;
+                            
+                            // Determinar status do pagamento
+                            if (totalPago === 0) {
+                                statusPagamento = 'pendente';
+                            } else if (totalPago > 0 && totalPago < totalPedido) {
+                                statusPagamento = 'parcial';
+                            } else if (totalPago >= totalPedido) {
+                                statusPagamento = 'pago';
+                            }
+                        }
+                        
                         // Garantir que temos todos os campos necessários do schema
                         const pedidoFormatado = {
-                            // Campos do schema "pedido" do README
                             id: event.id,
                             cliente: payload.cliente || 'Cliente não informado',
                             empresa: payload.empresa || 'Empresa não informada',
@@ -1124,19 +1157,18 @@
                             telemovel: payload.telemovel || '',
                             numero: payload.numero || `PED-${event.id.substring(0, 8)}`,
                             produtos: Array.isArray(payload.produtos) ? payload.produtos : [],
+                            pagamentos: Array.isArray(payload.pagamentos) ? payload.pagamentos : [],
                             total: parseFloat(payload.total) || 0,
-                            status: payload.status || 'pendente',
-                            dataEntrega: payload.dataEntrega || '',
-                            observacoes: payload.observacoes || '',
-                            
-                            // Campos adicionais do formulário
-                            atendente: payload.atendente || '',
-                            entrada: parseFloat(payload.entrada) || 0,
-                            dataEntrada: payload.dataEntrada || '',
-                            instalacao: parseFloat(payload.instalacao) || 0,
-                            comIVA: payload.comIVA || 'sim',
                             subtotal: parseFloat(payload.subtotal) || 0,
                             iva: parseFloat(payload.iva) || 0,
+                            totalPago: totalPago,
+                            saldoPendente: saldoPendente,
+                            statusPagamento: statusPagamento,
+                            status: payload.status || 'pendente',
+                            dataEntrega: payload.dataEntrega || '',
+                            atendente: payload.atendente || '',
+                            observacoes: payload.observacoes || '',
+                            comIVA: payload.comIVA || 'sim',
                             
                             // Metadados do evento
                             createdAt: event.timestamp || event.created_at || new Date().toISOString(),
@@ -1158,21 +1190,16 @@
                     const pedidoAtualizado = todosPedidos.find(p => p.id === modalPedidoAtual.id);
                     if (pedidoAtualizado) {
                         modalPedidoAtual = pedidoAtualizado;
-                        abrirModalDetalhes(pedidoAtualizado, true); // true = atualização silenciosa
+                        abrirModalDetalhes(pedidoAtualizado, true);
                     }
                 }
                 
                 // Ocultar loading, mostrar grid
                 loadingState.style.display = 'none';
                 pedidosGrid.style.display = 'grid';
-                
-                // Resetar flag
-                setTimeout(() => {
-                    engineRefreshInProgress = false;
-                }, 100);
             }
             
-            // Atualizar contadores com data-bind (Core Engine vai capturar)
+            // Atualizar contadores
             function atualizarContadores() {
                 const total = todosPedidos.length;
                 const pendentes = todosPedidos.filter(p => p.status === 'pendente').length;
@@ -1181,8 +1208,7 @@
                 
                 console.log(`📊 Contadores: Total=${total}, Pendentes=${pendentes}, Processamento=${processamento}, Concluídos=${concluidos}`);
                 
-                // O Core Engine irá atualizar automaticamente via data-bind
-                // Mas vamos atualizar manualmente também para garantir
+                // Atualizar elementos com data-bind
                 document.querySelector('[data-bind="pedidos.total"]').textContent = total;
                 document.querySelector('[data-bind="pedidos.pendentes"]').textContent = pendentes;
                 document.querySelector('[data-bind="pedidos.processamento"]').textContent = processamento;
@@ -1233,23 +1259,17 @@
                     const card = criarCardPedido(pedido);
                     pedidosGrid.appendChild(card);
                 });
-                
-                // Adicionar animação de entrada
-                const cards = document.querySelectorAll('.pedido-card');
-                cards.forEach((card, index) => {
-                    card.style.animationDelay = `${index * 0.05}s`;
-                    card.classList.add('slide-up');
-                });
             }
             
             // Criar card de pedido (formato profissional)
             function criarCardPedido(pedido) {
                 const produtos = pedido.produtos || [];
+                const pagamentos = pedido.pagamentos || [];
                 const total = pedido.total || 0;
                 const iva = pedido.iva || 0;
                 const subtotal = pedido.subtotal || total - iva;
-                const entrada = pedido.entrada || 0;
-                const valorRestante = total - entrada;
+                const totalPago = pedido.totalPago || 0;
+                const saldoPendente = pedido.saldoPendente || total;
                 
                 // Formatadores
                 const formatarData = (dataStr) => {
@@ -1269,6 +1289,26 @@
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
                     }).format(valor);
+                };
+                
+                // Obter label do status de pagamento
+                const getStatusPagamentoLabel = (status) => {
+                    switch(status) {
+                        case 'pago': return 'Pago';
+                        case 'parcial': return 'Parcial';
+                        case 'pendente': return 'Pendente';
+                        default: return status;
+                    }
+                };
+                
+                // Obter classe do status de pagamento
+                const getStatusPagamentoClasse = (status) => {
+                    switch(status) {
+                        case 'pago': return 'status-pago';
+                        case 'parcial': return 'status-parcial';
+                        case 'pendente': return 'status-pendente';
+                        default: return '';
+                    }
                 };
                 
                 const card = document.createElement('div');
@@ -1297,6 +1337,11 @@
                                 <div class="pedido-meta-item">
                                     <i class="fas fa-user-tie"></i>
                                     <span>Atendente: ${pedido.atendente || 'N/A'}</span>
+                                </div>
+                                <div class="pedido-meta-item">
+                                    <span class="payment-status-badge ${getStatusPagamentoClasse(pedido.statusPagamento)}">
+                                        ${getStatusPagamentoLabel(pedido.statusPagamento)}
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -1346,16 +1391,14 @@
                                 <span>IVA (23%):</span>
                                 <span>${formatarMoeda(iva)}</span>
                             </div>
-                            ${entrada > 0 ? `
-                                <div class="resumo-item">
-                                    <span>Entrada:</span>
-                                    <span>${formatarMoeda(entrada)}</span>
-                                </div>
-                                <div class="resumo-item">
-                                    <span>Restante:</span>
-                                    <span>${formatarMoeda(valorRestante)}</span>
-                                </div>
-                            ` : ''}
+                            <div class="resumo-item">
+                                <span>Total Pago:</span>
+                                <span>${formatarMoeda(totalPago)}</span>
+                            </div>
+                            <div class="resumo-item">
+                                <span>Saldo Pendente:</span>
+                                <span>${formatarMoeda(saldoPendente)}</span>
+                            </div>
                             <div class="resumo-item resumo-total">
                                 <span>Total:</span>
                                 <span>${formatarMoeda(total)}</span>
@@ -1395,19 +1438,19 @@
                 modalPedidoAtual = pedido;
                 
                 const produtos = pedido.produtos || [];
+                const pagamentos = pedido.pagamentos || [];
                 const total = pedido.total || 0;
                 const iva = pedido.iva || 0;
                 const subtotal = pedido.subtotal || total - iva;
-                const entrada = pedido.entrada || 0;
-                const instalacao = pedido.instalacao || 0;
-                const valorRestante = total - entrada;
+                const totalPago = pedido.totalPago || 0;
+                const saldoPendente = pedido.saldoPendente || total;
                 
                 // Formatadores
                 const formatarData = (dataStr) => {
                     if (!dataStr) return 'Não informado';
                     try {
                         const data = new Date(dataStr);
-                        return data.toLocaleDateString('pt-PT') + ' ' + data.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+                        return data.toLocaleDateString('pt-PT');
                     } catch (e) {
                         return dataStr;
                     }
@@ -1422,7 +1465,27 @@
                     }).format(valor);
                 };
                 
-                // Status info
+                // Obter label do status de pagamento
+                const getStatusPagamentoLabel = (status) => {
+                    switch(status) {
+                        case 'pago': return 'Pago';
+                        case 'parcial': return 'Parcial';
+                        case 'pendente': return 'Pendente';
+                        default: return status;
+                    }
+                };
+                
+                // Obter classe do status de pagamento
+                const getStatusPagamentoClasse = (status) => {
+                    switch(status) {
+                        case 'pago': return 'status-pago';
+                        case 'parcial': return 'status-parcial';
+                        case 'pendente': return 'status-pendente';
+                        default: return '';
+                    }
+                };
+                
+                // Status do pedido
                 const getStatusInfo = (status) => {
                     switch(status) {
                         case 'pendente': return { texto: 'Pendente', classe: 'status-pendente' };
@@ -1433,6 +1496,8 @@
                 };
                 
                 const statusInfo = getStatusInfo(pedido.status);
+                const statusPagamentoInfo = getStatusPagamentoLabel(pedido.statusPagamento);
+                const statusPagamentoClasse = getStatusPagamentoClasse(pedido.statusPagamento);
                 
                 modalContent.innerHTML = `
                     <div class="modal-section">
@@ -1443,9 +1508,15 @@
                                 <div class="info-value">${pedido.numero}</div>
                             </div>
                             <div class="info-item">
-                                <div class="info-label">Status</div>
+                                <div class="info-label">Status do Pedido</div>
                                 <div class="info-value">
                                     <span class="status-badge ${statusInfo.classe}">${statusInfo.texto}</span>
+                                </div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Status do Pagamento</div>
+                                <div class="info-value">
+                                    <span class="status-badge ${statusPagamentoClasse}">${statusPagamentoInfo}</span>
                                 </div>
                             </div>
                             <div class="info-item">
@@ -1490,22 +1561,8 @@
                     </div>
                     
                     <div class="modal-section">
-                        <h3 class="section-title">Datas</h3>
-                        <div class="info-grid">
-                            <div class="info-item">
-                                <div class="info-label">Data de Entrega</div>
-                                <div class="info-value">${formatarData(pedido.dataEntrega)}</div>
-                            </div>
-                            <div class="info-item">
-                                <div class="info-label">Data da Entrada</div>
-                                <div class="info-value">${formatarData(pedido.dataEntrada)}</div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="modal-section">
                         <h3 class="section-title">Produtos (${produtos.length})</h3>
-                        <table class="produtos-table" data-schema="modal-protected">
+                        <table>
                             <thead>
                                 <tr>
                                     <th>Produto</th>
@@ -1531,20 +1588,67 @@
                         </table>
                     </div>
                     
+                    ${pagamentos.length > 0 ? `
+                    <div class="modal-section">
+                        <h3 class="section-title">Pagamentos (${pagamentos.length})</h3>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Tipo</th>
+                                    <th>Data</th>
+                                    <th>Valor</th>
+                                    <th>Forma de Pagamento</th>
+                                    <th>Status</th>
+                                    <th>Observações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${pagamentos.map(pag => {
+                                    let tipoLabel = '';
+                                    switch(pag.tipo) {
+                                        case 'entrada': tipoLabel = 'Entrada'; break;
+                                        case 'parcela': tipoLabel = 'Parcela'; break;
+                                        case 'final': tipoLabel = 'Final'; break;
+                                        default: tipoLabel = pag.tipo;
+                                    }
+                                    
+                                    let statusClass = '';
+                                    let statusLabel = '';
+                                    switch(pag.status) {
+                                        case 'pago': 
+                                            statusClass = 'status-pago';
+                                            statusLabel = 'Pago';
+                                            break;
+                                        case 'pendente': 
+                                            statusClass = 'status-pendente';
+                                            statusLabel = 'Pendente';
+                                            break;
+                                        case 'atrasado': 
+                                            statusClass = 'status-pendente';
+                                            statusLabel = 'Atrasado';
+                                            break;
+                                    }
+                                    
+                                    return `
+                                        <tr>
+                                            <td>${tipoLabel}</td>
+                                            <td>${formatarData(pag.data)}</td>
+                                            <td>${formatarMoeda(pag.valor || 0)}</td>
+                                            <td>${pag.formaPagamento || ''}</td>
+                                            <td><span class="status-badge ${statusClass}">${statusLabel}</span></td>
+                                            <td>${pag.observacoes || ''}</td>
+                                        </tr>
+                                    `;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                    ` : ''}
+                    
                     <div class="modal-section">
                         <h3 class="section-title">Resumo Financeiro</h3>
                         <div class="total-section">
                             <div class="total-box">
-                                <div class="total-row">
-                                    <span>Subtotal Produtos:</span>
-                                    <span>${formatarMoeda(subtotal - instalacao)}</span>
-                                </div>
-                                ${instalacao > 0 ? `
-                                    <div class="total-row">
-                                        <span>Instalação:</span>
-                                        <span>${formatarMoeda(instalacao)}</span>
-                                </div>
-                                ` : ''}
                                 <div class="total-row">
                                     <span>Subtotal:</span>
                                     <span>${formatarMoeda(subtotal)}</span>
@@ -1553,16 +1657,14 @@
                                     <span>IVA (${pedido.comIVA === 'sim' ? '23%' : 'Isento'}):</span>
                                     <span>${formatarMoeda(iva)}</span>
                                 </div>
-                                ${entrada > 0 ? `
-                                    <div class="total-row">
-                                        <span>Entrada:</span>
-                                        <span>${formatarMoeda(entrada)}</span>
-                                    </div>
-                                    <div class="total-row">
-                                        <span>Valor Restante:</span>
-                                        <span>${formatarMoeda(valorRestante)}</span>
-                                    </div>
-                                ` : ''}
+                                <div class="total-row">
+                                    <span>Total Pago:</span>
+                                    <span>${formatarMoeda(totalPago)}</span>
+                                </div>
+                                <div class="total-row">
+                                    <span>Saldo Pendente:</span>
+                                    <span>${formatarMoeda(saldoPendente)}</span>
+                                </div>
                                 <div class="total-row">
                                     <span>TOTAL:</span>
                                     <span>${formatarMoeda(total)}</span>
@@ -1736,54 +1838,13 @@
             });
             
             // ============================================
-            // COMPATIBILIDADE COM ENGINE.JS
-            // ============================================
-            
-            // Sobrescrever a função do engine.js para evitar limpeza do modal
-            const originalAtualizarInterface = window.atualizarInterface;
-            if (originalAtualizarInterface) {
-                window.atualizarInterface = function(events) {
-                    console.log('🛡️ Protegendo tabela do modal do engine.js');
-                    
-                    // Chamar função original mas com proteção
-                    if (typeof originalAtualizarInterface === 'function') {
-                        // Filtrar para evitar limpeza de tabelas do modal
-                        const tables = document.querySelectorAll('table tbody:not([data-schema="modal-protected"])');
-                        const lists = document.querySelectorAll('.data-list:not(.modal-content .data-list)');
-                        
-                        // Não executar se o modal estiver aberto
-                        if (modalOverlay.classList.contains('active') && engineRefreshInProgress) {
-                            console.log('🛡️ Modal aberto - ignorando limpeza do engine.js');
-                            return;
-                        }
-                        
-                        // Executar função original com contexto seguro
-                        originalAtualizarInterface.call(this, events);
-                    }
-                };
-            }
-            
-            // ============================================
             // INICIALIZAÇÃO
             // ============================================
             
             // Iniciar carregamento dos pedidos
             carregarPedidos();
             
-            // Desabilitar auto-refresh do engine.js para esta página específica
-            // Já que temos nosso próprio sistema de atualização
-            setTimeout(() => {
-                // Encontrar e limpar o intervalo do engine.js
-                const intervalIds = window.setIntervalIds || [];
-                intervalIds.forEach(id => {
-                    if (id && typeof window.clearInterval === 'function') {
-                        window.clearInterval(id);
-                    }
-                });
-                console.log('⏹️ Desabilitado auto-refresh do engine.js para pedidos.html');
-            }, 1000);
-            
-            console.log('✅ Sistema de gestão de pedidos inicializado (CORE v5.1)');
+            console.log('✅ Sistema de gestão de pedidos inicializado');
         });
     </script>
     
