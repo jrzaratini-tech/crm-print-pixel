@@ -721,6 +721,16 @@
                     </div>
                     
                     <div class="form-group">
+                        <label for="dataFechamento">Data de Fechamento</label>
+                        <input type="date" id="dataFechamento" name="dataFechamento" data-bind="pedido.dataFechamento">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="valorInstalacao">Valor Instalação / Deslocamento (€)</label>
+                        <input type="number" id="valorInstalacao" name="valorInstalacao" data-bind="pedido.instalacao" min="0" step="0.01" value="0">
+                    </div>
+                    
+                    <div class="form-group">
                         <label for="atendente" class="required">Atendente</label>
                         <input type="text" id="atendente" name="atendente" data-bind="pedido.atendente" required>
                     </div>
@@ -840,8 +850,8 @@
                     </div>
                     
                     <div class="total-card">
-                        <div class="total-label">Instalação</div>
-                        <div class="total-value" id="totalInstalacao">0,00 €</div>
+                        <div class="total-label">Instalação / Deslocamento</div>
+                        <div class="total-value" id="totalInstalacaoDisplay">0,00 €</div>
                     </div>
                     
                     <div class="total-card">
@@ -980,7 +990,7 @@
         
         // Referências para totais
         const subtotalProdutosEl = document.getElementById('subtotalProdutos');
-        const totalInstalacaoEl = document.getElementById('totalInstalacao');
+        const totalInstalacaoEl = document.getElementById('totalInstalacaoDisplay');
         const valorIVAEl = document.getElementById('valorIVA');
         const totalFinalEl = document.getElementById('totalFinal');
         
@@ -1000,6 +1010,8 @@
         // Referências para campos de entrada
         const ivaSimRadio = document.getElementById('ivaSim');
         const ivaNaoRadio = document.getElementById('ivaNao');
+        const valorInstalacaoInput = document.getElementById('valorInstalacao');
+        const dataFechamentoInput = document.getElementById('dataFechamento');
 
         // Referências do Modal de Pagamento
         const paymentModal = document.getElementById('paymentModal');
@@ -1102,7 +1114,7 @@
         }
 
         // ============================================
-        // FUNÇÕES DE PAGAMENTOS (NOVAS)
+        // FUNÇÕES DE PAGAMENTOS (CORRIGIDAS)
         // ============================================
 
         function openPaymentModal(paymentData = null) {
@@ -1144,6 +1156,7 @@
             paymentModal.style.display = 'none';
             isPaymentEditMode = false;
             currentPaymentRow = null;
+            paymentForm.reset();
         }
 
         function addPaymentRow(paymentData) {
@@ -1180,9 +1193,13 @@
                     statusLabel = 'Pendente';
             }
             
+            // Gerar um ID único para o pagamento se não existir
+            const paymentId = paymentData.id || `payment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            
             row.innerHTML = `
                 <td>
                     <span>${tipoLabel}</span>
+                    <input type="hidden" class="payment-id-input" data-bind="pedido.pagamentos.${index}.id" value="${paymentId}">
                     <input type="hidden" class="payment-tipo-input" data-bind="pedido.pagamentos.${index}.tipo" value="${paymentData.tipo}">
                 </td>
                 <td>
@@ -1224,8 +1241,8 @@
             
             removeBtn.addEventListener('click', () => removePaymentRow(row));
             editBtn.addEventListener('click', () => {
-                const paymentData = {
-                    id: paymentIdInput.value,
+                const paymentRowData = {
+                    id: row.querySelector('.payment-id-input').value,
                     row: row,
                     tipo: row.querySelector('.payment-tipo-input').value,
                     data: row.querySelector('.payment-data-input').value,
@@ -1235,7 +1252,7 @@
                     observacoes: row.querySelector('.payment-obs-input').value,
                     referencia: row.querySelector('.payment-ref-input').value
                 };
-                openPaymentModal(paymentData);
+                openPaymentModal(paymentRowData);
             });
             
             return row;
@@ -1260,6 +1277,7 @@
             paymentIndex = 0;
             
             rows.forEach((row, index) => {
+                const idInput = row.querySelector('.payment-id-input');
                 const tipoInput = row.querySelector('.payment-tipo-input');
                 const dataInput = row.querySelector('.payment-data-input');
                 const valorInput = row.querySelector('.payment-valor-input');
@@ -1268,6 +1286,7 @@
                 const refInput = row.querySelector('.payment-ref-input');
                 const statusInput = row.querySelector('.payment-status-input');
                 
+                if (idInput) idInput.setAttribute('data-bind', `pedido.pagamentos.${index}.id`);
                 if (tipoInput) tipoInput.setAttribute('data-bind', `pedido.pagamentos.${index}.tipo`);
                 if (dataInput) dataInput.setAttribute('data-bind', `pedido.pagamentos.${index}.data`);
                 if (valorInput) valorInput.setAttribute('data-bind', `pedido.pagamentos.${index}.valor`);
@@ -1350,8 +1369,8 @@
                 subtotalProdutos += valor * quantidade;
             });
             
-            // Calcular valor de instalação (se houver campo)
-            const instalacao = 0; // Mantido como 0 para compatibilidade
+            // Calcular valor de instalação
+            const instalacao = parseFloat(valorInstalacaoInput.value) || 0;
             
             // Calcular subtotal geral
             const subtotalGeral = subtotalProdutos + instalacao;
@@ -1559,6 +1578,8 @@
                 document.getElementById('telemovel').value = pedido.telemovel || '';
                 document.getElementById('numero').value = pedido.numero || '';
                 document.getElementById('dataEntrega').value = pedido.dataEntrega || '';
+                document.getElementById('dataFechamento').value = pedido.dataFechamento || '';
+                document.getElementById('valorInstalacao').value = pedido.instalacao || '0';
                 document.getElementById('atendente').value = pedido.atendente || '';
                 document.getElementById('observacoes').value = pedido.observacoes || '';
                 
@@ -1646,6 +1667,8 @@
             tomorrow.setDate(tomorrow.getDate() + 1);
             
             document.getElementById('dataEntrega').valueAsDate = tomorrow;
+            document.getElementById('dataFechamento').valueAsDate = null;
+            document.getElementById('valorInstalacao').value = '0';
             
             // Adicionar primeira linha de produto
             addProductRow();
@@ -1693,6 +1716,8 @@
                 tomorrow.setDate(tomorrow.getDate() + 1);
                 
                 document.getElementById('dataEntrega').valueAsDate = tomorrow;
+                document.getElementById('dataFechamento').valueAsDate = null;
+                document.getElementById('valorInstalacao').value = '0';
                 
                 // Gerar número de pedido automático
                 gerarNumeroPedido();
@@ -1722,13 +1747,13 @@
                 if (detail.schema === 'pedido') {
                     // Feedback de sucesso
                     saveBtn.classList.remove('saving');
-                    saveBtn.textContent = '✓ SALVO!';
+                    saveBtn.textContent = detail.isUpdate ? '✓ ATUALIZADO!' : '✓ SALVO!';
                     
-                    showMessage(`Pedido ${isEditMode ? 'atualizado' : 'criado'} com sucesso!`, 'success');
+                    showMessage(`Pedido ${detail.isUpdate ? 'atualizado' : 'criado'} com sucesso!`, 'success');
                     
                     // Redirecionar após 2 segundos
                     setTimeout(() => {
-                        if (confirm(`Pedido ${isEditMode ? 'atualizado' : 'criado'} com sucesso! Deseja criar um novo pedido?`)) {
+                        if (confirm(`Pedido ${detail.isUpdate ? 'atualizado' : 'criado'} com sucesso! Deseja criar um novo pedido?`)) {
                             clearForm();
                         } else {
                             window.location.href = 'pedidos.html';
@@ -1779,7 +1804,7 @@
             
             // Feedback visual
             saveBtn.classList.add('saving');
-            saveBtn.textContent = 'SALVANDO...';
+            saveBtn.textContent = isEditMode ? 'ATUALIZANDO...' : 'SALVANDO...';
             saveBtn.disabled = true;
         });
 
@@ -1821,6 +1846,9 @@
             if (isPaymentEditMode && currentPaymentRow) {
                 // Atualizar linha existente
                 const row = currentPaymentRow;
+                const paymentId = paymentIdInput.value || row.querySelector('.payment-id-input').value;
+                
+                paymentData.id = paymentId;
                 row.querySelector('.payment-tipo-input').value = paymentData.tipo;
                 row.querySelector('.payment-data-input').value = paymentData.data;
                 row.querySelector('.payment-valor-input').value = paymentData.valor;
@@ -1879,6 +1907,7 @@
         // Listeners para cálculo automático de totais
         ivaSimRadio.addEventListener('change', calculateTotals);
         ivaNaoRadio.addEventListener('change', calculateTotals);
+        valorInstalacaoInput.addEventListener('input', calculateTotals);
     </script>
     
     <!-- CONEXÃO COM O CORE ENGINE -->

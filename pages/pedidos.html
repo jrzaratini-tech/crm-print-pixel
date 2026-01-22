@@ -444,6 +444,15 @@
             gap: 4px;
         }
         
+        .pedido-meta-item .instalacao-badge {
+            background: #e0f2fe;
+            color: #0369a1;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
         .pedido-actions {
             display: flex;
             gap: 8px;
@@ -1161,11 +1170,13 @@
                             total: parseFloat(payload.total) || 0,
                             subtotal: parseFloat(payload.subtotal) || 0,
                             iva: parseFloat(payload.iva) || 0,
+                            instalacao: parseFloat(payload.instalacao) || 0,
                             totalPago: totalPago,
                             saldoPendente: saldoPendente,
                             statusPagamento: statusPagamento,
                             status: payload.status || 'pendente',
                             dataEntrega: payload.dataEntrega || '',
+                            dataFechamento: payload.dataFechamento || '',
                             atendente: payload.atendente || '',
                             observacoes: payload.observacoes || '',
                             comIVA: payload.comIVA || 'sim',
@@ -1268,6 +1279,7 @@
                 const total = pedido.total || 0;
                 const iva = pedido.iva || 0;
                 const subtotal = pedido.subtotal || total - iva;
+                const instalacao = pedido.instalacao || 0;
                 const totalPago = pedido.totalPago || 0;
                 const saldoPendente = pedido.saldoPendente || total;
                 
@@ -1320,6 +1332,9 @@
                     return sum + ((prod.valor || 0) * (prod.quantidade || 1));
                 }, 0);
                 
+                // Verificar se tem instalação
+                const temInstalacao = instalacao > 0;
+                
                 card.innerHTML = `
                     <div class="pedido-header">
                         <div class="pedido-info">
@@ -1334,10 +1349,17 @@
                                     <i class="fas fa-calendar-alt"></i>
                                     <span>Entrega: ${formatarData(pedido.dataEntrega)}</span>
                                 </div>
+                                ${pedido.dataFechamento ? `
                                 <div class="pedido-meta-item">
-                                    <i class="fas fa-user-tie"></i>
-                                    <span>Atendente: ${pedido.atendente || 'N/A'}</span>
+                                    <i class="fas fa-calendar-check"></i>
+                                    <span>Fechamento: ${formatarData(pedido.dataFechamento)}</span>
                                 </div>
+                                ` : ''}
+                                ${temInstalacao ? `
+                                <div class="pedido-meta-item">
+                                    <span class="instalacao-badge">Instalação: ${formatarMoeda(instalacao)}</span>
+                                </div>
+                                ` : ''}
                                 <div class="pedido-meta-item">
                                     <span class="payment-status-badge ${getStatusPagamentoClasse(pedido.statusPagamento)}">
                                         ${getStatusPagamentoLabel(pedido.statusPagamento)}
@@ -1384,11 +1406,17 @@
                         
                         <div class="pedido-resumo">
                             <div class="resumo-item">
-                                <span>Subtotal:</span>
-                                <span>${formatarMoeda(subtotal)}</span>
+                                <span>Subtotal Produtos:</span>
+                                <span>${formatarMoeda(totalProdutos)}</span>
                             </div>
+                            ${temInstalacao ? `
                             <div class="resumo-item">
-                                <span>IVA (23%):</span>
+                                <span>Instalação:</span>
+                                <span>${formatarMoeda(instalacao)}</span>
+                            </div>
+                            ` : ''}
+                            <div class="resumo-item">
+                                <span>IVA (${pedido.comIVA === 'sim' ? '23%' : 'Isento'}):</span>
                                 <span>${formatarMoeda(iva)}</span>
                             </div>
                             <div class="resumo-item">
@@ -1442,6 +1470,7 @@
                 const total = pedido.total || 0;
                 const iva = pedido.iva || 0;
                 const subtotal = pedido.subtotal || total - iva;
+                const instalacao = pedido.instalacao || 0;
                 const totalPago = pedido.totalPago || 0;
                 const saldoPendente = pedido.saldoPendente || total;
                 
@@ -1527,6 +1556,18 @@
                                 <div class="info-label">Data de Entrega</div>
                                 <div class="info-value">${formatarData(pedido.dataEntrega)}</div>
                             </div>
+                            ${pedido.dataFechamento ? `
+                            <div class="info-item">
+                                <div class="info-label">Data de Fechamento</div>
+                                <div class="info-value">${formatarData(pedido.dataFechamento)}</div>
+                            </div>
+                            ` : ''}
+                            ${instalacao > 0 ? `
+                            <div class="info-item">
+                                <div class="info-label">Instalação/Deslocamento</div>
+                                <div class="info-value">${formatarMoeda(instalacao)}</div>
+                            </div>
+                            ` : ''}
                         </div>
                     </div>
                     
@@ -1650,9 +1691,15 @@
                         <div class="total-section">
                             <div class="total-box">
                                 <div class="total-row">
-                                    <span>Subtotal:</span>
-                                    <span>${formatarMoeda(subtotal)}</span>
+                                    <span>Subtotal Produtos:</span>
+                                    <span>${formatarMoeda(subtotal - instalacao)}</span>
                                 </div>
+                                ${instalacao > 0 ? `
+                                <div class="total-row">
+                                    <span>Instalação/Deslocamento:</span>
+                                    <span>${formatarMoeda(instalacao)}</span>
+                                </div>
+                                ` : ''}
                                 <div class="total-row">
                                     <span>IVA (${pedido.comIVA === 'sim' ? '23%' : 'Isento'}):</span>
                                     <span>${formatarMoeda(iva)}</span>

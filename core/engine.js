@@ -1,8 +1,8 @@
 /**
- * ENGINE.JS v5.2 - MOTOR DE COMUNICAÇÃO UNIVERSAL
+ * ENGINE.JS v5.2.1 - MOTOR DE COMUNICAÇÃO UNIVERSAL
  * Localização: /core/engine.js
  * Responsável por: Data-binding, Commits, Queries e UI Updates.
- * ATUALIZAÇÃO v5.2: Suporte universal para todos os schemas com produtos
+ * ATUALIZAÇÃO v5.2.1: Correção de duplicação e suporte para campos adicionais
  * Agora processa: pedido, orcamento, venda, despesa e qualquer outro schema
  * Mantém compatibilidade total com versões anteriores
  */
@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const pageId = document.body.getAttribute('data-page-id') || 'pagina-sem-id';
     const pageType = document.body.getAttribute('data-page-type') || 'NEUTRAL';
 
-    console.log(`🚀 Engine v5.2 Ativa: ${pageId} [Tipo: ${pageType}]`);
+    console.log(`🚀 Engine v5.2.1 Ativa: ${pageId} [Tipo: ${pageType}]`);
     console.log(`💾 Modo: Salvamento no Firebase Online`);
     console.log(`🔄 Suporte universal para schemas com produtos`);
 
@@ -52,18 +52,32 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (schema && Object.keys(payload).length > 0) {
                 try {
+                    // Verificar se é uma atualização (tem ID)
+                    const temId = document.getElementById(`${schema}Id`) || 
+                                  document.querySelector(`[data-bind$="${schema}.id"]`);
+                    const idPedido = temId ? temId.value : null;
+                    
+                    // Preparar dados para envio
+                    const dadosEnvio = {
+                        schema: schema,
+                        payload: payload,
+                        pageId: pageId,
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    // Se tem ID, adicionar ao payload para identificar como atualização
+                    if (idPedido && idPedido.trim() !== '') {
+                        dadosEnvio.id = idPedido;
+                        console.log(`🔄 Modo atualização detectado para ID: ${idPedido}`);
+                    }
+                    
                     // Salvar no Firebase via API
                     const response = await fetch('/api/database/commit', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify({
-                            schema: schema,
-                            payload: payload,
-                            pageId: pageId,
-                            timestamp: new Date().toISOString()
-                        })
+                        body: JSON.stringify(dadosEnvio)
                     });
                     
                     if (response.ok) {
@@ -72,12 +86,17 @@ document.addEventListener('DOMContentLoaded', () => {
                         
                         // Disparar evento de sucesso
                         window.dispatchEvent(new CustomEvent('coreCommitSuccess', {
-                            detail: { schema: schema, payload: payload, result: result }
+                            detail: { 
+                                schema: schema, 
+                                payload: payload, 
+                                result: result,
+                                isUpdate: !!idPedido
+                            }
                         }));
                         
                         // Feedback visual
                         commitBtn.style.backgroundColor = "#27ae60";
-                        commitBtn.textContent = "✓ Salvo Online!";
+                        commitBtn.textContent = idPedido ? "✓ Atualizado!" : "✓ Salvo Online!";
                         commitBtn.disabled = true;
                         
                         setTimeout(() => {
@@ -89,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Disparar evento de mudança de dados
                         window.dispatchEvent(new CustomEvent('coreDataChanged'));
                         
-                        // Limpar formulário se não estiver em modo de edição
+                        // Limpar formulário apenas se não for atualização e não tiver ID
                         const temIdField = document.querySelector('[data-bind$=".id"]') || 
                                          document.getElementById(`${schema}Id`);
                         if (!temIdField || !temIdField.value) {
@@ -580,10 +599,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Inicializar sistema de mensagens
     window.addEventListener('load', () => {
-        console.log('🔧 Engine v5.2 inicializada com sucesso!');
+        console.log('🔧 Engine v5.2.1 inicializada com sucesso!');
         console.log('🔥 Pronta para salvar no Firebase Online');
         console.log('🔄 Suporte universal para todos os schemas');
         console.log('📦 Processamento de produtos para: pedido, orcamento, etc.');
         console.log('🛡️ Sistema protegido contra limpeza de modais');
+        console.log('⚡ Modo atualização corrigido para evitar duplicação');
     });
 });
