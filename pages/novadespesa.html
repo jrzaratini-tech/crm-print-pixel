@@ -628,7 +628,7 @@
                             base64: base64,
                             tipo: 'image/jpeg',
                             tamanhoOriginal: file.size,
-                            tamanhoOtimizado: Math.round((base64.length * 3) / 4) // Estimativa do tamanho em bytes
+                            tamanhoOtimizado: Math.round((base64.length * 3) / 4)
                         });
                     };
                     
@@ -655,7 +655,7 @@
                         // Em produção, você pode querer usar storage externo como Firebase Storage
                         showMessage('Documento muito grande. Salve apenas o número da nota ou referência.', 'warning');
                         resolve({
-                            base64: '', // Não armazenar documentos muito grandes
+                            base64: '',
                             tipo: file.type,
                             tamanhoOriginal: file.size,
                             tamanhoOtimizado: 0,
@@ -685,8 +685,18 @@
             calcularTotais();
             configurarDatasPadrao();
             
-            // Desabilitar campo "Outro" inicialmente
-            outroPagamentoInput.disabled = true;
+            // Inicializar campos condicionais
+            // Categoria: se não for "OUTROS", desabilitar e remover data-bind do campo outraCategoriaInput
+            if (categoriaSelect.value !== 'OUTROS') {
+                outraCategoriaInput.disabled = true;
+                outraCategoriaInput.removeAttribute('data-bind');
+            }
+            
+            // Forma de pagamento: se não for "outro", desabilitar e remover data-bind do campo outroPagamentoInput
+            if (formaPagamentoSelect.value !== 'outro') {
+                outroPagamentoInput.disabled = true;
+                outroPagamentoInput.removeAttribute('data-bind');
+            }
             
             console.log('✅ Formulário de despesa inicializado');
         }
@@ -904,45 +914,6 @@
             return true;
         }
         
-        // Função para preparar dados para o Core Engine
-        function prepararDespesaData() {
-            const now = new Date();
-            
-            // Criar objeto da despesa no formato esperado pelo sistema
-            const despesaData = {
-                fornecedor: document.getElementById('fornecedor').value,
-                descricao: document.getElementById('descricao').value,
-                telefone: document.getElementById('telefone').value || '',
-                nifFornecedor: document.getElementById('nifFornecedor').value || '',
-                dataCompra: document.getElementById('dataCompra').value,
-                dataVencimento: document.getElementById('dataVencimento').value,
-                dataPagamento: document.getElementById('dataPagamento').value || '',
-                valorBruto: parseFloat(document.getElementById('valorBruto').value) || 0,
-                comIVA: document.querySelector('input[name="ivaOption"]:checked').value,
-                statusPagamento: document.querySelector('input[name="statusPagamento"]:checked').value,
-                categoria: document.getElementById('categoria').value,
-                outraCategoria: document.getElementById('outraCategoriaInput').value || '',
-                formaPagamento: document.getElementById('formaPagamento').value,
-                outroPagamento: document.getElementById('outroPagamento').value || '',
-                observacoes: document.getElementById('observacoes').value || '',
-                valorTotal: parseFloat(valorTotalHidden.value) || 0,
-                valorIVA: parseFloat(valorIVAHidden.value) || 0,
-                notaFiscal: notaFiscalBase64 || '',
-                tipoArquivo: tipoArquivo || '',
-                tamanhoOriginal: tamanhoOriginal || 0,
-                tamanhoOtimizado: tamanhoOtimizado || 0,
-                created_at: now.toISOString(),
-                updated_at: now.toISOString()
-            };
-            
-            // Se estiver em modo de edição, manter o ID
-            if (isEditMode && currentDespesaId) {
-                despesaData.id = currentDespesaId;
-            }
-            
-            return despesaData;
-        }
-        
         // Função para mostrar mensagens
         function showMessage(message, type = 'info') {
             // Remover mensagens anteriores
@@ -975,8 +946,11 @@
             limparNotaFiscal();
             outraCategoriaInput.classList.remove('active');
             outraCategoriaInput.value = '';
+            outraCategoriaInput.disabled = true;
+            outraCategoriaInput.removeAttribute('data-bind');
             outroPagamentoInput.disabled = true;
             outroPagamentoInput.value = '';
+            outroPagamentoInput.removeAttribute('data-bind');
             calcularTotais();
             configurarDatasPadrao();
             
@@ -1007,10 +981,16 @@
                 if (e.target.value === 'OUTROS') {
                     outraCategoriaInput.classList.add('active');
                     outraCategoriaInput.required = true;
+                    outraCategoriaInput.disabled = false;
+                    // Garantir data-bind quando ativo
+                    outraCategoriaInput.setAttribute('data-bind', 'despesa.outraCategoria');
                 } else {
                     outraCategoriaInput.classList.remove('active');
                     outraCategoriaInput.required = false;
                     outraCategoriaInput.value = '';
+                    outraCategoriaInput.disabled = true;
+                    // Remover data-bind quando desabilitado para não enviar valor vazio
+                    outraCategoriaInput.removeAttribute('data-bind');
                 }
             });
             
@@ -1019,10 +999,14 @@
                 if (e.target.value === 'outro') {
                     outroPagamentoInput.disabled = false;
                     outroPagamentoInput.required = true;
+                    // Garantir data-bind quando ativo
+                    outroPagamentoInput.setAttribute('data-bind', 'despesa.outroPagamento');
                 } else {
                     outroPagamentoInput.disabled = true;
                     outroPagamentoInput.required = false;
                     outroPagamentoInput.value = '';
+                    // Remover data-bind quando desabilitado para não enviar valor vazio
+                    outroPagamentoInput.removeAttribute('data-bind');
                 }
             });
             
