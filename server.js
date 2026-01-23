@@ -1,6 +1,7 @@
-// server.js - SERVIDOR PRINCIPAL
+// server.js - SERVIDOR PRINCIPAL CORRIGIDO
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const { saveEvent, getEvents, updatePedidoStatus } = require('./core/database');
 
 const app = express();
@@ -15,8 +16,8 @@ app.use(express.static('.'));
 app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'online', 
-        version: 'v5.2.2',
-        message: 'Sistema Core PrintPixel Online',
+        version: 'v5.2.2-FIXED',
+        message: 'Sistema Core PrintPixel Online - DUPLICAÇÃO CORRIGIDA',
         timestamp: new Date().toISOString()
     });
 });
@@ -30,14 +31,15 @@ app.get('/api/database/init', (req, res) => {
     });
 });
 
-// Rota para SALVAR/ATUALIZAR eventos (ATUALIZADA)
+// Rota para SALVAR/ATUALIZAR eventos (CORRIGIDA)
 app.post('/api/database/commit', async (req, res) => {
     try {
-        console.log('📨 Recebendo requisição COMMIT:', {
-            temId: !!req.body.id,
-            id: req.body.id,
+        console.log('📨 [SERVER] Recebendo requisição COMMIT:', {
+            bodyId: req.body.id || 'NENHUM',
+            payloadId: req.body.payload?.id || 'NENHUM',
             schema: req.body.schema,
-            pageId: req.body.pageId
+            pageId: req.body.pageId,
+            isUpdate: !!(req.body.id || req.body.payload?.id)
         });
         
         // Validar dados obrigatórios
@@ -48,29 +50,37 @@ app.post('/api/database/commit', async (req, res) => {
             });
         }
         
-        // Preparar dados para salvar
+        // Preparar dados para salvar - CORREÇÃO CRÍTICA
         const eventData = {
-            ...req.body,
+            schema: req.body.schema,
+            payload: req.body.payload || {},
+            pageId: req.body.pageId || 'unknown',
             timestamp: new Date().toISOString()
         };
         
-        // Tratamento consistente do ID
-        if (req.body.id) {
-            // Se já houver ID no nível superior, usá-lo e remover do payload se existir
-            eventData.id = req.body.id;
-            if (eventData.payload && eventData.payload.id) {
+        // CORREÇÃO: ID deve vir NO TOPO do objeto, não dentro do payload
+        if (req.body.id && req.body.id.trim() !== '') {
+            // ID no nível superior (vindo do engine.js)
+            eventData.id = req.body.id.trim();
+            console.log(`🔄 [SERVER] ID do nível superior para ATUALIZAÇÃO: ${eventData.id}`);
+            
+            // Remover ID do payload se existir para evitar conflito
+            if (eventData.payload.id) {
                 delete eventData.payload.id;
             }
-        } else if (eventData.payload && eventData.payload.id) {
-            // Se não houver ID no nível superior, mas houver no payload, movê-lo para o nível superior
-            eventData.id = eventData.payload.id;
+        } else if (req.body.payload && req.body.payload.id && req.body.payload.id.trim() !== '') {
+            // ID dentro do payload (compatibilidade)
+            eventData.id = req.body.payload.id.trim();
+            console.log(`🔄 [SERVER] ID do payload para ATUALIZAÇÃO: ${eventData.id}`);
             delete eventData.payload.id;
         }
         
-        console.log('📤 Dados processados para salvar:', {
-            id: eventData.id,
+        // Log detalhado
+        console.log('📤 [SERVER] Dados processados para salvar:', {
+            id: eventData.id || 'NOVO (sem ID)',
             schema: eventData.schema,
-            temPayload: !!eventData.payload
+            temPayload: !!eventData.payload,
+            isUpdate: !!eventData.id
         });
         
         const result = await saveEvent(eventData);
@@ -82,7 +92,7 @@ app.post('/api/database/commit', async (req, res) => {
         });
         
     } catch (error) {
-        console.error('❌ Erro na rota /commit:', error);
+        console.error('❌ [SERVER] Erro na rota /commit:', error);
         res.status(500).json({ 
             success: false, 
             error: error.message,
@@ -96,7 +106,7 @@ app.post('/api/database/query', async (req, res) => {
     try {
         const { schema = 'all', filters = {} } = req.body;
         
-        console.log('🔍 Buscando eventos:', { schema, filters });
+        console.log('🔍 [SERVER] Buscando eventos:', { schema, filters });
         
         const events = await getEvents(schema, filters);
         
@@ -108,7 +118,7 @@ app.post('/api/database/query', async (req, res) => {
         });
         
     } catch (error) {
-        console.error('❌ Erro na rota /query:', error);
+        console.error('❌ [SERVER] Erro na rota /query:', error);
         res.status(500).json({ 
             success: false, 
             error: error.message,
@@ -138,7 +148,7 @@ app.post('/api/database/update-status', async (req, res) => {
         });
         
     } catch (error) {
-        console.error('❌ Erro ao atualizar status:', error);
+        console.error('❌ [SERVER] Erro ao atualizar status:', error);
         res.status(500).json({ 
             success: false, 
             error: error.message
@@ -195,6 +205,9 @@ app.get('/api/database/stats', async (req, res) => {
 
 // Servir arquivos estáticos
 app.get('*', (req, res) => {
+    if (req.path.startsWith('/api/')) {
+        return res.status(404).json({ error: 'Rota API não encontrada' });
+    }
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
@@ -204,5 +217,6 @@ app.listen(PORT, () => {
     console.log(`📅 ${new Date().toLocaleString('pt-BR')}`);
     console.log(`🌐 Acesse: http://localhost:${PORT}`);
     console.log(`🔥 Firebase: Conectado`);
-    console.log(`💾 Modo: Atualização corrigida (não duplica mais)`);
+    console.log(`🛠️  MODIFICAÇÃO: Duplicação em edição CORRIGIDA`);
+    console.log(`🔧 Versão: v5.2.2-FIXED`);
 });
