@@ -962,113 +962,6 @@
         }
         
         // ============================================
-        // FUNÇÃO PARA CARREGAR DESPESA PARA EDIÇÃO
-        // ============================================
-        
-        async function loadDespesaForEdit(despesaId) {
-            try {
-                console.log(` Carregando despesa para edição: ${despesaId}`);
-                
-                const response = await fetch('/api/database/query', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        schema: 'despesa',
-                        filters: { id: despesaId }
-                    })
-                });
-                
-                if (!response.ok) {
-                    throw new Error('Erro ao buscar despesa');
-                }
-                
-                const result = await response.json();
-                const eventos = result.events || [];
-                
-                if (eventos.length === 0) {
-                    throw new Error('Despesa não encontrada');
-                }
-                
-                const despesaEvento = eventos[0];
-                const despesa = despesaEvento.payload;
-                
-                console.log(' Despesa carregada:', despesa);
-                
-                // Preencher campos do formulário
-                document.getElementById('descricao').value = despesa.descricao || '';
-                document.getElementById('fornecedor').value = despesa.fornecedor || '';
-                document.getElementById('dataCompra').value = despesa.dataCompra || '';
-                document.getElementById('dataVencimento').value = despesa.dataVencimento || '';
-                document.getElementById('dataPagamento').value = despesa.dataPagamento || '';
-                document.getElementById('valorBruto').value = despesa.valorBruto || '0';
-                document.getElementById('valorLiquido').value = despesa.valorLiquido || '0';
-                document.getElementById('valorDesconto').value = despesa.valorDesconto || '0';
-                document.getElementById('valorAcrescimo').value = despesa.valorAcrescimo || '0';
-                document.getElementById('categoria').value = despesa.categoria || '';
-                document.getElementById('subcategoria').value = despesa.subcategoria || '';
-                document.getElementById('observacoes').value = despesa.observacoes || '';
-                
-                // Status
-                if (despesa.status) {
-                    const statusRadio = document.querySelector(`input[name="statusPagamento"][value="${despesa.status}"]`);
-                    if (statusRadio) statusRadio.checked = true;
-                }
-                
-                // Forma de pagamento
-                if (despesa.formaPagamento) {
-                    const formaPagamentoSelect = document.getElementById('formaPagamento');
-                    if (formaPagamentoSelect) {
-                        formaPagamentoSelect.value = despesa.formaPagamento;
-                        // Disparar evento change para atualizar campos dependentes
-                        formaPagamentoSelect.dispatchEvent(new Event('change'));
-                    }
-                }
-                
-                // Categoria
-                if (despesa.categoria) {
-                    const categoriaSelect = document.getElementById('categoria');
-                    if (categoriaSelect) {
-                        categoriaSelect.value = despesa.categoria;
-                        // Disparar evento change para atualizar campos dependentes
-                        categoriaSelect.dispatchEvent(new Event('change'));
-                    }
-                }
-                
-                // Outra categoria (se aplicável)
-                if (despesa.outraCategoria) {
-                    document.getElementById('outraCategoria').value = despesa.outraCategoria;
-                }
-                
-                // Outra forma de pagamento (se aplicável)
-                if (despesa.outroPagamento) {
-                    document.getElementById('outroPagamento').value = despesa.outroPagamento;
-                }
-                
-                // Configurar modo de edição
-                isEditMode = true;
-                document.getElementById('despesaId').value = despesaEvento.id;
-                
-                // Atualizar texto do botão
-                const saveBtn = document.getElementById('saveBtn');
-                if (saveBtn) {
-                    saveBtn.textContent = 'ATUALIZAR DESPESA';
-                }
-                
-                // Calcular totais
-                calcularTotais();
-                
-                showMessage('Despesa carregada para edição.', 'info');
-                
-            } catch (error) {
-                console.error(' Erro ao carregar despesa:', error);
-                showMessage('Erro ao carregar despesa. Redirecionando...', 'error');
-                setTimeout(() => {
-                    window.location.href = 'despesas.html';
-                }, 2000);
-            }
-        }
-        
-        // ============================================
         // CONFIGURAÇÃO DE EVENT LISTENERS
         // ============================================
         
@@ -1152,80 +1045,73 @@
                 saveBtn.classList.add('saving');
                 saveBtn.textContent = 'SALVANDO...';
                 saveBtn.disabled = true;
-            });
-            
-            // Configurar listeners para eventos do engine.js
-            document.addEventListener('coreCommitSuccess', (event) => {
-                const detail = event.detail || {};
                 
-                if (detail.schema === 'despesa') {
-                    // Feedback de sucesso
-                    const saveBtn = document.getElementById('saveBtn');
-                    if (saveBtn) {
-                        saveBtn.classList.remove('saving');
-                        saveBtn.textContent = '✓ SALVO!';
-                        
-                        showMessage(`Despesa ${isEditMode ? 'atualizada' : 'criada'} com sucesso!`, 'success');
-                        
-                        // Redirecionar após 2 segundos
-                        setTimeout(() => {
-                            if (confirm(`Despesa ${isEditMode ? 'atualizada' : 'criada'} com sucesso! Deseja criar uma nova despesa?`)) {
-                                limparFormulario();
-                                saveBtn.textContent = 'SALVAR DESPESA';
-                                saveBtn.disabled = false;
-                            } else {
-                                window.location.href = 'despesas.html';
-                            }
-                        }, 2000);
-                    }
-                }
-            });
-            
-            document.addEventListener('coreCommitError', (event) => {
-                console.error('Erro no commit:', event.detail);
-                const saveBtn = document.getElementById('saveBtn');
-                if (saveBtn) {
-                    saveBtn.classList.remove('saving');
-                    saveBtn.textContent = isEditMode ? 'ATUALIZAR DESPESA' : 'SALVAR DESPESA';
-                    saveBtn.disabled = false;
-                }
-                
-                showMessage('Erro ao salvar despesa. Tente novamente.', 'error');
+                // O engine.js irá capturar os data-binds e fazer o commit
+                // Após o commit, o engine.js disparará um evento
             });
         }
         
-        // Inicialização
+        // ============================================
+        // INICIALIZAÇÃO
+        // ============================================
+        
         document.addEventListener('DOMContentLoaded', () => {
-            // Referências aos elementos do formulário
-            const despesaForm = document.getElementById('despesaForm');
-            const saveBtn = document.getElementById('saveBtn');
-            const cancelBtn = document.getElementById('cancelBtn');
-            
-            // Verificar se estamos no modo de edição
+            // Verificar se é modo de edição
             const urlParams = new URLSearchParams(window.location.search);
-            const despesaId = urlParams.get('id');
+            const editId = urlParams.get('edit');
             
-            if (despesaId) {
-                // Modo de edição - carregar despesa existente
-                console.log('Modo edição para despesa ID:', despesaId);
-                // Set the hidden input field with the ID
-                const despesaIdInput = document.getElementById('despesaId');
-                if (despesaIdInput) {
-                    despesaIdInput.value = despesaId;
-                }
-                showMessage('Carregando despesa para edição...', 'info');
-                loadDespesaForEdit(despesaId);
+            if (editId) {
+                // Modo de edição - implementar carregamento da despesa
+                console.log('Modo edição para despesa ID:', editId);
+                showMessage('Modo de edição - carregando despesa...', 'info');
+                
+                // Para compatibilidade, redirecionar para lista se não implementado
+                setTimeout(() => {
+                    if (confirm('Funcionalidade de edição em desenvolvimento. Deseja ir para a lista de despesas?')) {
+                        window.location.href = 'despesas.html';
+                    }
+                }, 1500);
             } else {
                 // Configurar novo formulário
                 inicializarFormulario();
             }
             
-            // Configurar listeners de eventos
-            configurarEventListeners();
+            // Configurar listener para evento do engine.js
+            document.addEventListener('coreCommitSuccess', (event) => {
+                const detail = event.detail || {};
+                
+                if (detail.schema === 'despesa') {
+                    // Feedback de sucesso
+                    saveBtn.classList.remove('saving');
+                    saveBtn.textContent = '✓ SALVO!';
+                    
+                    showMessage(`Despesa ${isEditMode ? 'atualizada' : 'criada'} com sucesso!`, 'success');
+                    
+                    // Redirecionar após 2 segundos
+                    setTimeout(() => {
+                        if (confirm(`Despesa ${isEditMode ? 'atualizada' : 'criada'} com sucesso! Deseja criar uma nova despesa?`)) {
+                            limparFormulario();
+                            saveBtn.textContent = 'SALVAR DESPESA';
+                            saveBtn.disabled = false;
+                        } else {
+                            window.location.href = 'despesas.html';
+                        }
+                    }, 2000);
+                }
+            });
+            
+            document.addEventListener('coreCommitError', (event) => {
+                console.error('Erro no commit:', event.detail);
+                saveBtn.classList.remove('saving');
+                saveBtn.textContent = isEditMode ? 'ATUALIZAR DESPESA' : 'SALVAR DESPESA';
+                saveBtn.disabled = false;
+                
+                showMessage('Erro ao salvar despesa. Tente novamente.', 'error');
+            });
         });
     </script>
     
     <!-- CONEXÃO COM O CORE ENGINE -->
     <script src="../core/engine.js"></script>
 </body>
-</html><input type="hidden" data-bind="despesa.id"> 
+</html>

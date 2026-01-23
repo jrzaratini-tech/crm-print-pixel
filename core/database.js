@@ -1,4 +1,4 @@
-// database.js - CAMADA DE DADOS FIREBASE CORRIGIDA
+// database.js - CAMADA DE DADOS FIREBASE (SERVIDOR)
 const admin = require('firebase-admin');
 
 // Certifique-se de que o Firebase está inicializado
@@ -19,112 +19,63 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
-// Função para salvar/atualizar eventos - CORRIGIDA
+// Função para salvar/atualizar eventos
 async function saveEvent(eventData) {
     try {
-        console.log('📤 [DATABASE] Recebendo evento para salvar:', {
+        console.log('📤 Recebendo evento para salvar:', {
             temId: !!eventData.id,
-            id: eventData.id || 'NENHUM',
+            id: eventData.id,
             schema: eventData.schema,
-            pageId: eventData.pageId,
-            payloadKeys: Object.keys(eventData.payload || {}).length
+            pageId: eventData.pageId
         });
 
         const eventsCollection = db.collection('events');
         
-        // CORREÇÃO CRÍTICA: SE TEM ID - ATUALIZAR documento existente
+        // SE TEM ID: Atualizar documento existente
         if (eventData.id && eventData.id.trim() !== '') {
-            const documentId = eventData.id.trim();
-            console.log(`🔄 [DATABASE] Modo ATUALIZAÇÃO detectado para ID: ${documentId}`);
+            console.log(`🔄 Modo ATUALIZAÇÃO detectado para ID: ${eventData.id}`);
             
-            const docRef = eventsCollection.doc(documentId);
+            // Verificar se o documento existe
+            const docRef = eventsCollection.doc(eventData.id);
             const docSnap = await docRef.get();
             
             if (docSnap.exists) {
-                // ✅ DOCUMENTO EXISTE - ATUALIZAR
-                console.log(`📝 [DATABASE] Documento EXISTE, ATUALIZANDO: ${documentId}`);
-                
-                // Preparar dados para atualização
-                const updateData = {
-                    ...eventData.payload,
-                    schema: eventData.schema,
+                // Atualizar documento existente
+                await docRef.set({
+                    ...eventData,
                     updated_at: admin.firestore.FieldValue.serverTimestamp(),
                     updated: true
-                };
+                }, { merge: true }); // merge: true preserva campos não alterados
                 
-                // Manter dados importantes do documento original
-                const existingData = docSnap.data();
-                
-                // Preservar campos críticos que não devem ser perdidos
-                if (existingData.created_at) {
-                    updateData.created_at = existingData.created_at;
-                }
-                
-                // Preservar número do pedido se já existir e não for enviado novo
-                if (existingData.numero && !updateData.numero) {
-                    updateData.numero = existingData.numero;
-                }
-                
-                // Atualizar o documento
-                await docRef.update(updateData);
-                
-                console.log(`✅ [DATABASE] Documento ATUALIZADO com sucesso: ${documentId}`);
-                return { 
-                    success: true, 
-                    id: documentId, 
-                    action: 'updated',
-                    exists: true,
-                    message: 'Documento atualizado'
-                };
+                console.log(`✅ Documento ATUALIZADO com sucesso: ${eventData.id}`);
+                return { success: true, id: eventData.id, action: 'updated', exists: true };
             } else {
-                // ⚠️ Documento NÃO existe, mas temos ID - CRIAR com o ID fornecido
-                console.log(`⚠️ [DATABASE] Documento NÃO existe, CRIANDO com ID fornecido: ${documentId}`);
-                
-                // Garantir que não há ID duplicado no payload
-                const payload = { ...eventData.payload };
-                if (payload.id) delete payload.id;
-                
+                console.log(`⚠️ Documento não encontrado com ID: ${eventData.id}, criando novo...`);
+                // Se não existe, criar novo com o ID fornecido
                 await docRef.set({
-                    ...payload,
-                    schema: eventData.schema,
+                    ...eventData,
                     created_at: admin.firestore.FieldValue.serverTimestamp(),
                     deleted: false
                 });
-                
-                console.log(`✅ [DATABASE] Novo documento CRIADO com ID fornecido: ${documentId}`);
-                return { 
-                    success: true, 
-                    id: documentId, 
-                    action: 'created_with_id',
-                    exists: false,
-                    message: 'Novo documento criado com ID fornecido'
-                };
+                return { success: true, id: eventData.id, action: 'created_new', exists: false };
             }
         } 
-        // SE NÃO TEM ID: Criar novo documento com ID automático
+        // SE NÃO TEM ID: Criar novo documento
         else {
-            console.log('🆕 [DATABASE] Modo CRIAÇÃO detectado - Gerando novo ID automático');
+            console.log('🆕 Modo CRIAÇÃO detectado - Gerando novo ID');
             
             // Criar novo documento com ID automático
             const docRef = await eventsCollection.add({
-                ...eventData.payload,
-                schema: eventData.schema,
+                ...eventData,
                 created_at: admin.firestore.FieldValue.serverTimestamp(),
                 deleted: false
             });
             
-            console.log(`✅ [DATABASE] Novo documento CRIADO com ID automático: ${docRef.id}`);
-            return { 
-                success: true, 
-                id: docRef.id, 
-                action: 'created_auto', 
-                exists: false,
-                message: 'Novo documento criado com ID automático'
-            };
+            console.log(`✅ Novo documento CRIADO com ID: ${docRef.id}`);
+            return { success: true, id: docRef.id, action: 'created', exists: false };
         }
     } catch (error) {
-        console.error('❌ [DATABASE] Erro ao salvar evento no Firebase:', error);
-        console.error('❌ [DATABASE] Detalhes do erro:', error.message);
+        console.error('❌ Erro ao salvar evento no Firebase:', error);
         throw error;
     }
 }
@@ -153,24 +104,21 @@ async function getEvents(schema = 'all', filters = {}) {
         const events = [];
         
         snapshot.forEach(doc => {
-            const data = doc.data();
             events.push({
                 id: doc.id,
-                ...data,
-                // Garantir que o payload tenha estrutura consistente
-                payload: typeof data === 'object' ? data : { data }
+                ...doc.data()
             });
         });
         
-        console.log(`📊 [DATABASE] ${events.length} eventos encontrados para schema: ${schema}`);
+        console.log(`📊 ${events.length} eventos encontrados para schema: ${schema}`);
         return events;
     } catch (error) {
-        console.error('❌ [DATABASE] Erro ao buscar eventos:', error);
+        console.error('❌ Erro ao buscar eventos:', error);
         throw error;
     }
 }
 
-// Função para atualizar status de pedido
+// Função para atualizar status de pedido (exemplo)
 async function updatePedidoStatus(pedidoId, novoStatus) {
     try {
         const docRef = db.collection('events').doc(pedidoId);
@@ -180,17 +128,19 @@ async function updatePedidoStatus(pedidoId, novoStatus) {
             throw new Error('Pedido não encontrado');
         }
         
+        const pedidoData = docSnap.data();
+        
         // Atualizar apenas o status mantendo outros dados
         await docRef.update({
-            status: novoStatus,
+            'payload.status': novoStatus,
             updated_at: admin.firestore.FieldValue.serverTimestamp(),
             updated: true
         });
         
-        console.log(`✅ [DATABASE] Status do pedido ${pedidoId} atualizado para: ${novoStatus}`);
+        console.log(`✅ Status do pedido ${pedidoId} atualizado para: ${novoStatus}`);
         return { success: true, id: pedidoId };
     } catch (error) {
-        console.error('❌ [DATABASE] Erro ao atualizar status do pedido:', error);
+        console.error('❌ Erro ao atualizar status do pedido:', error);
         throw error;
     }
 }

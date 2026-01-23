@@ -4,11 +4,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Novo Orçamento - PrintPixel</title>
-    <link rel="stylesheet" href="../assets/css/orcs.css">
     <style>
-        /* Estilos específicos da página de novo orçamento */
+        /* Estilos da página novopedido.html (mantidos) */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        
+        body {
+            background-color: #f8fafc;
+            color: #1e293b;
+            padding: 20px;
+            line-height: 1.5;
+        }
+        
         .container {
             max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+            padding: 30px;
         }
         
         .header-section {
@@ -119,9 +137,9 @@
         }
         
         input:focus, select:focus, textarea:focus {
-            border-color: var(--primary-color);
+            border-color: #f59e0b;
             outline: none;
-            box-shadow: 0 0 0 3px var(--primary-light);
+            box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.1);
         }
         
         input[type="date"] {
@@ -1021,18 +1039,14 @@
         document.addEventListener('DOMContentLoaded', async () => {
             // Verificar se é modo de edição
             const urlParams = new URLSearchParams(window.location.search);
-            const orcamentoId = urlParams.get('id');
+            const editId = urlParams.get('edit');
             
             // Gerar código do orçamento
             const codigo = await gerarCodigoOrcamento();
             codigoInput.value = codigo;
             
-            if (orcamentoId) {
-                // Set the hidden input field with the ID
-                if (document.getElementById('orcamentoId')) {
-                    document.getElementById('orcamentoId').value = orcamentoId;
-                }
-                await loadOrcamentoForEdit(orcamentoId);
+            if (editId) {
+                await loadOrcamentoForEdit(editId);
             } else {
                 // Adicionar primeiro produto
                 addProductRow();
@@ -1152,4 +1166,4 @@
     <!-- CONEXÃO COM O CORE ENGINE -->
     <script src="../core/engine.js"></script>
 </body>
-</html><input type="hidden" data-bind="orcamento.id">  
+</html>

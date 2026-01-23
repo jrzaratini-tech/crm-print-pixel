@@ -876,20 +876,6 @@
 
         function setupAutoSave() {
             autoSaveTimer = setInterval(async () => {
-                // Check if we're on a WRITE page
-                const pageType = document.body.getAttribute('data-page-type');
-                if (pageType === 'WRITE') {
-                    console.log('🛑 Auto-save BLOQUEADO em página WRITE');
-                    return;
-                }
-
-                // Check if we have a valid document ID
-                const idInput = document.querySelector('[data-bind$=".id"]');
-                if (!idInput || !idInput.value) {
-                    console.log('🛑 Auto-save cancelado: documento sem ID');
-                    return;
-                }
-
                 if (dbManager.initialized) {
                     triggerSaveIndicator();
                     console.log('💾 Auto-save executado');

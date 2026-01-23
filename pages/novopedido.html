@@ -1001,24 +1001,11 @@
             
             // Verificar se é modo de edição
             const urlParams = new URLSearchParams(window.location.search);
-            const pedidoId = urlParams.get('id');
+            const editId = urlParams.get('edit');
             
-            if (pedidoId) {
-                console.log(`✏️ Modo EDIÇÃO detectado para ID: ${pedidoId}`);
-                // Set the hidden input field with the ID
-                if (pedidoIdInput) {
-                    pedidoIdInput.value = pedidoId;
-                }
-                
-                // Atualizar o texto do botão para 'Atualizar Pedido'
-                const commitBtn = document.querySelector('[data-action="commit"]');
-                if (commitBtn) {
-                    commitBtn.textContent = 'Atualizar Pedido';
-                    commitBtn.setAttribute('data-original-text', 'Atualizar Pedido');
-                }
-                
-                // Carregar pedido existente
-                loadPedidoForEdit(pedidoId);
+            if (editId) {
+                console.log(`✏️ Modo EDIÇÃO detectado para ID: ${editId}`);
+                loadPedidoForEdit(editId);
             } else {
                 console.log('🆕 Modo CRIAÇÃO detectado');
                 setupNewPedido();
@@ -1063,13 +1050,12 @@
                 try {
                     console.log(`📥 Carregando pedido para edição: ${pedidoId}`);
                     
-                    // Buscar todos os pedidos e filtrar pelo ID no cliente
                     const response = await fetch('/api/database/query', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             schema: 'pedido',
-                            filters: { deleted: false } // Filtro genérico para buscar todos
+                            filters: { id: pedidoId }
                         })
                     });
                     
@@ -1080,13 +1066,11 @@
                     const result = await response.json();
                     const eventos = result.events || [];
                     
-                    // Encontrar o pedido pelo ID
-                    const pedidoEvento = eventos.find(e => e.id === pedidoId);
-                    
-                    if (!pedidoEvento) {
+                    if (eventos.length === 0) {
                         throw new Error('Pedido não encontrado');
                     }
                     
+                    const pedidoEvento = eventos[0];
                     const pedido = pedidoEvento.payload;
                     
                     console.log('📦 Pedido carregado:', pedido);
@@ -1110,17 +1094,10 @@
                         if (statusRadio) statusRadio.checked = true;
                     }
                     
-                    // IVA - Garante tratamento consistente como string 'sim'/'nao'
-                    if (pedido.comIVA !== undefined) {
-                        // Converte qualquer valor para 'sim' ou 'nao'
-                        const ivaValue = (pedido.comIVA === true || pedido.comIVA === 'sim') ? 'sim' : 'nao';
-                        const ivaRadio = document.querySelector(`input[name="ivaOption"][value="${ivaValue}"]`);
+                    // IVA
+                    if (pedido.comIVA) {
+                        const ivaRadio = document.querySelector(`input[name="ivaOption"][value="${pedido.comIVA}"]`);
                         if (ivaRadio) ivaRadio.checked = true;
-                        // Garante que o valor salvo será 'sim' ou 'nao'
-                        pedido.comIVA = ivaValue;
-                    } else {
-                        // Valor padrão se não estiver definido
-                        document.querySelector('input[name="ivaOption"][value="sim"]').checked = true;
                     }
                     
                     // Produtos
@@ -1161,8 +1138,9 @@
                     currentPedidoId = pedidoEvento.id;
                     pedidoIdInput.value = currentPedidoId;
                     
-                    // Manter o campo número como somente leitura para evitar duplicações
-                    // e manter a integridade dos dados
+                    // Tornar o campo número editável no modo edição
+                    numeroPedidoInput.removeAttribute('readonly');
+                    numeroPedidoInput.style.backgroundColor = '';
                     
                     // Atualizar texto do botão
                     document.getElementById('saveBtn').textContent = 'ATUALIZAR PEDIDO';
@@ -1535,11 +1513,10 @@
                 // Calcular subtotal geral
                 const subtotalGeral = subtotalProdutos + instalacao;
                 
-                // Calcular IVA se necessário
-                const ivaSimRadio = document.querySelector('input[name="ivaOption"][value="sim"]');
+                // Calcular IVA
+                const ivaSimRadio = document.getElementById('ivaSim');
                 let iva = 0;
-                
-                if (ivaSimRadio && ivaSimRadio.checked) {
+                if (ivaSimRadio.checked) {
                     iva = subtotalGeral * 0.23;
                 }
                 
