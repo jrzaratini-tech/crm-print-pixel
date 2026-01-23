@@ -1,4 +1,4 @@
-// server.js - SERVIDOR PRINCIPAL
+// server.js - SERVIDOR PRINCIPAL v1.3
 const express = require('express');
 const cors = require('cors');
 const { saveEvent, getEvents, updatePedidoStatus } = require('./database');
@@ -15,7 +15,7 @@ app.use(express.static('.'));
 app.get('/api/health', (req, res) => {
     res.json({ 
         status: 'online', 
-        version: 'v5.2.2',
+        version: 'v5.2.3',
         message: 'Sistema Core PrintPixel Online',
         timestamp: new Date().toISOString()
     });
@@ -34,9 +34,10 @@ app.get('/api/database/init', (req, res) => {
 app.post('/api/database/commit', async (req, res) => {
     try {
         console.log('📨 Recebendo requisição COMMIT:', {
-            body: req.body,
             temId: !!req.body.id,
-            schema: req.body.schema
+            id: req.body.id,
+            schema: req.body.schema,
+            pageId: req.body.pageId
         });
         
         const eventData = {
@@ -52,11 +53,21 @@ app.post('/api/database/commit', async (req, res) => {
             });
         }
         
+        console.log('📤 Enviando para database.saveEvent...');
         const result = await saveEvent(eventData);
+        
+        console.log('✅ Resultado do saveEvent:', result);
+        
+        // CRÍTICO: Garantir que retorna o ID correto
+        const documentId = result.documentId || result.id;
+        const isUpdate = result.action === 'updated' || result.action === 'created_new';
         
         res.json({
             success: true,
-            message: result.action === 'updated' ? 'Dados atualizados com sucesso' : 'Dados salvos com sucesso',
+            message: isUpdate ? 'Dados atualizados com sucesso' : 'Dados salvos com sucesso',
+            id: documentId,                    // ID do documento no Firestore
+            eventId: documentId,               // Para compatibilidade com engine.js
+            action: result.action || 'unknown',
             ...result
         });
         
@@ -173,6 +184,7 @@ app.get('/api/database/stats', async (req, res) => {
 });
 
 // Servir arquivos estáticos
+const path = require('path');
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
@@ -184,4 +196,5 @@ app.listen(PORT, () => {
     console.log(`🌐 Acesse: http://localhost:${PORT}`);
     console.log(`🔥 Firebase: Conectado`);
     console.log(`💾 Modo: Atualização corrigida (não duplica mais)`);
+    console.log(`🔄 Engine v5.2.3 compatível`);
 });

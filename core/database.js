@@ -1,4 +1,4 @@
-// database.js - CAMADA DE DADOS FIREBASE (SERVIDOR)
+// database.js - CAMADA DE DADOS FIREBASE (SERVIDOR) v1.2
 const admin = require('firebase-admin');
 
 // Certifique-se de que o Firebase está inicializado
@@ -19,7 +19,7 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
-// Função para salvar/atualizar eventos
+// Função para salvar/atualizar eventos (CORRIGIDA)
 async function saveEvent(eventData) {
     try {
         console.log('📤 Recebendo evento para salvar:', {
@@ -33,31 +33,48 @@ async function saveEvent(eventData) {
         
         // SE TEM ID: Atualizar documento existente
         if (eventData.id && eventData.id.trim() !== '') {
-            console.log(`🔄 Modo ATUALIZAÇÃO detectado para ID: ${eventData.id}`);
+            console.log(`🔄 Modo ATUALIZAÇÃO detectado para ID: "${eventData.id}"`);
             
             // Verificar se o documento existe
             const docRef = eventsCollection.doc(eventData.id);
             const docSnap = await docRef.get();
             
+            console.log(`🔍 Documento "${eventData.id}" existe? ${docSnap.exists}`);
+            
             if (docSnap.exists) {
-                // Atualizar documento existente
+                console.log(`📊 Documento encontrado no Firestore`);
+                // Atualizar documento existente - CORRIGIDO: preservar created_at original
+                const existingData = docSnap.data();
                 await docRef.set({
-                    ...eventData,
+                    ...existingData,           // Mantém dados originais
+                    ...eventData,              // Sobrescreve com novos dados
                     updated_at: admin.firestore.FieldValue.serverTimestamp(),
                     updated: true
                 }, { merge: true }); // merge: true preserva campos não alterados
                 
                 console.log(`✅ Documento ATUALIZADO com sucesso: ${eventData.id}`);
-                return { success: true, id: eventData.id, action: 'updated', exists: true };
+                return { 
+                    success: true, 
+                    id: eventData.id, 
+                    action: 'updated', 
+                    exists: true,
+                    documentId: eventData.id  // CRÍTICO: retorna o mesmo ID
+                };
             } else {
-                console.log(`⚠️ Documento não encontrado com ID: ${eventData.id}, criando novo...`);
+                console.log(`⚠️ Documento não encontrado com ID: "${eventData.id}", criando novo...`);
                 // Se não existe, criar novo com o ID fornecido
                 await docRef.set({
                     ...eventData,
                     created_at: admin.firestore.FieldValue.serverTimestamp(),
                     deleted: false
                 });
-                return { success: true, id: eventData.id, action: 'created_new', exists: false };
+                return { 
+                    success: true, 
+                    id: eventData.id, 
+                    action: 'created_new', 
+                    exists: false,
+                    documentId: eventData.id  // CRÍTICO: retorna o mesmo ID
+                };
             }
         } 
         // SE NÃO TEM ID: Criar novo documento
@@ -72,7 +89,13 @@ async function saveEvent(eventData) {
             });
             
             console.log(`✅ Novo documento CRIADO com ID: ${docRef.id}`);
-            return { success: true, id: docRef.id, action: 'created', exists: false };
+            return { 
+                success: true, 
+                id: docRef.id, 
+                action: 'created', 
+                exists: false,
+                documentId: docRef.id  // CRÍTICO: retorna o novo ID
+            };
         }
     } catch (error) {
         console.error('❌ Erro ao salvar evento no Firebase:', error);
