@@ -1,8 +1,8 @@
 /**
- * ENGINE.JS v5.2.2 - MOTOR DE COMUNICAÇÃO UNIVERSAL
+ * ENGINE.JS v5.2.3 - MOTOR DE COMUNICAÇÃO UNIVERSAL
  * Localização: /core/engine.js
  * Responsável por: Data-binding, Commits, Queries e UI Updates.
- * ATUALIZAÇÃO v5.2.2: Correção DEFINITIVA da duplicação na edição
+ * ATUALIZAÇÃO v5.2.3: Correção DEFINITIVA da duplicação na edição
  * Agora detecta corretamente se é atualização e envia ID para o backend
  */
 
@@ -10,9 +10,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const pageId = document.body.getAttribute('data-page-id') || 'pagina-sem-id';
     const pageType = document.body.getAttribute('data-page-type') || 'NEUTRAL';
 
-    console.log(`🚀 Engine v5.2.2 Ativa: ${pageId} [Tipo: ${pageType}]`);
+    console.log(`🚀 Engine v5.2.3 Ativa: ${pageId} [Tipo: ${pageType}]`);
     console.log(`💾 Modo: Salvamento/Atualização no Firebase`);
     console.log(`🔄 Suporte universal para todos os schemas`);
+    console.log(`🔧 CORREÇÃO: Modo edição/atualização corrigido`);
 
     // --- MODO ESCRITA (WRITE) ---
     const commitBtn = document.querySelector('[data-action="commit"]');
@@ -52,14 +53,42 @@ document.addEventListener('DOMContentLoaded', () => {
             if (schema && Object.keys(payload).length > 0) {
                 try {
                     // CRÍTICO: Verificar se é uma atualização (tem ID no formulário)
-                    const idInput = document.getElementById(`${schema}Id`) || 
-                                   document.querySelector(`[data-bind$="${schema}.id"]`);
+                    // Buscar ID de múltiplas formas para garantir compatibilidade
+                    let idPedido = null;
                     
-                    const idPedido = idInput ? idInput.value : null;
+                    // 1. Procurar por input com ID específico do schema
+                    const idInput = document.getElementById(`${schema}Id`);
+                    if (idInput && idInput.value && idInput.value.trim() !== '') {
+                        idPedido = idInput.value.trim();
+                        console.log(`🔍 ID encontrado em #${schema}Id: ${idPedido}`);
+                    }
+                    
+                    // 2. Procurar por data-bind que termine com .id
+                    if (!idPedido) {
+                        const idBindInputs = document.querySelectorAll(`[data-bind$="${schema}.id"], [data-bind$=".id"]`);
+                        idBindInputs.forEach(input => {
+                            if (input.value && input.value.trim() !== '') {
+                                idPedido = input.value.trim();
+                                console.log(`🔍 ID encontrado em data-bind: ${idPedido}`);
+                            }
+                        });
+                    }
+                    
+                    // 3. Procurar por qualquer input hidden com "id" no nome
+                    if (!idPedido) {
+                        const hiddenIdInputs = document.querySelectorAll('input[type="hidden"][id*="id"], input[type="hidden"][id*="Id"]');
+                        hiddenIdInputs.forEach(input => {
+                            if (input.value && input.value.trim() !== '') {
+                                idPedido = input.value.trim();
+                                console.log(`🔍 ID encontrado em input hidden: ${idPedido}`);
+                            }
+                        });
+                    }
+                    
                     const isUpdate = idPedido && idPedido.trim() !== '';
                     
                     console.log(`🔍 Verificando modo: ${isUpdate ? 'ATUALIZAÇÃO' : 'CRIAÇÃO'}`);
-                    console.log(`🔍 ID do pedido: ${idPedido || 'Nenhum (novo pedido)'}`);
+                    console.log(`🔍 ID do documento: ${idPedido || 'Nenhum (novo pedido)'}`);
                     
                     // Preparar dados para envio
                     const dadosEnvio = {
@@ -73,6 +102,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (isUpdate) {
                         dadosEnvio.id = idPedido;
                         console.log(`🔄 Enviando em MODO ATUALIZAÇÃO com ID: ${idPedido}`);
+                        console.log(`📤 Dados enviados:`, dadosEnvio);
                     } else {
                         console.log(`🆕 Enviando em MODO CRIAÇÃO (sem ID)`);
                     }
@@ -116,22 +146,27 @@ document.addEventListener('DOMContentLoaded', () => {
                         window.dispatchEvent(new CustomEvent('coreDataChanged'));
                         
                         // Se for criação, guardar o ID gerado no campo oculto
-                        if (!isUpdate && result.id && idInput) {
-                            idInput.value = result.id;
-                            console.log(`💾 ID gerado armazenado: ${result.id}`);
+                        if (!isUpdate && result.id) {
+                            // Tentar encontrar o campo ID para armazenar
+                            const campoId = document.getElementById(`${schema}Id`) || 
+                                          document.querySelector(`[data-bind$="${schema}.id"]`) ||
+                                          document.querySelector(`[data-bind$=".id"]`);
+                            
+                            if (campoId) {
+                                campoId.value = result.id;
+                                console.log(`💾 ID gerado armazenado no campo: ${result.id}`);
+                            } else {
+                                console.log(`⚠️ Campo para ID não encontrado, ID gerado: ${result.id}`);
+                            }
                         }
                         
                         // NÃO limpar formulário se for atualização
                         if (!isUpdate) {
-                            const temIdField = document.querySelector('[data-bind$=".id"]') || 
-                                             document.getElementById(`${schema}Id`);
-                            if (!temIdField || !temIdField.value) {
-                                setTimeout(() => {
-                                    if (confirm('Deseja criar um novo pedido?')) {
-                                        limparFormulario(inputs);
-                                    }
-                                }, 1000);
-                            }
+                            setTimeout(() => {
+                                if (confirm('Deseja criar um novo pedido?')) {
+                                    limparFormulario(inputs);
+                                }
+                            }, 1000);
                         }
                         
                     } else {
@@ -262,6 +297,12 @@ document.addEventListener('DOMContentLoaded', () => {
             // NUNCA limpar campos que têm .id no data-bind
             if (bindPath && bindPath.endsWith('.id')) {
                 console.log(`🛡️ Protegendo campo ID: ${bindPath}`);
+                return;
+            }
+            
+            // Não limpar campos hidden com "id" no nome
+            if (input.type === 'hidden' && (input.id.includes('id') || input.id.includes('Id'))) {
+                console.log(`🛡️ Protegendo campo hidden ID: ${input.id}`);
                 return;
             }
             
@@ -588,9 +629,56 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
+        // Processar pagamentos (se existirem)
+        inputs.forEach(input => {
+            const bindPath = input.getAttribute('data-bind');
+            if (!bindPath) return;
+            
+            const parts = bindPath.split('.');
+            
+            if (parts[0] === schema && parts[1] === 'pagamentos' && parts.length >= 3) {
+                const index = parseInt(parts[2]);
+                const field = parts[3];
+                
+                if (!isNaN(index) && field) {
+                    if (!payload.pagamentos) {
+                        payload.pagamentos = [];
+                    }
+                    
+                    if (!payload.pagamentos[index]) {
+                        payload.pagamentos[index] = {};
+                    }
+                    
+                    let value;
+                    if (input.type === 'checkbox') {
+                        value = input.checked;
+                    } else if (input.type === 'radio') {
+                        value = input.checked ? input.value : undefined;
+                    } else if (input.type === 'number') {
+                        value = parseFloat(input.value) || 0;
+                    } else if (input.type === 'date') {
+                        value = input.value;
+                    } else {
+                        value = input.value;
+                    }
+                    
+                    if (!(input.type === 'radio' && !input.checked)) {
+                        payload.pagamentos[index][field] = value;
+                    }
+                    
+                    console.log(`💳 Pagamento [${index}].${field} = ${value}`);
+                }
+            }
+        });
+        
         // Remover produtos vazios
         if (payload.produtos) {
             payload.produtos = payload.produtos.filter(prod => prod && Object.keys(prod).length > 0);
+        }
+        
+        // Remover pagamentos vazios
+        if (payload.pagamentos) {
+            payload.pagamentos = payload.pagamentos.filter(pag => pag && Object.keys(pag).length > 0);
         }
         
         // Adicionar data de criação se não existir
@@ -608,6 +696,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         console.log(`✅ Payload final para ${schema}:`, payload);
         console.log(`✅ Produtos processados:`, payload.produtos ? payload.produtos.length : 0);
+        console.log(`✅ Pagamentos processados:`, payload.pagamentos ? payload.pagamentos.length : 0);
         
         return payload;
     }
@@ -642,10 +731,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Inicializar sistema de mensagens
     window.addEventListener('load', () => {
-        console.log('🔧 Engine v5.2.2 inicializada com sucesso!');
+        console.log('🔧 Engine v5.2.3 inicializada com sucesso!');
         console.log('🔥 Sistema de atualização corrigido');
         console.log('🔄 Agora detecta corretamente modo ATUALIZAÇÃO vs CRIAÇÃO');
         console.log('📦 Processamento de produtos otimizado');
+        console.log('💳 Processamento de pagamentos implementado');
         console.log('🛡️ Sistema protegido contra duplicação');
     });
 });
