@@ -1,7 +1,7 @@
 // server.js - SERVIDOR PRINCIPAL
 const express = require('express');
 const cors = require('cors');
-const { saveEvent, getEvents, updatePedidoStatus } = require('./database');
+const { saveEvent, getEvents, updatePedidoStatus } = require('./core/database');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
