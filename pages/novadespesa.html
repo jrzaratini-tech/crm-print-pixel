@@ -961,94 +961,11 @@
             showMessage('Formulário limpo. Pronto para nova despesa.', 'info');
         }
         
-        // ============================================
-        // CONFIGURAÇÃO DE EVENT LISTENERS
-        // ============================================
-        
-        function configurarEventListeners() {
-            // Cálculo de totais
-            valorBrutoInput.addEventListener('input', calcularTotais);
-            ivaSimRadio.addEventListener('change', calcularTotais);
-            ivaNaoRadio.addEventListener('change', calcularTotais);
-            
-            // Nota fiscal
-            notaFiscalInput.addEventListener('change', (e) => {
-                processarNotaFiscal(e.target.files[0]);
-            });
-            
-            // Categoria "Outros"
-            categoriaSelect.addEventListener('change', (e) => {
-                if (e.target.value === 'OUTROS') {
-                    outraCategoriaInput.classList.add('active');
-                    outraCategoriaInput.required = true;
-                    outraCategoriaInput.disabled = false;
-                    // Garantir data-bind quando ativo
-                    outraCategoriaInput.setAttribute('data-bind', 'despesa.outraCategoria');
-                } else {
-                    outraCategoriaInput.classList.remove('active');
-                    outraCategoriaInput.required = false;
-                    outraCategoriaInput.value = '';
-                    outraCategoriaInput.disabled = true;
-                    // Remover data-bind quando desabilitado para não enviar valor vazio
-                    outraCategoriaInput.removeAttribute('data-bind');
-                }
-            });
-            
-            // Forma de pagamento "Outro"
-            formaPagamentoSelect.addEventListener('change', (e) => {
-                if (e.target.value === 'outro') {
-                    outroPagamentoInput.disabled = false;
-                    outroPagamentoInput.required = true;
-                    // Garantir data-bind quando ativo
-                    outroPagamentoInput.setAttribute('data-bind', 'despesa.outroPagamento');
-                } else {
-                    outroPagamentoInput.disabled = true;
-                    outroPagamentoInput.required = false;
-                    outroPagamentoInput.value = '';
-                    // Remover data-bind quando desabilitado para não enviar valor vazio
-                    outroPagamentoInput.removeAttribute('data-bind');
-                }
-            });
-            
-            // Data de pagamento condicional
-            document.querySelectorAll('input[name="statusPagamento"]').forEach(radio => {
-                radio.addEventListener('change', (e) => {
-                    const dataPagamentoInput = document.getElementById('dataPagamento');
-                    if (e.target.value === 'pago') {
-                        dataPagamentoInput.required = true;
-                        dataPagamentoInput.disabled = false;
-                        dataPagamentoInput.valueAsDate = new Date();
-                    } else {
-                        dataPagamentoInput.required = false;
-                        dataPagamentoInput.disabled = true;
-                        dataPagamentoInput.value = '';
-                    }
-                });
-            });
-            
-            // Botão cancelar
-            cancelBtn.addEventListener('click', () => {
-                if (confirm('Tem certeza que deseja cancelar? Todos os dados serão perdidos.')) {
-                    limparFormulario();
-                }
-            });
-            
-            // Botão salvar - O engine.js fará o commit automaticamente devido ao data-action="commit"
-            saveBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                
-                if (!validarFormulario()) {
-                    return;
-                }
-                
-                // Feedback visual
-                saveBtn.classList.add('saving');
-                saveBtn.textContent = 'SALVANDO...';
-                saveBtn.disabled = true;
-                
-                // O engine.js irá capturar os data-binds e fazer o commit
-                // Após o commit, o engine.js disparará um evento
-            });
+        function inicializarFormulario() {
+            configurarEventListeners();
+            configurarDatasPadrao();
+            calcularTotais();
+            showMessage('Formulário pronto para nova despesa.', 'success');
         }
         
         // ============================================
@@ -1061,16 +978,10 @@
             const editId = urlParams.get('edit');
             
             if (editId) {
-                // Modo de edição - implementar carregamento da despesa
+                // Modo de edição - carregar despesa existente
                 console.log('Modo edição para despesa ID:', editId);
-                showMessage('Modo de edição - carregando despesa...', 'info');
-                
-                // Para compatibilidade, redirecionar para lista se não implementado
-                setTimeout(() => {
-                    if (confirm('Funcionalidade de edição em desenvolvimento. Deseja ir para a lista de despesas?')) {
-                        window.location.href = 'despesas.html';
-                    }
-                }, 1500);
+                showMessage('Carregando despesa para edição...', 'info');
+                loadDespesaForEdit(editId);
             } else {
                 // Configurar novo formulário
                 inicializarFormulario();
@@ -1107,6 +1018,21 @@
                 saveBtn.disabled = false;
                 
                 showMessage('Erro ao salvar despesa. Tente novamente.', 'error');
+            });
+        });
+        
+        // Data de pagamento condicional
+        document.querySelectorAll('input[name="statusPagamento"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                const dataPagamentoInput = document.getElementById('dataPagamento');
+                if (e.target.value === 'pago') {
+                    dataPagamentoInput.required = true;
+                    dataPagamentoInput.disabled = false;
+                    dataPagamentoInput.valueAsDate = new Date();
+                } else {
+                    dataPagamentoInput.required = false;
+                    dataPagamentoInput.disabled = true;
+                }
             });
         });
     </script>
