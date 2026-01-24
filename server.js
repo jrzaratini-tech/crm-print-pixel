@@ -116,52 +116,33 @@ app.post('/api/database/query', async (req, res) => {
     const { schema, limit = 100, filters = {} } = req.body;
     
     console.log(`🔍 Query recebida: schema=${schema}, limit=${limit}, filters=`, filters);
-    console.log('🔧 Tipo do db:', typeof db);
-    console.log('🔧 Db disponível:', !!db);
     
-    // Verificar se db.collection existe
-    if (!db || typeof db.collection !== 'function') {
-      console.error('❌ db.collection não é uma função');
-      return res.status(500).json({ 
-        status: 'error',
-        success: false,
-        error: 'Firebase não está disponível' 
-      });
-    }
+    // Query simplificada - apenas pegar todos os documentos e filtrar no código
+    console.log('📋 Buscando todos os documentos...');
+    const snapshot = await db.collection('events').get();
+    console.log('✅ Documents buscados com sucesso');
     
-    console.log('📋 Criando query base...');
-    let query = db.collection('events').where('deleted', '==', false);
-    console.log('✅ Query base criada com sucesso');
-    
-    if (schema && schema !== 'all') {
-      console.log(`🎯 Filtrando por schema: ${schema}`);
-      query = query.where('schema', '==', schema);
-      console.log('✅ Filtro schema aplicado');
-    }
-    
-    // Aplicar filtros adicionais (exceto schema que já foi tratado)
-    if (filters && typeof filters === 'object') {
-      console.log('🎯 Aplicando filtros adicionais...');
-      Object.keys(filters).forEach(key => {
-        if (filters[key] !== undefined && key !== 'schema' && key !== 'deleted') {
-          console.log(`🎯 Aplicando filtro: ${key}=${filters[key]}`);
-          query = query.where(key, '==', filters[key]);
-        }
-      });
-      console.log('✅ Filtros adicionais aplicados');
-    }
-    
-    console.log('📋 Executando query...');
-    const snapshot = await query.orderBy('timestamp', 'desc').limit(parseInt(limit)).get();
-    console.log('✅ Query executada com sucesso');
-    
-    const events = [];
+    let events = [];
     snapshot.forEach(doc => {
-      events.push({
-        id: doc.id,
-        ...doc.data()
-      });
+      const data = doc.data();
+      // Filtrar no código
+      if (!data.deleted) {
+        if (!schema || schema === 'all' || data.schema === schema) {
+          events.push({
+            id: doc.id,
+            ...data
+          });
+        }
+      }
     });
+    
+    // Ordenar por timestamp (mais recentes primeiro)
+    events.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    // Aplicar limite
+    if (limit && events.length > limit) {
+      events = events.slice(0, parseInt(limit));
+    }
     
     console.log(`📊 ${events.length} eventos encontrados`);
     
