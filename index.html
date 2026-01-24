@@ -9,7 +9,7 @@
             --primary: #2c3e50; 
             --accent: #3498db; 
             --bg: #f4f4f4; 
-            --admin-color: #e74c3c; 
+ 
             --sidebar-width: 250px;
         }
     </style>
@@ -82,40 +82,6 @@
             transition: all 0.3s;
         }
 
-        /* ADMIN ZONE */
-        .admin-active #sidebar { border-right: 6px solid var(--admin-color); }
-        #admin-zone { 
-            display: none; 
-            margin: 10px; 
-            padding: 10px; 
-            background: rgba(0, 0, 0, 0.2); 
-            border-radius: 8px;
-            border: 1px dashed var(--admin-color);
-        }
-        .btn-admin-item { 
-            background: var(--admin-color) !important; 
-            font-weight: bold;
-        }
-        .btn-admin-item:hover { filter: brightness(1.2); }
-
-        #lock-btn { 
-            background: rgba(255,255,255,0.1); 
-            color: #ecf0f1; 
-            border: none; 
-            padding: 15px; 
-            cursor: pointer; 
-            width: 100%; 
-            font-size: 0.8rem; 
-            font-weight: bold;
-            letter-spacing: 1px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            margin-top: auto;
-            border-top: 1px solid rgba(255,255,255,0.1);
-        }
-        #lock-btn:hover { background: var(--admin-color); }
         
         /* STATUS BAR */
         .status-bar {
@@ -240,23 +206,6 @@
             font-size: 20px;
         }
         
-        /* PORTABLE BANNER */
-        #portable-banner {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
-            background: rgba(44, 62, 80, 0.9);
-            color: white;
-            padding: 8px 15px;
-            border-radius: 20px;
-            font-size: 12px;
-            z-index: 999;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255,255,255,0.1);
-        }
         
         /* MOBILE MENU TOGGLE */
         .mobile-menu-toggle {
@@ -345,13 +294,6 @@
                 max-width: none;
             }
             
-            #portable-banner {
-                bottom: 60px;
-                right: 10px;
-                left: 10px;
-                border-radius: 12px;
-                justify-content: center;
-            }
         }
         
         @media (max-width: 576px) {
@@ -405,23 +347,8 @@
                 <!-- CUSTOM PAGES WILL APPEAR HERE -->
                 <div id="custom-pages-area"></div>
                 
-                <!-- ADMIN ZONE -->
-                <div id="admin-zone">
-                    <button class="btn-admin-item" onclick="nav('admin/admin-lancamentos.html')">
-                        <i class="fas fa-database"></i><span>Gerenciar Dados</span>
-                    </button>
-                    <button class="btn-admin-item" onclick="nav('admin/admin-config.html')">
-                        <i class="fas fa-cogs"></i><span>Configurações</span>
-                    </button>
-                    <button class="btn-admin-item" onclick="nav('admin/admin-fabrica.html')">
-                        <i class="fas fa-industry"></i><span>Fábrica</span>
-                    </button>
-                </div>
             </nav>
             
-            <button id="lock-btn" onclick="toggleAdmin()">
-                <i class="fas fa-lock"></i><span>MODO ADMIN</span>
-            </button>
         </aside>
 
         <iframe id="content-area" name="main_frame" src="about:blank" title="Sistema CORE"></iframe>
@@ -441,22 +368,12 @@
         </div>
     </div>
     
-    <!-- PORTABLE BANNER -->
-    <div id="portable-banner" style="display: none;">
-        <i class="fas fa-usb-drive"></i>
-        <span>Modo Pen Drive Ativo</span>
-        <div id="core-save-status" style="display: none;">
-            <i class="fas fa-save"></i>
-        </div>
-    </div>
 
     <!-- SISTEMA DE BANCO DE DADOS SIMPLIFICADO -->
     <script>
         class DatabaseManager {
             constructor() {
                 this.initialized = false;
-                this.isPortable = window.location.protocol === 'file:' || 
-                                 localStorage.getItem('core_portable_mode') === 'true';
             }
 
             async init() {
@@ -711,7 +628,6 @@
     </script>
 
     <script>
-        let isAdmin = false;
         let currentPage = 'dashboard';
         let dbManager = new DatabaseManager();
         let systemSettings = {};
@@ -737,9 +653,6 @@
                 
                 updateLoadingMessage('Inicializando páginas...');
                 
-                if (dbManager.isPortable) {
-                    document.getElementById('portable-banner').style.display = 'flex';
-                }
                 
                 setupAutoSave();
                 
@@ -901,11 +814,6 @@
             currentPage = pageName.toLowerCase();
             
             console.log(`🌐 Navegando para: ${url}`);
-            
-            // Aguardar o iframe carregar e então notificar status admin
-            setTimeout(() => {
-                notifyAllFramesAdminStatus(isAdmin);
-            }, 1000);
         }
 
         // MOBILE MENU FUNCTIONS
@@ -971,53 +879,6 @@
             }
         }
 
-        function toggleAdmin() {
-            if (!isAdmin) {
-                const pin = prompt("DIGITE O PIN ADMIN (v4.0):");
-                
-                if (pin === "3377") {
-                    isAdmin = true;
-                    document.getElementById('main-body').classList.add('admin-active');
-                    document.getElementById('admin-zone').style.display = 'block';
-                    
-                    const lockBtn = document.getElementById('lock-btn');
-                    lockBtn.innerHTML = '<i class="fas fa-unlock"></i><span>SAIR ADMIN</span>';
-                    
-                    showNotification('🔓 Modo Administrador ATIVADO', 'success');
-                    console.log("🔓 Modo Admin ATIVADO");
-                    
-                    // Notificar todos os iframes sobre mudança de status
-                    notifyAllFramesAdminStatus(true);
-                } else {
-                    showNotification('❌ PIN incorreto!', 'error');
-                }
-            } else {
-                isAdmin = false;
-                document.getElementById('main-body').classList.remove('admin-active');
-                document.getElementById('admin-zone').style.display = 'none';
-                
-                const lockBtn = document.getElementById('lock-btn');
-                lockBtn.innerHTML = '<i class="fas fa-lock"></i><span>MODO ADMIN</span>';
-                
-                showNotification('🔐 Modo Administrador DESATIVADO', 'info');
-                console.log("🔐 Modo Admin DESATIVADO");
-                
-                // Notificar todos os iframes sobre mudança de status
-                notifyAllFramesAdminStatus(false);
-            }
-        }
-        
-        // Função para notificar todos os iframes sobre status admin
-        function notifyAllFramesAdminStatus(isAdminStatus) {
-            const iframe = document.getElementById('content-area');
-            if (iframe && iframe.contentWindow) {
-                iframe.contentWindow.postMessage({
-                    type: 'ADMIN_STATUS_RESPONSE',
-                    isAdmin: isAdminStatus
-                }, '*');
-                console.log('📤 Status admin enviado para iframe:', isAdminStatus);
-            }
-        }
 
         window.addEventListener("message", async (event) => {
             console.log('📨 Mensagem recebida:', event.data.type);
@@ -1157,14 +1018,6 @@
                 showNotification('⚙️ Configurações atualizadas!', 'success');
             }
             
-            if (event.data.type === "ADMIN_STATUS_REQUEST") {
-                if (event.source && event.source.postMessage) {
-                    event.source.postMessage({ 
-                        type: "ADMIN_STATUS_RESPONSE",
-                        isAdmin: isAdmin
-                    }, "*");
-                }
-            }
             
             if (event.data.type === "GET_SETTINGS_REQUEST") {
                 const settings = await dbManager.getSettings();
@@ -1244,14 +1097,12 @@
 
         function showSystemInfo() {
             const info = `
-SISTEMA CORE v4.0 - PORTÁTIL
+SISTEMA CORE v5.1 - ONLINE
 =============================
-Modo: ${dbManager.isPortable ? 'Pen Drive' : 'Online'}
 Status: ${dbManager.initialized ? '✅ Ativo' : '❌ Inativo'}
 
 Uso do Storage: ${Math.round((JSON.stringify(localStorage).length / 1024) * 100) / 100} KB
 Páginas Registradas: ${systemSettings.menu_config?.length || 0}
-Admin Ativo: ${isAdmin ? 'SIM' : 'NÃO'}
             `;
             
             alert(info);
@@ -1374,12 +1225,6 @@ Admin Ativo: ${isAdmin ? 'SIM' : 'NÃO'}
         }
 
         // Keyboard shortcuts
-        document.addEventListener('keydown', function(e) {
-            if (e.ctrlKey && e.key === 'a') {
-                e.preventDefault();
-                toggleAdmin();
-            }
-        });
 
         document.addEventListener('DOMContentLoaded', function() {
             console.log('🚀 DOM Carregado - Iniciando sistema...');
@@ -1391,11 +1236,9 @@ Admin Ativo: ${isAdmin ? 'SIM' : 'NÃO'}
 
         window.coreSystem = {
             nav: nav,
-            toggleAdmin: toggleAdmin,
             showNotification: showNotification,
             dbManager: dbManager,
             getSettings: () => systemSettings,
-            isAdmin: () => isAdmin,
             reloadSystem: () => {
                 showNotification('🔄 Recarregando sistema...', 'info');
                 setTimeout(() => location.reload(), 1000);

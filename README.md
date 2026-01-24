@@ -8,6 +8,34 @@
 
 ⚡ Início Rápido
 
+🔥 Configuração Firebase
+
+1. **Criar Projeto Firebase**
+   - Acesse [Firebase Console](https://console.firebase.google.com/)
+   - Crie projeto: `crm-print-pixel`
+   - Ative Firestore Database
+
+2. **Gerar Chave de Serviço**
+   - Project Settings > Contas de serviço
+   - Gerar chave privada > Firebase Admin SDK
+   - Baixar arquivo JSON
+
+3. **Configurar Credenciais**
+   - Abra `firebase.js`
+   - Substitua linhas 19-31 com seus dados
+   - Configure variáveis de ambiente ou edite diretamente
+
+4. **Iniciar Sistema**
+   ```bash
+   node server.js
+   # Acesse: http://localhost:3000
+   ```
+
+5. **Testar Funcionalidade**
+   - API: `http://localhost:3000/api/database/init`
+   - Crie pedido/orçamento/despesa
+   - Verifique dados no Firebase Console
+
 🌐 Deploy Online
 
 💾 Sistema de Dados
@@ -16,24 +44,25 @@
 
 🏭 Fábrica de Páginas
 
-⚙️ Administração
+📱 RESPONSIVIDADE MOBILE
 
-� Responsividade Mobile
-
-�️ Troubleshooting
+🛠️ Troubleshooting
 
 🔮 Evolução Futura
 
 📞 Suporte
 
 🏆 VISÃO GERAL
-O SISTEMA CORE v5.1 é uma plataforma de gestão empresarial 100% online que roda em servidor Node.js com banco de dados Firebase Firestore. Baseado em arquitetura event-sourcing, é imutável, desacoplado e infinitamente extensível.
+O SISTEMA CORE v5.1 é uma plataforma de gestão empresarial 100% online que roda em servidor Node.js com banco de dados Firebase Firestore.
 
 🔥 **Novidades v5.1:**
-- ✅ Fábrica de páginas otimizada com geração de código de menu
-- ✅ Menu dinâmico reorganizado e centralizado
-- ✅ Sistema limpo e otimizado, remoção de arquivos obsoletos
-- ✅ Estrutura menu/menu.config.js para configuração centralizada
+- ✅ Sistema limpo e otimizado
+- ✅ Código obsoleto removido
+- ✅ Menu dinâmico centralizado
+- ✅ Estrutura simplificada
+- ✅ Firebase Firestore integrado
+- ✅ API REST completa
+- ✅ Gravação, leitura e edição garantidas
 
 Filosofia Fundadora
 ✅ Separação total: Interface vs Lógica de Dados
@@ -46,7 +75,9 @@ Filosofia Fundadora
 
 ✅ Online: Acessível de qualquer lugar via navegador
 
-✅ Escalável: Firebase Firestore para dados ilimitados
+✅ Firebase: Banco de dados em nuvem escalável
+
+✅ API REST: Integração completa frontend-backend
 
 ✨ CARACTERÍSTICAS
 🎯 Principais Diferenciais
@@ -62,7 +93,9 @@ Sistema modular: Adicione páginas sem modificar o core
 
 API RESTful: Integração completa com frontend
 
-📱 **RESPONSIVIDADE MOBILE**
+Gravação/Leitura/Edição: 100% funcional no Firebase
+
+📱 RESPONSIVIDADE MOBILE
 Design Adaptativo Completo
 
 ✅ **Tablets (≤768px):** Sidebar otimizado para 200px
@@ -106,144 +139,6 @@ Para implementar menu hamburger (ocultar sidebar):
 - Implementar funções JavaScript
 - Sidebar se torna deslizante em mobile
 
-🔒 Segurança e Confiabilidade
-PIN Admin: 3377 (imutável)
-
-Backup automático na nuvem
-
-Soft-delete apenas (nunca perda de dados)
-
-Todos os eventos são auditáveis
-
-Dados sincronizados em tempo real
-
-### 📦 ESTRUTURA DE PRODUTOS EM PEDIDOS
-
-**Para páginas WRITE com arrays de objetos:**
-
-```html
-<!-- Produto individual -->
-<input type="text" data-bind="pedido.produtos.0.nome">
-<input type="number" data-bind="pedido.produtos.0.valor">
-<textarea data-bind="pedido.produtos.0.observacoes"></textarea>
-
-<!-- Segundo produto -->
-<input type="text" data-bind="pedido.produtos.1.nome">
-<input type="number" data-bind="pedido.produtos.1.valor">
-```
-
-**Formato no Firebase:**
-```javascript
-produtos: [
-    { 
-        nome: "Produto 1", 
-        valor: 100, 
-        observacoes: "..." 
-    },
-    { 
-        nome: "Produto 2", 
-        valor: 200, 
-        observacoes: "..." 
-    }
-]
-```
-
-### 🔧 ATUALIZAÇÃO v5.1.1
-- **Correção**: `engine.js` agora processa corretamente `pedido.produtos.X.campo`
-- **Novos eventos**: `coreCommitSuccess` e `coreCommitError`
-- **Compatibilidade**: Mantém dados antigos, novos serão estruturados
-
-📁 ESTRUTURA DO SISTEMA
-text
-CRM_PRINT_PIXEL/
-├── 📄 index.html              # 🏠 Sistema Principal (CORE)
-├── 📄 README.md               # 📚 Este documento
-├── 📄 server.js               # 🌐 Servidor Node.js
-├── 📄 package.json            # 📦 Dependências NPM
-├── 📄 firebase.js             # 🔥 Configuração Firebase
-├── 📄 style.css               # 🎨 Estilos base
-│
-├── 📂 core/                   # 🧠 INTELIGÊNCIA DO SISTEMA
-│   ├── engine.js             # 🔌 Motor de Comunicação v5.0
-│   ├── database.js           # 🗄️ Camada de Dados Firebase
-│   └── config.js             # ⚙️ Configurações Online
-│
-├── 📂 menu/                  # 🎯 CONFIGURAÇÃO DO MENU
-│   └── menu.config.js       # ⚙️ Botões e ordem do menu dinâmico
-│
-├── 📂 pages/                  # 📂 TODAS AS TELAS
-│   ├── dashboard.html        # 📊 Dashboard Principal
-│   ├── novopedido.html       # ➕ Novo Pedido
-│   ├── novadespesa.html     # 💸 Nova Despesa
-│   ├── pedidos.html          # 📦 Lista Pedidos
-│   └── despesas.html         # 💸 Lista Despesas
-│
-├── 📂 admin/                  # 👑 ADMINISTRAÇÃO
-│   ├── admin-config.html     # 🎨 Configurações do Sistema
-│   ├── admin-fabrica.html    # 🏭 Fábrica de Páginas
-│   └── admin-lancamentos.html # 📦 Gerenciar Dados
-│
-├── 📂 DATA/                   # 💾 DADOS LOCAIS
-│   └── database/             # 🗄️ Backup local
-│
-└── 📂 node_modules/           # 📦 Dependências
-🚨 REGRA ABSOLUTA
-❌ Nunca crie páginas fora de /pages/
-
-❌ Nunca modifique o /core/ manualmente
-
-✅ Sempre use a Fábrica para novas páginas
-
-✅ Mantenha Firebase.js seguro e privado
-
-⚡ INÍCIO RÁPIDO
-Método Online: Servidor Node.js (PRODUÇÃO)
-bash
-# 1. Instale as dependências
-npm install
-
-# 2. Inicie o servidor
-npm start
-
-# 3. Acesse no navegador
-http://localhost:3000
-
-# 4. Sistema pronto para uso!
-Deploy em Produção
-bash
-# 1. Configure variáveis de ambiente
-PORT=3000
-NODE_ENV=production
-
-# 2. Faça deploy na plataforma (Render, Heroku, etc.)
-# 3. Configure Firebase Firestore
-# 4. Sistema online 24/7!
-🌐 DEPLOY ONLINE
-Requisitos Mínimos
-✅ Node.js 18+ instalado
-
-✅ Conta Firebase configurada
-
-✅ Servidor web (Render, Heroku, VPS)
-
-✅ Domínio próprio (opcional)
-
-Passo a Passo
-bash
-# 1. Configure Firebase Firestore
-# 2. Copie as credenciais para firebase.js
-# 3. Instale dependências: npm install
-# 4. Configure PORT no ambiente
-# 5. Faça deploy do código
-# 6. Teste endpoints da API
-# 7. Use PIN admin: 3377 para liberar recursos
-Verificação de Deploy
-bash
-# Teste endpoints:
-curl https://seu-dominio.com/api/database/init
-# Deve retornar: {"status":"ok","message":"Firebase pronto"}
-# Teste frontend:
-https://seu-dominio.com/
 💾 SISTEMA DE DADOS
 Arquitetura Firebase Firestore
 javascript
@@ -397,7 +292,7 @@ await fetch('/api/database/commit', {
 🏭 FÁBRICA DE PÁGINAS v5.1
 Criar Novas Páginas em 3 Passos
 
-1. **Acessar:** admin/admin-fabrica.html
+1. **Acessar:** pages/novopedido.html
 2. **Preencher:** Nome no Menu, Nome do Arquivo, Tipo (WRITE/READ/NEUTRAL)
 3. **Gerar Código:** Clique em "Gerar Código Botão"
 
@@ -443,39 +338,6 @@ Siga EXATAMENTE o protocolo:
 8. NÃO altere CSS, classes ou IDs
 
 Aqui está o HTML: [COLE O HTML AQUI]"
-⚙️ ADMINISTRAÇÃO
-Acesso Admin
-PIN: 3377 (imutável)
-
-Botão: "MODO ADMIN" no sidebar
-
-Recursos: Fábrica, Configurações, Gerenciamento
-
-Ferramentas Disponíveis
-1. 🎨 Configurações do Sistema (admin-config.html)
-
-Personalização de cores (primária, destaque)
-
-Ordem e visibilidade do menu
-
-Backup e restauração
-
-2. 🏭 Fábrica de Páginas (admin-fabrica.html)
-
-Criação de novas páginas
-
-Geração de protocolos para IAs
-
-Registro automático no menu
-
-3. 📦 Gerenciar Dados (admin-lancamentos.html)
-
-Visualização de todos os registros
-
-Soft-delete de eventos
-
-Exportação completa
-
 🛠️ TROUBLESHOOTING
 Problema: "Página não mostra dados"
 javascript
