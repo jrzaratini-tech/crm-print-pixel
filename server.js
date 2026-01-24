@@ -124,10 +124,10 @@ app.post('/api/database/query', async (req, res) => {
       query = query.where('schema', '==', schema);
     }
     
-    // Aplicar filtros adicionais
+    // Aplicar filtros adicionais (exceto schema que já foi tratado)
     if (filters && typeof filters === 'object') {
       Object.keys(filters).forEach(key => {
-        if (filters[key] !== undefined && key !== 'schema') {
+        if (filters[key] !== undefined && key !== 'schema' && key !== 'deleted') {
           console.log(`🎯 Aplicando filtro: ${key}=${filters[key]}`);
           query = query.where(key, '==', filters[key]);
         }
@@ -154,6 +154,7 @@ app.post('/api/database/query', async (req, res) => {
     });
   } catch (error) {
     console.error('❌ Erro na consulta:', error);
+    console.error('Stack trace:', error.stack);
     res.status(500).json({ 
       status: 'error',
       success: false,

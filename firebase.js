@@ -61,26 +61,30 @@ try {
     
     // Mock do db para o sistema não quebrar
     const dbMock = {
-      collection: () => ({
-        add: async () => ({ id: 'mock-' + Date.now() }),
-        doc: () => ({
-          set: async () => console.log("📝 Mock: Documento salvo"),
-          get: async () => ({ exists: false }),
-          update: async () => console.log("📝 Mock: Documento atualizado")
-        }),
-        where: () => ({
-          where: () => ({
-            orderBy: () => ({
-              limit: () => ({
-                get: async () => ({
-                  forEach: () => {},
-                  size: 0
+      collection: (name) => {
+        const mockCollection = {
+          add: async () => ({ id: 'mock-' + Date.now() }),
+          doc: (id) => ({
+            set: async () => console.log("📝 Mock: Documento salvo"),
+            get: async () => ({ exists: false, data: () => ({}) }),
+            update: async () => console.log("📝 Mock: Documento atualizado")
+          }),
+          where: (field, op, value) => ({
+            where: (field2, op2, value2) => ({
+              orderBy: (field3, dir) => ({
+                limit: (count) => ({
+                  get: async () => ({
+                    forEach: () => {},
+                    size: 0,
+                    docs: []
+                  })
                 })
               })
             })
           })
-        })
-      })
+        };
+        return mockCollection;
+      }
     };
     
     module.exports = { db: dbMock };
