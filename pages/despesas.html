@@ -1452,22 +1452,18 @@
                         updated_at: new Date().toISOString()
                     };
                     
-                    // Criar novo evento de atualização
-                    const eventoAtualizacao = {
-                        schema: 'despesa',
-                        payload: payloadAtualizado,
-                        pageId: 'despesas',
-                        timestamp: new Date().toISOString(),
-                        deleted: false
-                    };
-                    
-                    // Enviar para Firebase via API Core
+                    // Atualizar documento existente usando o ID correto
                     const commitResponse = await fetch('/api/database/commit', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify(eventoAtualizacao)
+                        body: JSON.stringify({
+                            schema: 'despesa',
+                            payload: payloadAtualizado,
+                            pageId: 'despesas',
+                            id: despesaId // 🔥 CRÍTICO: Usar ID do documento existente
+                        })
                     });
                     
                     if (!commitResponse.ok) {
