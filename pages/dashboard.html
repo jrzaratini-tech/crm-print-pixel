@@ -1167,7 +1167,14 @@
                         
                         if (!isNaN(valorDespesa) && valorDespesa > 0) {
                             totalDespesas += valorDespesa;
-                            totalAPagar += valorDespesa; // Despesas são contas a pagar
+                            
+                            // CORREÇÃO: Calcular apenas valor restante a pagar de despesas
+                            const valorPago = parseFloat(payload?.valorPago || payload?.pago || 0);
+                            const restantePagar = valorDespesa - valorPago;
+                            
+                            if (restantePagar > 0) {
+                                totalAPagar += restantePagar; // Apenas o que ainda não foi pago
+                            }
                             
                             // Agrupar por categoria
                             const categoria = payload?.categoria || payload?.tipo || 'Outros';
