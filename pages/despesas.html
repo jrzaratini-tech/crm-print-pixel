@@ -1091,7 +1091,7 @@
                             id: event.id,
                             descricao: payload.descricao || 'Despesa sem descrição',
                             fornecedor: payload.fornecedor || 'Fornecedor não informado',
-                            valor: parseFloat(payload.valor) || 0,
+                            valor: parseFloat(payload.valorTotal) || parseFloat(payload.valor) || 0,
                             categoria: payload.categoria || 'OUTROS',
                             data: payload.data || new Date().toISOString().split('T')[0],
                             observacoes: payload.observacoes || '',

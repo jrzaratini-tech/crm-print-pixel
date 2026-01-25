@@ -746,13 +746,136 @@
             return '€' + valor.toFixed(2).replace('.', ',');
         }
         
+        // ============================================
+        // FUNÇÕES DE EDIÇÃO
+        // ============================================
+        
+        async function loadDespesaForEdit(despesaId) {
+            try {
+                console.log(`📥 Carregando despesa para edição: ${despesaId}`);
+                
+                const response = await fetch('/api/database/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        schema: 'despesa',
+                        filters: { id: despesaId }
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error('Erro ao buscar despesa');
+                }
+                
+                const result = await response.json();
+                const eventos = result.events || [];
+                
+                if (eventos.length === 0) {
+                    throw new Error('Despesa não encontrada');
+                }
+                
+                const despesaEvento = eventos[0];
+                const despesa = despesaEvento.payload;
+                
+                console.log('💰 Despesa carregada:', despesa);
+                
+                // Preencher campos do formulário
+                document.getElementById('fornecedor').value = despesa.fornecedor || '';
+                document.getElementById('descricao').value = despesa.descricao || '';
+                document.getElementById('dataCompra').value = despesa.dataCompra || '';
+                document.getElementById('dataVencimento').value = despesa.dataVencimento || '';
+                document.getElementById('valorBruto').value = despesa.valorBruto || '0';
+                document.getElementById('categoria').value = despesa.categoria || '';
+                document.getElementById('formaPagamento').value = despesa.formaPagamento || '';
+                document.getElementById('observacoes').value = despesa.observacoes || '';
+                
+                // Status de pagamento
+                if (despesa.statusPagamento) {
+                    const statusRadio = document.querySelector(`input[name="statusPagamento"][value="${despesa.statusPagamento}"]`);
+                    if (statusRadio) statusRadio.checked = true;
+                }
+                
+                // Data de pagamento se existir
+                if (despesa.dataPagamento) {
+                    document.getElementById('dataPagamento').value = despesa.dataPagamento;
+                }
+                
+                // IVA
+                if (despesa.comIVA !== undefined) {
+                    const ivaRadio = despesa.comIVA ? ivaSimRadio : ivaNaoRadio;
+                    if (ivaRadio) ivaRadio.checked = true;
+                }
+                
+                // Categoria "Outros"
+                if (despesa.categoria === 'OUTROS' && despesa.outraCategoria) {
+                    outraCategoriaInput.classList.add('active');
+                    outraCategoriaInput.required = true;
+                    outraCategoriaInput.disabled = false;
+                    outraCategoriaInput.setAttribute('data-bind', 'despesa.outraCategoria');
+                    outraCategoriaInput.value = despesa.outraCategoria;
+                }
+                
+                // Forma de pagamento "Outro"
+                if (despesa.formaPagamento === 'outro' && despesa.outroPagamento) {
+                    outroPagamentoInput.disabled = false;
+                    outroPagamentoInput.required = true;
+                    outroPagamentoInput.setAttribute('data-bind', 'despesa.outroPagamento');
+                    outroPagamentoInput.value = despesa.outroPagamento;
+                }
+                
+                // Nota fiscal (se existir)
+                if (despesa.notaFiscal && despesa.tipoArquivo) {
+                    notaFiscalBase64 = despesa.notaFiscal;
+                    tipoArquivo = despesa.tipoArquivo;
+                    tamanhoOriginal = despesa.tamanhoOriginal || 0;
+                    tamanhoOtimizado = despesa.tamanhoOtimizado || 0;
+                    
+                    // Mostrar preview do arquivo
+                    filePreview.innerHTML = `
+                        <div style="margin-top: 10px; padding: 10px; background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 6px;">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <i class="fas fa-file-alt" style="color: #0ea5e9;"></i>
+                                <div>
+                                    <div style="font-weight: 600; color: #0c4a6e;">Nota Fiscal existente</div>
+                                    <div style="font-size: 12px; color: #64748b;">
+                                        Tamanho: ${(tamanhoOtimizado / 1024).toFixed(2)}KB
+                                    </div>
+                                </div>
+                                <button type="button" onclick="limparNotaFiscal()" style="margin-left: auto; background: #ef4444; color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer;">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                // Configurar modo de edição
+                isEditMode = true;
+                currentDespesaId = despesaEvento.id;
+                
+                // Atualizar texto do botão
+                saveBtn.textContent = 'ATUALIZAR DESPESA';
+                
+                // Calcular totais
+                calcularTotais();
+                
+                showMessage('Despesa carregada com sucesso para edição!', 'success');
+                
+            } catch (error) {
+                console.error('❌ Erro ao carregar despesa:', error);
+                showMessage('Erro ao carregar despesa: ' + error.message, 'error');
+                
+                // Redirecionar para lista após erro
+                setTimeout(() => {
+                    if (confirm('Não foi possível carregar a despesa para edição. Deseja voltar para a lista?')) {
+                        window.location.href = 'despesas.html';
+                    }
+                }, 2000);
+            }
+        }
+        
         // Função para processar anexo de nota fiscal
         async function processarNotaFiscal(file) {
-            if (!file) {
-                limparNotaFiscal();
-                return;
-            }
-            
             // Verificar tamanho do arquivo (máx. 5MB)
             if (file.size > 5 * 1024 * 1024) {
                 showMessage('O arquivo é muito grande (máx. 5MB).', 'error');
