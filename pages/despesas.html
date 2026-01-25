@@ -1001,11 +1001,11 @@
 
     <script>
         // ============================================
-        // SISTEMA DE GESTÃO DE DESPESAS - CORE v5.1 COMPATÍVEL
+        // SISTEMA DE GESTÃO DE DESPESAS - VERSÃO CORRIGIDA (PADRÃO PEDIDOS)
         // ============================================
         
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('💰 Página de Gestão de Despesas (CORE v5.1) carregada');
+            console.log('💰 Página de Gestão de Despesas carregada');
             
             // Elementos do DOM
             const despesasGrid = document.getElementById('despesasGrid');
@@ -1023,15 +1023,14 @@
             let termoBusca = '';
             
             // ============================================
-            // FUNÇÕES PRINCIPAIS - SIGA PROTOCOLO CORE
+            // FUNÇÕES PRINCIPAIS - SEGUINDO PADRÃO PEDIDOS
             // ============================================
             
             // Carregar despesas do Firebase via API Core
             async function carregarDespesas() {
                 try {
-                    console.log('🔄 Carregando despesas do Firebase (CORE v5.1)...');
+                    console.log('🔄 Carregando despesas do Firebase...');
                     
-                    // Usar API REST do servidor CORE
                     const response = await fetch('/api/database/query', {
                         method: 'POST',
                         headers: {
@@ -1085,20 +1084,58 @@
                             }
                         }
                         
-                        // Garantir que temos todos os campos necessários do schema
+                        // Calcular totais corretamente
+                        const valorBruto = parseFloat(payload.valorBruto) || 0;
+                        const comIVA = payload.comIVA === 'sim' || payload.comIVA === 'comIVA' || payload.comIVA === true;
+                        
+                        let valorIVA = 0;
+                        let valorTotal = valorBruto;
+                        
+                        if (comIVA) {
+                            valorIVA = valorBruto * 0.23;
+                            valorTotal = valorBruto + valorIVA;
+                        }
+                        
+                        // Status de pagamento corretamente interpretado
+                        let statusPagamento = 'pendente';
+                        if (payload.statusPagamento === 'paga' || payload.statusPagamento === 'pago') {
+                            statusPagamento = 'paga';
+                        } else if (payload.statusPagamento === 'pendente') {
+                            statusPagamento = 'pendente';
+                        }
+                        
+                        // Garantir que temos todos os campos necessários
                         const despesaFormatada = {
-                            // Campos do schema "despesa" do README
+                            // Campos do schema "despesa"
                             id: event.id,
                             descricao: payload.descricao || 'Despesa sem descrição',
                             fornecedor: payload.fornecedor || 'Fornecedor não informado',
-                            valor: parseFloat(payload.valorTotal) || parseFloat(payload.valor) || 0,
+                            valorBruto: valorBruto,
+                            valorIVA: valorIVA,
+                            valorTotal: valorTotal,
                             categoria: payload.categoria || 'OUTROS',
+                            outraCategoria: payload.outraCategoria || '',
                             data: payload.data || new Date().toISOString().split('T')[0],
                             observacoes: payload.observacoes || '',
-                            
-                            // Status de pagamento (usando lógica padrão)
-                            statusPagamento: payload.paga || payload.statusPagamento || 'pendente',
+                            dataCompra: payload.dataCompra || '',
+                            dataVencimento: payload.dataVencimento || '',
                             dataPagamento: payload.dataPagamento || '',
+                            telefone: payload.telefone || '',
+                            nifFornecedor: payload.nifFornecedor || '',
+                            
+                            // Status e IVA - seguindo padrão pedidos
+                            statusPagamento: statusPagamento,
+                            comIVA: comIVA ? 'sim' : 'nao',
+                            
+                            // Forma de pagamento
+                            formaPagamento: payload.formaPagamento || '',
+                            outroPagamento: payload.outroPagamento || '',
+                            
+                            // Anexos
+                            notaFiscal: payload.notaFiscal || '',
+                            tipoArquivo: payload.tipoArquivo || '',
+                            tamanhoOriginal: payload.tamanhoOriginal || 0,
+                            tamanhoOtimizado: payload.tamanhoOtimizado || 0,
                             
                             // Metadados do evento
                             createdAt: event.timestamp || event.created_at || new Date().toISOString(),
@@ -1120,10 +1157,10 @@
                 despesasGrid.style.display = 'grid';
             }
             
-            // Atualizar contadores com data-bind (Core Engine vai capturar)
+            // Atualizar contadores com data-bind
             function atualizarContadores() {
                 const total = todasDespesas.length;
-                const pagas = todasDespesas.filter(d => d.statusPagamento === 'paga' || d.statusPagamento === 'pago').length;
+                const pagas = todasDespesas.filter(d => d.statusPagamento === 'paga').length;
                 const pendentes = todasDespesas.filter(d => d.statusPagamento === 'pendente').length;
                 
                 // Calcular total do mês atual
@@ -1132,17 +1169,17 @@
                 const anoAtual = hoje.getFullYear();
                 
                 const despesasMes = todasDespesas.filter(d => {
+                    if (!d.data) return false;
                     const dataDespesa = new Date(d.data);
                     return dataDespesa.getMonth() + 1 === mesAtual && 
                            dataDespesa.getFullYear() === anoAtual;
                 });
                 
-                const totalMes = despesasMes.reduce((sum, d) => sum + d.valor, 0);
+                const totalMes = despesasMes.reduce((sum, d) => sum + d.valorTotal, 0);
                 
                 console.log(`📊 Contadores: Total=${total}, Pagas=${pagas}, Pendentes=${pendentes}, Total Mês=${totalMes}`);
                 
-                // O Core Engine irá atualizar automaticamente via data-bind
-                // Mas vamos atualizar manualmente também para garantir
+                // Atualizar elementos
                 document.querySelector('[data-bind="despesas.total"]').textContent = total;
                 document.querySelector('[data-bind="despesas.mensal"]').textContent = formatarMoeda(totalMes);
                 document.querySelector('[data-bind="despesas.pagas"]').textContent = pagas;
@@ -1157,7 +1194,7 @@
                 if (filtroAtual !== 'all') {
                     despesasFiltradas = despesasFiltradas.filter(d => {
                         if (filtroAtual === 'paga') {
-                            return d.statusPagamento === 'paga' || d.statusPagamento === 'pago';
+                            return d.statusPagamento === 'paga';
                         } else {
                             return d.statusPagamento === filtroAtual;
                         }
@@ -1202,16 +1239,15 @@
                 const cards = document.querySelectorAll('.despesa-card');
                 cards.forEach((card, index) => {
                     card.style.animationDelay = `${index * 0.05}s`;
-                    card.classList.add('slide-up');
                 });
             }
             
             // Criar card de despesa (formato profissional)
             function criarCardDespesa(despesa) {
-                const valor = despesa.valor || 0;
+                const valorTotal = despesa.valorTotal || 0;
                 const status = despesa.statusPagamento;
-                const statusClasse = (status === 'paga' || status === 'pago') ? 'paga' : 'pendente';
-                const statusTexto = (status === 'paga' || status === 'pago') ? 'Paga' : 'A Pagar';
+                const statusClasse = (status === 'paga') ? 'paga' : 'pendente';
+                const statusTexto = (status === 'paga') ? 'Paga' : 'A Pagar';
                 const categoria = despesa.categoria || 'OUTROS';
                 
                 // Formatadores
@@ -1285,9 +1321,17 @@
                         </div>
                         
                         <div class="despesa-resumo">
+                            <div class="resumo-item">
+                                <span>Valor Bruto:</span>
+                                <span>${formatarMoeda(despesa.valorBruto || 0)}</span>
+                            </div>
+                            <div class="resumo-item">
+                                <span>IVA (${despesa.comIVA === 'sim' ? '23%' : 'Isento'}):</span>
+                                <span>${formatarMoeda(despesa.valorIVA || 0)}</span>
+                            </div>
                             <div class="resumo-item resumo-total">
-                                <span>Valor:</span>
-                                <span>${formatarMoeda(valor)}</span>
+                                <span>Total:</span>
+                                <span>${formatarMoeda(valorTotal)}</span>
                             </div>
                             <div class="resumo-item">
                                 <span>Status:</span>
@@ -1303,7 +1347,7 @@
                         <div class="despesa-status">
                             <select class="status-select" data-id="${despesa.id}">
                                 <option value="pendente" ${status === 'pendente' ? 'selected' : ''}>A Pagar</option>
-                                <option value="paga" ${(status === 'paga' || status === 'pago') ? 'selected' : ''}>Paga</option>
+                                <option value="paga" ${status === 'paga' ? 'selected' : ''}>Paga</option>
                             </select>
                         </div>
                     </div>
@@ -1323,9 +1367,11 @@
             
             // Abrir modal com detalhes da despesa
             function abrirModalDetalhes(despesa) {
-                const valor = despesa.valor || 0;
+                const valorBruto = despesa.valorBruto || 0;
+                const valorIVA = despesa.valorIVA || 0;
+                const valorTotal = despesa.valorTotal || 0;
                 const status = despesa.statusPagamento;
-                const statusTexto = (status === 'paga' || status === 'pago') ? 'Paga' : 'A Pagar';
+                const statusTexto = (status === 'paga') ? 'Paga' : 'A Pagar';
                 const categoria = despesa.categoria || 'OUTROS';
                 
                 // Formatadores
@@ -1382,12 +1428,20 @@
                     </div>
                     
                     <div class="modal-section">
-                        <h3 class="section-title">Valores</h3>
+                        <h3 class="section-title">Detalhes Financeiros</h3>
                         <div class="total-section">
                             <div class="total-box">
                                 <div class="total-row">
+                                    <span>Valor Bruto:</span>
+                                    <span>${formatarMoeda(valorBruto)}</span>
+                                </div>
+                                <div class="total-row">
+                                    <span>IVA (${despesa.comIVA === 'sim' ? '23%' : 'Isento'}):</span>
+                                    <span>${formatarMoeda(valorIVA)}</span>
+                                </div>
+                                <div class="total-row">
                                     <span>Valor Total:</span>
-                                    <span>${formatarMoeda(valor)}</span>
+                                    <span>${formatarMoeda(valorTotal)}</span>
                                 </div>
                             </div>
                         </div>
@@ -1405,7 +1459,7 @@
                     <div class="modal-section">
                         <h3 class="section-title">Ações</h3>
                         <div style="display: flex; gap: 12px;">
-                            <button class="btn-new" onclick="editarDespesa('${despesa.id}')" style="margin-right: 0;">
+                            <button class="btn-new" onclick="editarDespesaModal('${despesa.id}')" style="margin-right: 0;">
                                 <i class="fas fa-edit"></i>
                                 Editar Despesa
                             </button>
@@ -1414,6 +1468,11 @@
                 `;
                 
                 modalOverlay.classList.add('active');
+            }
+            
+            // Função para editar via modal
+            function editarDespesaModal(despesaId) {
+                editarDespesa(despesaId);
             }
             
             // Atualizar status da despesa via API Core
@@ -1452,7 +1511,7 @@
                         updated_at: new Date().toISOString()
                     };
                     
-                    // Atualizar documento existente usando o ID correto
+                    // Atualizar documento existente - SEGUINDO PADRÃO PEDIDOS
                     const commitResponse = await fetch('/api/database/commit', {
                         method: 'POST',
                         headers: {
@@ -1462,7 +1521,7 @@
                             schema: 'despesa',
                             payload: payloadAtualizado,
                             pageId: 'despesas',
-                            id: despesaId // 🔥 CRÍTICO: Usar ID do documento existente
+                            id: despesaId  // 🔥 CRÍTICO: ID do documento
                         })
                     });
                     
@@ -1586,7 +1645,7 @@
             // Iniciar carregamento das despesas
             carregarDespesas();
             
-            console.log('✅ Sistema de gestão de despesas inicializado (CORE v5.1)');
+            console.log('✅ Sistema de gestão de despesas inicializado');
         });
     </script>
     
