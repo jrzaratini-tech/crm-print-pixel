@@ -18,6 +18,7 @@
             --accent-yellow: #f59e0b;
             --accent-green: #10b981;
             --accent-blue: #3b82f6;
+            --accent-purple: #8b5cf6;
             --border-color: #334155;
             --shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
             --radius: 12px;
@@ -115,6 +116,10 @@
             color: var(--accent-blue);
         }
         
+        .stat-concluido .stat-value {
+            color: var(--accent-green);
+        }
+        
         .stat-label {
             font-size: 12px;
             color: var(--text-secondary);
@@ -123,7 +128,7 @@
         }
         
         /* ============================================
-           PAINEL DE PRODUÇÃO (ESTILO McDONALD'S)
+           PAINEL DE PRODUÇÃO
            ============================================ */
         .production-board {
             display: grid;
@@ -166,14 +171,14 @@
             animation: pulse 2s infinite;
         }
         
+        .order-card.concluido {
+            border-left: 6px solid var(--accent-green);
+            opacity: 0.8;
+        }
+        
         @keyframes pulse {
             0%, 100% { border-left-color: var(--accent-red); }
             50% { border-left-color: #ff6b6b; }
-        }
-        
-        .order-card.concluido {
-            border-left: 6px solid var(--accent-green);
-            opacity: 0.7;
         }
         
         /* Order header */
@@ -218,6 +223,11 @@
             animation: blink 1s infinite;
         }
         
+        .status-concluido {
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--accent-green);
+        }
+        
         @keyframes blink {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.7; }
@@ -227,6 +237,7 @@
         .order-info {
             margin-bottom: 15px;
             flex-grow: 1;
+            position: relative;
         }
         
         .order-cliente {
@@ -258,6 +269,45 @@
         .meta-icon {
             color: var(--accent-blue);
             font-size: 14px;
+        }
+        
+        /* Timer styling - REPOSICIONADO */
+        .order-timer {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            font-size: 11px;
+            color: var(--text-secondary);
+            background: rgba(0, 0, 0, 0.3);
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        /* Status alert - NOVA POSIÇÃO */
+        .status-alert {
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            z-index: 2;
+        }
+        
+        .alert-pendente {
+            background: rgba(245, 158, 11, 0.2);
+            color: var(--accent-yellow);
+        }
+        
+        .alert-atrasado {
+            background: rgba(239, 68, 68, 0.2);
+            color: var(--accent-red);
         }
         
         /* Products list */
@@ -340,16 +390,8 @@
             background: var(--accent-red);
         }
         
-        /* Timer */
-        .order-timer {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            font-size: 11px;
-            color: var(--text-secondary);
-            background: rgba(0, 0, 0, 0.3);
-            padding: 4px 8px;
-            border-radius: 4px;
+        .action-btn.print:hover {
+            background: var(--accent-purple);
         }
         
         /* ============================================
@@ -371,6 +413,7 @@
         .filter-buttons {
             display: flex;
             gap: 10px;
+            flex-wrap: wrap;
         }
         
         .filter-btn {
@@ -556,6 +599,10 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            position: sticky;
+            top: 0;
+            background: var(--card-bg);
+            z-index: 10;
         }
         
         .modal-title {
@@ -564,7 +611,12 @@
             color: var(--text-primary);
         }
         
-        .modal-close {
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .modal-action-btn {
             width: 40px;
             height: 40px;
             border-radius: 8px;
@@ -578,9 +630,18 @@
             transition: var(--transition);
         }
         
+        .modal-action-btn:hover {
+            background: var(--accent-blue);
+            color: white;
+            transform: scale(1.1);
+        }
+        
+        .modal-action-btn.print:hover {
+            background: var(--accent-purple);
+        }
+        
         .modal-close:hover {
             background: var(--accent-red);
-            color: white;
         }
         
         .modal-content {
@@ -610,6 +671,7 @@
             
             .header-stats {
                 justify-content: center;
+                flex-wrap: wrap;
             }
             
             .controls-panel {
@@ -619,6 +681,10 @@
             
             .filter-buttons {
                 justify-content: center;
+            }
+            
+            .stat-box {
+                min-width: 100px;
             }
         }
         
@@ -631,12 +697,12 @@
                 grid-template-columns: 1fr;
             }
             
-            .stat-box {
-                min-width: 100px;
-            }
-            
             .stat-value {
                 font-size: 24px;
+            }
+            
+            .order-card {
+                padding: 15px;
             }
         }
         
@@ -684,6 +750,38 @@
             border-radius: 50%;
             animation: pulse 2s infinite;
         }
+        
+        /* ============================================
+           IMPRESSÃO
+           ============================================ */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            
+            .modal-container,
+            .modal-container * {
+                visibility: visible;
+            }
+            
+            .modal-container {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                max-width: 100%;
+                max-height: none;
+                box-shadow: none;
+                border: none;
+            }
+            
+            .modal-actions,
+            .refresh-btn,
+            .action-btn,
+            button {
+                display: none !important;
+            }
+        }
     </style>
     
     <!-- FONT AWESOME -->
@@ -713,6 +811,10 @@
                 <div class="stat-value" data-bind="producao.processamento">0</div>
                 <div class="stat-label">Em Produção</div>
             </div>
+            <div class="stat-box stat-concluido">
+                <div class="stat-value" data-bind="producao.concluidos">0</div>
+                <div class="stat-label">Concluídos</div>
+            </div>
             <div class="stat-box">
                 <div class="stat-value" data-bind="producao.total">0</div>
                 <div class="stat-label">Total</div>
@@ -740,6 +842,10 @@
             <button class="filter-btn" data-filter="atrasado">
                 <i class="fas fa-exclamation-triangle"></i>
                 Atrasados
+            </button>
+            <button class="filter-btn" data-filter="concluido">
+                <i class="fas fa-check-circle"></i>
+                Concluídos
             </button>
         </div>
         
@@ -801,12 +907,17 @@
          MODAL DE DETALHES
          ============================================ -->
     <div class="modal-overlay" id="modalOverlay">
-        <div class="modal-container">
+        <div class="modal-container" id="modalContainer">
             <div class="modal-header">
                 <h2 class="modal-title">Detalhes da Ordem</h2>
-                <button class="modal-close" id="modalClose">
-                    <i class="fas fa-times"></i>
-                </button>
+                <div class="modal-actions">
+                    <button class="modal-action-btn print" id="modalPrint" title="Imprimir">
+                        <i class="fas fa-print"></i>
+                    </button>
+                    <button class="modal-action-btn modal-close" id="modalClose" title="Fechar">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
             </div>
             <div class="modal-content" id="modalContent">
                 <!-- Conteúdo será preenchido dinamicamente -->
@@ -837,6 +948,8 @@
             const modalOverlay = document.getElementById('modalOverlay');
             const modalClose = document.getElementById('modalClose');
             const modalContent = document.getElementById('modalContent');
+            const modalPrint = document.getElementById('modalPrint');
+            const modalContainer = document.getElementById('modalContainer');
             const manualRefresh = document.getElementById('manualRefresh');
             const filterButtons = document.querySelectorAll('.filter-btn');
             const refreshTimer = document.getElementById('refreshTimer');
@@ -845,6 +958,7 @@
             let todasOrdens = [];
             let filtroAtual = 'all';
             let contadorRefresh = 30;
+            let ordemAtualModal = null;
             
             // ============================================
             // FUNÇÕES PRINCIPAIS - SIGA PROTOCOLO CORE
@@ -911,6 +1025,7 @@
                         
                         // Determinar se está atrasado (data de entrega passada)
                         const hoje = new Date();
+                        hoje.setHours(0, 0, 0, 0);
                         const dataEntrega = payload.dataEntrega ? new Date(payload.dataEntrega) : null;
                         let status = payload.status || 'pendente';
                         
@@ -918,9 +1033,9 @@
                             status = 'atrasado';
                         }
                         
-                        // Calcular tempo decorrido
+                        // Calcular tempo decorrido em DIAS
                         const dataCriacao = event.timestamp ? new Date(event.timestamp) : new Date();
-                        const tempoDecorrido = Math.floor((hoje - dataCriacao) / (1000 * 60)); // minutos
+                        const diasDecorridos = Math.floor((hoje - dataCriacao) / (1000 * 60 * 60 * 24));
                         
                         // Formatar ordem
                         const ordemFormatada = {
@@ -943,11 +1058,13 @@
                             entrada: parseFloat(payload.entrada) || 0,
                             dataEntrada: payload.dataEntrada || '',
                             instalacao: parseFloat(payload.instalacao) || 0,
+                            subtotal: parseFloat(payload.subtotal) || 0,
+                            iva: parseFloat(payload.iva) || 0,
                             
                             // Metadados
                             createdAt: event.timestamp || event.created_at || new Date().toISOString(),
                             pageId: event.pageId || 'novo_pedido',
-                            tempoDecorrido: tempoDecorrido
+                            diasDecorridos: diasDecorridos > 0 ? diasDecorridos : 0
                         };
                         
                         return ordemFormatada;
@@ -980,15 +1097,18 @@
             // Atualizar contadores com data-bind
             function atualizarContadores() {
                 const total = todasOrdens.length;
-                const pendentes = todasOrdens.filter(o => o.status === 'pendente' || o.status === 'atrasado').length;
+                const pendentes = todasOrdens.filter(o => o.status === 'pendente').length;
+                const atrasados = todasOrdens.filter(o => o.status === 'atrasado').length;
                 const processamento = todasOrdens.filter(o => o.status === 'processamento').length;
+                const concluidos = todasOrdens.filter(o => o.status === 'concluido').length;
                 
-                console.log(`📊 Contadores: Total=${total}, Pendentes/Atrasados=${pendentes}, Processamento=${processamento}`);
+                console.log(`📊 Contadores: Total=${total}, Pendentes=${pendentes}, Atrasados=${atrasados}, Processamento=${processamento}, Concluídos=${concluidos}`);
                 
                 // Atualizar elementos com data-bind
                 document.querySelector('[data-bind="producao.total"]').textContent = total;
-                document.querySelector('[data-bind="producao.pendentes"]').textContent = pendentes;
+                document.querySelector('[data-bind="producao.pendentes"]').textContent = pendentes + atrasados;
                 document.querySelector('[data-bind="producao.processamento"]').textContent = processamento;
+                document.querySelector('[data-bind="producao.concluidos"]').textContent = concluidos;
             }
             
             // Aplicar filtro atual
@@ -997,11 +1117,13 @@
                 
                 // Aplicar filtro de status
                 if (filtroAtual !== 'all') {
-                    ordensFiltradas = ordensFiltradas.filter(o => o.status === filtroAtual);
+                    if (filtroAtual === 'pendente') {
+                        // Mostrar pendentes E atrasados
+                        ordensFiltradas = ordensFiltradas.filter(o => o.status === 'pendente' || o.status === 'atrasado');
+                    } else {
+                        ordensFiltradas = ordensFiltradas.filter(o => o.status === filtroAtual);
+                    }
                 }
-                
-                // Remover concluídos do painel principal
-                ordensFiltradas = ordensFiltradas.filter(o => o.status !== 'concluido');
                 
                 // Renderizar ordens
                 renderizarOrdens(ordensFiltradas);
@@ -1057,21 +1179,20 @@
                     }).format(valor);
                 };
                 
-                const formatarTempo = (minutos) => {
-                    if (minutos < 60) return `${minutos}min`;
-                    const horas = Math.floor(minutos / 60);
-                    const mins = minutos % 60;
-                    return `${horas}h${mins > 0 ? ` ${mins}min` : ''}`;
+                const formatarDias = (dias) => {
+                    if (dias === 0) return 'Hoje';
+                    if (dias === 1) return '1 dia';
+                    return `${dias} dias`;
                 };
                 
                 // Status info
                 const getStatusInfo = (status) => {
                     switch(status) {
-                        case 'pendente': return { texto: 'PENDENTE', classe: 'status-pendente' };
-                        case 'processamento': return { texto: 'EM PRODUÇÃO', classe: 'status-processamento' };
-                        case 'atrasado': return { texto: 'ATRASADO', classe: 'status-atrasado' };
-                        case 'concluido': return { texto: 'CONCLUÍDO', classe: 'status-concluido' };
-                        default: return { texto: status, classe: '' };
+                        case 'pendente': return { texto: 'PENDENTE', classe: 'status-pendente', alert: '' };
+                        case 'processamento': return { texto: 'EM PRODUÇÃO', classe: 'status-processamento', alert: '' };
+                        case 'atrasado': return { texto: 'ATRASADO', classe: 'status-atrasado', alert: 'alert-atrasado' };
+                        case 'concluido': return { texto: 'CONCLUÍDO', classe: 'status-concluido', alert: '' };
+                        default: return { texto: status, classe: '', alert: '' };
                     }
                 };
                 
@@ -1085,9 +1206,11 @@
                 const produtosExibicao = produtos.slice(0, 4);
                 
                 card.innerHTML = `
-                    <div class="order-timer">
-                        <i class="fas fa-clock"></i> ${formatarTempo(ordem.tempoDecorrido || 0)}
-                    </div>
+                    ${ordem.status === 'atrasado' ? `
+                        <div class="status-alert ${statusInfo.alert}">
+                            <i class="fas fa-exclamation-circle"></i> Atrasado
+                        </div>
+                    ` : ''}
                     
                     <div class="order-header">
                         <div class="order-number">${ordem.numero}</div>
@@ -1108,6 +1231,11 @@
                                 <span>Atendente: ${ordem.atendente || 'N/A'}</span>
                             </div>
                         </div>
+                        
+                        <div class="order-timer">
+                            <i class="fas fa-calendar-day"></i>
+                            ${formatarDias(ordem.diasDecorridos || 0)}
+                        </div>
                     </div>
                     
                     <div class="products-preview">
@@ -1123,9 +1251,11 @@
                     <div class="order-footer">
                         <div class="order-total">${formatarMoeda(total)}</div>
                         <div class="order-actions">
-                            <button class="action-btn complete" title="Marcar como concluído" data-id="${ordem.id}">
-                                <i class="fas fa-check"></i>
-                            </button>
+                            ${ordem.status !== 'concluido' ? `
+                                <button class="action-btn complete" title="Marcar como concluído" data-id="${ordem.id}">
+                                    <i class="fas fa-check"></i>
+                                </button>
+                            ` : ''}
                             <button class="action-btn" title="Ver detalhes" data-id="${ordem.id}">
                                 <i class="fas fa-eye"></i>
                             </button>
@@ -1144,9 +1274,9 @@
                 `;
                 
                 // Adicionar event listeners
-                const viewBtn = card.querySelector('.order-actions .action-btn:nth-child(2)');
+                const viewBtn = card.querySelector('.order-actions button:nth-child(2)');
                 const completeBtn = card.querySelector('.action-btn.complete');
-                const startBtn = card.querySelector('.action-btn:nth-child(3)');
+                const startBtn = card.querySelector('.order-actions button:nth-child(3)');
                 const problemBtn = card.querySelector('.action-btn.delay');
                 
                 viewBtn.addEventListener('click', () => abrirModalDetalhes(ordem));
@@ -1159,10 +1289,11 @@
             
             // Abrir modal com detalhes da ordem
             function abrirModalDetalhes(ordem) {
+                ordemAtualModal = ordem;
                 const produtos = ordem.produtos || [];
                 const total = ordem.total || 0;
-                const iva = ordem.iva || 0;
-                const subtotal = ordem.subtotal || total - iva;
+                const iva = ordem.iva || (total * 0.23); // Calcular IVA se não existir
+                const subtotal = ordem.subtotal || (total - iva);
                 
                 // Formatadores
                 const formatarData = (dataStr) => {
@@ -1181,7 +1312,7 @@
                         currency: 'EUR',
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2
-                    }).format(valor);
+                    }).format(valor || 0);
                 };
                 
                 modalContent.innerHTML = `
@@ -1196,8 +1327,8 @@
                                     </div>
                                     <div>
                                         <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Status</div>
-                                        <div class="order-status ${ordem.status === 'pendente' ? 'status-pendente' : ordem.status === 'processamento' ? 'status-processamento' : 'status-atrasado'}" style="display: inline-block;">
-                                            ${ordem.status === 'pendente' ? 'PENDENTE' : ordem.status === 'processamento' ? 'EM PRODUÇÃO' : 'ATRASADO'}
+                                        <div class="order-status ${ordem.status === 'pendente' ? 'status-pendente' : ordem.status === 'processamento' ? 'status-processamento' : ordem.status === 'atrasado' ? 'status-atrasado' : 'status-concluido'}" style="display: inline-block;">
+                                            ${ordem.status === 'pendente' ? 'PENDENTE' : ordem.status === 'processamento' ? 'EM PRODUÇÃO' : ordem.status === 'atrasado' ? 'ATRASADO' : 'CONCLUÍDO'}
                                         </div>
                                     </div>
                                     <div>
@@ -1207,6 +1338,14 @@
                                     <div>
                                         <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Atendente</div>
                                         <div style="font-weight: 600;">${ordem.atendente || 'Não informado'}</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Data de Criação</div>
+                                        <div style="font-weight: 600;">${formatarData(ordem.createdAt)}</div>
+                                    </div>
+                                    <div>
+                                        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Dias Decorridos</div>
+                                        <div style="font-weight: 600;">${ordem.diasDecorridos || 0} dias</div>
                                     </div>
                                 </div>
                             </div>
@@ -1222,6 +1361,14 @@
                                 <div style="margin-bottom: 10px;">
                                     <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Empresa</div>
                                     <div style="font-weight: 600;">${ordem.empresa}</div>
+                                </div>
+                                <div style="margin-bottom: 10px;">
+                                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">NIF</div>
+                                    <div style="font-weight: 600;">${ordem.nif || 'Não informado'}</div>
+                                </div>
+                                <div style="margin-bottom: 10px;">
+                                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Morada</div>
+                                    <div style="font-weight: 600;">${ordem.morada || 'Não informado'}</div>
                                 </div>
                                 <div style="margin-bottom: 10px;">
                                     <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Telemóvel</div>
@@ -1253,7 +1400,7 @@
                                             </td>
                                             <td style="padding: 12px;">${prod.tamanho || 'N/A'}</td>
                                             <td style="padding: 12px;">${prod.quantidade || 1}</td>
-                                            <td style="padding: 12px;">${formatarMoeda(prod.valor || 0)}</td>
+                                            <td style="padding: 12px;">${formatarMoeda(prod.valor)}</td>
                                             <td style="padding: 12px; font-weight: 600;">${formatarMoeda((prod.valor || 0) * (prod.quantidade || 1))}</td>
                                         </tr>
                                     `).join('')}
@@ -1289,9 +1436,15 @@
                     ` : ''}
                     
                     <div style="display: flex; gap: 15px; margin-top: 30px;">
-                        <button class="refresh-btn" style="flex: 1;" onclick="atualizarStatusOrdem('${ordem.id}', 'concluido'); fecharModal();">
-                            <i class="fas fa-check"></i>
-                            Marcar como Concluído
+                        ${ordem.status !== 'concluido' ? `
+                            <button class="refresh-btn" style="flex: 1;" onclick="atualizarStatusOrdem('${ordem.id}', 'concluido'); fecharModal();">
+                                <i class="fas fa-check"></i>
+                                Marcar como Concluído
+                            </button>
+                        ` : ''}
+                        <button class="refresh-btn" style="flex: 1; background: linear-gradient(135deg, var(--accent-purple), #7c3aed);" onclick="imprimirOrdem()">
+                            <i class="fas fa-print"></i>
+                            Imprimir Ordem
                         </button>
                         <button class="filter-btn" style="flex: 1;" onclick="fecharModal();">
                             <i class="fas fa-times"></i>
@@ -1332,8 +1485,13 @@
                     }
                     
                     const eventoOriginal = eventos[0];
+                    let payload = eventoOriginal.payload;
+                    if (typeof payload === 'string') {
+                        payload = JSON.parse(payload);
+                    }
+                    
                     const payloadAtualizado = {
-                        ...eventoOriginal.payload,
+                        ...payload,
                         status: novoStatus,
                         updated_at: new Date().toISOString()
                     };
@@ -1364,12 +1522,11 @@
                     const card = document.querySelector(`.order-card[data-id="${ordemId}"]`);
                     if (card) {
                         card.classList.add('concluido');
-                        card.style.opacity = '0.5';
-                        card.style.transform = 'scale(0.95)';
+                        card.style.opacity = '0.8';
                         
                         setTimeout(() => {
                             carregarOrdens(); // Recarregar ordens
-                        }, 1000);
+                        }, 800);
                     }
                     
                     console.log(`✅ Status da ordem ${ordemId} atualizado para: ${novoStatus}`);
@@ -1389,9 +1546,18 @@
                 }
             }
             
+            // Imprimir ordem atual
+            function imprimirOrdem() {
+                if (ordemAtualModal) {
+                    console.log(`🖨️ Imprimindo ordem: ${ordemAtualModal.numero}`);
+                    window.print();
+                }
+            }
+            
             // Fechar modal
             function fecharModal() {
                 modalOverlay.classList.remove('active');
+                ordemAtualModal = null;
             }
             
             // Mostrar erro
@@ -1427,9 +1593,11 @@
             // Atualizar manualmente
             manualRefresh.addEventListener('click', () => {
                 manualRefresh.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Atualizando...';
+                manualRefresh.disabled = true;
                 carregarOrdens();
                 setTimeout(() => {
                     manualRefresh.innerHTML = '<i class="fas fa-redo"></i> Atualizar Agora';
+                    manualRefresh.disabled = false;
                 }, 1000);
             });
             
@@ -1440,6 +1608,9 @@
                     fecharModal();
                 }
             });
+            
+            // Imprimir modal
+            modalPrint.addEventListener('click', imprimirOrdem);
             
             // Escutar eventos do Core Engine
             document.addEventListener('coreDataChanged', () => {
@@ -1481,9 +1652,10 @@
             
             console.log('✅ Sistema de ordem de produção inicializado (CORE v5.1)');
             
-            // Expor funções para uso global (se necessário)
+            // Expor funções para uso global
             window.fecharModal = fecharModal;
             window.atualizarStatusOrdem = atualizarStatusOrdem;
+            window.imprimirOrdem = imprimirOrdem;
         });
     </script>
     
