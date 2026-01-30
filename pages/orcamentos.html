@@ -273,12 +273,14 @@
             background-color: #f8fafc;
         }
         
-        /* CORREÇÃO AQUI: Botões agora ajustam automaticamente */
+        /* CORREÇÃO AQUI: Botões ajustados para orçamentos */
         .actions-cell {
             display: flex;
             gap: 8px;
-            flex-wrap: wrap;
-            min-width: 150px;
+            flex-wrap: nowrap;
+            min-width: 280px;
+            justify-content: flex-start;
+            align-items: center;
         }
         
         .action-btn {
@@ -286,21 +288,30 @@
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 13px;
             font-weight: 600;
             transition: all 0.2s;
             display: inline-flex;
             align-items: center;
             gap: 6px;
             white-space: nowrap;
-            min-width: 80px;
+            min-width: 90px;
             justify-content: center;
+            height: 36px;
         }
         
         /* CORREÇÃO: Garantir visibilidade dos textos */
         .action-btn span {
             display: inline-block;
             min-width: 20px;
+            font-size: 14px;
+        }
+        
+        /* Status específicos para orçamentos */
+        .status-convertido {
+            background-color: #d1fae5;
+            color: #065f46;
+            border: 1px solid #10b981;
         }
         
         .modal-overlay {
@@ -661,18 +672,18 @@
             }
             
             .actions-cell {
-                flex-direction: row;
-                flex-wrap: wrap;
-                gap: 6px;
+                flex-direction: column;
+                gap: 5px;
                 min-width: 150px;
             }
             
             .action-btn {
-                flex: none;
-                min-width: 70px;
+                width: 100%;
                 justify-content: center;
-                padding: 8px 10px;
+                padding: 10px;
                 font-size: 12px;
+                min-width: 0;
+                height: auto;
             }
             
             .action-btn span {
@@ -740,6 +751,8 @@
                 justify-content: center;
                 padding: 10px;
                 font-size: 13px;
+                min-width: 0;
+                height: auto;
             }
             
             .page-title {
@@ -896,15 +909,15 @@
         let orcamentoAtual = null;
         
         // ============================================
-        // FUNÇÕES PRINCIPAIS
+        // FUNÇÕES PRINCIPAIS (CORRIGIDAS)
         // ============================================
         
-        // Função para carregar orçamentos
+        // Função para carregar orçamentos (CORRIGIDA)
         async function carregarOrcamentos() {
             mostrarLoading();
             
             try {
-                // Buscar orçamentos do Firebase
+                // 🔥 BUSCAR TODOS OS ORÇAMENTOS
                 const response = await fetch('/api/database/query', {
                     method: 'POST',
                     headers: {
@@ -912,7 +925,7 @@
                     },
                     body: JSON.stringify({
                         schema: 'orcamento',
-                        filters: { deleted: false }
+                        filters: {}  // ✅ Buscar TODOS os orçamentos
                     })
                 });
                 
@@ -923,11 +936,29 @@
                 const result = await response.json();
                 const eventos = result.events || [];
                 
-                // Converter eventos em orçamentos
+                console.log(`📦 Total de eventos encontrados: ${eventos.length}`);
+                
+                // 🔥 CORREÇÃO: Filtrar localmente orçamentos não deletados
+                // E que NÃO tenham sido convertidos em pedidos
                 orcamentosData = eventos
-                    .filter(evento => evento.schema === 'orcamento' && !evento.deleted)
+                    .filter(evento => {
+                        // Verificar se não está deletado
+                        let deleted = false;
+                        if (typeof evento.payload === 'string') {
+                            try {
+                                const payloadObj = JSON.parse(evento.payload);
+                                deleted = payloadObj.deleted === true;
+                            } catch (e) {
+                                // Ignorar erros de parsing
+                            }
+                        } else if (evento.payload && typeof evento.payload === 'object') {
+                            deleted = evento.payload.deleted === true;
+                        }
+                        
+                        return !deleted;
+                    })
                     .map(evento => {
-                        // CORREÇÃO: Processamento de payload igual ao pedidos.html
+                        // Processar payload
                         let payload = evento.payload;
                         if (typeof payload === 'string') {
                             try {
@@ -938,7 +969,7 @@
                             }
                         }
                         
-                        // CORREÇÃO: Garantir estrutura correta dos produtos
+                        // Processar produtos
                         let produtos = [];
                         if (payload.produtos) {
                             if (Array.isArray(payload.produtos)) {
@@ -952,6 +983,7 @@
                             }
                         }
                         
+                        // Criar objeto formatado
                         const orcamentoFormatado = {
                             id: evento.id,
                             cliente: payload.cliente || 'Cliente não informado',
@@ -961,7 +993,7 @@
                             telemovel: payload.telemovel || '',
                             email: payload.email || '',
                             atendente: payload.atendente || '',
-                            produtos: produtos, // CORREÇÃO: Usar produtos processados
+                            produtos: produtos,
                             total: parseFloat(payload.total) || 0,
                             subtotal: parseFloat(payload.subtotal) || 0,
                             iva: parseFloat(payload.iva) || 0,
@@ -975,6 +1007,7 @@
                             dataCriacao: payload.dataCriacao || evento.timestamp || new Date().toISOString(),
                             pedidoNumero: payload.pedidoNumero || '',
                             dataConversao: payload.dataConversao || '',
+                            deleted: payload.deleted || false,
                             
                             // Metadados
                             createdAt: evento.timestamp || evento.created_at || new Date().toISOString(),
@@ -983,10 +1016,19 @@
                         
                         return orcamentoFormatado;
                     })
+                    .filter(orcamento => {
+                        // 🔥 CORREÇÃO CRÍTICA: NÃO mostrar orçamentos convertidos em pedidos
+                        // Apenas mostrar se não tiver pedidoNumero (não convertido)
+                        return !orcamento.pedidoNumero;
+                    })
                     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
                 
-                console.log(`✅ ${orcamentosData.length} orçamentos carregados`);
-                console.log('📦 Exemplo de produtos:', orcamentosData[0]?.produtos || 'Nenhum');
+                console.log(`✅ ${orcamentosData.length} orçamentos ativos carregados (sem conversão)`);
+                console.log('📊 Status dos orçamentos:');
+                orcamentosData.forEach(o => {
+                    console.log(`  - ${o.codigo}: ${o.status} ${o.pedidoNumero ? `(Pedido: ${o.pedidoNumero})` : '(Não convertido)'}`);
+                });
+                
                 atualizarEstatisticas();
                 filtrarOrcamentos();
                 
@@ -1040,7 +1082,7 @@
             atualizarPaginacao();
         }
         
-        // Função para renderizar a tabela (CORRIGIDO)
+        // Função para renderizar a tabela (CORRIGIDA COM BOTÕES)
         function renderizarTabela() {
             const tbody = document.getElementById('orcamentosTableBody');
             const container = document.getElementById('orcamentosTableContainer');
@@ -1099,17 +1141,43 @@
                         statusClass = 'status-convertido';
                         statusText = 'Convertido';
                         break;
+                    default:
+                        statusClass = 'status-pendente';
+                        statusText = orcamento.status || 'Pendente';
                 }
                 
-                // CORREÇÃO: Renderizar botões condicionais
+                // 🔥 CORREÇÃO: Renderizar botões condicionais corretamente
                 let botoesHTML = '';
-                if (orcamento.status === 'pendente') {
+                
+                // Se já tem pedidoNumero (convertido), mostrar botão para ver pedido
+                if (orcamento.pedidoNumero) {
+                    botoesHTML = `
+                        <button class="action-btn btn-success" onclick="window.location.href='pedidos.html?view=${orcamento.pedidoNumero}'" title="Ver Pedido">
+                            <span>📋</span> Ver Pedido
+                        </button>
+                    `;
+                } 
+                // Se não tem pedidoNumero e status é pendente/aprovado, mostrar botão converter
+                else if (orcamento.status === 'pendente' || orcamento.status === 'aprovado') {
                     botoesHTML = `
                         <button class="action-btn btn-success" onclick="converterOrcamentoDireto('${orcamento.id}')" title="Converter em Pedido">
                             <span>🔄</span> Converter
                         </button>
                     `;
                 }
+                
+                // Sempre mostrar botões de visualizar, editar e excluir
+                botoesHTML += `
+                    <button class="action-btn btn-info" onclick="visualizarOrcamento('${orcamento.id}')" title="Visualizar">
+                        <span>👁️</span> Ver
+                    </button>
+                    <button class="action-btn btn-warning" onclick="editarOrcamento('${orcamento.id}')" title="Editar">
+                        <span>✏️</span> Editar
+                    </button>
+                    <button class="action-btn btn-danger" onclick="excluirOrcamento('${orcamento.id}')" title="Excluir">
+                        <span>🗑️</span> Excluir
+                    </button>
+                `;
                 
                 row.innerHTML = `
                     <td><strong>${orcamento.codigo || `ORC-${orcamento.id.substring(0, 8)}`}</strong></td>
@@ -1121,15 +1189,6 @@
                     <td>${dataFormatada}</td>
                     <td>
                         <div class="actions-cell">
-                            <button class="action-btn btn-info" onclick="visualizarOrcamento('${orcamento.id}')" title="Visualizar">
-                                <span>👁️</span> Ver
-                            </button>
-                            <button class="action-btn btn-warning" onclick="editarOrcamento('${orcamento.id}')" title="Editar">
-                                <span>✏️</span> Editar
-                            </button>
-                            <button class="action-btn btn-danger" onclick="excluirOrcamento('${orcamento.id}')" title="Excluir">
-                                <span>🗑️</span> Excluir
-                            </button>
                             ${botoesHTML}
                         </div>
                     </td>
@@ -1147,13 +1206,14 @@
             const pendentes = orcamentosData.filter(o => o.status === 'pendente').length;
             const aprovados = orcamentosData.filter(o => o.status === 'aprovado').length;
             const convertidos = orcamentosData.filter(o => o.status === 'convertido').length;
+            const recusados = orcamentosData.filter(o => o.status === 'recusado').length;
             
             const valorTotal = orcamentosData.reduce((sum, o) => sum + (o.total || 0), 0);
+            const valorPendentes = orcamentosData
+                .filter(o => o.status === 'pendente')
+                .reduce((sum, o) => sum + (o.total || 0), 0);
             const valorAprovados = orcamentosData
                 .filter(o => o.status === 'aprovado')
-                .reduce((sum, o) => sum + (o.total || 0), 0);
-            const valorConvertidos = orcamentosData
-                .filter(o => o.status === 'convertido')
                 .reduce((sum, o) => sum + (o.total || 0), 0);
             
             statsContainer.innerHTML = `
@@ -1232,11 +1292,12 @@
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
         
-        // Função para visualizar orçamento
+        // Função para visualizar orçamento (CORRIGIDA)
         async function visualizarOrcamento(id) {
             mostrarLoading();
             
             try {
+                // 🔥 CORREÇÃO: Encontrar o orçamento nos dados já carregados
                 const orcamento = orcamentosData.find(o => o.id === id);
                 
                 if (!orcamento) {
@@ -1251,8 +1312,8 @@
                 // Gerar preview do orçamento
                 document.getElementById('orcamentoPreview').innerHTML = gerarPreviewOrcamento(orcamento);
                 
-                // Configurar botões baseado no status
-                configurarBotoesStatus(orcamento.status);
+                // 🔥 CORREÇÃO: Configurar botões baseado no status e pedidoNumero
+                configurarBotoesModal(orcamento.status, orcamento.pedidoNumero);
                 
                 // Mostrar modal
                 document.getElementById('viewModal').style.display = 'flex';
@@ -1265,7 +1326,32 @@
             }
         }
         
-        // Função para gerar preview do orçamento (CORRIGIDO)
+        // 🔥 NOVA FUNÇÃO: Configurar botões do modal corretamente
+        function configurarBotoesModal(status, pedidoNumero) {
+            const btnConverter = document.getElementById('btnConverter');
+            
+            // Mostrar botão "Converter em Pedido" apenas se:
+            // 1. Status for "pendente" OU "aprovado"
+            // 2. Não tiver pedidoNumero (não convertido)
+            if ((status === 'pendente' || status === 'aprovado') && !pedidoNumero) {
+                btnConverter.style.display = 'inline-flex';
+                btnConverter.disabled = false;
+                btnConverter.innerHTML = '<span>🔄</span> Converter em Pedido';
+                btnConverter.onclick = converterParaPedido;
+            } else if (pedidoNumero) {
+                // Se já tem pedidoNumero, mostrar link para o pedido
+                btnConverter.style.display = 'inline-flex';
+                btnConverter.disabled = false;
+                btnConverter.innerHTML = `<span>📋</span> Ver Pedido ${pedidoNumero}`;
+                btnConverter.onclick = () => {
+                    window.location.href = `pedidos.html?view=${pedidoNumero}`;
+                };
+            } else {
+                btnConverter.style.display = 'none';
+            }
+        }
+        
+        // Função para gerar preview do orçamento (CORRIGIDA)
         function gerarPreviewOrcamento(orcamento) {
             const dataCriacao = new Date(orcamento.dataCriacao || orcamento.createdAt);
             const dataValidade = orcamento.validade ? new Date(orcamento.validade) : null;
@@ -1418,23 +1504,11 @@
             `;
         }
         
-        // Função para configurar botões baseado no status
-        function configurarBotoesStatus(status) {
-            const btnConverter = document.getElementById('btnConverter');
-            
-            if (status === 'pendente') {
-                btnConverter.style.display = 'inline-flex';
-                btnConverter.disabled = false;
-            } else {
-                btnConverter.style.display = 'none';
-            }
-        }
-        
-        // Função para converter orçamento em pedido
+        // Função para converter orçamento em pedido (CORRIGIDA)
         async function converterParaPedido() {
             if (!orcamentoAtual) return;
             
-            if (!confirm('Deseja converter este orçamento em pedido?')) return;
+            if (!confirm('Deseja converter este orçamento em pedido?\n\nApós a conversão, o orçamento não aparecerá mais na lista.')) return;
             
             mostrarLoading();
             
@@ -1480,7 +1554,7 @@
                     throw new Error('Erro ao criar pedido');
                 }
                 
-                // Atualizar status do orçamento para "convertido"
+                // 🔥 CORREÇÃO: Marcar orçamento como convertido com pedidoNumero
                 const updateResponse = await fetch('/api/database/commit', {
                     method: 'POST',
                     headers: {
@@ -1502,12 +1576,10 @@
                     throw new Error('Erro ao atualizar orçamento');
                 }
                 
-                // CORREÇÃO: Atualizar dados locais IMEDIATAMENTE
+                // 🔥 CORREÇÃO CRÍTICA: Remover o orçamento convertido da lista local
                 const index = orcamentosData.findIndex(o => o.id === orcamentoAtual.id);
                 if (index !== -1) {
-                    orcamentosData[index].status = 'convertido';
-                    orcamentosData[index].pedidoNumero = numeroPedido;
-                    orcamentosData[index].dataConversao = new Date().toISOString().split('T')[0];
+                    orcamentosData.splice(index, 1);
                 }
                 
                 // Atualizar estatísticas e tabela
@@ -1515,15 +1587,15 @@
                 filtrarOrcamentos();
                 renderizarTabela();
                 
-                mostrarMensagem(`Orçamento convertido em pedido ${numeroPedido}!`, 'success');
+                mostrarMensagem(`✅ Orçamento convertido em pedido ${numeroPedido}!\nO orçamento foi removido da lista.`, 'success');
                 
                 // Fechar modal
                 fecharModal();
                 
-                // Redirecionar para pedidos após 1 segundo
+                // Redirecionar para pedidos após 1.5 segundos
                 setTimeout(() => {
-                    window.location.href = `pedidos.html`;
-                }, 1000);
+                    window.location.href = `pedidos.html?view=${numeroPedido}`;
+                }, 1500);
                 
             } catch (error) {
                 console.error('Erro ao converter orçamento:', error);
@@ -1594,7 +1666,7 @@
                     throw new Error('Orçamento não encontrado');
                 }
                 
-                if (!confirm(`Converter orçamento ${orcamento.codigo} em pedido?`)) {
+                if (!confirm(`Converter orçamento ${orcamento.codigo} em pedido?\n\nApós a conversão, o orçamento não aparecerá mais na lista.`)) {
                     esconderLoading();
                     return;
                 }
@@ -1662,15 +1734,13 @@
                     throw new Error('Erro ao atualizar orçamento');
                 }
                 
-                // CORREÇÃO: Atualizar dados locais IMEDIATAMENTE
+                // 🔥 CORREÇÃO CRÍTICA: Remover o orçamento convertido da lista local
                 const index = orcamentosData.findIndex(o => o.id === id);
                 if (index !== -1) {
-                    orcamentosData[index].status = 'convertido';
-                    orcamentosData[index].pedidoNumero = numeroPedido;
-                    orcamentosData[index].dataConversao = new Date().toISOString().split('T')[0];
+                    orcamentosData.splice(index, 1);
                 }
                 
-                mostrarMensagem(`Orçamento convertido em pedido ${numeroPedido}!`, 'success');
+                mostrarMensagem(`✅ Orçamento convertido em pedido ${numeroPedido}!\nO orçamento foi removido da lista.`, 'success');
                 atualizarEstatisticas();
                 filtrarOrcamentos();
                 renderizarTabela();
@@ -1693,7 +1763,7 @@
                     },
                     body: JSON.stringify({
                         schema: 'pedido',
-                        filters: { deleted: false }
+                        filters: {}  // Buscar todos os pedidos
                     })
                 });
                 
@@ -1751,7 +1821,7 @@
         
         // Função para excluir orçamento
         async function excluirOrcamento(id) {
-            if (!confirm('Tem certeza que deseja excluir este orçamento?')) return;
+            if (!confirm('Tem certeza que deseja excluir este orçamento?\n\nEsta ação não pode ser desfeita.')) return;
             
             mostrarLoading();
             

@@ -407,6 +407,32 @@
             animation: slideIn 0.3s ease-out;
         }
         
+        .error-message {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #ef4444;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 6px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        .warning-message {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: #f59e0b;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 6px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            animation: slideIn 0.3s ease-out;
+        }
+        
         @keyframes slideIn {
             from {
                 transform: translateX(100%);
@@ -650,6 +676,7 @@
         // Gerar código de orçamento automático
         async function gerarCodigoOrcamento() {
             try {
+                // 🔥 CORREÇÃO: Buscar todos os orçamentos
                 const response = await fetch('/api/database/query', {
                     method: 'POST',
                     headers: {
@@ -657,7 +684,7 @@
                     },
                     body: JSON.stringify({
                         schema: 'orcamento',
-                        filters: { deleted: false }
+                        filters: {}  // ✅ Buscar TODOS os orçamentos
                     })
                 });
                 
@@ -668,20 +695,33 @@
                 const result = await response.json();
                 const eventos = result.events || [];
                 
+                console.log(`📦 Total de eventos encontrados: ${eventos.length}`);
+                
                 const anoAtual = new Date().getFullYear();
                 let maiorSequencia = 0;
                 
                 eventos.forEach(evento => {
-                    if (evento.schema === 'orcamento' && evento.payload.codigo) {
-                        const codigo = evento.payload.codigo;
-                        const match = codigo.match(/^OC-(\d{4})\/(\d{4})$/);
+                    if (evento.schema === 'orcamento') {
+                        let payload = evento.payload;
+                        if (typeof payload === 'string') {
+                            try {
+                                payload = JSON.parse(payload);
+                            } catch (e) {
+                                // Ignorar erro
+                            }
+                        }
                         
-                        if (match) {
-                            const ano = parseInt(match[1]);
-                            const sequencia = parseInt(match[2]);
+                        if (payload && payload.codigo) {
+                            const codigo = payload.codigo;
+                            const match = codigo.match(/^OC-(\d{4})\/(\d{4})$/);
                             
-                            if (ano === anoAtual && sequencia > maiorSequencia) {
-                                maiorSequencia = sequencia;
+                            if (match) {
+                                const ano = parseInt(match[1]);
+                                const sequencia = parseInt(match[2]);
+                                
+                                if (ano === anoAtual && sequencia > maiorSequencia) {
+                                    maiorSequencia = sequencia;
+                                }
                             }
                         }
                     }
@@ -693,7 +733,7 @@
                 return `OC-${anoAtual}/${sequenciaFormatada}`;
                 
             } catch (error) {
-                console.error('Erro ao gerar código:', error);
+                console.error('❌ Erro ao gerar código:', error);
                 const anoAtual = new Date().getFullYear();
                 return `OC-${anoAtual}/0001`;
             }
@@ -726,9 +766,12 @@
             alert(previewHTML);
         }
         
-        // Função para carregar orçamento para edição
+        // 🔥 CORREÇÃO: Função para carregar orçamento para edição (CORRIGIDA)
         async function loadOrcamentoForEdit(id) {
             try {
+                console.log(`📥 Carregando orçamento para edição: ${id}`);
+                
+                // 🔥 CORREÇÃO: Buscar todos e filtrar localmente
                 const response = await fetch('/api/database/query', {
                     method: 'POST',
                     headers: {
@@ -736,24 +779,28 @@
                     },
                     body: JSON.stringify({
                         schema: 'orcamento',
-                        filters: { id: id }
+                        filters: {}  // ✅ Buscar TODOS os orçamentos
                     })
                 });
                 
                 if (!response.ok) {
-                    throw new Error('Erro ao buscar orçamento');
+                    throw new Error('Erro ao buscar orçamentos');
                 }
                 
                 const result = await response.json();
                 const eventos = result.events || [];
                 
-                if (eventos.length === 0) {
-                    mostrarMensagem('Orçamento não encontrado.', 'error');
-                    window.location.href = 'orcamentos.html';
-                    return;
+                console.log(`📦 Total de eventos encontrados: ${eventos.length}`);
+                
+                // 🔥 CORREÇÃO: Filtrar pelo ID correto
+                const orcamentoEvento = eventos.find(evento => evento.id === id);
+                
+                if (!orcamentoEvento) {
+                    throw new Error('Orçamento não encontrado');
                 }
                 
-                const orcamentoEvento = eventos[0];
+                console.log('✅ Orçamento encontrado:', orcamentoEvento);
+                
                 let orcamento = orcamentoEvento.payload;
                 
                 // Processar payload se for string
@@ -761,9 +808,18 @@
                     try {
                         orcamento = JSON.parse(orcamento);
                     } catch (e) {
-                        console.warn('Payload não é JSON válido');
+                        console.warn('⚠️ Payload não é JSON válido:', e);
                         orcamento = {};
                     }
+                }
+                
+                // 🔥 CORREÇÃO: Verificar se o orçamento já foi convertido
+                if (orcamento.pedidoNumero) {
+                    mostrarMensagem('Este orçamento já foi convertido em pedido e não pode ser editado.', 'warning');
+                    setTimeout(() => {
+                        window.location.href = 'orcamentos.html';
+                    }, 2000);
+                    return;
                 }
                 
                 // Preencher formulário
@@ -776,6 +832,7 @@
                 document.getElementById('codigo').value = orcamento.codigo || '';
                 document.getElementById('atendente').value = orcamento.atendente || '';
                 document.getElementById('observacoes').value = orcamento.observacoes || '';
+                document.getElementById('orcamentoId').value = orcamentoEvento.id;
                 
                 // Validade
                 if (orcamento.validadeDias) {
@@ -788,7 +845,7 @@
                     if (ivaRadio) ivaRadio.checked = true;
                 }
                 
-                // CORREÇÃO: Processar produtos corretamente
+                // 🔥 CORREÇÃO: Processar produtos corretamente
                 productsTableBody.innerHTML = '';
                 productIndex = 0;
                 
@@ -813,18 +870,59 @@
                 // Configurar modo edição
                 isEditMode = true;
                 currentOrcamentoId = orcamentoEvento.id;
-                document.getElementById('orcamentoId').value = currentOrcamentoId;
                 
                 // Calcular totais
                 calculateTotals();
                 
-                mostrarMensagem('Orçamento carregado para edição.', 'info');
+                // Atualizar título da página
+                document.querySelector('.page-title').textContent = 'Editar Orçamento';
+                
+                mostrarMensagem('Orçamento carregado para edição.', 'success');
                 
             } catch (error) {
-                console.error('Erro ao carregar orçamento:', error);
-                mostrarMensagem('Erro ao carregar orçamento', 'error');
-                window.location.href = 'orcamentos.html';
+                console.error('❌ Erro ao carregar orçamento:', error);
+                mostrarMensagem('Erro ao carregar orçamento. Redirecionando...', 'error');
+                setTimeout(() => {
+                    window.location.href = 'orcamentos.html';
+                }, 2000);
             }
+        }
+        
+        // 🔥 NOVA FUNÇÃO: Buscar pedidoNumero do orçamento atual
+        async function getPedidoNumeroFromOrcamento(orcamentoId) {
+            try {
+                const response = await fetch('/api/database/query', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        schema: 'orcamento',
+                        filters: {}  // Buscar todos
+                    })
+                });
+                
+                const result = await response.json();
+                const eventos = result.events || [];
+                const orcamentoEvento = eventos.find(evento => evento.id === orcamentoId);
+                
+                if (orcamentoEvento) {
+                    let payload = orcamentoEvento.payload;
+                    if (typeof payload === 'string') {
+                        try {
+                            payload = JSON.parse(payload);
+                        } catch (e) {
+                            // Ignorar erro
+                        }
+                    }
+                    
+                    return payload.pedidoNumero || '';
+                }
+            } catch (error) {
+                console.warn('Erro ao buscar pedidoNumero:', error);
+            }
+            
+            return '';
         }
         
         // ============================================
@@ -958,23 +1056,25 @@
         
         function mostrarMensagem(mensagem, tipo = 'info') {
             const messageDiv = document.createElement('div');
-            messageDiv.className = 'success-message';
-            messageDiv.textContent = mensagem;
             
             if (tipo === 'warning') {
-                messageDiv.style.backgroundColor = '#f59e0b';
+                messageDiv.className = 'warning-message';
             } else if (tipo === 'error') {
-                messageDiv.style.backgroundColor = '#ef4444';
-            } else if (tipo === 'success') {
-                messageDiv.style.backgroundColor = '#10b981';
+                messageDiv.className = 'error-message';
+            } else {
+                messageDiv.className = 'success-message';
             }
             
-            document.querySelectorAll('.success-message').forEach(msg => msg.remove());
+            messageDiv.textContent = mensagem;
+            
+            document.querySelectorAll('.success-message, .error-message, .warning-message').forEach(msg => msg.remove());
             
             document.body.appendChild(messageDiv);
             
             setTimeout(() => {
-                messageDiv.remove();
+                if (messageDiv.parentNode) {
+                    messageDiv.remove();
+                }
             }, 3000);
         }
         
@@ -1089,14 +1189,57 @@
         });
         
         cancelBtn.addEventListener('click', () => {
-            if (confirm(isEditMode ? 'Cancelar edição?' : 'Cancelar orçamento?')) {
+            if (confirm(isEditMode ? 'Cancelar edição? Todas as alterações serão perdidas.' : 'Cancelar orçamento?')) {
                 window.location.href = 'orcamentos.html';
             }
         });
         
-        // CORREÇÃO: Evento de save melhorado
+        // 🔥 CORREÇÃO: Evento de save melhorado com validação de orçamento convertido
         saveBtn.addEventListener('click', async (e) => {
             e.preventDefault();
+            
+            // 🔥 CORREÇÃO: Verificar se é modo edição e se já foi convertido
+            if (isEditMode && currentOrcamentoId) {
+                try {
+                    // Buscar o orçamento atual para verificar se já foi convertido
+                    const response = await fetch('/api/database/query', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            schema: 'orcamento',
+                            filters: {}  // Buscar todos
+                        })
+                    });
+                    
+                    const result = await response.json();
+                    const eventos = result.events || [];
+                    const orcamentoEvento = eventos.find(evento => evento.id === currentOrcamentoId);
+                    
+                    if (orcamentoEvento) {
+                        let payload = orcamentoEvento.payload;
+                        if (typeof payload === 'string') {
+                            try {
+                                payload = JSON.parse(payload);
+                            } catch (e) {
+                                // Ignorar erro
+                            }
+                        }
+                        
+                        // Se já foi convertido, não permitir editar
+                        if (payload.pedidoNumero) {
+                            mostrarMensagem('Este orçamento já foi convertido em pedido e não pode ser editado.', 'warning');
+                            setTimeout(() => {
+                                window.location.href = 'orcamentos.html';
+                            }, 2000);
+                            return;
+                        }
+                    }
+                } catch (error) {
+                    console.warn('Erro ao verificar status do orçamento:', error);
+                }
+            }
             
             if (!validateForm()) return;
             
@@ -1118,16 +1261,18 @@
                     codigo: document.getElementById('codigo').value,
                     atendente: document.getElementById('atendente').value,
                     observacoes: document.getElementById('observacoes').value,
-                    produtos: produtosArray, // CORREÇÃO: Array estruturado
+                    produtos: produtosArray,
                     subtotal: parseFloat(document.getElementById('orcamentoSubtotal').value) || 0,
                     iva: parseFloat(document.getElementById('orcamentoIVA').value) || 0,
                     total: parseFloat(document.getElementById('orcamentoTotal').value) || 0,
                     comIVA: document.querySelector('input[name="ivaOption"]:checked').value,
-                    status: 'pendente',
+                    status: 'pendente', // Sempre definir como pendente ao salvar/editar
                     validade: validadeData,
                     validadeDias: validadeDias,
                     dataCriacao: new Date().toISOString().split('T')[0],
-                    instalacao: 0 // Orçamento não tem instalação
+                    instalacao: 0,
+                    // 🔥 CORREÇÃO: Manter o pedidoNumero se já existir (para edição)
+                    pedidoNumero: isEditMode ? (await getPedidoNumeroFromOrcamento(currentOrcamentoId)) : ''
                 };
                 
                 // Adicionar id se for edição
