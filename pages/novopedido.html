@@ -717,6 +717,11 @@
                     </div>
                     
                     <div class="form-group">
+                        <label for="numeroFatura">Número da Fatura</label>
+                        <input type="text" id="numeroFatura" name="numeroFatura" data-bind="pedido.numeroFatura" placeholder="Ex: FT2026/0001">
+                    </div>
+                    
+                    <div class="form-group">
                         <label for="dataEntrega" class="required">Data da Entrega</label>
                         <input type="date" id="dataEntrega" name="dataEntrega" data-bind="pedido.dataEntrega" required>
                     </div>
@@ -979,6 +984,7 @@
             const paymentsTableBody = document.getElementById('paymentsTableBody');
             const pedidoIdInput = document.getElementById('pedidoId');
             const numeroPedidoInput = document.getElementById('numero');
+            const numeroFaturaInput = document.getElementById('numeroFatura');
             const valorInstalacaoInput = document.getElementById('valorInstalacao');
             const dataFechamentoInput = document.getElementById('dataFechamento');
             
@@ -1024,6 +1030,7 @@
                 document.getElementById('dataEntrega').valueAsDate = tomorrow;
                 document.getElementById('dataFechamento').valueAsDate = null;
                 document.getElementById('valorInstalacao').value = '0';
+                document.getElementById('numeroFatura').value = '';
                 
                 // Gerar número de pedido automático
                 gerarNumeroPedido();
@@ -1050,27 +1057,30 @@
                 try {
                     console.log(`📥 Carregando pedido para edição: ${pedidoId}`);
                     
+                    // 🔥 CORREÇÃO: Buscar todos e filtrar localmente
                     const response = await fetch('/api/database/query', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             schema: 'pedido',
-                            filters: { id: pedidoId }
+                            filters: {}  // Buscar todos os pedidos
                         })
                     });
                     
                     if (!response.ok) {
-                        throw new Error('Erro ao buscar pedido');
+                        throw new Error('Erro ao buscar pedidos');
                     }
                     
                     const result = await response.json();
                     const eventos = result.events || [];
                     
-                    if (eventos.length === 0) {
+                    // 🔥 CORREÇÃO: Filtrar pelo ID correto
+                    const pedidoEvento = eventos.find(evento => evento.id === pedidoId);
+                    
+                    if (!pedidoEvento) {
                         throw new Error('Pedido não encontrado');
                     }
                     
-                    const pedidoEvento = eventos[0];
                     const pedido = pedidoEvento.payload;
                     
                     console.log('📦 Pedido carregado:', pedido);
@@ -1082,6 +1092,7 @@
                     document.getElementById('morada').value = pedido.morada || '';
                     document.getElementById('telemovel').value = pedido.telemovel || '';
                     document.getElementById('numero').value = pedido.numero || '';
+                    document.getElementById('numeroFatura').value = pedido.numeroFatura || '';
                     document.getElementById('dataEntrega').value = pedido.dataEntrega || '';
                     document.getElementById('dataFechamento').value = pedido.dataFechamento || '';
                     document.getElementById('valorInstalacao').value = pedido.instalacao || '0';

@@ -1087,7 +1087,7 @@
                         },
                         body: JSON.stringify({
                             schema: 'pedido',
-                            filters: { deleted: false }
+                            filters: {}  // Buscar todos os pedidos
                         })
                     });
                     
@@ -1165,6 +1165,7 @@
                             morada: payload.morada || '',
                             telemovel: payload.telemovel || '',
                             numero: payload.numero || `PED-${event.id.substring(0, 8)}`,
+                            numeroFatura: payload.numeroFatura || '',
                             produtos: Array.isArray(payload.produtos) ? payload.produtos : [],
                             pagamentos: Array.isArray(payload.pagamentos) ? payload.pagamentos : [],
                             total: parseFloat(payload.total) || 0,
@@ -1242,10 +1243,12 @@
                         const cliente = (p.cliente || '').toLowerCase();
                         const empresa = (p.empresa || '').toLowerCase();
                         const numero = (p.numero || '').toLowerCase();
+                        const numeroFatura = (p.numeroFatura || '').toLowerCase();
                         
                         return cliente.includes(busca) || 
                                empresa.includes(busca) || 
-                               numero.includes(busca);
+                               numero.includes(busca) ||
+                               numeroFatura.includes(busca);
                     });
                 }
                 
@@ -1335,6 +1338,9 @@
                 // Verificar se tem instalação
                 const temInstalacao = instalacao > 0;
                 
+                // Verificar se tem número da fatura
+                const temFatura = pedido.numeroFatura && pedido.numeroFatura.trim() !== '';
+                
                 card.innerHTML = `
                     <div class="pedido-header">
                         <div class="pedido-info">
@@ -1345,6 +1351,12 @@
                                     <i class="fas fa-hashtag"></i>
                                     <span>${pedido.numero}</span>
                                 </div>
+                                ${temFatura ? `
+                                <div class="pedido-meta-item">
+                                    <i class="fas fa-file-invoice"></i>
+                                    <span>Fatura: ${pedido.numeroFatura}</span>
+                                </div>
+                                ` : ''}
                                 <div class="pedido-meta-item">
                                     <i class="fas fa-calendar-alt"></i>
                                     <span>Entrega: ${formatarData(pedido.dataEntrega)}</span>
@@ -1536,6 +1548,12 @@
                                 <div class="info-label">Número do Pedido</div>
                                 <div class="info-value">${pedido.numero}</div>
                             </div>
+                            ${pedido.numeroFatura ? `
+                            <div class="info-item">
+                                <div class="info-label">Número da Fatura</div>
+                                <div class="info-value">${pedido.numeroFatura}</div>
+                            </div>
+                            ` : ''}
                             <div class="info-item">
                                 <div class="info-label">Status do Pedido</div>
                                 <div class="info-value">
@@ -1740,7 +1758,7 @@
                 try {
                     console.log(`🔄 Atualizando status do pedido ${pedidoId} para: ${novoStatus}`);
                     
-                    // Buscar o evento original
+                    // 🔥 CORREÇÃO: Buscar todos e filtrar localmente
                     const response = await fetch('/api/database/query', {
                         method: 'POST',
                         headers: {
@@ -1748,22 +1766,24 @@
                         },
                         body: JSON.stringify({
                             schema: 'pedido',
-                            filters: { id: pedidoId }
+                            filters: {}  // Buscar todos
                         })
                     });
                     
                     if (!response.ok) {
-                        throw new Error('Erro ao buscar pedido');
+                        throw new Error('Erro ao buscar pedidos');
                     }
                     
                     const result = await response.json();
                     const eventos = result.events || [];
                     
-                    if (eventos.length === 0) {
+                    // 🔥 CORREÇÃO: Filtrar pelo ID correto
+                    const eventoOriginal = eventos.find(evento => evento.id === pedidoId);
+                    
+                    if (!eventoOriginal) {
                         throw new Error('Pedido não encontrado');
                     }
                     
-                    const eventoOriginal = eventos[0];
                     const payloadAtualizado = {
                         ...eventoOriginal.payload,
                         status: novoStatus,
