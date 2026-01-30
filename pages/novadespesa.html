@@ -762,27 +762,30 @@
                 try {
                     console.log(`📥 Carregando despesa para edição: ${despesaId}`);
                     
+                    // 🔥 CORREÇÃO: Buscar todos e filtrar localmente
                     const response = await fetch('/api/database/query', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             schema: 'despesa',
-                            filters: { id: despesaId }
+                            filters: {}  // ✅ Buscar TODOS os pedidos
                         })
                     });
                     
                     if (!response.ok) {
-                        throw new Error('Erro ao buscar despesa');
+                        throw new Error('Erro ao buscar despesas');
                     }
                     
                     const result = await response.json();
                     const eventos = result.events || [];
                     
-                    if (eventos.length === 0) {
+                    // 🔥 CORREÇÃO: Filtrar pelo ID correto
+                    const despesaEvento = eventos.find(evento => evento.id === despesaId);
+                    
+                    if (!despesaEvento) {
                         throw new Error('Despesa não encontrada');
                     }
                     
-                    const despesaEvento = eventos[0];
                     const despesa = despesaEvento.payload;
                     
                     console.log('💰 Despesa carregada:', despesa);
