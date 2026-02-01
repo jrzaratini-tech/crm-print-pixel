@@ -638,30 +638,30 @@
             let sessionId = '';
             let despesaId = '';
             let isIOS = false;
+            let iosVersion = null;
             
-            // Pegar parâmetros da URL
-            const urlParams = new URLSearchParams(window.location.search);
-            sessionId = urlParams.get('session');
-            despesaId = urlParams.get('despesa');
+            // ============================================
+            // FUNÇÕES DE DETECÇÃO DE iOS
+            // ============================================
             
-            if (!sessionId || !despesaId) {
-                showError('Link inválido. Volte ao CRM e gere um novo QR Code.');
-                return;
-            }
-            
-            // Atualizar código da despesa
-            despesaCodeEl.textContent = despesaId.substring(0, 12) + '...';
-            
-            console.log('🔗 Sessão:', sessionId);
-            console.log('💰 Despesa:', despesaId);
-            
-            // Detectar se é iOS
-            isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-            console.log('📱 Dispositivo iOS?', isIOS);
-            
-            // Ajustar interface para iOS
-            if (isIOS) {
-                document.body.classList.add('ios-detected');
+            function detectIOS() {
+                const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+                const iosRegex = /iPad|iPhone|iPod/;
+                
+                // Detectar iOS
+                const detectedIOS = iosRegex.test(userAgent) && !window.MSStream;
+                
+                // Detectar versão do iOS
+                let version = null;
+                if (detectedIOS) {
+                    const match = userAgent.match(/OS (\d+)_(\d+)_?(\d+)?/);
+                    if (match) {
+                        version = parseFloat(`${match[1]}.${match[2]}`);
+                        console.log(`📱 iOS versão: ${version}`);
+                    }
+                }
+                
+                return { isIOS: detectedIOS, iosVersion: version };
             }
             
             // ============================================
@@ -702,55 +702,81 @@
             }
             
             // ============================================
-            // SCANNER NATIVO DO iOS (Bloco de Notas)
+            // SCANNER NATIVO DO iOS (Bloco de Notas) - CORRIGIDO
             // ============================================
             
             function openIOSScanner() {
                 console.log('📄 Abrindo scanner nativo do iOS (Bloco de Notas)...');
                 
-                // Para iOS, precisamos criar um input dinâmico com múltiplo
+                // Criar um input file com as propriedades específicas para iOS
                 const scannerInput = document.createElement('input');
                 scannerInput.type = 'file';
                 scannerInput.accept = 'image/*';
-                scannerInput.capture = 'environment';
-                scannerInput.multiple = true; // 🔥 CRÍTICO: Isso ativa o scanner de documentos!
+                
+                // 🔥 CONFIGURAÇÃO CRÍTICA PARA iOS SCANNER
+                // Estas propriedades são necessárias para ativar o scanner de documentos
+                scannerInput.setAttribute('capture', 'environment');
+                scannerInput.setAttribute('multiple', 'true'); // Múltiplo ativa modo documento
                 scannerInput.style.display = 'none';
                 
-                scannerInput.onchange = (event) => {
-                    handleScannerFiles(event.target.files);
-                    document.body.removeChild(scannerInput);
-                };
+                // Adicionar eventos específicos para iOS
+                scannerInput.addEventListener('change', handleIOSScannerFiles, false);
                 
+                // Adicionar evento para detectar cancelamento (iOS específico)
+                scannerInput.addEventListener('cancel', () => {
+                    console.log('❌ Scanner cancelado pelo usuário');
+                    document.body.removeChild(scannerInput);
+                });
+                
+                // Adicionar ao body e acionar
                 document.body.appendChild(scannerInput);
-                scannerInput.click();
+                
+                // Método específico para iOS
+                if (scannerInput.click) {
+                    scannerInput.click();
+                } else if (scannerInput.dispatchEvent) {
+                    const clickEvent = new MouseEvent('click', {
+                        bubbles: true,
+                        cancelable: true,
+                        view: window
+                    });
+                    scannerInput.dispatchEvent(clickEvent);
+                }
             }
             
-            async function handleScannerFiles(files) {
-                if (!files || files.length === 0) return;
+            // Função específica para lidar com arquivos do scanner iOS
+            async function handleIOSScannerFiles(event) {
+                const input = event.target;
                 
-                console.log(`📁 Scanner retornou ${files.length} arquivo(s)`);
+                if (!input.files || input.files.length === 0) {
+                    console.log('Nenhum arquivo selecionado');
+                    document.body.removeChild(input);
+                    return;
+                }
                 
-                // Pegar o primeiro arquivo (ou múltiplos se quiser)
-                const file = files[0];
+                console.log(`📁 Scanner iOS retornou ${input.files.length} arquivo(s)`);
                 
-                console.log('📄 Arquivo do scanner:', {
+                // Pegar o primeiro arquivo (poderia processar múltiplos se necessário)
+                const file = input.files[0];
+                
+                console.log('📄 Arquivo do scanner iOS:', {
                     name: file.name,
                     type: file.type,
-                    size: (file.size / 1024).toFixed(2) + 'KB'
+                    size: (file.size / 1024).toFixed(2) + 'KB',
+                    lastModified: new Date(file.lastModified).toLocaleString()
                 });
                 
                 try {
                     showScreen('progress');
-                    document.getElementById('progressText').textContent = 'Processando documento do scanner...';
+                    document.getElementById('progressText').textContent = 'Processando documento digitalizado...';
                     
                     // Usar FileReader para ler o arquivo
                     const reader = new FileReader();
-                    reader.readAsDataURL(file);
                     
-                    reader.onload = async (event) => {
-                        const base64Image = event.target.result;
+                    reader.onload = async (loadEvent) => {
+                        const base64Image = loadEvent.target.result;
                         
-                        // O scanner do iOS já entrega imagem otimizada, mas ainda comprimimos
+                        // O scanner do iOS já entrega imagem otimizada
                         const processed = await processImageForUpload(base64Image, true);
                         
                         capturedPhoto = processed.base64;
@@ -758,17 +784,34 @@
                         
                         showScreen('preview');
                         
-                        console.log('✅ Documento do scanner processado:', {
+                        console.log('✅ Documento do scanner iOS processado:', {
                             original: processed.tamanhoOriginal,
                             otimizado: processed.tamanhoOtimizado,
-                            reducao: `${((1 - processed.tamanhoOtimizado/processed.tamanhoOriginal) * 100).toFixed(1)}%`
+                            reducao: `${((1 - processed.tamanhoOtimizado/processed.tamanhoOriginal) * 100).toFixed(1)}%`,
+                            width: previewImage.naturalWidth,
+                            height: previewImage.naturalHeight
                         });
                     };
+                    
+                    reader.onerror = (error) => {
+                        console.error('❌ Erro ao ler arquivo do scanner:', error);
+                        showError('Erro ao ler documento digitalizado.');
+                        showScreen('initial');
+                    };
+                    
+                    reader.readAsDataURL(file);
                     
                 } catch (error) {
                     console.error('❌ Erro ao processar documento do scanner:', error);
                     showError('Erro ao processar documento. Tente novamente.');
                     showScreen('initial');
+                } finally {
+                    // Remover o input do DOM
+                    setTimeout(() => {
+                        if (input.parentNode) {
+                            document.body.removeChild(input);
+                        }
+                    }, 100);
                 }
             }
             
@@ -1130,10 +1173,36 @@
             // INICIALIZAÇÃO
             // ============================================
             
+            // Pegar parâmetros da URL
+            const urlParams = new URLSearchParams(window.location.search);
+            sessionId = urlParams.get('session');
+            despesaId = urlParams.get('despesa');
+            
+            if (!sessionId || !despesaId) {
+                showError('Link inválido. Volte ao CRM e gere um novo QR Code.');
+                return;
+            }
+            
+            // Atualizar código da despesa
+            despesaCodeEl.textContent = despesaId.substring(0, 12) + '...';
+            
+            console.log('🔗 Sessão:', sessionId);
+            console.log('💰 Despesa:', despesaId);
+            
+            // Detectar iOS
+            const iosDetection = detectIOS();
+            isIOS = iosDetection.isIOS;
+            iosVersion = iosDetection.iosVersion;
+            
+            // Ajustar interface para iOS
+            if (isIOS) {
+                document.body.classList.add('ios-detected');
+            }
+            
             showScreen('initial');
             
             console.log('✅ Sistema de upload mobile pronto');
-            console.log('📱 Dispositivo:', isIOS ? 'iPhone/iPad' : 'Outro');
+            console.log('📱 Dispositivo:', isIOS ? 'iPhone/iPad' + (iosVersion ? ' (iOS ' + iosVersion + ')' : '') : 'Outro');
         });
     </script>
     
