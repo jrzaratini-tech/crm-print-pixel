@@ -244,12 +244,188 @@ app.get('/*.html', (req, res) => {
   res.sendFile(filePath);
 });
 
+// API para upload via celular
+app.post('/api/upload/nota-fiscal', async (req, res) => {
+  try {
+    const { sessionId, despesaId, fileData } = req.body;
+    
+    if (!sessionId || !despesaId || !fileData) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Dados incompletos' 
+      });
+    }
+    
+    console.log(` Upload recebido: sessão=${sessionId}, despesa=${despesaId}`);
+    console.log(` Tamanho: ${fileData.tamanhoOtimizado} bytes`);
+    
+    // Buscar a despesa correspondente
+    let despesaRef;
+    
+    if (despesaId.startsWith('pending-')) {
+      // Despesa ainda não foi salva, criar temporariamente
+      const tempId = despesaId.replace('pending-', '');
+      despesaRef = db.collection('temp_uploads').doc(sessionId);
+    } else {
+      // Despesa já existe, atualizar
+      despesaRef = db.collection('events').doc(despesaId);
+      const despesaDoc = await despesaRef.get();
+      
+      if (!despesaDoc.exists) {
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Despesa não encontrada' 
+        });
+      }
+    }
+    
+    // Salvar upload temporário
+    await db.collection('mobile_uploads').doc(sessionId).set({
+      sessionId: sessionId,
+      despesaId: despesaId,
+      fileData: fileData,
+      timestamp: new Date().toISOString(),
+      status: 'uploaded'
+    });
+    
+    // Se a despesa já existe, atualizar com o anexo
+    if (!despesaId.startsWith('pending-')) {
+      const despesaData = (await despesaRef.get()).data();
+      
+      await despesaRef.update({
+        'payload.notaFiscal': fileData.base64,
+        'payload.tipoArquivo': fileData.tipo,
+        'payload.tamanhoOriginal': fileData.tamanhoOriginal,
+        'payload.tamanhoOtimizado': fileData.tamanhoOtimizado,
+        'payload.updated_at': new Date().toISOString()
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Nota fiscal recebida com sucesso',
+      sessionId: sessionId,
+      despesaId: despesaId,
+      fileSize: fileData.tamanhoOtimizado
+    });
+    
+  } catch (error) {
+    console.error(' Erro no upload:', error);
+      success: false, 
+      message: 'Dados incompletos' 
+    });
+  }
+  
+  console.log(` Upload recebido: sessão=${sessionId}, despesa=${despesaId}`);
+  console.log(` Tamanho: ${fileData.tamanhoOtimizado} bytes`);
+  
+  // Buscar a despesa correspondente
+  let despesaRef;
+  
+  if (despesaId.startsWith('pending-')) {
+    // Despesa ainda não foi salva, criar temporariamente
+    const tempId = despesaId.replace('pending-', '');
+    despesaRef = db.collection('temp_uploads').doc(sessionId);
+  } else {
+    // Despesa já existe, atualizar
+    despesaRef = db.collection('events').doc(despesaId);
+    const despesaDoc = await despesaRef.get();
+    
+    if (!despesaDoc.exists) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Despesa não encontrada' 
+      });
+    }
+  }
+  
+  // Salvar upload temporário
+  await db.collection('mobile_uploads').doc(sessionId).set({
+    sessionId: sessionId,
+    despesaId: despesaId,
+    fileData: fileData,
+    timestamp: new Date().toISOString(),
+    status: 'uploaded'
+  });
+  
+  // Se a despesa já existe, atualizar com o anexo
+  if (!despesaId.startsWith('pending-')) {
+    const despesaData = (await despesaRef.get()).data();
+    
+    await despesaRef.update({
+      'payload.notaFiscal': fileData.base64,
+      'payload.tipoArquivo': fileData.tipo,
+      'payload.tamanhoOriginal': fileData.tamanhoOriginal,
+      'payload.tamanhoOtimizado': fileData.tamanhoOtimizado,
+      'payload.updated_at': new Date().toISOString()
+    });
+  }
+  
+  res.json({
+    success: true,
+    message: 'Nota fiscal recebida com sucesso',
+    sessionId: sessionId,
+    despesaId: despesaId,
+    fileSize: fileData.tamanhoOtimizado
+  });
+  
+} catch (error) {
+  console.error(' Erro no upload:', error);
+  res.status(500).json({ 
+    success: false, 
+    message: `Erro no servidor: ${error.message}` 
+  });
+}
+});
+
+// API para verificar upload (usada pelo QR Code)
+app.get('/api/upload/check', async (req, res) => {
+try {
+  const { session } = req.query;
+  
+  if (!session) {
+    return res.status(400).json({ 
+      status: 'error', 
+      message: 'Sessão não especificada' 
+    });
+  }
+  
+  const uploadRef = db.collection('mobile_uploads').doc(session);
+  const uploadDoc = await uploadRef.get();
+  
+  if (!uploadDoc.exists) {
+    return res.json({ 
+      status: 'waiting', 
+      message: 'Aguardando upload' 
+    });
+  }
+  
+  const uploadData = uploadDoc.data();
+  
+  // Remover do armazenamento temporário após consulta
+  await uploadRef.delete();
+  
+  res.json({
+    status: 'uploaded',
+    fileData: uploadData.fileData,
+    timestamp: uploadData.timestamp
+  });
+  
+} catch (error) {
+  console.error('Erro ao verificar upload:', error);
+  res.status(500).json({ 
+    status: 'error', 
+    message: error.message 
+  });
+}
+});
+
 // Iniciar servidor
 app.listen(PORT, () => {
-  console.log(`🚀 CRM PRINT PIXEL ONLINE - PORTA ${PORT}`);
-  console.log(`📅 ${new Date().toLocaleString()}`);
-  console.log(`🌐 Acesse: http://localhost:${PORT}`);
-  console.log(`🔧 Endpoints disponíveis:`);
+  console.log(` CRM PRINT PIXEL ONLINE - PORTA ${PORT}`);
+  console.log(` ${new Date().toLocaleString()}`);
+  console.log(` Acesse: http://localhost:${PORT}`);
+  console.log(` Endpoints disponíveis:`);
   console.log(`   GET  /api/database/init     - Testar Firebase`);
   console.log(`   POST /api/database/commit   - Salvar/Atualizar dados`);
   console.log(`   POST /api/database/query    - Consultar dados (AGORA É POST!)`);
