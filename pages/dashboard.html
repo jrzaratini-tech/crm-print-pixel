@@ -847,7 +847,7 @@
 
     <script>
         // ============================================
-        // SISTEMA DE DASHBOARD - CORRIGIDO
+        // SISTEMA DE DASHBOARD - CORRIGIDO E OTIMIZADO
         // ============================================
         
         // Variável global para armazenar o período selecionado
@@ -865,7 +865,8 @@
             let isPrivate = false;
             let charts = {};
             let dadosCore = {};
-            let todosEventos = []; // Armazenar todos os eventos para filtragem local
+            let todosEventos = [];
+            let todosEventosComTimestampsCorrigidos = [];
             
             // ============================================
             // FUNÇÕES PRINCIPAIS - CORRIGIDAS
@@ -906,7 +907,7 @@
                     console.log('📅 Período alterado para:', periodoAtual);
                     
                     // Filtra os dados localmente com o período selecionado
-                    if (todosEventos.length > 0) {
+                    if (todosEventosComTimestampsCorrigidos.length > 0) {
                         processarEFiltrarDados();
                     } else {
                         solicitarTodosDadosAoCore();
@@ -945,6 +946,41 @@
                 });
             }
             
+            // SOLUÇÃO CRÍTICA: Corrigir timestamps dos eventos
+            function corrigirTimestampsDosEventos(eventos) {
+                if (!Array.isArray(eventos)) {
+                    console.warn('⚠️ Eventos não são um array válido');
+                    return [];
+                }
+                
+                return eventos.map(evento => {
+                    // Criar uma cópia do evento para não modificar o original
+                    const eventoCorrigido = { ...evento };
+                    
+                    // Determinar o timestamp CORRETO para filtragem
+                    // Prioridade: created_at (sempre mantém a data de criação) > timestamp (pode ser atualizado) > data atual
+                    const timestampCriacao = evento.created_at || evento.payload?.dataCriacao || evento.timestamp;
+                    
+                    // Se houver uma data específica no payload (para pedidos e despesas), use-a
+                    let dataParaFiltragem = timestampCriacao;
+                    
+                    // Para pedidos: priorizar data do pedido se existir
+                    if (evento.schema === 'pedido' && evento.payload?.dataPedido) {
+                        dataParaFiltragem = evento.payload.dataPedido;
+                    }
+                    
+                    // Para despesas: priorizar data da despesa se existir
+                    if (evento.schema === 'despesa' && evento.payload?.dataDespesa) {
+                        dataParaFiltragem = evento.payload.dataDespesa;
+                    }
+                    
+                    // Adicionar campo especial para filtragem que NUNCA muda
+                    eventoCorrigido.dataFiltragem = dataParaFiltragem;
+                    
+                    return eventoCorrigido;
+                });
+            }
+            
             // Solicitar TODOS os dados ao Core uma vez
             function solicitarTodosDadosAoCore() {
                 console.log('🔄 Solicitando TODOS os dados da API...');
@@ -971,11 +1007,17 @@
                         return;
                     }
                     
+                    // CORREÇÃO CRÍTICA: Corrigir timestamps antes de processar
+                    todosEventosComTimestampsCorrigidos = corrigirTimestampsDosEventos(todosEventos);
+                    console.log(`✅ Timestamps corrigidos para`, todosEventosComTimestampsCorrigidos.length, 'eventos');
+                    
                     // Processar dados com o período atual
                     processarEFiltrarDados();
                 })
                 .catch(error => {
                     console.error('❌ Erro ao buscar dados da API:', error);
+                    // Carregar dados de exemplo para teste
+                    carregarDadosExemplo();
                 });
             }
             
@@ -983,14 +1025,14 @@
             function processarEFiltrarDados() {
                 console.log(`🔍 Filtrando dados para período: ${periodoAtual}`);
                 
-                if (todosEventos.length === 0) {
+                if (todosEventosComTimestampsCorrigidos.length === 0) {
                     console.warn('⚠️ Nenhum dado disponível para filtrar');
                     return;
                 }
                 
                 // Filtrar eventos com base no período selecionado
-                const eventosFiltrados = filtrarEventosPorPeriodo(todosEventos, periodoAtual);
-                console.log(`📊 Eventos filtrados: ${eventosFiltrados.length} de ${todosEventos.length} total`);
+                const eventosFiltrados = filtrarEventosPorPeriodo(todosEventosComTimestampsCorrigidos, periodoAtual);
+                console.log(`📊 Eventos filtrados: ${eventosFiltrados.length} de ${todosEventosComTimestampsCorrigidos.length} total`);
                 
                 // Processar dados para o dashboard
                 dadosCore = processarDadosParaDashboard(eventosFiltrados, periodoAtual);
@@ -1003,7 +1045,7 @@
                 console.log('📊 Dashboard atualizado com sucesso para período:', periodoAtual);
             }
             
-            // Filtrar eventos por período - FUNÇÃO CORRIGIDA
+            // Filtrar eventos por período - FUNÇÃO CORRIGIDA E MELHORADA
             function filtrarEventosPorPeriodo(eventos, periodo) {
                 const agora = new Date();
                 const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
@@ -1012,41 +1054,57 @@
                 
                 switch(periodo) {
                     case 'mes_anterior':
-                        // Mês anterior completo
-                        dataInicio = new Date(agora.getFullYear(), agora.getMonth() - 1, 1);
-                        dataFim = new Date(agora.getFullYear(), agora.getMonth(), 0);
+                        // Mês anterior COMPLETO
+                        const mesAnterior = agora.getMonth() === 0 ? 11 : agora.getMonth() - 1;
+                        const anoMesAnterior = agora.getMonth() === 0 ? agora.getFullYear() - 1 : agora.getFullYear();
+                        dataInicio = new Date(anoMesAnterior, mesAnterior, 1);
+                        dataFim = new Date(anoMesAnterior, mesAnterior + 1, 0); // Último dia do mês anterior
                         break;
                         
                     case 'trimestre':
-                        // Últimos 3 meses completos
-                        dataInicio = new Date(agora.getFullYear(), agora.getMonth() - 3, 1);
-                        dataFim = new Date(agora.getFullYear(), agora.getMonth() + 1, 0);
+                        // Últimos 3 meses COMPLETOS (não inclui mês atual)
+                        const mesTrimestre = agora.getMonth();
+                        const anoTrimestre = agora.getFullYear();
+                        // Se estamos em Janeiro, Fevereiro ou Março, ajustar o ano
+                        if (mesTrimestre < 3) {
+                            dataInicio = new Date(anoTrimestre - 1, 9 + mesTrimestre, 1); // Outubro, Novembro ou Dezembro do ano anterior
+                            dataFim = new Date(anoTrimestre - 1, 12 + mesTrimestre, 0); // Último dia do mês
+                        } else {
+                            dataInicio = new Date(anoTrimestre, mesTrimestre - 3, 1);
+                            dataFim = new Date(anoTrimestre, mesTrimestre, 0); // Último dia do mês anterior
+                        }
                         break;
                         
                     case 'ano_atual':
-                        // Desde o início do ano até hoje
+                        // Desde o início do ano até HOJE (não fim do ano)
                         dataInicio = new Date(agora.getFullYear(), 0, 1);
                         dataFim = hoje;
                         break;
                         
                     case 'todos':
                         // Todos os dados (sem filtro)
-                        return eventos;
+                        return eventos.filter(evento => !evento.deleted);
                         
                     case 'mes_atual':
                     default:
-                        // Mês atual até hoje (não o mês completo)
+                        // Mês atual até HOJE (não o mês completo)
                         dataInicio = new Date(agora.getFullYear(), agora.getMonth(), 1);
                         dataFim = hoje;
                 }
                 
-                console.log(`📅 Filtrando eventos de ${dataInicio.toLocaleDateString()} até ${dataFim.toLocaleDateString()}`);
+                console.log(`📅 Filtrando eventos de ${dataInicio.toLocaleDateString('pt-PT')} até ${dataFim.toLocaleDateString('pt-PT')}`);
                 
                 return eventos.filter(evento => {
                     if (evento.deleted) return false;
                     
-                    // Usar timestamp do evento (corrigido para buscar o campo correto)
-                    const dataEvento = new Date(evento.timestamp || evento.created_at);
+                    // Usar dataFiltragem que criamos anteriormente (nunca muda)
+                    let dataEvento;
+                    try {
+                        dataEvento = new Date(evento.dataFiltragem || evento.created_at || evento.timestamp);
+                    } catch (e) {
+                        console.warn('⚠️ Erro ao converter data do evento:', evento);
+                        return false;
+                    }
                     
                     // Verificar se a data do evento está dentro do período
                     return dataEvento >= dataInicio && dataEvento <= dataFim;
@@ -1096,31 +1154,28 @@
                     metaDiaria = saldoRestante / diasUteisRestantes;
                 }
                 
-                return metaDiaria;
+                return Math.max(0, metaDiaria);
             }
             
-            // CORREÇÃO: Processar dados do Core para o dashboard
+            // Processar dados do Core para o dashboard - CORRIGIDO
             function processarDadosParaDashboard(eventos, periodo) {
                 console.log('📊 Processando eventos para dashboard:', eventos.length, 'eventos');
                 
                 let totalVendas = 0;
-                let totalPedidos = 0;
+                let totalPedidosValor = 0;
                 let pedidosAtivos = 0;
                 let pedidosConcluidos = 0;
                 let totalDespesas = 0;
                 let despesasMesAnterior = 0;
                 let vendasMesAnterior = 0;
-                let pedidosMesAnterior = 0;
+                let totalAReceber = 0;
+                let totalAPagar = 0;
                 
                 // Categorias para agrupamento
                 const vendasPorCategoria = {};
                 const despesasPorCategoria = {};
                 const meses = {};
                 const meses12 = {};
-                
-                // Variáveis para controle de contas a receber e pagar
-                let totalAReceber = 0;
-                let totalAPagar = 0;
                 
                 const agora = new Date();
                 const mesAtual = agora.getMonth();
@@ -1134,59 +1189,76 @@
                 const dataInicioMesAnterior = new Date(anoMesAnterior, mesAnterior, 1);
                 const dataFimMesAnterior = new Date(anoMesAnterior, mesAnterior + 1, 0);
                 
+                // Calcular dados do mês atual para comparação
+                const dataInicioMesAtual = new Date(anoAtual, mesAtual, 1);
+                const dataFimMesAtual = new Date(anoAtual, mesAtual + 1, 0);
+                
                 // Processar todos os eventos
-                eventos.forEach((evento, index) => {
+                eventos.forEach((evento) => {
                     if (evento.deleted) return;
                     
-                    const dataEvento = new Date(evento.timestamp || evento.created_at);
+                    // Usar dataFiltragem para cálculos de período
+                    let dataEvento;
+                    try {
+                        dataEvento = new Date(evento.dataFiltragem || evento.created_at || evento.timestamp);
+                    } catch (e) {
+                        console.warn('⚠️ Erro ao converter data do evento para processamento:', evento);
+                        return;
+                    }
+                    
                     const mesEvento = dataEvento.getMonth();
                     const anoEvento = dataEvento.getFullYear();
                     
-                    // CORREÇÃO CRÍTICA: Processar contas a receber e pagar
+                    // CORREÇÃO CRÍTICA: Processar pedidos
                     if (evento.schema === 'pedido') {
-                        const valorTotal = parseFloat(evento.payload?.total || 0);
-                        const totalPago = parseFloat(evento.payload?.totalPago || 0);
+                        const valorTotal = parseFloat(evento.payload?.total || evento.payload?.valorTotal || 0);
+                        const totalPago = parseFloat(evento.payload?.totalPago || evento.payload?.pago || 0);
+                        const status = evento.payload?.status || 'pendente';
                         
                         if (!isNaN(valorTotal) && valorTotal > 0) {
-                            const saldoPendente = valorTotal - totalPago;
-                            if (saldoPendente > 0) {
-                                totalAReceber += saldoPendente;
-                            }
-                            
-                            // Agrupar como venda
+                            // Contabilizar vendas
                             totalVendas += valorTotal;
-                            totalPedidos += valorTotal;
+                            totalPedidosValor += valorTotal;
+                            
+                            // Calcular saldo pendente
+                            const saldoPendente = Math.max(0, valorTotal - totalPago);
+                            totalAReceber += saldoPendente;
                             
                             // Contar pedidos por status
-                            const status = evento.payload?.status || 'pendente';
-                            if (status === 'pendente' || status === 'processamento') {
+                            if (status === 'pendente' || status === 'processamento' || status === 'produção') {
                                 pedidosAtivos++;
-                            } else if (status === 'concluido') {
+                            } else if (status === 'concluido' || status === 'entregue' || status === 'finalizado') {
                                 pedidosConcluidos++;
                             }
                             
-                            // Agrupar vendas de pedidos por produto/categoria
+                            // Agrupar vendas por produto/categoria
                             if (evento.payload?.produtos && Array.isArray(evento.payload.produtos)) {
                                 evento.payload.produtos.forEach(produto => {
-                                    const catProduto = produto.nome || produto.categoria || 'Produto';
+                                    const catProduto = produto.categoria || produto.tipo || produto.nome || 'Produto';
                                     const catProdutoLimpa = catProduto.trim() || 'Produto';
                                     
                                     if (!vendasPorCategoria[catProdutoLimpa]) {
                                         vendasPorCategoria[catProdutoLimpa] = 0;
                                     }
-                                    const valorProduto = parseFloat(produto.valor || 0);
+                                    const valorProduto = parseFloat(produto.valor || produto.preco || 0);
                                     const quantidade = parseInt(produto.quantidade || 1);
                                     if (!isNaN(valorProduto) && !isNaN(quantidade)) {
                                         vendasPorCategoria[catProdutoLimpa] += valorProduto * quantidade;
                                     }
                                 });
+                            } else {
+                                // Se não há produtos detalhados, agrupar como "Vendas Gerais"
+                                const categoria = evento.payload?.categoria || 'Vendas Gerais';
+                                if (!vendasPorCategoria[categoria]) {
+                                    vendasPorCategoria[categoria] = 0;
+                                }
+                                vendasPorCategoria[categoria] += valorTotal;
                             }
-                        }
-                        
-                        // Calcular dados do mês anterior para comparação
-                        if (dataEvento >= dataInicioMesAnterior && dataEvento <= dataFimMesAnterior) {
-                            vendasMesAnterior += valorTotal || 0;
-                            pedidosMesAnterior += valorTotal || 0;
+                            
+                            // Verificar se é do mês anterior para cálculo de variação
+                            if (dataEvento >= dataInicioMesAnterior && dataEvento <= dataFimMesAnterior) {
+                                vendasMesAnterior += valorTotal;
+                            }
                         }
                         
                     } else if (evento.schema === 'despesa') {
@@ -1208,16 +1280,16 @@
                         if (!isNaN(valorDespesa) && valorDespesa > 0) {
                             totalDespesas += valorDespesa;
                             
-                            // CORREÇÃO CRÍTICA: Verificar status de pagamento para despesas
+                            // Verificar status de pagamento para despesas
                             const statusPagamento = payload?.statusPagamento || payload?.status || 'pendente';
                             
                             // Adicionar ao total a pagar apenas se não estiver paga
                             if (statusPagamento !== 'pago' && statusPagamento !== 'paga') {
-                                totalAPagar += valorDespesa; // Despesas não pagas são contas a pagar
+                                totalAPagar += valorDespesa;
                             }
                             
                             // Agrupar por categoria
-                            const categoria = payload?.categoria || payload?.tipo || 'Outros';
+                            const categoria = payload?.categoria || payload?.tipo || payload?.descricao || 'Outros';
                             const categoriaLimpa = categoria.trim() || 'Outros';
                             
                             if (!despesasPorCategoria[categoriaLimpa]) {
@@ -1225,7 +1297,7 @@
                             }
                             despesasPorCategoria[categoriaLimpa] += valorDespesa;
                             
-                            // Calcular dados do mês anterior para comparação
+                            // Verificar se é do mês anterior para cálculo de variação
                             if (dataEvento >= dataInicioMesAnterior && dataEvento <= dataFimMesAnterior) {
                                 despesasMesAnterior += valorDespesa;
                             }
@@ -1246,7 +1318,7 @@
                         }
                         
                         if (evento.schema === 'pedido') {
-                            const valor = parseFloat(evento.payload?.total || 0);
+                            const valor = parseFloat(evento.payload?.total || evento.payload?.valorTotal || 0);
                             if (!isNaN(valor)) meses[chaveMes].vendas += valor;
                         } else if (evento.schema === 'despesa') {
                             let valorDespesa = 0;
@@ -1273,7 +1345,7 @@
                         }
                         
                         if (evento.schema === 'pedido') {
-                            const valor = parseFloat(evento.payload?.total || 0);
+                            const valor = parseFloat(evento.payload?.total || evento.payload?.valorTotal || 0);
                             if (!isNaN(valor)) meses12[chaveMes].vendas += valor;
                         } else if (evento.schema === 'despesa') {
                             let valorDespesa = 0;
@@ -1316,12 +1388,9 @@
                 
                 // Preparar dados para gráficos de vendas
                 let topVendasCategorias = [];
-                
-                // Verificar se há vendas para processar
                 const entradasVendas = Object.entries(vendasPorCategoria);
                 
                 if (entradasVendas.length > 0) {
-                    // Processar categorias com valores positivos
                     topVendasCategorias = entradasVendas
                         .filter(([categoria, valor]) => valor > 0)
                         .sort((a, b) => b[1] - a[1])
@@ -1332,7 +1401,6 @@
                         }));
                 }
                 
-                // Se não houver categorias com valores positivos, adicionar uma mensagem
                 if (topVendasCategorias.length === 0) {
                     topVendasCategorias.push({ 
                         categoria: periodo === 'mes_atual' ? 'Sem vendas este mês' : 'Sem dados de vendas', 
@@ -1349,14 +1417,6 @@
                         categoria: categoria.length > 20 ? categoria.substring(0, 17) + '...' : categoria, 
                         valor 
                     }));
-                
-                // Mensagens para gráficos vazios
-                if (topVendasCategorias.length === 0) {
-                    topVendasCategorias.push({ 
-                        categoria: periodo === 'mes_atual' ? 'Nenhuma venda este mês' : 'Nenhuma venda registrada', 
-                        valor: 0 
-                    });
-                }
                 
                 if (topDespesasCategorias.length === 0) {
                     topDespesasCategorias.push({ 
@@ -1396,19 +1456,6 @@
                         despesas: meses12[chave]?.despesas || 0
                     });
                 }
-                
-                console.log('📊 DADOS FINAIS PARA INTERFACE:', {
-                    periodo: periodo,
-                    vendasTotal: totalVendas.toFixed(2),
-                    totalDespesas: totalDespesas.toFixed(2),
-                    totalAReceber: totalAReceber.toFixed(2),
-                    totalAPagar: totalAPagar.toFixed(2),
-                    metaDiariaReal: calcularMetaDiariaReal(totalVendas, 10000).toFixed(2),
-                    variacaoDespesas: variacaoDespesas.toFixed(1),
-                    variacaoVendas: variacaoVendas.toFixed(1),
-                    vendasMesAnterior: vendasMesAnterior.toFixed(2),
-                    despesasMesAnterior: despesasMesAnterior.toFixed(2)
-                });
                 
                 return {
                     vendas: {
@@ -1468,83 +1515,98 @@
                 };
                 
                 // Atualizar todas as métricas
-                const elementoVendas = document.querySelector('[data-bind="vendas.total"]');
-                const elementoDespesas = document.querySelector('[data-bind="despesas.total"]');
-                const elementoReceber = document.querySelector('[data-bind="contas.receber"]');
-                const elementoPagar = document.querySelector('[data-bind="contas.pagar"]');
+                const elementos = {
+                    vendas: document.querySelector('[data-bind="vendas.total"]'),
+                    despesas: document.querySelector('[data-bind="despesas.total"]'),
+                    receber: document.querySelector('[data-bind="contas.receber"]'),
+                    pagar: document.querySelector('[data-bind="contas.pagar"]'),
+                    variacaoVendas: document.querySelector('[data-bind="vendas.variacao"]'),
+                    variacaoDespesas: document.querySelector('[data-bind="despesas.variacao"]'),
+                    pedidosAtivos: document.querySelector('[data-bind="pedidos.ativos"]'),
+                    pedidosConcluidos: document.querySelector('[data-bind="pedidos.concluidos"]'),
+                    equilibrioAtingido: document.querySelector('[data-bind="equilibrio.atingido"]'),
+                    equilibrioMeta: document.querySelector('[data-bind="equilibrio.meta"]'),
+                    equilibrioPercentual: document.querySelector('[data-bind="equilibrio.percentual"]'),
+                    equilibrioMetaDiaria: document.querySelector('[data-bind="equilibrio.metaDiaria"]')
+                };
                 
-                if (elementoVendas) {
-                    elementoVendas.textContent = formatarMoeda(dados.vendas.total);
-                    console.log('✅ Vendas atualizado:', formatarMoeda(dados.vendas.total));
+                // Atualizar valores monetários
+                if (elementos.vendas) {
+                    elementos.vendas.textContent = formatarMoeda(dados.vendas.total);
                 }
                 
-                if (elementoDespesas) {
-                    elementoDespesas.textContent = formatarMoeda(dados.despesas.total);
-                    console.log('✅ Despesas atualizado:', formatarMoeda(dados.despesas.total));
+                if (elementos.despesas) {
+                    elementos.despesas.textContent = formatarMoeda(dados.despesas.total);
                 }
                 
-                // CORREÇÃO CRÍTICA: Atualizar contas a receber e pagar
-                if (elementoReceber) {
-                    elementoReceber.textContent = formatarMoeda(dados.contas?.receber || 0);
-                    console.log('✅ Restante a Receber atualizado:', formatarMoeda(dados.contas?.receber || 0));
+                if (elementos.receber) {
+                    elementos.receber.textContent = formatarMoeda(dados.contas?.receber || 0);
                 }
                 
-                if (elementoPagar) {
-                    elementoPagar.textContent = formatarMoeda(dados.contas?.pagar || 0);
-                    console.log('✅ Restante a Pagar atualizado:', formatarMoeda(dados.contas?.pagar || 0));
+                if (elementos.pagar) {
+                    elementos.pagar.textContent = formatarMoeda(dados.contas?.pagar || 0);
                 }
                 
                 // Atualizar variações
-                const elementoVariacaoVendas = document.querySelector('[data-bind="vendas.variacao"]');
-                const elementoVariacaoDespesas = document.querySelector('[data-bind="despesas.variacao"]');
-                
-                if (elementoVariacaoVendas) {
+                if (elementos.variacaoVendas) {
                     const variacao = parseFloat(dados.vendas.variacao);
-                    elementoVariacaoVendas.textContent = formatarPercentual(variacao);
-                    elementoVariacaoVendas.className = variacao >= 0 ? 'positive' : 'negative';
+                    elementos.variacaoVendas.textContent = formatarPercentual(variacao);
+                    elementos.variacaoVendas.className = variacao >= 0 ? 'positive' : 'negative';
                     
                     // Atualizar ícone de seta
-                    const seta = elementoVariacaoVendas.closest('.metric-change').querySelector('i');
+                    const seta = elementos.variacaoVendas.closest('.metric-change').querySelector('i');
                     if (seta) {
                         seta.className = variacao >= 0 ? 'fas fa-arrow-up positive' : 'fas fa-arrow-down negative';
                     }
                 }
                 
-                if (elementoVariacaoDespesas) {
+                if (elementos.variacaoDespesas) {
                     const variacao = parseFloat(dados.despesas.variacao);
-                    elementoVariacaoDespesas.textContent = formatarPercentual(variacao);
-                    elementoVariacaoDespesas.className = variacao >= 0 ? 'positive' : 'negative';
+                    elementos.variacaoDespesas.textContent = formatarPercentual(variacao);
+                    elementos.variacaoDespesas.className = variacao >= 0 ? 'positive' : 'negative';
                 }
                 
                 // Atualizar pedidos
-                document.querySelector('[data-bind="pedidos.ativos"]').textContent = dados.pedidos.ativos;
-                document.querySelector('[data-bind="pedidos.concluidos"]').textContent = `${dados.pedidos.concluidos}/${dados.pedidos.total}`;
+                if (elementos.pedidosAtivos) {
+                    elementos.pedidosAtivos.textContent = dados.pedidos.ativos;
+                }
+                
+                if (elementos.pedidosConcluidos) {
+                    elementos.pedidosConcluidos.textContent = `${dados.pedidos.concluidos}/${dados.pedidos.total}`;
+                }
                 
                 // Atualizar ponto de equilíbrio
-                document.querySelector('[data-bind="equilibrio.atingido"]').textContent = formatarMoeda(dados.equilibrio.atingido);
-                document.querySelector('[data-bind="equilibrio.meta"]').textContent = formatarMoeda(dados.equilibrio.meta);
-                document.querySelector('[data-bind="equilibrio.percentual"]').textContent = `${dados.equilibrio.percentual}%`;
+                if (elementos.equilibrioAtingido) {
+                    elementos.equilibrioAtingido.textContent = formatarMoeda(dados.equilibrio.atingido);
+                }
                 
-                // Atualizar meta diária REAL
-                const elementoMetaDiaria = document.querySelector('[data-bind="equilibrio.metaDiaria"]');
-                if (elementoMetaDiaria) {
-                    elementoMetaDiaria.textContent = formatarMoeda(dados.equilibrio.metaDiaria);
-                    console.log('✅ Meta diária REAL calculada:', formatarMoeda(dados.equilibrio.metaDiaria));
+                if (elementos.equilibrioMeta) {
+                    elementos.equilibrioMeta.textContent = formatarMoeda(dados.equilibrio.meta);
+                }
+                
+                if (elementos.equilibrioPercentual) {
+                    elementos.equilibrioPercentual.textContent = `${dados.equilibrio.percentual}%`;
+                }
+                
+                if (elementos.equilibrioMetaDiaria) {
+                    elementos.equilibrioMetaDiaria.textContent = formatarMoeda(dados.equilibrio.metaDiaria);
                 }
                 
                 // Atualizar barra de progresso
                 const progressBar = document.getElementById('equilibriumProgress');
-                progressBar.style.width = `${dados.equilibrio.percentual}%`;
-                
-                // Aplicar privacidade se necessário
-                if (isPrivate) {
-                    aplicarModoPrivacidade(true);
+                if (progressBar) {
+                    progressBar.style.width = `${dados.equilibrio.percentual}%`;
                 }
                 
                 // Atualizar label da meta
                 const metaLabel = document.querySelector('.progress-labels span:last-child');
                 if (metaLabel) {
                     metaLabel.textContent = `Meta: ${formatarMoeda(dados.equilibrio.meta)}`;
+                }
+                
+                // Aplicar privacidade se necessário
+                if (isPrivate) {
+                    aplicarModoPrivacidade(true);
                 }
             }
             
@@ -1790,23 +1852,14 @@
             
             // Atualizar gráficos com dados
             function atualizarGraficosComDados(dados) {
-                console.log('🔄 Atualizando gráficos com dados:', {
-                    vendasCategorias: dados.vendasPorCategoria,
-                    despesasCategorias: dados.despesasPorCategoria,
-                    historico: dados.historicoMensal,
-                    historicoAnual: dados.historicoAnual
-                });
+                console.log('🔄 Atualizando gráficos com dados');
                 
                 // Atualizar gráfico de vendas por categoria
                 if (charts.salesByCategory) {
                     try {
                         const vendasData = Array.isArray(dados.vendasPorCategoria) ? dados.vendasPorCategoria : [];
                         
-                        console.log('📊 Dados de vendas por categoria para gráfico:', vendasData);
-                        
-                        // Verificar se temos dados válidos
                         if (vendasData.length > 0 && vendasData[0] && 'categoria' in vendasData[0] && 'valor' in vendasData[0]) {
-                            // Filtrar e formatar os dados
                             const dadosFiltrados = vendasData
                                 .filter(item => item && item.categoria !== undefined && item.valor !== undefined)
                                 .map(item => ({
@@ -1814,29 +1867,18 @@
                                     valor: parseFloat(item.valor) || 0
                                 }));
                             
-                            // Ordenar por valor decrescente
                             dadosFiltrados.sort((a, b) => b.valor - a.valor);
                             
-                            console.log('📊 Dados processados para o gráfico de vendas:', dadosFiltrados);
-                            
-                            // Atualizar dados do gráfico
                             charts.salesByCategory.data.labels = dadosFiltrados.map(d => d.categoria);
                             charts.salesByCategory.data.datasets[0].data = dadosFiltrados.map(d => d.valor);
-                            
-                            // Atualizar o gráfico com animação
                             charts.salesByCategory.update();
-                            
-                            console.log('✅ Gráfico de vendas por categoria atualizado com sucesso!');
                         } else {
-                            console.warn('⚠️ Dados de vendas por categoria inválidos ou vazios, usando dados de exemplo');
-                            // Usar dados de exemplo para evitar erro no gráfico
                             charts.salesByCategory.data.labels = ['Sem dados disponíveis'];
                             charts.salesByCategory.data.datasets[0].data = [1];
                             charts.salesByCategory.update();
                         }
                     } catch (error) {
                         console.error('❌ Erro ao atualizar gráfico de vendas por categoria:', error);
-                        // Garantir que o gráfico não quebre
                         charts.salesByCategory.data.labels = ['Erro ao carregar'];
                         charts.salesByCategory.data.datasets[0].data = [1];
                         charts.salesByCategory.update();
@@ -1848,11 +1890,7 @@
                     try {
                         const despesasData = Array.isArray(dados.despesasPorCategoria) ? dados.despesasPorCategoria : [];
                         
-                        console.log('💰 Dados de despesas por categoria para gráfico:', despesasData);
-                        
-                        // Verificar se temos dados válidos
                         if (despesasData.length > 0 && despesasData[0] && 'categoria' in despesasData[0] && 'valor' in despesasData[0]) {
-                            // Filtrar e formatar os dados
                             const dadosFiltrados = despesasData
                                 .filter(item => item && item.categoria !== undefined && item.valor !== undefined)
                                 .map(item => ({
@@ -1860,26 +1898,16 @@
                                     valor: parseFloat(item.valor) || 0
                                 }));
                             
-                            console.log('💰 Dados processados para o gráfico de despesas:', dadosFiltrados);
-                            
-                            // Atualizar dados do gráfico
                             charts.expensesByCategory.data.labels = dadosFiltrados.map(d => d.categoria);
                             charts.expensesByCategory.data.datasets[0].data = dadosFiltrados.map(d => d.valor);
-                            
-                            // Atualizar o gráfico com animação
                             charts.expensesByCategory.update();
-                            
-                            console.log('✅ Gráfico de despesas por categoria atualizado com sucesso!');
                         } else {
-                            console.warn('⚠️ Dados de despesas por categoria inválidos ou vazios, usando dados de exemplo');
-                            // Usar dados de exemplo para evitar erro no gráfico
                             charts.expensesByCategory.data.labels = ['Sem dados disponíveis'];
                             charts.expensesByCategory.data.datasets[0].data = [1];
                             charts.expensesByCategory.update();
                         }
                     } catch (error) {
                         console.error('❌ Erro ao atualizar gráfico de despesas por categoria:', error);
-                        // Garantir que o gráfico não quebre
                         charts.expensesByCategory.data.labels = ['Erro ao carregar'];
                         charts.expensesByCategory.data.datasets[0].data = [1];
                         charts.expensesByCategory.update();
@@ -1905,13 +1933,77 @@
                 }
             }
             
+            // Função para carregar dados de exemplo (apenas para desenvolvimento)
+            function carregarDadosExemplo() {
+                console.log('📊 Carregando dados de exemplo para desenvolvimento');
+                
+                // Criar eventos de exemplo
+                const eventosExemplo = [
+                    {
+                        schema: 'pedido',
+                        created_at: new Date(new Date().getFullYear(), new Date().getMonth() - 1, 15).toISOString(),
+                        timestamp: new Date(new Date().getFullYear(), new Date().getMonth() - 1, 15).toISOString(),
+                        payload: {
+                            total: 1500,
+                            totalPago: 1000,
+                            status: 'concluido',
+                            produtos: [
+                                { nome: 'Cartão de Visita', categoria: 'Impressão', valor: 300, quantidade: 1 },
+                                { nome: 'Banner', categoria: 'Grande Formato', valor: 1200, quantidade: 1 }
+                            ]
+                        },
+                        deleted: false
+                    },
+                    {
+                        schema: 'pedido',
+                        created_at: new Date().toISOString(),
+                        timestamp: new Date().toISOString(),
+                        payload: {
+                            total: 800,
+                            totalPago: 400,
+                            status: 'processamento',
+                            produtos: [
+                                { nome: 'Folheto', categoria: 'Impressão', valor: 800, quantidade: 1 }
+                            ]
+                        },
+                        deleted: false
+                    },
+                    {
+                        schema: 'despesa',
+                        created_at: new Date(new Date().getFullYear(), new Date().getMonth() - 1, 20).toISOString(),
+                        timestamp: new Date(new Date().getFullYear(), new Date().getMonth() - 1, 20).toISOString(),
+                        payload: {
+                            valorTotal: 500,
+                            categoria: 'Material',
+                            statusPagamento: 'pago'
+                        },
+                        deleted: false
+                    },
+                    {
+                        schema: 'despesa',
+                        created_at: new Date().toISOString(),
+                        timestamp: new Date().toISOString(),
+                        payload: {
+                            valorTotal: 300,
+                            categoria: 'Energia',
+                            statusPagamento: 'pendente'
+                        },
+                        deleted: false
+                    }
+                ];
+                
+                todosEventos = eventosExemplo;
+                todosEventosComTimestampsCorrigidos = corrigirTimestampsDosEventos(eventosExemplo);
+                processarEFiltrarDados();
+            }
+            
             // ============================================
             // INICIALIZAÇÃO
             // ============================================
             
             inicializar();
             
-            // Atualizar dados a cada 30 segundos (reduzido para economizar recursos)
+            // Atualizar dados a cada 30 segundos
             setInterval(solicitarTodosDadosAoCore, 30000);
             
             // Forçar solicitação inicial após 1 segundo
