@@ -364,7 +364,7 @@
             border-radius: 50%;
             display: flex;
             align-items: center;
-            justify-content: center;
+            justifyContent: center;
             color: white;
             font-size: 40px;
         }
@@ -476,7 +476,7 @@
                     <li>Posicione o documento em uma superfície plana</li>
                     <li>Evite sombras e reflexos na foto</li>
                     <li>O sistema compactará automaticamente a imagem</li>
-                    <li>Recomendado: imagem menor que 500KB</li>
+                    <li>Tamanho máximo: 300KB</li>
                 </ol>
                 
                 <div class="file-info" id="fileInfo" style="display: none;">
@@ -557,7 +557,7 @@
 
     <script>
         // ============================================
-        // SISTEMA DE UPLOAD VIA CELULAR - CORRIGIDO
+        // SISTEMA DE UPLOAD VIA CELULAR - VERSÃO FINAL
         // ============================================
         
         document.addEventListener('DOMContentLoaded', () => {
@@ -594,7 +594,7 @@
             
             // Variáveis
             let currentStream = null;
-            let imageBlob = null; // Agora armazenamos como Blob
+            let compressedBase64 = null;
             let sessionId = '';
             let despesaId = '';
             let compressedFileSize = 0;
@@ -691,9 +691,9 @@
                 const videoWidth = cameraVideo.videoWidth;
                 const videoHeight = cameraVideo.videoHeight;
                 
-                // Reduzir tamanho significativamente
-                const maxWidth = 800;
-                const maxHeight = 1000;
+                // Reduzir significativamente
+                const maxWidth = 600;
+                const maxHeight = 800;
                 
                 let width = videoWidth;
                 let height = videoHeight;
@@ -715,35 +715,24 @@
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(cameraVideo, 0, 0, width, height);
                 
-                // Converter para Blob com alta compressão
-                canvas.toBlob(async (blob) => {
-                    if (!blob) {
-                        showError('Erro ao processar foto.');
-                        return;
-                    }
-                    
-                    imageBlob = blob;
-                    compressedFileSize = blob.size;
-                    
-                    // Criar URL para preview
-                    const imageUrl = URL.createObjectURL(blob);
-                    previewImage.src = imageUrl;
-                    
-                    // Mostrar informações
-                    previewFileSizeEl.textContent = formatFileSize(compressedFileSize);
-                    previewFileInfo.style.display = 'block';
-                    
-                    console.log('✅ Foto capturada e comprimida:', {
-                        original: `${videoWidth}x${videoHeight}`,
-                        compressed: `${width}x${height}`,
-                        size: formatFileSize(compressedFileSize),
-                        quality: 'alta compressão'
-                    });
-                    
-                    stopCamera();
-                    showScreen('preview');
-                    
-                }, 'image/jpeg', 0.5); // 50% de qualidade
+                // Comprimir bastante (30% de qualidade)
+                compressedBase64 = canvas.toDataURL('image/jpeg', 0.3);
+                compressedFileSize = Math.round((compressedBase64.length * 3) / 4);
+                
+                // Mostrar preview
+                previewImage.src = compressedBase64;
+                previewFileSizeEl.textContent = formatFileSize(compressedFileSize);
+                previewFileInfo.style.display = 'block';
+                
+                stopCamera();
+                showScreen('preview');
+                
+                console.log('✅ Foto capturada e comprimida:', {
+                    original: `${videoWidth}x${videoHeight}`,
+                    compressed: `${width}x${height}`,
+                    size: formatFileSize(compressedFileSize),
+                    qualidade: '30%'
+                });
             }
             
             // ============================================
@@ -781,33 +770,43 @@
                     showScreen('progress');
                     document.getElementById('progressText').textContent = 'Comprimindo imagem...';
                     
-                    // Primeiro, ler a imagem
-                    const img = await loadImage(file);
+                    const reader = new FileReader();
                     
-                    // Comprimir significativamente
-                    const compressedBlob = await compressImageToBlob(img, 0.5); // 50% de qualidade
+                    reader.onload = async (event) => {
+                        const base64Image = event.target.result;
+                        
+                        // Comprimir com qualidade muito baixa para garantir tamanho pequeno
+                        const compressed = await compressImage(base64Image, 0.3); // 30% de qualidade
+                        
+                        compressedBase64 = compressed.dataUrl;
+                        compressedFileSize = compressed.size;
+                        
+                        // Mostrar preview
+                        previewImage.src = compressedBase64;
+                        previewFileSizeEl.textContent = formatFileSize(compressedFileSize);
+                        previewFileInfo.style.display = 'block';
+                        
+                        // Mostrar informações
+                        fileSizeEl.textContent = formatFileSize(compressedFileSize);
+                        fileInfo.style.display = 'block';
+                        
+                        console.log('✅ Imagem processada:', {
+                            original: formatFileSize(file.size),
+                            compressed: formatFileSize(compressedFileSize),
+                            reducao: `${((1 - compressedFileSize/file.size) * 100).toFixed(1)}%`,
+                            qualidade: '30%'
+                        });
+                        
+                        showScreen('preview');
+                    };
                     
-                    imageBlob = compressedBlob;
-                    compressedFileSize = compressedBlob.size;
+                    reader.onerror = (error) => {
+                        console.error('❌ Erro ao ler arquivo:', error);
+                        showError('Erro ao processar imagem. Tente novamente.');
+                        showScreen('initial');
+                    };
                     
-                    // Criar URL para preview
-                    const imageUrl = URL.createObjectURL(compressedBlob);
-                    previewImage.src = imageUrl;
-                    
-                    // Mostrar informações
-                    previewFileSizeEl.textContent = formatFileSize(compressedFileSize);
-                    previewFileInfo.style.display = 'block';
-                    fileSizeEl.textContent = formatFileSize(compressedFileSize);
-                    fileInfo.style.display = 'block';
-                    
-                    console.log('✅ Imagem processada:', {
-                        original: formatFileSize(file.size),
-                        compressed: formatFileSize(compressedFileSize),
-                        reducao: `${((1 - compressedFileSize/file.size) * 100).toFixed(1)}%`,
-                        qualidade: '50%'
-                    });
-                    
-                    showScreen('preview');
+                    reader.readAsDataURL(file);
                     
                 } catch (error) {
                     console.error('❌ Erro ao processar imagem:', error);
@@ -816,67 +815,67 @@
                 }
             }
             
-            function loadImage(file) {
+            async function compressImage(base64Image, quality = 0.3) {
                 return new Promise((resolve, reject) => {
                     const img = new Image();
-                    const reader = new FileReader();
+                    img.src = base64Image;
                     
-                    reader.onload = (e) => {
-                        img.src = e.target.result;
-                        img.onload = () => resolve(img);
-                        img.onerror = reject;
-                    };
-                    
-                    reader.onerror = reject;
-                    reader.readAsDataURL(file);
-                });
-            }
-            
-            async function compressImageToBlob(img, quality = 0.5) {
-                return new Promise((resolve) => {
-                    const canvas = document.createElement('canvas');
-                    
-                    // Definir tamanhos máximos ainda menores
-                    const MAX_WIDTH = 800;
-                    const MAX_HEIGHT = 1000;
-                    
-                    let width = img.width;
-                    let height = img.height;
-                    
-                    // Redimensionar se necessário
-                    if (width > MAX_WIDTH || height > MAX_HEIGHT) {
-                        if (width > height) {
-                            if (width > MAX_WIDTH) {
-                                height = Math.round((height * MAX_WIDTH) / width);
-                                width = MAX_WIDTH;
-                            }
-                        } else {
-                            if (height > MAX_HEIGHT) {
-                                width = Math.round((width * MAX_HEIGHT) / height);
-                                height = MAX_HEIGHT;
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        
+                        // Tamanhos muito pequenos
+                        const MAX_WIDTH = 600;
+                        const MAX_HEIGHT = 800;
+                        
+                        let width = img.width;
+                        let height = img.height;
+                        
+                        // Redimensionar se necessário
+                        if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+                            if (width > height) {
+                                if (width > MAX_WIDTH) {
+                                    height = Math.round((height * MAX_WIDTH) / width);
+                                    width = MAX_WIDTH;
+                                }
+                            } else {
+                                if (height > MAX_HEIGHT) {
+                                    width = Math.round((width * MAX_HEIGHT) / height);
+                                    height = MAX_HEIGHT;
+                                }
                             }
                         }
-                    }
+                        
+                        canvas.width = width;
+                        canvas.height = height;
+                        
+                        const ctx = canvas.getContext('2d');
+                        
+                        // Aplicar filtro de preto e branco para documentos (reduz tamanho)
+                        ctx.filter = 'grayscale(50%) contrast(120%)';
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        // Comprimir com qualidade muito baixa
+                        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+                        const size = Math.round((compressedDataUrl.length * 3) / 4);
+                        
+                        resolve({
+                            dataUrl: compressedDataUrl,
+                            size: size,
+                            width: width,
+                            height: height
+                        });
+                    };
                     
-                    canvas.width = width;
-                    canvas.height = height;
-                    
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
-                    
-                    // Converter para Blob com compressão
-                    canvas.toBlob((blob) => {
-                        resolve(blob);
-                    }, 'image/jpeg', quality);
+                    img.onerror = reject;
                 });
             }
             
             // ============================================
-            // FUNÇÃO DE UPLOAD CORRIGIDA - ENVIA COMO MULTIPART/FORM-DATA
+            // FUNÇÃO DE UPLOAD - VERSÃO CORRETA (JSON)
             // ============================================
             
             async function uploadPhoto() {
-                if (!imageBlob) {
+                if (!compressedBase64) {
                     showError('Nenhuma imagem para enviar.');
                     return;
                 }
@@ -885,37 +884,48 @@
                 document.getElementById('progressText').textContent = 'Enviando nota fiscal...';
                 
                 try {
-                    // Verificar tamanho (máximo 500KB para garantir)
-                    if (compressedFileSize > 500 * 1024) {
+                    // Garantir que a imagem seja pequena (máximo 150KB)
+                    if (compressedFileSize > 150 * 1024) {
                         // Se ainda estiver grande, comprimir mais
                         console.log('⚠️ Imagem ainda grande, comprimindo mais...');
-                        const img = await loadImageFromBlob(imageBlob);
-                        const moreCompressedBlob = await compressImageToBlob(img, 0.3); // 30% de qualidade
-                        
-                        imageBlob = moreCompressedBlob;
-                        compressedFileSize = moreCompressedBlob.size;
+                        const moreCompressed = await compressImage(compressedBase64, 0.2); // 20% de qualidade
+                        compressedBase64 = moreCompressed.dataUrl;
+                        compressedFileSize = moreCompressed.size;
                         
                         console.log('✅ Re-comprimida para:', formatFileSize(compressedFileSize));
                     }
                     
                     console.log('📤 Enviando imagem:', {
                         tamanho: formatFileSize(compressedFileSize),
-                        tipo: imageBlob.type
+                        base64Length: compressedBase64.length
                     });
                     
-                    // Criar FormData para enviar como multipart/form-data
-                    const formData = new FormData();
-                    formData.append('sessionId', sessionId);
-                    formData.append('despesaId', despesaId);
-                    formData.append('image', imageBlob, `nota-fiscal-${Date.now()}.jpg`);
-                    formData.append('timestamp', new Date().toISOString());
-                    formData.append('source', 'mobile_upload');
+                    // Remover o prefixo "data:image/jpeg;base64," para economizar espaço
+                    const base64Data = compressedBase64.split(',')[1];
                     
-                    // Fazer o upload usando FormData (não JSON)
+                    // Preparar payload no formato que o servidor espera
+                    const payload = {
+                        sessionId: sessionId,
+                        despesaId: despesaId,
+                        fileData: {
+                            base64: base64Data, // Apenas os dados base64, sem o prefixo
+                            tipo: 'image/jpeg',
+                            tamanhoOriginal: compressedFileSize,
+                            tamanhoOtimizado: compressedFileSize
+                        },
+                        timestamp: new Date().toISOString(),
+                        source: 'camera'
+                    };
+                    
+                    console.log('📦 Payload size:', JSON.stringify(payload).length, 'bytes');
+                    
+                    // Fazer o upload (manter JSON como estava antes)
                     const response = await fetch('/api/upload/nota-fiscal', {
                         method: 'POST',
-                        body: formData
-                        // NOTA: Não definir Content-Type - o browser define automaticamente para FormData
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(payload)
                     });
                     
                     if (!response.ok) {
@@ -923,11 +933,17 @@
                         console.error('❌ Erro no servidor:', response.status, errorText);
                         
                         if (response.status === 413) {
-                            throw new Error('Imagem muito grande mesmo após compressão. Tente uma foto mais simples.');
+                            throw new Error('Imagem muito grande. Tente uma imagem menor ou com menos detalhes.');
                         } else if (response.status === 400) {
-                            throw new Error('Dados inválidos. Recarregue a página.');
+                            // Verificar se é problema de estrutura de dados
+                            const serverResponse = await response.json().catch(() => null);
+                            if (serverResponse && serverResponse.message) {
+                                throw new Error(`Erro: ${serverResponse.message}`);
+                            } else {
+                                throw new Error('Formato de dados inválido. Tente novamente.');
+                            }
                         } else {
-                            throw new Error(`Erro no servidor: ${response.status}`);
+                            throw new Error(`Erro no servidor (${response.status})`);
                         }
                     }
                     
@@ -935,11 +951,6 @@
                     
                     if (result.success) {
                         showScreen('success');
-                        
-                        // Limpar URL do blob
-                        if (previewImage.src.startsWith('blob:')) {
-                            URL.revokeObjectURL(previewImage.src);
-                        }
                         
                         // Fechar após 3 segundos
                         setTimeout(() => {
@@ -958,21 +969,6 @@
                     console.error('❌ Erro no upload:', error);
                     showError(`Falha no envio: ${error.message}`);
                 }
-            }
-            
-            function loadImageFromBlob(blob) {
-                return new Promise((resolve, reject) => {
-                    const img = new Image();
-                    const url = URL.createObjectURL(blob);
-                    
-                    img.onload = () => {
-                        URL.revokeObjectURL(url);
-                        resolve(img);
-                    };
-                    
-                    img.onerror = reject;
-                    img.src = url;
-                });
             }
             
             // ============================================
@@ -1017,12 +1013,7 @@
             
             // Controles do preview
             retakeBtn.addEventListener('click', () => {
-                // Limpar URL do blob se existir
-                if (previewImage.src.startsWith('blob:')) {
-                    URL.revokeObjectURL(previewImage.src);
-                }
-                
-                imageBlob = null;
+                compressedBase64 = null;
                 compressedFileSize = 0;
                 previewFileInfo.style.display = 'none';
                 showScreen('initial');
