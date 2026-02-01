@@ -865,6 +865,7 @@
             let isPrivate = false;
             let charts = {};
             let dadosCore = {};
+            let todosEventos = []; // Armazenar todos os eventos para filtragem local
             
             // ============================================
             // FUNÇÕES PRINCIPAIS - CORRIGIDAS
@@ -877,7 +878,7 @@
                 configurarEventListeners();
                 
                 // Solicitar dados ao Core
-                solicitarDadosAoCore();
+                solicitarTodosDadosAoCore();
                 
                 console.log('✅ Dashboard inicializado');
             }
@@ -903,7 +904,13 @@
                 periodFilter.addEventListener('change', function(e) {
                     periodoAtual = e.target.value;
                     console.log('📅 Período alterado para:', periodoAtual);
-                    solicitarDadosAoCore();
+                    
+                    // Filtra os dados localmente com o período selecionado
+                    if (todosEventos.length > 0) {
+                        processarEFiltrarDados();
+                    } else {
+                        solicitarTodosDadosAoCore();
+                    }
                 });
             }
             
@@ -938,62 +945,16 @@
                 });
             }
             
-            // Solicitar dados ao Core - CORRIGIDO para suportar filtro de período
-            function solicitarDadosAoCore() {
-                console.log('🔄 Solicitando dados da API com período:', periodoAtual);
-                
-                // Calcular datas baseadas no período selecionado
-                const agora = new Date();
-                const mesAtual = agora.getMonth();
-                const anoAtual = agora.getFullYear();
-                
-                let dataInicio, dataFim;
-                
-                switch(periodoAtual) {
-                    case 'mes_anterior':
-                        // Mês anterior completo
-                        dataInicio = new Date(anoAtual, mesAtual - 1, 1);
-                        dataFim = new Date(anoAtual, mesAtual, 0);
-                        break;
-                    case 'trimestre':
-                        // Últimos 3 meses
-                        dataInicio = new Date(anoAtual, mesAtual - 3, 1);
-                        dataFim = new Date(anoAtual, mesAtual + 1, 0);
-                        break;
-                    case 'ano_atual':
-                        // Desde o início do ano
-                        dataInicio = new Date(anoAtual, 0, 1);
-                        dataFim = new Date(anoAtual, 11, 31);
-                        break;
-                    case 'todos':
-                        // Todos os dados (sem filtro de data)
-                        dataInicio = null;
-                        dataFim = null;
-                        break;
-                    case 'mes_atual':
-                    default:
-                        // Mês atual completo
-                        dataInicio = new Date(anoAtual, mesAtual, 1);
-                        dataFim = new Date(anoAtual, mesAtual + 1, 0);
-                }
-                
-                // Preparar o corpo da requisição
-                const body = { schema: 'all' };
-                
-                // Adicionar filtros de data apenas se definidos
-                if (dataInicio && dataFim) {
-                    body.filters = {
-                        dataInicio: dataInicio.toISOString(),
-                        dataFim: dataFim.toISOString()
-                    };
-                }
+            // Solicitar TODOS os dados ao Core uma vez
+            function solicitarTodosDadosAoCore() {
+                console.log('🔄 Solicitando TODOS os dados da API...');
                 
                 fetch('/api/database/query', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(body)
+                    body: JSON.stringify({ schema: 'all' })
                 })
                 .then(response => {
                     if (!response.ok) {
@@ -1002,25 +963,93 @@
                     return response.json();
                 })
                 .then(result => {
-                    const eventos = result.events || [];
-                    console.log(`✅ Dados recebidos da API (${periodoAtual}):`, eventos.length, 'eventos');
+                    todosEventos = result.events || [];
+                    console.log(`✅ Todos os dados recebidos da API:`, todosEventos.length, 'eventos');
                     
-                    if (!eventos || !Array.isArray(eventos)) {
+                    if (!todosEventos || !Array.isArray(todosEventos)) {
                         console.error('❌ Dados inválidos recebidos da API');
                         return;
                     }
                     
-                    // Processar dados
-                    dadosCore = processarDadosParaDashboard(eventos, periodoAtual);
-                    console.log('📊 Dados processados para dashboard:', dadosCore);
-                    
-                    atualizarInterface(dadosCore);
-                    atualizarGraficosComDados(dadosCore);
-                    
-                    console.log('📊 Dashboard atualizado com sucesso');
+                    // Processar dados com o período atual
+                    processarEFiltrarDados();
                 })
                 .catch(error => {
                     console.error('❌ Erro ao buscar dados da API:', error);
+                });
+            }
+            
+            // Processar e filtrar dados localmente com base no período selecionado
+            function processarEFiltrarDados() {
+                console.log(`🔍 Filtrando dados para período: ${periodoAtual}`);
+                
+                if (todosEventos.length === 0) {
+                    console.warn('⚠️ Nenhum dado disponível para filtrar');
+                    return;
+                }
+                
+                // Filtrar eventos com base no período selecionado
+                const eventosFiltrados = filtrarEventosPorPeriodo(todosEventos, periodoAtual);
+                console.log(`📊 Eventos filtrados: ${eventosFiltrados.length} de ${todosEventos.length} total`);
+                
+                // Processar dados para o dashboard
+                dadosCore = processarDadosParaDashboard(eventosFiltrados, periodoAtual);
+                console.log('📊 Dados processados para dashboard:', dadosCore);
+                
+                // Atualizar interface e gráficos
+                atualizarInterface(dadosCore);
+                atualizarGraficosComDados(dadosCore);
+                
+                console.log('📊 Dashboard atualizado com sucesso para período:', periodoAtual);
+            }
+            
+            // Filtrar eventos por período - FUNÇÃO CORRIGIDA
+            function filtrarEventosPorPeriodo(eventos, periodo) {
+                const agora = new Date();
+                const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
+                
+                let dataInicio, dataFim;
+                
+                switch(periodo) {
+                    case 'mes_anterior':
+                        // Mês anterior completo
+                        dataInicio = new Date(agora.getFullYear(), agora.getMonth() - 1, 1);
+                        dataFim = new Date(agora.getFullYear(), agora.getMonth(), 0);
+                        break;
+                        
+                    case 'trimestre':
+                        // Últimos 3 meses completos
+                        dataInicio = new Date(agora.getFullYear(), agora.getMonth() - 3, 1);
+                        dataFim = new Date(agora.getFullYear(), agora.getMonth() + 1, 0);
+                        break;
+                        
+                    case 'ano_atual':
+                        // Desde o início do ano até hoje
+                        dataInicio = new Date(agora.getFullYear(), 0, 1);
+                        dataFim = hoje;
+                        break;
+                        
+                    case 'todos':
+                        // Todos os dados (sem filtro)
+                        return eventos;
+                        
+                    case 'mes_atual':
+                    default:
+                        // Mês atual até hoje (não o mês completo)
+                        dataInicio = new Date(agora.getFullYear(), agora.getMonth(), 1);
+                        dataFim = hoje;
+                }
+                
+                console.log(`📅 Filtrando eventos de ${dataInicio.toLocaleDateString()} até ${dataFim.toLocaleDateString()}`);
+                
+                return eventos.filter(evento => {
+                    if (evento.deleted) return false;
+                    
+                    // Usar timestamp do evento (corrigido para buscar o campo correto)
+                    const dataEvento = new Date(evento.timestamp || evento.created_at);
+                    
+                    // Verificar se a data do evento está dentro do período
+                    return dataEvento >= dataInicio && dataEvento <= dataFim;
                 });
             }
             
@@ -1101,11 +1130,15 @@
                 const mesAnterior = mesAtual === 0 ? 11 : mesAtual - 1;
                 const anoMesAnterior = mesAtual === 0 ? anoAtual - 1 : anoAtual;
                 
+                // Calcular datas do mês anterior para comparação
+                const dataInicioMesAnterior = new Date(anoMesAnterior, mesAnterior, 1);
+                const dataFimMesAnterior = new Date(anoMesAnterior, mesAnterior + 1, 0);
+                
                 // Processar todos os eventos
                 eventos.forEach((evento, index) => {
                     if (evento.deleted) return;
                     
-                    const dataEvento = new Date(evento.created_at);
+                    const dataEvento = new Date(evento.timestamp || evento.created_at);
                     const mesEvento = dataEvento.getMonth();
                     const anoEvento = dataEvento.getFullYear();
                     
@@ -1121,6 +1154,7 @@
                             }
                             
                             // Agrupar como venda
+                            totalVendas += valorTotal;
                             totalPedidos += valorTotal;
                             
                             // Contar pedidos por status
@@ -1147,6 +1181,12 @@
                                     }
                                 });
                             }
+                        }
+                        
+                        // Calcular dados do mês anterior para comparação
+                        if (dataEvento >= dataInicioMesAnterior && dataEvento <= dataFimMesAnterior) {
+                            vendasMesAnterior += valorTotal || 0;
+                            pedidosMesAnterior += valorTotal || 0;
                         }
                         
                     } else if (evento.schema === 'despesa') {
@@ -1185,24 +1225,21 @@
                             }
                             despesasPorCategoria[categoriaLimpa] += valorDespesa;
                             
-                            // Calcular dados do período de comparação (mês anterior)
-                            const dataInicioComparacao = new Date(anoMesAnterior, mesAnterior, 1);
-                            const dataFimComparacao = new Date(anoMesAnterior, mesAnterior + 1, 0, 23, 59, 59, 999);
-                            
-                            if (dataEvento >= dataInicioComparacao && dataEvento <= dataFimComparacao) {
+                            // Calcular dados do mês anterior para comparação
+                            if (dataEvento >= dataInicioMesAnterior && dataEvento <= dataFimMesAnterior) {
                                 despesasMesAnterior += valorDespesa;
                             }
                         }
                     }
                     
-                    // Agrupar por mês para histórico
+                    // Agrupar por mês para histórico (apenas se o evento estiver no período selecionado)
                     const mesParaHistorico = dataEvento.getMonth();
                     const anoParaHistorico = dataEvento.getFullYear();
                     const chaveMes = `${anoParaHistorico}-${mesParaHistorico}`;
                     
                     const diferencaMeses = (anoAtual - anoParaHistorico) * 12 + (mesAtual - mesParaHistorico);
                     
-                    // Histórico dos últimos 6 meses
+                    // Histórico dos últimos 6 meses (sempre dos últimos 6 meses, independente do filtro)
                     if (diferencaMeses >= 0 && diferencaMeses < 6) {
                         if (!meses[chaveMes]) {
                             meses[chaveMes] = { vendas: 0, despesas: 0 };
@@ -1257,10 +1294,6 @@
                     }
                 });
                 
-                // Calcular vendas totais (apenas pedidos)
-                const vendasTotais = totalPedidos;
-                const vendasTotaisMesAnterior = pedidosMesAnterior;
-                
                 // Calcular variação das despesas
                 let variacaoDespesas = 0;
                 if (despesasMesAnterior > 0 && totalDespesas > 0) {
@@ -1273,11 +1306,11 @@
                 
                 // Calcular variação das vendas
                 let variacaoVendas = 0;
-                if (vendasTotaisMesAnterior > 0 && vendasTotais > 0) {
-                    variacaoVendas = ((vendasTotais - vendasTotaisMesAnterior) / vendasTotaisMesAnterior) * 100;
-                } else if (vendasTotais > 0 && vendasTotaisMesAnterior === 0) {
+                if (vendasMesAnterior > 0 && totalVendas > 0) {
+                    variacaoVendas = ((totalVendas - vendasMesAnterior) / vendasMesAnterior) * 100;
+                } else if (totalVendas > 0 && vendasMesAnterior === 0) {
                     variacaoVendas = 100;
-                } else if (vendasTotais === 0 && vendasTotaisMesAnterior > 0) {
+                } else if (totalVendas === 0 && vendasMesAnterior > 0) {
                     variacaoVendas = -100;
                 }
                 
@@ -1302,7 +1335,7 @@
                 // Se não houver categorias com valores positivos, adicionar uma mensagem
                 if (topVendasCategorias.length === 0) {
                     topVendasCategorias.push({ 
-                        categoria: 'Sem dados de vendas', 
+                        categoria: periodo === 'mes_atual' ? 'Sem vendas este mês' : 'Sem dados de vendas', 
                         valor: 0 
                     });
                 }
@@ -1319,14 +1352,20 @@
                 
                 // Mensagens para gráficos vazios
                 if (topVendasCategorias.length === 0) {
-                    topVendasCategorias.push({ categoria: 'Nenhuma venda registrada', valor: 0 });
+                    topVendasCategorias.push({ 
+                        categoria: periodo === 'mes_atual' ? 'Nenhuma venda este mês' : 'Nenhuma venda registrada', 
+                        valor: 0 
+                    });
                 }
                 
                 if (topDespesasCategorias.length === 0) {
-                    topDespesasCategorias.push({ categoria: 'Nenhuma despesa registrada', valor: 0 });
+                    topDespesasCategorias.push({ 
+                        categoria: periodo === 'mes_atual' ? 'Nenhuma despesa este mês' : 'Nenhuma despesa registrada', 
+                        valor: 0 
+                    });
                 }
                 
-                // Gerar histórico dos últimos 6 meses
+                // Gerar histórico dos últimos 6 meses (sempre dos últimos 6 meses)
                 const historicoMensal = [];
                 const mesesNomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
                 
@@ -1343,7 +1382,7 @@
                     });
                 }
                 
-                // Gerar histórico dos últimos 12 meses para o novo gráfico
+                // Gerar histórico dos últimos 12 meses
                 const historicoAnual = [];
                 for (let i = 11; i >= 0; i--) {
                     const data = new Date(anoAtual, mesAtual - i, 1);
@@ -1359,18 +1398,21 @@
                 }
                 
                 console.log('📊 DADOS FINAIS PARA INTERFACE:', {
-                    vendasTotal: vendasTotais.toFixed(2),
+                    periodo: periodo,
+                    vendasTotal: totalVendas.toFixed(2),
                     totalDespesas: totalDespesas.toFixed(2),
                     totalAReceber: totalAReceber.toFixed(2),
                     totalAPagar: totalAPagar.toFixed(2),
-                    metaDiariaReal: calcularMetaDiariaReal(vendasTotais, 10000).toFixed(2),
+                    metaDiariaReal: calcularMetaDiariaReal(totalVendas, 10000).toFixed(2),
                     variacaoDespesas: variacaoDespesas.toFixed(1),
-                    variacaoVendas: variacaoVendas.toFixed(1)
+                    variacaoVendas: variacaoVendas.toFixed(1),
+                    vendasMesAnterior: vendasMesAnterior.toFixed(2),
+                    despesasMesAnterior: despesasMesAnterior.toFixed(2)
                 });
                 
                 return {
                     vendas: {
-                        total: vendasTotais,
+                        total: totalVendas,
                         variacao: variacaoVendas.toFixed(1)
                     },
                     pedidos: {
@@ -1383,10 +1425,10 @@
                         variacao: variacaoDespesas.toFixed(1)
                     },
                     equilibrio: {
-                        atingido: vendasTotais,
+                        atingido: totalVendas,
                         meta: 10000,
-                        percentual: Math.min(100, Math.max(0, (vendasTotais / 10000) * 100)).toFixed(1),
-                        metaDiaria: calcularMetaDiariaReal(vendasTotais, 10000)
+                        percentual: Math.min(100, Math.max(0, (totalVendas / 10000) * 100)).toFixed(1),
+                        metaDiaria: calcularMetaDiariaReal(totalVendas, 10000)
                     },
                     contas: {
                         receber: totalAReceber,
@@ -1452,9 +1494,29 @@
                     console.log('✅ Restante a Pagar atualizado:', formatarMoeda(dados.contas?.pagar || 0));
                 }
                 
-                document.querySelector('[data-bind="vendas.variacao"]').textContent = formatarPercentual(dados.vendas.variacao);
-                document.querySelector('[data-bind="despesas.variacao"]').textContent = formatarPercentual(dados.despesas.variacao);
+                // Atualizar variações
+                const elementoVariacaoVendas = document.querySelector('[data-bind="vendas.variacao"]');
+                const elementoVariacaoDespesas = document.querySelector('[data-bind="despesas.variacao"]');
                 
+                if (elementoVariacaoVendas) {
+                    const variacao = parseFloat(dados.vendas.variacao);
+                    elementoVariacaoVendas.textContent = formatarPercentual(variacao);
+                    elementoVariacaoVendas.className = variacao >= 0 ? 'positive' : 'negative';
+                    
+                    // Atualizar ícone de seta
+                    const seta = elementoVariacaoVendas.closest('.metric-change').querySelector('i');
+                    if (seta) {
+                        seta.className = variacao >= 0 ? 'fas fa-arrow-up positive' : 'fas fa-arrow-down negative';
+                    }
+                }
+                
+                if (elementoVariacaoDespesas) {
+                    const variacao = parseFloat(dados.despesas.variacao);
+                    elementoVariacaoDespesas.textContent = formatarPercentual(variacao);
+                    elementoVariacaoDespesas.className = variacao >= 0 ? 'positive' : 'negative';
+                }
+                
+                // Atualizar pedidos
                 document.querySelector('[data-bind="pedidos.ativos"]').textContent = dados.pedidos.ativos;
                 document.querySelector('[data-bind="pedidos.concluidos"]').textContent = `${dados.pedidos.concluidos}/${dados.pedidos.total}`;
                 
@@ -1849,11 +1911,11 @@
             
             inicializar();
             
-            // Atualizar dados a cada 15 segundos
-            setInterval(solicitarDadosAoCore, 15000);
+            // Atualizar dados a cada 30 segundos (reduzido para economizar recursos)
+            setInterval(solicitarTodosDadosAoCore, 30000);
             
             // Forçar solicitação inicial após 1 segundo
-            setTimeout(solicitarDadosAoCore, 1000);
+            setTimeout(solicitarTodosDadosAoCore, 1000);
         });
     </script>
     
