@@ -233,18 +233,7 @@ app.get('/api/database/stats', async (req, res) => {
   }
 });
 
-// Servir o index.html na raiz
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// Rota para servir qualquer página HTML
-app.get('/*.html', (req, res) => {
-  const filePath = path.join(__dirname, req.path);
-  res.sendFile(filePath);
-});
-
-// API para upload via celular
+// API para upload via celular (NOVA FUNÇÃO ADICIONADA)
 app.post('/api/upload/nota-fiscal', async (req, res) => {
   try {
     const { sessionId, despesaId, fileData } = req.body;
@@ -256,8 +245,8 @@ app.post('/api/upload/nota-fiscal', async (req, res) => {
       });
     }
     
-    console.log(` Upload recebido: sessão=${sessionId}, despesa=${despesaId}`);
-    console.log(` Tamanho: ${fileData.tamanhoOtimizado} bytes`);
+    console.log(`📱 Upload recebido: sessão=${sessionId}, despesa=${despesaId}`);
+    console.log(`📏 Tamanho: ${fileData.tamanhoOtimizado} bytes`);
     
     // Buscar a despesa correspondente
     let despesaRef;
@@ -266,6 +255,16 @@ app.post('/api/upload/nota-fiscal', async (req, res) => {
       // Despesa ainda não foi salva, criar temporariamente
       const tempId = despesaId.replace('pending-', '');
       despesaRef = db.collection('temp_uploads').doc(sessionId);
+      
+      // Salvar como upload temporário
+      await despesaRef.set({
+        sessionId: sessionId,
+        despesaId: despesaId,
+        fileData: fileData,
+        timestamp: new Date().toISOString(),
+        status: 'pending'
+      });
+      
     } else {
       // Despesa já existe, atualizar
       despesaRef = db.collection('events').doc(despesaId);
@@ -277,20 +276,9 @@ app.post('/api/upload/nota-fiscal', async (req, res) => {
           message: 'Despesa não encontrada' 
         });
       }
-    }
-    
-    // Salvar upload temporário
-    await db.collection('mobile_uploads').doc(sessionId).set({
-      sessionId: sessionId,
-      despesaId: despesaId,
-      fileData: fileData,
-      timestamp: new Date().toISOString(),
-      status: 'uploaded'
-    });
-    
-    // Se a despesa já existe, atualizar com o anexo
-    if (!despesaId.startsWith('pending-')) {
-      const despesaData = (await despesaRef.get()).data();
+      
+      // Atualizar a despesa existente com o anexo
+      const despesaData = despesaDoc.data();
       
       await despesaRef.update({
         'payload.notaFiscal': fileData.base64,
@@ -300,6 +288,15 @@ app.post('/api/upload/nota-fiscal', async (req, res) => {
         'payload.updated_at': new Date().toISOString()
       });
     }
+    
+    // Salvar upload temporário para verificação via QR Code
+    await db.collection('mobile_uploads').doc(sessionId).set({
+      sessionId: sessionId,
+      despesaId: despesaId,
+      fileData: fileData,
+      timestamp: new Date().toISOString(),
+      status: 'uploaded'
+    });
     
     res.json({
       success: true,
@@ -317,57 +314,70 @@ app.post('/api/upload/nota-fiscal', async (req, res) => {
   }
 });
 
-// API para verificar upload (usada pelo QR Code)
+// API para verificar upload (usada pelo QR Code) (NOVA FUNÇÃO ADICIONADA)
 app.get('/api/upload/check', async (req, res) => {
-try {
-  const { session } = req.query;
-  
-  if (!session) {
-    return res.status(400).json({ 
+  try {
+    const { session } = req.query;
+    
+    if (!session) {
+      return res.status(400).json({ 
+        status: 'error', 
+        message: 'Sessão não especificada' 
+      });
+    }
+    
+    const uploadRef = db.collection('mobile_uploads').doc(session);
+    const uploadDoc = await uploadRef.get();
+    
+    if (!uploadDoc.exists) {
+      return res.json({ 
+        status: 'waiting', 
+        message: 'Aguardando upload' 
+      });
+    }
+    
+    const uploadData = uploadDoc.data();
+    
+    // Remover do armazenamento temporário após consulta
+    await uploadRef.delete();
+    
+    res.json({
+      status: 'uploaded',
+      fileData: uploadData.fileData,
+      timestamp: uploadData.timestamp
+    });
+    
+  } catch (error) {
+    console.error('Erro ao verificar upload:', error);
+    res.status(500).json({ 
       status: 'error', 
-      message: 'Sessão não especificada' 
+      message: error.message 
     });
   }
-  
-  const uploadRef = db.collection('mobile_uploads').doc(session);
-  const uploadDoc = await uploadRef.get();
-  
-  if (!uploadDoc.exists) {
-    return res.json({ 
-      status: 'waiting', 
-      message: 'Aguardando upload' 
-    });
-  }
-  
-  const uploadData = uploadDoc.data();
-  
-  // Remover do armazenamento temporário após consulta
-  await uploadRef.delete();
-  
-  res.json({
-    status: 'uploaded',
-    fileData: uploadData.fileData,
-    timestamp: uploadData.timestamp
-  });
-  
-} catch (error) {
-  console.error('Erro ao verificar upload:', error);
-  res.status(500).json({ 
-    status: 'error', 
-    message: error.message 
-  });
-}
+});
+
+// Servir o index.html na raiz
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+// Rota para servir qualquer página HTML
+app.get('/*.html', (req, res) => {
+  const filePath = path.join(__dirname, req.path);
+  res.sendFile(filePath);
 });
 
 // Iniciar servidor
 app.listen(PORT, () => {
-  console.log(` CRM PRINT PIXEL ONLINE - PORTA ${PORT}`);
-  console.log(` ${new Date().toLocaleString()}`);
-  console.log(` Acesse: http://localhost:${PORT}`);
-  console.log(` Endpoints disponíveis:`);
+  console.log(`🚀 CRM PRINT PIXEL ONLINE - PORTA ${PORT}`);
+  console.log(`📅 ${new Date().toLocaleString()}`);
+  console.log(`🌐 Acesse: http://localhost:${PORT}`);
+  console.log(`🔧 Endpoints disponíveis:`);
   console.log(`   GET  /api/database/init     - Testar Firebase`);
   console.log(`   POST /api/database/commit   - Salvar/Atualizar dados`);
   console.log(`   POST /api/database/query    - Consultar dados (AGORA É POST!)`);
   console.log(`   POST /api/database/delete   - Soft delete`);
   console.log(`   GET  /api/database/stats    - Estatísticas`);
+  console.log(`   POST /api/upload/nota-fiscal - Upload via celular (NOVO)`);
+  console.log(`   GET  /api/upload/check      - Verificar upload (NOVO)`);
 });
