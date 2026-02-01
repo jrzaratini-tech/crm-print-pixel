@@ -130,7 +130,28 @@
             color: #64748b;
         }
         
-        .scanner-container {
+        /* Botão do scanner nativo - DESTACADO */
+        .scanner-native-btn {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border: none;
+            color: white;
+        }
+        
+        .scanner-native-btn:hover {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            border: none;
+        }
+        
+        .scanner-native-btn i {
+            color: white;
+        }
+        
+        .scanner-native-btn .upload-btn-text,
+        .scanner-native-btn .upload-btn-desc {
+            color: white;
+        }
+        
+        .camera-container {
             width: 100%;
             height: 300px;
             background: #1e293b;
@@ -141,13 +162,13 @@
             display: none;
         }
         
-        #scannerVideo {
+        #cameraVideo {
             width: 100%;
             height: 100%;
             object-fit: cover;
         }
         
-        .scanner-overlay {
+        .camera-overlay {
             position: absolute;
             top: 0;
             left: 0;
@@ -160,7 +181,7 @@
             align-items: center;
         }
         
-        .scanner-frame {
+        .camera-frame {
             width: 80%;
             height: 200px;
             border: 3px solid white;
@@ -168,14 +189,14 @@
             margin-bottom: 20px;
         }
         
-        .scanner-instruction {
+        .camera-instruction {
             color: white;
             font-size: 16px;
             text-align: center;
             padding: 0 20px;
         }
         
-        .scanner-controls {
+        .camera-controls {
             position: absolute;
             bottom: 20px;
             left: 0;
@@ -185,7 +206,7 @@
             gap: 20px;
         }
         
-        .scanner-btn {
+        .camera-btn {
             width: 60px;
             height: 60px;
             border-radius: 50%;
@@ -198,22 +219,22 @@
             transition: all 0.2s;
         }
         
-        .scanner-btn-capture {
+        .camera-btn-capture {
             background: #3b82f6;
             color: white;
         }
         
-        .scanner-btn-capture:hover {
+        .camera-btn-capture:hover {
             background: #2563eb;
             transform: scale(1.1);
         }
         
-        .scanner-btn-cancel {
+        .camera-btn-cancel {
             background: #64748b;
             color: white;
         }
         
-        .scanner-btn-cancel:hover {
+        .camera-btn-cancel:hover {
             background: #475569;
         }
         
@@ -401,24 +422,16 @@
             margin-bottom: 8px;
         }
         
-        /* Novo estilo para o scanner nativo */
-        .native-scanner-btn {
-            background: #10b981;
-            border-color: #10b981;
+        .ios-only {
+            display: none;
         }
         
-        .native-scanner-btn:hover {
-            background: #059669;
-            border-color: #059669;
+        .ios-detected .ios-only {
+            display: block;
         }
         
-        .native-scanner-btn i {
-            color: white;
-        }
-        
-        .native-scanner-btn .upload-btn-text,
-        .native-scanner-btn .upload-btn-desc {
-            color: white;
+        .ios-detected .non-ios {
+            display: none;
         }
         
         @media (max-width: 480px) {
@@ -462,25 +475,25 @@
             </div>
             
             <div class="upload-options">
-                <!-- SCANNER NATIVO DO iPHONE (PRINCIPAL) -->
-                <a href="#" class="upload-btn native-scanner-btn" id="nativeScannerBtn">
+                <!-- SCANNER NATIVO DO iPHONE - APENAS PARA iOS -->
+                <a href="#" class="upload-btn scanner-native-btn ios-only" id="iosScannerBtn">
                     <i class="fas fa-document-scanner"></i>
                     <div>
-                        <div class="upload-btn-text">Scanner Nativo iPhone</div>
-                        <div class="upload-btn-desc">Usa o scanner profissional do iOS</div>
+                        <div class="upload-btn-text">📄 Scanner do iPhone</div>
+                        <div class="upload-btn-desc">Abre o scanner nativo do Bloco de Notas</div>
                     </div>
                 </a>
                 
-                <!-- CÂMERA SIMPLES (ALTERNATIVA) -->
-                <a href="#" class="upload-btn" id="cameraBtn">
+                <!-- CÂMERA NORMAL PARA TODOS -->
+                <a href="#" class="upload-btn non-ios" id="cameraBtn">
                     <i class="fas fa-camera"></i>
                     <div>
-                        <div class="upload-btn-text">Tirar Foto Simples</div>
-                        <div class="upload-btn-desc">Use a câmera normal</div>
+                        <div class="upload-btn-text">Tirar Foto</div>
+                        <div class="upload-btn-desc">Use a câmera do celular</div>
                     </div>
                 </a>
                 
-                <!-- GALERIA (ALTERNATIVA) -->
+                <!-- GALERIA PARA TODOS -->
                 <a href="#" class="upload-btn" id="galleryBtn">
                     <i class="fas fa-image"></i>
                     <div>
@@ -491,35 +504,43 @@
             </div>
             
             <div class="instructions">
-                <h3>📝 Instruções para Scanner Nativo:</h3>
-                <ol>
-                    <li><strong>Clique em "Scanner Nativo iPhone"</strong></li>
-                    <li>O iOS abrirá o scanner profissional automaticamente</li>
+                <h3 class="ios-only">📱 Para iPhone/iPad:</h3>
+                <ol class="ios-only">
+                    <li><strong>Clique em "Scanner do iPhone"</strong></li>
+                    <li>O iOS abrirá automaticamente o <strong>scanner do Bloco de Notas</strong></li>
                     <li>Aponte para o documento - ele detecta bordas automaticamente</li>
-                    <li>Toque no botão de captura (ou ele captura sozinho)</li>
-                    <li>Use os controles para ajustar corte e filtros</li>
-                    <li>Salve - a imagem já virá otimizada e processada</li>
+                    <li>Capture - o scanner já otimiza e corta o documento</li>
+                    <li>Salve - a imagem chegará pronta e compacta</li>
                 </ol>
-                <p style="margin-top: 10px; color: #059669; font-size: 12px;">
-                    <i class="fas fa-check-circle"></i> <strong>Dica:</strong> O scanner nativo já faz todo o processamento automático!
+                
+                <h3 class="non-ios">📱 Para outros dispositivos:</h3>
+                <ol class="non-ios">
+                    <li>Use a câmera para tirar uma foto</li>
+                    <li>Posicione o documento em uma superfície plana</li>
+                    <li>Evite sombras e reflexos</li>
+                    <li>O sistema otimizará automaticamente a imagem</li>
+                </ol>
+                
+                <p style="margin-top: 10px; color: #059669; font-size: 12px; font-weight: 600;">
+                    <i class="fas fa-lightbulb"></i> <strong>Dica:</strong> No iPhone, use sempre o scanner nativo para melhor qualidade!
                 </p>
             </div>
         </div>
         
-        <!-- TELA DO SCANNER SIMPLES (alternativa) -->
-        <div class="scanner-container" id="scannerScreen">
-            <video id="scannerVideo" autoplay playsinline></video>
-            <div class="scanner-overlay">
-                <div class="scanner-frame"></div>
-                <div class="scanner-instruction" id="scannerInstruction">
+        <!-- TELA DA CÂMERA (apenas para não-iOS) -->
+        <div class="camera-container" id="cameraScreen">
+            <video id="cameraVideo" autoplay playsinline></video>
+            <div class="camera-overlay">
+                <div class="camera-frame"></div>
+                <div class="camera-instruction" id="cameraInstruction">
                     Posicione a nota fiscal dentro do quadro
                 </div>
             </div>
-            <div class="scanner-controls">
-                <button class="scanner-btn scanner-btn-cancel" id="cancelScannerBtn">
+            <div class="camera-controls">
+                <button class="camera-btn camera-btn-cancel" id="cancelCameraBtn">
                     <i class="fas fa-times"></i>
                 </button>
-                <button class="scanner-btn scanner-btn-capture" id="captureBtn">
+                <button class="camera-btn camera-btn-capture" id="captureBtn">
                     <i class="fas fa-camera"></i>
                 </button>
             </div>
@@ -567,35 +588,38 @@
         </div>
     </div>
 
-    <!-- INPUT OCULTO PARA SCANNER NATIVO -->
-    <input type="file" id="nativeScannerInput" accept="image/*" capture="environment" style="display: none;">
+    <!-- INPUT OCULTO PARA SCANNER NATIVO DO iOS (MÚLTIPLO) -->
+    <input type="file" id="iosScannerInput" accept="image/*" capture="environment" multiple style="display: none;">
+    
+    <!-- INPUT OCULTO PARA CÂMERA NORMAL -->
+    <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;">
     
     <!-- INPUT OCULTO PARA GALERIA -->
     <input type="file" id="galleryInput" accept="image/*" style="display: none;">
 
     <script>
         // ============================================
-        // SISTEMA DE UPLOAD VIA CELULAR COM SCANNER NATIVO
+        // SISTEMA DE UPLOAD VIA CELULAR
         // ============================================
         
         document.addEventListener('DOMContentLoaded', () => {
-            console.log('📱 Sistema de upload mobile com scanner nativo inicializado');
+            console.log('📱 Sistema de upload mobile inicializado');
             
             // Elementos do DOM
             const despesaCodeEl = document.getElementById('despesaCode');
             const initialScreen = document.getElementById('initialScreen');
-            const scannerScreen = document.getElementById('scannerScreen');
+            const cameraScreen = document.getElementById('cameraScreen');
             const previewScreen = document.getElementById('previewScreen');
             const progressScreen = document.getElementById('progressScreen');
             const successScreen = document.getElementById('successScreen');
             const errorScreen = document.getElementById('errorScreen');
             
-            // Botões principais
-            const nativeScannerBtn = document.getElementById('nativeScannerBtn');
+            // Botões
+            const iosScannerBtn = document.getElementById('iosScannerBtn');
             const cameraBtn = document.getElementById('cameraBtn');
             const galleryBtn = document.getElementById('galleryBtn');
-            const scannerVideo = document.getElementById('scannerVideo');
-            const cancelScannerBtn = document.getElementById('cancelScannerBtn');
+            const cameraVideo = document.getElementById('cameraVideo');
+            const cancelCameraBtn = document.getElementById('cancelCameraBtn');
             const captureBtn = document.getElementById('captureBtn');
             const previewImage = document.getElementById('previewImage');
             const retakeBtn = document.getElementById('retakeBtn');
@@ -604,7 +628,8 @@
             const retryBtn = document.getElementById('retryBtn');
             
             // Inputs ocultos
-            const nativeScannerInput = document.getElementById('nativeScannerInput');
+            const iosScannerInput = document.getElementById('iosScannerInput');
+            const cameraInput = document.getElementById('cameraInput');
             const galleryInput = document.getElementById('galleryInput');
             
             // Variáveis
@@ -612,6 +637,7 @@
             let capturedPhoto = null;
             let sessionId = '';
             let despesaId = '';
+            let isIOS = false;
             
             // Pegar parâmetros da URL
             const urlParams = new URLSearchParams(window.location.search);
@@ -629,6 +655,15 @@
             console.log('🔗 Sessão:', sessionId);
             console.log('💰 Despesa:', despesaId);
             
+            // Detectar se é iOS
+            isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            console.log('📱 Dispositivo iOS?', isIOS);
+            
+            // Ajustar interface para iOS
+            if (isIOS) {
+                document.body.classList.add('ios-detected');
+            }
+            
             // ============================================
             // FUNÇÕES DE CONTROLE DE TELAS
             // ============================================
@@ -636,7 +671,7 @@
             function showScreen(screenName) {
                 // Esconder todas as telas
                 initialScreen.style.display = 'none';
-                scannerScreen.style.display = 'none';
+                cameraScreen.style.display = 'none';
                 previewScreen.style.display = 'none';
                 progressScreen.style.display = 'none';
                 successScreen.style.display = 'none';
@@ -647,9 +682,9 @@
                     case 'initial':
                         initialScreen.style.display = 'block';
                         break;
-                    case 'scanner':
-                        scannerScreen.style.display = 'block';
-                        startScanner();
+                    case 'camera':
+                        cameraScreen.style.display = 'block';
+                        startCamera();
                         break;
                     case 'preview':
                         previewScreen.style.display = 'block';
@@ -667,92 +702,130 @@
             }
             
             // ============================================
-            // SCANNER NATIVO DO IPHONE (PRINCIPAL)
+            // SCANNER NATIVO DO iOS (Bloco de Notas)
             // ============================================
             
-            function openNativeScanner() {
-                console.log('📄 Abrindo scanner nativo do iPhone...');
+            function openIOSScanner() {
+                console.log('📄 Abrindo scanner nativo do iOS (Bloco de Notas)...');
                 
-                // Limpar input anterior
-                nativeScannerInput.value = '';
+                // Para iOS, precisamos criar um input dinâmico com múltiplo
+                const scannerInput = document.createElement('input');
+                scannerInput.type = 'file';
+                scannerInput.accept = 'image/*';
+                scannerInput.capture = 'environment';
+                scannerInput.multiple = true; // 🔥 CRÍTICO: Isso ativa o scanner de documentos!
+                scannerInput.style.display = 'none';
                 
-                // Disparar clique no input oculto
-                nativeScannerInput.click();
+                scannerInput.onchange = (event) => {
+                    handleScannerFiles(event.target.files);
+                    document.body.removeChild(scannerInput);
+                };
+                
+                document.body.appendChild(scannerInput);
+                scannerInput.click();
             }
             
-            // Configurar evento para quando selecionar arquivo
-            nativeScannerInput.addEventListener('change', async (event) => {
-                const file = event.target.files[0];
-                if (!file) return;
+            async function handleScannerFiles(files) {
+                if (!files || files.length === 0) return;
                 
-                console.log('📁 Arquivo selecionado do scanner nativo:', {
+                console.log(`📁 Scanner retornou ${files.length} arquivo(s)`);
+                
+                // Pegar o primeiro arquivo (ou múltiplos se quiser)
+                const file = files[0];
+                
+                console.log('📄 Arquivo do scanner:', {
                     name: file.name,
                     type: file.type,
                     size: (file.size / 1024).toFixed(2) + 'KB'
                 });
                 
-                if (!file.type.startsWith('image/')) {
-                    showError('Por favor, selecione apenas imagens.');
-                    return;
-                }
-                
                 try {
-                    // Mostrar tela de progresso
                     showScreen('progress');
-                    document.getElementById('progressText').textContent = 'Processando imagem do scanner...';
+                    document.getElementById('progressText').textContent = 'Processando documento do scanner...';
                     
-                    // Processar imagem do scanner nativo
-                    const processed = await processScannerImage(file);
-                    
-                    capturedPhoto = processed.base64;
-                    previewImage.src = capturedPhoto;
-                    
-                    // Mostrar preview
-                    showScreen('preview');
-                    
-                    console.log('✅ Imagem do scanner processada:', {
-                        original: processed.tamanhoOriginal,
-                        otimizado: processed.tamanhoOtimizado
-                    });
-                    
-                } catch (error) {
-                    console.error('❌ Erro ao processar imagem do scanner:', error);
-                    showError('Erro ao processar imagem do scanner. Tente novamente.');
-                    showScreen('initial');
-                }
-            });
-            
-            async function processScannerImage(file) {
-                return new Promise((resolve, reject) => {
+                    // Usar FileReader para ler o arquivo
                     const reader = new FileReader();
                     reader.readAsDataURL(file);
                     
                     reader.onload = async (event) => {
-                        try {
-                            const base64Image = event.target.result;
-                            
-                            // O scanner nativo já entrega imagem boa, mas ainda otimizamos
-                            const processed = await processImageForUpload(base64Image, true);
-                            
-                            resolve(processed);
-                        } catch (error) {
-                            reject(error);
-                        }
+                        const base64Image = event.target.result;
+                        
+                        // O scanner do iOS já entrega imagem otimizada, mas ainda comprimimos
+                        const processed = await processImageForUpload(base64Image, true);
+                        
+                        capturedPhoto = processed.base64;
+                        previewImage.src = capturedPhoto;
+                        
+                        showScreen('preview');
+                        
+                        console.log('✅ Documento do scanner processado:', {
+                            original: processed.tamanhoOriginal,
+                            otimizado: processed.tamanhoOtimizado,
+                            reducao: `${((1 - processed.tamanhoOtimizado/processed.tamanhoOriginal) * 100).toFixed(1)}%`
+                        });
                     };
                     
-                    reader.onerror = reject;
-                });
+                } catch (error) {
+                    console.error('❌ Erro ao processar documento do scanner:', error);
+                    showError('Erro ao processar documento. Tente novamente.');
+                    showScreen('initial');
+                }
             }
             
             // ============================================
-            // SCANNER SIMPLES (CÂMERA NORMAL - ALTERNATIVA)
+            // CÂMERA NORMAL (para não-iOS)
             // ============================================
             
-            async function startScanner() {
+            function openCamera() {
+                if (isIOS) {
+                    // No iOS, usamos input normal com capture
+                    cameraInput.click();
+                } else {
+                    // Em outros dispositivos, abrir câmera diretamente
+                    showScreen('camera');
+                }
+            }
+            
+            cameraInput.onchange = (event) => {
+                const file = event.target.files[0];
+                if (file) handleCameraFile(file);
+            };
+            
+            async function handleCameraFile(file) {
+                console.log('📸 Arquivo da câmera:', {
+                    name: file.name,
+                    type: file.type,
+                    size: (file.size / 1024).toFixed(2) + 'KB'
+                });
+                
+                try {
+                    showScreen('progress');
+                    document.getElementById('progressText').textContent = 'Processando foto...';
+                    
+                    const reader = new FileReader();
+                    reader.readAsDataURL(file);
+                    
+                    reader.onload = async (event) => {
+                        const base64Image = event.target.result;
+                        const processed = await processImageForUpload(base64Image, false);
+                        
+                        capturedPhoto = processed.base64;
+                        previewImage.src = capturedPhoto;
+                        showScreen('preview');
+                    };
+                    
+                } catch (error) {
+                    console.error('❌ Erro ao processar foto:', error);
+                    showError('Erro ao processar foto. Tente novamente.');
+                    showScreen('initial');
+                }
+            }
+            
+            async function startCamera() {
                 try {
                     const constraints = {
                         video: {
-                            facingMode: 'environment', // Usar câmera traseira
+                            facingMode: 'environment',
                             width: { ideal: 1920 },
                             height: { ideal: 1080 }
                         },
@@ -760,51 +833,50 @@
                     };
                     
                     currentStream = await navigator.mediaDevices.getUserMedia(constraints);
-                    scannerVideo.srcObject = currentStream;
+                    cameraVideo.srcObject = currentStream;
                     
                 } catch (error) {
                     console.error('Erro ao acessar câmera:', error);
-                    showError('Não foi possível acessar a câmera. Use o scanner nativo ou a galeria.');
+                    showError('Não foi possível acessar a câmera. Verifique as permissões.');
                     showScreen('initial');
                 }
             }
             
-            function stopScanner() {
+            function stopCamera() {
                 if (currentStream) {
                     currentStream.getTracks().forEach(track => track.stop());
                     currentStream = null;
                 }
             }
             
-            function captureFromScanner() {
+            function capturePhoto() {
                 const canvas = document.createElement('canvas');
-                canvas.width = scannerVideo.videoWidth;
-                canvas.height = scannerVideo.videoHeight;
+                canvas.width = cameraVideo.videoWidth;
+                canvas.height = cameraVideo.videoHeight;
                 
                 const ctx = canvas.getContext('2d');
-                ctx.drawImage(scannerVideo, 0, 0, canvas.width, canvas.height);
+                ctx.drawImage(cameraVideo, 0, 0, canvas.width, canvas.height);
                 
                 capturedPhoto = canvas.toDataURL('image/jpeg', 0.9);
                 previewImage.src = capturedPhoto;
                 
-                stopScanner();
+                stopCamera();
                 showScreen('preview');
             }
             
             // ============================================
-            // GALERIA (ALTERNATIVA)
+            // GALERIA
             // ============================================
             
             function openGallery() {
-                console.log('📂 Abrindo galeria...');
                 galleryInput.click();
             }
             
-            galleryInput.addEventListener('change', async (event) => {
+            galleryInput.onchange = async (event) => {
                 const file = event.target.files[0];
                 if (!file) return;
                 
-                console.log('📁 Arquivo selecionado da galeria:', {
+                console.log('📁 Arquivo da galeria:', {
                     name: file.name,
                     type: file.type,
                     size: (file.size / 1024).toFixed(2) + 'KB'
@@ -816,7 +888,7 @@
                 }
                 
                 if (file.size > 20 * 1024 * 1024) {
-                    showError('A imagem é muito grande (máx. 20MB). Use o scanner nativo para otimização automática.');
+                    showError('A imagem é muito grande (máx. 20MB).');
                     return;
                 }
                 
@@ -837,11 +909,11 @@
                     };
                     
                 } catch (error) {
-                    console.error('❌ Erro ao processar imagem da galeria:', error);
+                    console.error('❌ Erro ao processar imagem:', error);
                     showError('Erro ao processar imagem. Tente novamente.');
                     showScreen('initial');
                 }
-            });
+            };
             
             // ============================================
             // PROCESSAMENTO DE IMAGEM
@@ -855,18 +927,16 @@
                     img.onload = () => {
                         const canvas = document.createElement('canvas');
                         
-                        // Configurações diferentes para scanner vs galeria
-                        let maxWidth, maxHeight, quality;
+                        // Configurações diferentes para scanner vs câmera normal
+                        let maxWidth, quality;
                         
                         if (fromScanner) {
                             // Scanner já entrega imagem boa - menos compressão
                             maxWidth = 1600;
-                            maxHeight = 1600;
-                            quality = 0.75; // Qualidade maior para scanner
+                            quality = 0.8; // Alta qualidade
                         } else {
-                            // Galeria/câmera normal - mais compressão
+                            // Câmera/galeria normal - mais compressão
                             maxWidth = 1200;
-                            maxHeight = 1200;
                             quality = 0.65; // Mais compressão
                         }
                         
@@ -874,29 +944,31 @@
                         let height = img.height;
                         
                         // Redimensionar mantendo proporção
-                        if (width > height) {
-                            if (width > maxWidth) {
-                                height = Math.round((height * maxWidth) / width);
-                                width = maxWidth;
-                            }
-                        } else {
-                            if (height > maxHeight) {
-                                width = Math.round((width * maxHeight) / height);
-                                height = maxHeight;
-                            }
+                        if (width > maxWidth) {
+                            height = Math.round((height * maxWidth) / width);
+                            width = maxWidth;
                         }
                         
                         canvas.width = width;
                         canvas.height = height;
                         
                         const ctx = canvas.getContext('2d');
-                        ctx.drawImage(img, 0, 0, width, height);
                         
-                        // Aplicar filtros para melhorar documento (se não for do scanner)
-                        if (!fromScanner) {
-                            const imageData = ctx.getImageData(0, 0, width, height);
-                            const processedData = enhanceDocument(imageData);
-                            ctx.putImageData(processedData, 0, 0);
+                        // Para scanner, manter como está
+                        if (fromScanner) {
+                            ctx.drawImage(img, 0, 0, width, height);
+                        } else {
+                            // Para câmera normal, aplicar filtros de documento
+                            ctx.drawImage(img, 0, 0, width, height);
+                            
+                            // Aplicar melhorias para documentos
+                            try {
+                                const imageData = ctx.getImageData(0, 0, width, height);
+                                const processedData = enhanceDocument(imageData);
+                                ctx.putImageData(processedData, 0, 0);
+                            } catch (e) {
+                                console.log('⚠️ Não foi possível aplicar filtros de documento');
+                            }
                         }
                         
                         const optimizedBase64 = canvas.toDataURL('image/jpeg', quality);
@@ -913,7 +985,6 @@
             }
             
             function enhanceDocument(imageData) {
-                // Algoritmo simples para melhorar documentos
                 const data = imageData.data;
                 
                 for (let i = 0; i < data.length; i += 4) {
@@ -930,10 +1001,9 @@
                     // Limitar valores
                     const final = Math.min(255, Math.max(0, contrasted));
                     
-                    data[i] = final;     // R
-                    data[i + 1] = final; // G
-                    data[i + 2] = final; // B
-                    // Alpha permanece o mesmo
+                    data[i] = final;
+                    data[i + 1] = final;
+                    data[i + 2] = final;
                 }
                 
                 return imageData;
@@ -948,16 +1018,14 @@
                 document.getElementById('progressText').textContent = 'Enviando nota fiscal...';
                 
                 try {
-                    // Processar imagem
                     const processed = await processImageForUpload(base64Image, fromScanner);
                     
                     console.log('📁 Imagem processada para upload:', {
                         original: processed.tamanhoOriginal,
                         otimizado: processed.tamanhoOtimizado,
-                        fromScanner: processed.fromScanner
+                        reducao: `${((1 - processed.tamanhoOtimizado/processed.tamanhoOriginal) * 100).toFixed(1)}%`
                     });
                     
-                    // Enviar para servidor
                     const response = await fetch('/api/upload/nota-fiscal', {
                         method: 'POST',
                         headers: {
@@ -968,20 +1036,15 @@
                             despesaId: despesaId,
                             fileData: processed,
                             timestamp: new Date().toISOString(),
-                            source: fromScanner ? 'native_scanner' : 'camera'
+                            source: fromScanner ? 'ios_scanner' : 'camera'
                         })
                     });
                     
                     if (!response.ok) {
-                        const errorText = await response.text();
-                        console.error('❌ Erro resposta servidor:', errorText);
-                        
-                        // Verificar se é erro 413 (tamanho muito grande)
                         if (response.status === 413) {
-                            throw new Error('Imagem muito grande. O servidor precisa ser configurado para aceitar arquivos maiores.');
+                            throw new Error('Imagem muito grande após compressão. Tente novamente.');
                         }
-                        
-                        throw new Error(`Erro no servidor: ${response.status} - ${errorText}`);
+                        throw new Error(`Erro no servidor: ${response.status}`);
                     }
                     
                     const result = await response.json();
@@ -989,7 +1052,6 @@
                     if (result.success) {
                         showScreen('success');
                         
-                        // Fechar automaticamente após 3 segundos
                         setTimeout(() => {
                             window.close();
                         }, 3000);
@@ -1018,14 +1080,14 @@
             // ============================================
             
             // Botões da tela inicial
-            nativeScannerBtn.addEventListener('click', (e) => {
+            iosScannerBtn.addEventListener('click', (e) => {
                 e.preventDefault();
-                openNativeScanner();
+                openIOSScanner();
             });
             
             cameraBtn.addEventListener('click', (e) => {
                 e.preventDefault();
-                showScreen('scanner');
+                openCamera();
             });
             
             galleryBtn.addEventListener('click', (e) => {
@@ -1033,24 +1095,23 @@
                 openGallery();
             });
             
-            // Controles do scanner simples
-            cancelScannerBtn.addEventListener('click', () => {
-                stopScanner();
+            // Controles da câmera
+            cancelCameraBtn.addEventListener('click', () => {
+                stopCamera();
                 showScreen('initial');
             });
             
-            captureBtn.addEventListener('click', captureFromScanner);
+            captureBtn.addEventListener('click', capturePhoto);
             
             // Controles do preview
             retakeBtn.addEventListener('click', () => {
-                // Voltar para tela inicial para escolher método novamente
                 showScreen('initial');
             });
             
             sendBtn.addEventListener('click', () => {
                 if (capturedPhoto) {
-                    // Determinar se veio do scanner nativo ou não
-                    const fromScanner = nativeScannerInput.files.length > 0;
+                    // Determinar se veio do scanner iOS
+                    const fromScanner = isIOS && capturedPhoto.includes('data:image/jpeg');
                     uploadPhoto(capturedPhoto, fromScanner);
                 }
             });
@@ -1069,39 +1130,10 @@
             // INICIALIZAÇÃO
             // ============================================
             
-            // Mostrar tela inicial
             showScreen('initial');
             
-            // Verificar se é iPhone/iPad
-            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
-            
-            if (isIOS) {
-                console.log('📱 Dispositivo iOS detectado - Scanner nativo disponível');
-                nativeScannerBtn.innerHTML = `
-                    <i class="fas fa-document-scanner"></i>
-                    <div>
-                        <div class="upload-btn-text">Scanner Nativo iPhone</div>
-                        <div class="upload-btn-desc" style="color: #d1fae5;">Recomendado - Usa tecnologia Apple</div>
-                    </div>
-                `;
-            } else {
-                console.log('📱 Dispositivo não-iOS - Scanner nativo não disponível');
-                nativeScannerBtn.innerHTML = `
-                    <i class="fas fa-camera"></i>
-                    <div>
-                        <div class="upload-btn-text">Câmera com Scanner</div>
-                        <div class="upload-btn-desc">Use a câmera com detecção manual</div>
-                    </div>
-                `;
-                nativeScannerBtn.classList.remove('native-scanner-btn');
-            }
-            
-            // Verificar permissões para câmera normal
-            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                cameraBtn.style.display = 'none';
-            }
-            
-            console.log('✅ Sistema de upload mobile com scanner nativo pronto');
+            console.log('✅ Sistema de upload mobile pronto');
+            console.log('📱 Dispositivo:', isIOS ? 'iPhone/iPad' : 'Outro');
         });
     </script>
     
