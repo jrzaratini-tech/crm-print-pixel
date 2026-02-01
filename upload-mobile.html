@@ -434,6 +434,15 @@
             display: none;
         }
         
+        .file-info {
+            background: #f8fafc;
+            padding: 10px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 12px;
+            color: #64748b;
+        }
+        
         @media (max-width: 480px) {
             .container {
                 padding: 20px;
@@ -475,17 +484,8 @@
             </div>
             
             <div class="upload-options">
-                <!-- SCANNER NATIVO DO iPHONE - APENAS PARA iOS -->
-                <a href="#" class="upload-btn scanner-native-btn ios-only" id="iosScannerBtn">
-                    <i class="fas fa-document-scanner"></i>
-                    <div>
-                        <div class="upload-btn-text">📄 Scanner do iPhone</div>
-                        <div class="upload-btn-desc">Abre o scanner nativo do Bloco de Notas</div>
-                    </div>
-                </a>
-                
-                <!-- CÂMERA NORMAL PARA TODOS -->
-                <a href="#" class="upload-btn non-ios" id="cameraBtn">
+                <!-- CÂMERA NORMAL -->
+                <a href="#" class="upload-btn" id="cameraBtn">
                     <i class="fas fa-camera"></i>
                     <div>
                         <div class="upload-btn-text">Tirar Foto</div>
@@ -493,7 +493,7 @@
                     </div>
                 </a>
                 
-                <!-- GALERIA PARA TODOS -->
+                <!-- GALERIA -->
                 <a href="#" class="upload-btn" id="galleryBtn">
                     <i class="fas fa-image"></i>
                     <div>
@@ -504,30 +504,21 @@
             </div>
             
             <div class="instructions">
-                <h3 class="ios-only">📱 Para iPhone/iPad:</h3>
-                <ol class="ios-only">
-                    <li><strong>Clique em "Scanner do iPhone"</strong></li>
-                    <li>O iOS abrirá automaticamente o <strong>scanner do Bloco de Notas</strong></li>
-                    <li>Aponte para o documento - ele detecta bordas automaticamente</li>
-                    <li>Capture - o scanner já otimiza e corta o documento</li>
-                    <li>Salve - a imagem chegará pronta e compacta</li>
-                </ol>
-                
-                <h3 class="non-ios">📱 Para outros dispositivos:</h3>
-                <ol class="non-ios">
-                    <li>Use a câmera para tirar uma foto</li>
+                <h3>📱 Instruções:</h3>
+                <ol>
                     <li>Posicione o documento em uma superfície plana</li>
-                    <li>Evite sombras e reflexos</li>
-                    <li>O sistema otimizará automaticamente a imagem</li>
+                    <li>Evite sombras e reflexos na foto</li>
+                    <li>O sistema compactará automaticamente a imagem</li>
+                    <li>Tamanho máximo recomendado: 2MB</li>
                 </ol>
                 
-                <p style="margin-top: 10px; color: #059669; font-size: 12px; font-weight: 600;">
-                    <i class="fas fa-lightbulb"></i> <strong>Dica:</strong> No iPhone, use sempre o scanner nativo para melhor qualidade!
-                </p>
+                <div class="file-info" id="fileInfo" style="display: none;">
+                    <i class="fas fa-info-circle"></i> Tamanho após compressão: <span id="fileSize">0 KB</span>
+                </div>
             </div>
         </div>
         
-        <!-- TELA DA CÂMERA (apenas para não-iOS) -->
+        <!-- TELA DA CÂMERA -->
         <div class="camera-container" id="cameraScreen">
             <video id="cameraVideo" autoplay playsinline></video>
             <div class="camera-overlay">
@@ -549,6 +540,9 @@
         <!-- TELA DE PREVIEW -->
         <div class="preview-container" id="previewScreen">
             <img id="previewImage" alt="Preview da nota fiscal">
+            <div class="file-info" id="previewFileInfo">
+                <i class="fas fa-info-circle"></i> Tamanho: <span id="previewFileSize">0 KB</span>
+            </div>
             <div class="preview-controls">
                 <button class="preview-btn preview-btn-retake" id="retakeBtn">
                     <i class="fas fa-redo"></i> Tirar Outra
@@ -588,10 +582,7 @@
         </div>
     </div>
 
-    <!-- INPUT OCULTO PARA SCANNER NATIVO DO iOS -->
-    <input type="file" id="iosScannerInput" accept="image/*" capture="environment" multiple style="display: none;">
-    
-    <!-- INPUT OCULTO PARA CÂMERA NORMAL -->
+    <!-- INPUT OCULTO PARA CÂMERA -->
     <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;">
     
     <!-- INPUT OCULTO PARA GALERIA -->
@@ -599,7 +590,7 @@
 
     <script>
         // ============================================
-        // SISTEMA DE UPLOAD VIA CELULAR
+        // SISTEMA DE UPLOAD VIA CELULAR SIMPLIFICADO
         // ============================================
         
         document.addEventListener('DOMContentLoaded', () => {
@@ -613,9 +604,12 @@
             const progressScreen = document.getElementById('progressScreen');
             const successScreen = document.getElementById('successScreen');
             const errorScreen = document.getElementById('errorScreen');
+            const fileInfo = document.getElementById('fileInfo');
+            const previewFileInfo = document.getElementById('previewFileInfo');
+            const fileSizeEl = document.getElementById('fileSize');
+            const previewFileSizeEl = document.getElementById('previewFileSize');
             
             // Botões
-            const iosScannerBtn = document.getElementById('iosScannerBtn');
             const cameraBtn = document.getElementById('cameraBtn');
             const galleryBtn = document.getElementById('galleryBtn');
             const cameraVideo = document.getElementById('cameraVideo');
@@ -628,7 +622,6 @@
             const retryBtn = document.getElementById('retryBtn');
             
             // Inputs ocultos
-            const iosScannerInput = document.getElementById('iosScannerInput');
             const cameraInput = document.getElementById('cameraInput');
             const galleryInput = document.getElementById('galleryInput');
             
@@ -637,35 +630,7 @@
             let capturedPhoto = null;
             let sessionId = '';
             let despesaId = '';
-            let isIOS = false;
-            let iosVersion = null;
-            
-            // ============================================
-            // FUNÇÕES DE DETECÇÃO DE iOS
-            // ============================================
-            
-            function detectIOS() {
-                const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-                
-                // Detecção mais precisa do iOS
-                const isIPad = /iPad/.test(userAgent) || 
-                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-                const isIPhone = /iPhone/.test(userAgent);
-                const isIPod = /iPod/.test(userAgent);
-                
-                const detectedIOS = isIPad || isIPhone || isIPod;
-                
-                // Detectar versão do iOS
-                let version = null;
-                if (detectedIOS) {
-                    const match = userAgent.match(/OS (\d+)_(\d+)_?(\d+)?/);
-                    if (match) {
-                        version = parseFloat(`${match[1]}.${match[2]}`);
-                    }
-                }
-                
-                return { isIOS: detectedIOS, iosVersion: version };
-            }
+            let compressedFileSize = 0;
             
             // ============================================
             // FUNÇÕES DE CONTROLE DE TELAS
@@ -705,237 +670,34 @@
             }
             
             // ============================================
-            // SCANNER NATIVO DO iOS (Bloco de Notas) - CORRIGIDO
-            // ============================================
-            
-            function openIOSScanner() {
-                console.log('📄 Abrindo scanner nativo do iOS (Bloco de Notas)...');
-                
-                // Para iOS 14.5+, precisamos usar uma abordagem diferente
-                // Criar input com propriedades específicas
-                const scannerInput = document.createElement('input');
-                scannerInput.type = 'file';
-                scannerInput.accept = 'image/*';
-                
-                // 🔥 PROPRIEDADES CRÍTICAS PARA ATIVAR O SCANNER
-                scannerInput.setAttribute('capture', 'environment'); // Usar câmera traseira
-                scannerInput.setAttribute('multiple', 'multiple'); // Formato correto
-                
-                // Para versões mais recentes do iOS, adicionar webkitdirectory
-                scannerInput.setAttribute('webkitdirectory', '');
-                scannerInput.setAttribute('directory', '');
-                
-                scannerInput.style.display = 'none';
-                
-                // Evento para quando o usuário seleciona arquivos
-                scannerInput.addEventListener('change', handleIOSScannerFiles, false);
-                
-                // Adicionar ao body
-                document.body.appendChild(scannerInput);
-                
-                // Tentar diferentes métodos para disparar o input
-                try {
-                    // Método 1: click() normal
-                    scannerInput.click();
-                } catch (error) {
-                    console.log('Método 1 falhou, tentando método 2...');
-                    try {
-                        // Método 2: criar evento de clique
-                        const clickEvent = new MouseEvent('click', {
-                            view: window,
-                            bubbles: true,
-                            cancelable: true
-                        });
-                        scannerInput.dispatchEvent(clickEvent);
-                    } catch (error2) {
-                        console.log('Método 2 falhou, tentando método 3...');
-                        // Método 3: usar focus e click
-                        scannerInput.focus();
-                        scannerInput.click();
-                    }
-                }
-            }
-            
-            // Função específica para lidar com arquivos do scanner iOS
-            async function handleIOSScannerFiles(event) {
-                const input = event.target;
-                
-                if (!input.files || input.files.length === 0) {
-                    console.log('❌ Nenhum arquivo selecionado ou scanner cancelado');
-                    // Remover input do DOM
-                    setTimeout(() => {
-                        if (input.parentNode) {
-                            input.parentNode.removeChild(input);
-                        }
-                    }, 100);
-                    return;
-                }
-                
-                console.log(`✅ Scanner iOS retornou ${input.files.length} arquivo(s)`);
-                
-                // Pegar o primeiro arquivo (o scanner geralmente retorna um)
-                const file = input.files[0];
-                
-                console.log('📄 Arquivo do scanner iOS:', {
-                    name: file.name,
-                    type: file.type,
-                    size: (file.size / 1024).toFixed(2) + 'KB',
-                    lastModified: new Date(file.lastModified).toLocaleString()
-                });
-                
-                try {
-                    showScreen('progress');
-                    document.getElementById('progressText').textContent = 'Processando documento digitalizado...';
-                    
-                    // Usar FileReader para ler o arquivo
-                    const reader = new FileReader();
-                    
-                    reader.onload = async (loadEvent) => {
-                        const base64Image = loadEvent.target.result;
-                        
-                        // O scanner do iOS já entrega imagem otimizada
-                        const processed = await processImageForUpload(base64Image, true);
-                        
-                        capturedPhoto = processed.base64;
-                        previewImage.src = capturedPhoto;
-                        
-                        showScreen('preview');
-                        
-                        console.log('✅ Documento do scanner iOS processado:', {
-                            original: processed.tamanhoOriginal,
-                            otimizado: processed.tamanhoOtimizado,
-                            reducao: `${((1 - processed.tamanhoOtimizado/processed.tamanhoOriginal) * 100).toFixed(1)}%`,
-                            width: previewImage.naturalWidth,
-                            height: previewImage.naturalHeight
-                        });
-                    };
-                    
-                    reader.onerror = (error) => {
-                        console.error('❌ Erro ao ler arquivo do scanner:', error);
-                        showError('Erro ao ler documento digitalizado.');
-                        showScreen('initial');
-                    };
-                    
-                    reader.readAsDataURL(file);
-                    
-                } catch (error) {
-                    console.error('❌ Erro ao processar documento do scanner:', error);
-                    showError('Erro ao processar documento. Tente novamente.');
-                    showScreen('initial');
-                } finally {
-                    // Remover o input do DOM após processamento
-                    setTimeout(() => {
-                        if (input.parentNode) {
-                            input.parentNode.removeChild(input);
-                        }
-                    }, 500);
-                }
-            }
-            
-            // ============================================
-            // MÉTODO ALTERNATIVO PARA iOS - Abrir câmera com modo documento
-            // ============================================
-            
-            function openIOSScannerAlternative() {
-                console.log('📄 Tentando método alternativo para scanner iOS...');
-                
-                // Criar input com as propriedades que ativam o modo documento
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = 'image/*';
-                
-                // A combinação 'capture=environment' e 'multiple' geralmente ativa o scanner
-                input.capture = 'environment';
-                input.multiple = true;
-                
-                // Adicionar atributos extras
-                input.setAttribute('data-scanner', 'true');
-                
-                input.style.display = 'none';
-                
-                input.onchange = (e) => {
-                    const files = e.target.files;
-                    if (files.length > 0) {
-                        handleIOSScannerFiles(e);
-                    }
-                    // Limpar o input
-                    setTimeout(() => {
-                        if (input.parentNode) {
-                            input.parentNode.removeChild(input);
-                        }
-                    }, 100);
-                };
-                
-                document.body.appendChild(input);
-                
-                // Disparar o input
-                try {
-                    // Forçar um clique com setTimeout
-                    setTimeout(() => {
-                        input.click();
-                    }, 100);
-                } catch (error) {
-                    console.error('Erro ao abrir scanner:', error);
-                    showError('Não foi possível abrir o scanner. Tente o modo câmera.');
-                }
-            }
-            
-            // ============================================
-            // CÂMERA NORMAL (para não-iOS)
+            // CÂMERA SIMPLES
             // ============================================
             
             function openCamera() {
-                if (isIOS) {
-                    // No iOS, usamos input normal com capture
-                    cameraInput.click();
-                } else {
-                    // Em outros dispositivos, abrir câmera diretamente
-                    showScreen('camera');
-                }
+                console.log('📸 Abrindo câmera...');
+                cameraInput.click();
             }
             
-            cameraInput.onchange = (event) => {
+            cameraInput.onchange = async (event) => {
                 const file = event.target.files[0];
-                if (file) handleCameraFile(file);
-            };
-            
-            async function handleCameraFile(file) {
+                if (!file) return;
+                
                 console.log('📸 Arquivo da câmera:', {
                     name: file.name,
                     type: file.type,
-                    size: (file.size / 1024).toFixed(2) + 'KB'
+                    size: formatFileSize(file.size)
                 });
                 
-                try {
-                    showScreen('progress');
-                    document.getElementById('progressText').textContent = 'Processando foto...';
-                    
-                    const reader = new FileReader();
-                    reader.readAsDataURL(file);
-                    
-                    reader.onload = async (event) => {
-                        const base64Image = event.target.result;
-                        const processed = await processImageForUpload(base64Image, false);
-                        
-                        capturedPhoto = processed.base64;
-                        previewImage.src = capturedPhoto;
-                        showScreen('preview');
-                    };
-                    
-                } catch (error) {
-                    console.error('❌ Erro ao processar foto:', error);
-                    showError('Erro ao processar foto. Tente novamente.');
-                    showScreen('initial');
-                }
-            }
+                await handleImageFile(file);
+            };
             
             async function startCamera() {
                 try {
                     const constraints = {
                         video: {
                             facingMode: 'environment',
-                            width: { ideal: 1920 },
-                            height: { ideal: 1080 }
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
                         },
                         audio: false
                     };
@@ -959,17 +721,52 @@
             
             function capturePhoto() {
                 const canvas = document.createElement('canvas');
-                canvas.width = cameraVideo.videoWidth;
-                canvas.height = cameraVideo.videoHeight;
+                const videoWidth = cameraVideo.videoWidth;
+                const videoHeight = cameraVideo.videoHeight;
+                
+                // Reduzir tamanho da imagem imediatamente
+                const maxWidth = 1200;
+                const maxHeight = 1600;
+                
+                let width = videoWidth;
+                let height = videoHeight;
+                
+                // Redimensionar mantendo proporção
+                if (width > maxWidth) {
+                    height = Math.round((height * maxWidth) / width);
+                    width = maxWidth;
+                }
+                
+                if (height > maxHeight) {
+                    width = Math.round((width * maxHeight) / height);
+                    height = maxHeight;
+                }
+                
+                canvas.width = width;
+                canvas.height = height;
                 
                 const ctx = canvas.getContext('2d');
-                ctx.drawImage(cameraVideo, 0, 0, canvas.width, canvas.height);
+                ctx.drawImage(cameraVideo, 0, 0, width, height);
                 
-                capturedPhoto = canvas.toDataURL('image/jpeg', 0.9);
+                // Comprimir fortemente (50% de qualidade)
+                capturedPhoto = canvas.toDataURL('image/jpeg', 0.5);
+                
+                // Mostrar preview
                 previewImage.src = capturedPhoto;
+                
+                // Calcular tamanho
+                compressedFileSize = Math.round((capturedPhoto.length * 3) / 4);
+                previewFileSizeEl.textContent = formatFileSize(compressedFileSize);
+                previewFileInfo.style.display = 'block';
                 
                 stopCamera();
                 showScreen('preview');
+                
+                console.log('✅ Foto capturada e comprimida:', {
+                    original: `${videoWidth}x${videoHeight}`,
+                    compressed: `${width}x${height}`,
+                    size: formatFileSize(compressedFileSize)
+                });
             }
             
             // ============================================
@@ -987,7 +784,7 @@
                 console.log('📁 Arquivo da galeria:', {
                     name: file.name,
                     type: file.type,
-                    size: (file.size / 1024).toFixed(2) + 'KB'
+                    size: formatFileSize(file.size)
                 });
                 
                 if (!file.type.startsWith('image/')) {
@@ -995,164 +792,183 @@
                     return;
                 }
                 
-                if (file.size > 20 * 1024 * 1024) {
-                    showError('A imagem é muito grande (máx. 20MB).');
+                if (file.size > 10 * 1024 * 1024) { // 10MB máximo
+                    showError('A imagem é muito grande (máx. 10MB). Selecione uma imagem menor.');
                     return;
                 }
                 
+                await handleImageFile(file);
+            };
+            
+            // ============================================
+            // PROCESSAMENTO DE IMAGEM OTIMIZADO
+            // ============================================
+            
+            async function handleImageFile(file) {
                 try {
                     showScreen('progress');
-                    document.getElementById('progressText').textContent = 'Processando imagem...';
+                    document.getElementById('progressText').textContent = 'Comprimindo imagem...';
                     
                     const reader = new FileReader();
-                    reader.readAsDataURL(file);
                     
                     reader.onload = async (event) => {
                         const base64Image = event.target.result;
-                        const processed = await processImageForUpload(base64Image, false);
+                        const compressed = await compressImage(base64Image, 0.6); // 60% de qualidade
                         
-                        capturedPhoto = processed.base64;
+                        capturedPhoto = compressed.dataUrl;
+                        compressedFileSize = compressed.size;
+                        
+                        // Mostrar preview
                         previewImage.src = capturedPhoto;
+                        previewFileSizeEl.textContent = formatFileSize(compressedFileSize);
+                        previewFileInfo.style.display = 'block';
+                        
+                        // Mostrar informações de compressão
+                        fileSizeEl.textContent = formatFileSize(compressedFileSize);
+                        fileInfo.style.display = 'block';
+                        
+                        console.log('✅ Imagem processada:', {
+                            original: formatFileSize(file.size),
+                            compressed: formatFileSize(compressedFileSize),
+                            reducao: `${((1 - compressedFileSize/file.size) * 100).toFixed(1)}%`,
+                            qualidade: '60%'
+                        });
+                        
                         showScreen('preview');
                     };
+                    
+                    reader.onerror = (error) => {
+                        console.error('❌ Erro ao ler arquivo:', error);
+                        showError('Erro ao processar imagem. Tente novamente.');
+                        showScreen('initial');
+                    };
+                    
+                    reader.readAsDataURL(file);
                     
                 } catch (error) {
                     console.error('❌ Erro ao processar imagem:', error);
                     showError('Erro ao processar imagem. Tente novamente.');
                     showScreen('initial');
                 }
-            };
+            }
             
-            // ============================================
-            // PROCESSAMENTO DE IMAGEM
-            // ============================================
-            
-            async function processImageForUpload(base64Image, fromScanner = false) {
-                return new Promise((resolve) => {
+            async function compressImage(base64Image, quality = 0.6) {
+                return new Promise((resolve, reject) => {
                     const img = new Image();
                     img.src = base64Image;
                     
                     img.onload = () => {
                         const canvas = document.createElement('canvas');
                         
-                        // Configurações diferentes para scanner vs câmera normal
-                        let maxWidth, quality;
-                        
-                        if (fromScanner) {
-                            // Scanner já entrega imagem boa - menos compressão
-                            maxWidth = 1600;
-                            quality = 0.8; // Alta qualidade
-                        } else {
-                            // Câmera/galeria normal - mais compressão
-                            maxWidth = 1200;
-                            quality = 0.65; // Mais compressão
-                        }
+                        // Definir tamanhos máximos
+                        const MAX_WIDTH = 1200;
+                        const MAX_HEIGHT = 1600;
                         
                         let width = img.width;
                         let height = img.height;
                         
-                        // Redimensionar mantendo proporção
-                        if (width > maxWidth) {
-                            height = Math.round((height * maxWidth) / width);
-                            width = maxWidth;
+                        // Redimensionar se necessário
+                        if (width > MAX_WIDTH || height > MAX_HEIGHT) {
+                            if (width > height) {
+                                if (width > MAX_WIDTH) {
+                                    height = Math.round((height * MAX_WIDTH) / width);
+                                    width = MAX_WIDTH;
+                                }
+                            } else {
+                                if (height > MAX_HEIGHT) {
+                                    width = Math.round((width * MAX_HEIGHT) / height);
+                                    height = MAX_HEIGHT;
+                                }
+                            }
                         }
                         
                         canvas.width = width;
                         canvas.height = height;
                         
                         const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
                         
-                        // Para scanner, manter como está
-                        if (fromScanner) {
-                            ctx.drawImage(img, 0, 0, width, height);
-                        } else {
-                            // Para câmera normal, aplicar filtros de documento
-                            ctx.drawImage(img, 0, 0, width, height);
-                            
-                            // Aplicar melhorias para documentos
-                            try {
-                                const imageData = ctx.getImageData(0, 0, width, height);
-                                const processedData = enhanceDocument(imageData);
-                                ctx.putImageData(processedData, 0, 0);
-                            } catch (e) {
-                                console.log('⚠️ Não foi possível aplicar filtros de documento');
-                            }
-                        }
-                        
-                        const optimizedBase64 = canvas.toDataURL('image/jpeg', quality);
+                        // Comprimir com a qualidade especificada
+                        const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+                        const size = Math.round((compressedDataUrl.length * 3) / 4);
                         
                         resolve({
-                            base64: optimizedBase64,
-                            tipo: 'image/jpeg',
-                            tamanhoOriginal: Math.round((base64Image.length * 3) / 4),
-                            tamanhoOtimizado: Math.round((optimizedBase64.length * 3) / 4),
-                            fromScanner: fromScanner
+                            dataUrl: compressedDataUrl,
+                            size: size,
+                            width: width,
+                            height: height
                         });
                     };
+                    
+                    img.onerror = reject;
                 });
             }
             
-            function enhanceDocument(imageData) {
-                const data = imageData.data;
-                
-                for (let i = 0; i < data.length; i += 4) {
-                    const r = data[i];
-                    const g = data[i + 1];
-                    const b = data[i + 2];
-                    
-                    // Converter para escala de cinza
-                    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-                    
-                    // Aumentar contraste
-                    const contrasted = gray < 128 ? gray * 0.7 : gray * 1.3;
-                    
-                    // Limitar valores
-                    const final = Math.min(255, Math.max(0, contrasted));
-                    
-                    data[i] = final;
-                    data[i + 1] = final;
-                    data[i + 2] = final;
+            // ============================================
+            // FUNÇÃO DE UPLOAD CORRIGIDA
+            // ============================================
+            
+            async function uploadPhoto() {
+                if (!capturedPhoto) {
+                    showError('Nenhuma imagem para enviar.');
+                    return;
                 }
                 
-                return imageData;
-            }
-            
-            // ============================================
-            // FUNÇÃO DE UPLOAD
-            // ============================================
-            
-            async function uploadPhoto(base64Image, fromScanner = false) {
                 showScreen('progress');
                 document.getElementById('progressText').textContent = 'Enviando nota fiscal...';
                 
                 try {
-                    const processed = await processImageForUpload(base64Image, fromScanner);
+                    // Verificar tamanho da imagem (máximo 2MB para envio seguro)
+                    if (compressedFileSize > 2 * 1024 * 1024) {
+                        // Se ainda estiver grande, comprimir mais
+                        console.log('⚠️ Imagem ainda grande, comprimindo mais...');
+                        const moreCompressed = await compressImage(capturedPhoto, 0.4); // 40% de qualidade
+                        capturedPhoto = moreCompressed.dataUrl;
+                        compressedFileSize = moreCompressed.size;
+                        
+                        console.log('✅ Re-comprimida para:', formatFileSize(compressedFileSize));
+                        
+                        if (compressedFileSize > 2 * 1024 * 1024) {
+                            throw new Error('Imagem muito grande mesmo após compressão. Tente uma imagem menor.');
+                        }
+                    }
                     
-                    console.log('📁 Imagem processada para upload:', {
-                        original: processed.tamanhoOriginal,
-                        otimizado: processed.tamanhoOtimizado,
-                        reducao: `${((1 - processed.tamanhoOtimizado/processed.tamanhoOriginal) * 100).toFixed(1)}%`
+                    console.log('📤 Enviando imagem:', {
+                        tamanho: formatFileSize(compressedFileSize),
+                        base64Length: capturedPhoto.length
                     });
                     
+                    // Preparar dados para envio
+                    const payload = {
+                        sessionId: sessionId,
+                        despesaId: despesaId,
+                        imageData: capturedPhoto,
+                        fileName: `nota-fiscal-${Date.now()}.jpg`,
+                        fileSize: compressedFileSize,
+                        timestamp: new Date().toISOString(),
+                        source: 'mobile_upload'
+                    };
+                    
+                    // Fazer o upload
                     const response = await fetch('/api/upload/nota-fiscal', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                         },
-                        body: JSON.stringify({
-                            sessionId: sessionId,
-                            despesaId: despesaId,
-                            fileData: processed,
-                            timestamp: new Date().toISOString(),
-                            source: fromScanner ? 'ios_scanner' : 'camera'
-                        })
+                        body: JSON.stringify(payload)
                     });
                     
                     if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error('❌ Erro no servidor:', response.status, errorText);
+                        
                         if (response.status === 413) {
-                            throw new Error('Imagem muito grande após compressão. Tente novamente.');
+                            throw new Error('Imagem muito grande. Tente uma imagem menor.');
+                        } else if (response.status === 400) {
+                            throw new Error('Dados inválidos. Recarregue a página e tente novamente.');
+                        } else {
+                            throw new Error(`Erro no servidor (${response.status}): ${errorText.substring(0, 100)}`);
                         }
-                        throw new Error(`Erro no servidor: ${response.status}`);
                     }
                     
                     const result = await response.json();
@@ -1160,12 +976,18 @@
                     if (result.success) {
                         showScreen('success');
                         
+                        // Fechar após 3 segundos
                         setTimeout(() => {
-                            window.close();
+                            if (typeof window.close === 'function') {
+                                window.close();
+                            } else {
+                                // Se não puder fechar, voltar para tela inicial
+                                showScreen('initial');
+                            }
                         }, 3000);
                         
                     } else {
-                        throw new Error(result.message || 'Erro desconhecido');
+                        throw new Error(result.message || 'Erro desconhecido no servidor');
                     }
                     
                 } catch (error) {
@@ -1178,6 +1000,14 @@
             // FUNÇÕES AUXILIARES
             // ============================================
             
+            function formatFileSize(bytes) {
+                if (bytes === 0) return '0 Bytes';
+                const k = 1024;
+                const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+                const i = Math.floor(Math.log(bytes) / Math.log(k));
+                return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            }
+            
             function showError(message) {
                 document.getElementById('errorMessage').textContent = message;
                 showScreen('error');
@@ -1188,23 +1018,6 @@
             // ============================================
             
             // Botões da tela inicial
-            iosScannerBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                console.log('📱 Botão scanner iOS clicado');
-                
-                // Tentar método principal primeiro
-                openIOSScanner();
-                
-                // Se falhar, tentar método alternativo após um tempo
-                setTimeout(() => {
-                    // Verificar se não houve interação
-                    if (initialScreen.style.display !== 'none') {
-                        console.log('⚠️ Método principal falhou, tentando alternativa...');
-                        openIOSScannerAlternative();
-                    }
-                }, 1000);
-            });
-            
             cameraBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 openCamera();
@@ -1225,21 +1038,24 @@
             
             // Controles do preview
             retakeBtn.addEventListener('click', () => {
+                capturedPhoto = null;
+                compressedFileSize = 0;
+                previewFileInfo.style.display = 'none';
                 showScreen('initial');
             });
             
             sendBtn.addEventListener('click', () => {
-                if (capturedPhoto) {
-                    // Determinar se veio do scanner iOS
-                    const fromScanner = isIOS && capturedPhoto.includes('data:image/jpeg');
-                    uploadPhoto(capturedPhoto, fromScanner);
-                }
+                uploadPhoto();
             });
             
             // Botões de erro/sucesso
             backBtn.addEventListener('click', (e) => {
                 e.preventDefault();
-                window.close();
+                if (typeof window.close === 'function') {
+                    window.close();
+                } else {
+                    showScreen('initial');
+                }
             });
             
             retryBtn.addEventListener('click', () => {
@@ -1266,21 +1082,10 @@
             console.log('🔗 Sessão:', sessionId);
             console.log('💰 Despesa:', despesaId);
             
-            // Detectar iOS
-            const iosDetection = detectIOS();
-            isIOS = iosDetection.isIOS;
-            iosVersion = iosDetection.iosVersion;
-            
-            // Ajustar interface para iOS
-            if (isIOS) {
-                document.body.classList.add('ios-detected');
-            }
-            
+            // Inicializar
             showScreen('initial');
             
-            console.log('✅ Sistema de upload mobile pronto');
-            console.log('📱 Dispositivo:', isIOS ? 'iPhone/iPad' + (iosVersion ? ' (iOS ' + iosVersion + ')' : '') : 'Outro');
-            console.log('🌐 Navegador:', navigator.userAgent);
+            console.log('✅ Sistema de upload mobile pronto e simplificado');
         });
     </script>
     
