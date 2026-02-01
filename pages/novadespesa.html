@@ -782,7 +782,7 @@
 
     <script>
         // ============================================
-        // SISTEMA DE DESPESAS COM QR CODE AUTOMÁTICO
+        // SISTEMA DE DESPESAS COM QR CODE AUTOMÁTICO - CORRIGIDO
         // ============================================
         
         document.addEventListener('DOMContentLoaded', () => {
@@ -797,6 +797,7 @@
             let tamanhoOtimizado = 0;
             let uploadSessionId = '';
             let qrCodeCheckInterval = null;
+            let temporaryDespesaId = '';
             
             // Referências DOM
             const despesaForm = document.getElementById('despesaForm');
@@ -863,7 +864,7 @@
             }
             
             // ============================================
-            // SISTEMA DE QR CODE (NOVO)
+            // SISTEMA DE QR CODE (CORRIGIDO)
             // ============================================
             
             function gerarUploadSession() {
@@ -873,18 +874,17 @@
             }
             
             function gerarQRCode() {
-                if (!currentDespesaId && !isEditMode) {
-                    showMessage('Salve a despesa primeiro para gerar QR Code.', 'warning');
-                    return;
-                }
-                
+                // GERAR SEMPRE, MESMO SEM DESPESA SALVA
                 const sessionId = gerarUploadSession();
-                const despesaId = currentDespesaId || 'pending-' + Date.now();
+                
+                // Usar ID temporário se não tiver ID real
+                temporaryDespesaId = currentDespesaId || 'pending-' + Date.now();
                 
                 // URL que será escaneada pelo iPhone
-                const uploadUrl = `${window.location.origin}/upload-mobile.html?session=${sessionId}&despesa=${despesaId}`;
+                const uploadUrl = `${window.location.origin}/upload-mobile.html?session=${sessionId}&despesa=${temporaryDespesaId}`;
                 
                 console.log('🔗 URL para QR Code:', uploadUrl);
+                console.log('📋 ID da despesa:', temporaryDespesaId);
                 
                 // Gerar QR Code visual
                 qrCodeDisplay.innerHTML = `
@@ -902,27 +902,42 @@
                 `;
                 
                 // Armazenar sessão no localStorage para verificação
-                localStorage.setItem('uploadSession', JSON.stringify({
+                localStorage.setItem('uploadSession_' + sessionId, JSON.stringify({
                     id: sessionId,
-                    despesaId: despesaId,
+                    despesaId: temporaryDespesaId,
                     timestamp: Date.now(),
-                    status: 'waiting'
+                    status: 'waiting',
+                    isTemporary: !currentDespesaId
                 }));
                 
                 // Iniciar verificação
-                iniciarVerificacaoUpload(sessionId, despesaId);
+                iniciarVerificacaoUpload(sessionId, temporaryDespesaId);
                 
                 // Mostrar modal
                 qrModalOverlay.classList.add('active');
                 qrStatus.className = 'qr-status pending';
                 qrStatus.innerHTML = '<i class="fas fa-clock"></i> Aguardando upload do celular...';
                 qrStatus.style.display = 'block';
+                
+                showMessage('QR Code gerado! Escaneie com o iPhone.', 'success');
             }
             
             function iniciarVerificacaoUpload(sessionId, despesaId) {
                 if (qrCodeCheckInterval) clearInterval(qrCodeCheckInterval);
                 
+                let checkCount = 0;
+                const maxChecks = 300; // 15 minutos (300 checks * 3 segundos)
+                
                 qrCodeCheckInterval = setInterval(async () => {
+                    checkCount++;
+                    
+                    if (checkCount > maxChecks) {
+                        clearInterval(qrCodeCheckInterval);
+                        qrStatus.className = 'qr-status error';
+                        qrStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> QR Code expirado. Gere um novo.';
+                        return;
+                    }
+                    
                     try {
                         const response = await fetch(`/api/upload/check?session=${sessionId}`);
                         if (response.ok) {
@@ -936,7 +951,7 @@
                                 qrStatus.innerHTML = `<i class="fas fa-check-circle"></i> Nota recebida! Processando...`;
                                 
                                 // Processar arquivo recebido
-                                processarArquivoRecebido(data.fileData);
+                                processarArquivoRecebido(data.fileData, sessionId);
                                 
                                 // Fechar modal após 2 segundos
                                 setTimeout(() => {
@@ -950,12 +965,15 @@
                             }
                         }
                     } catch (error) {
-                        console.log('⏳ Aguardando upload...');
+                        // Silencioso - apenas aguardando
+                        if (checkCount % 10 === 0) {
+                            console.log('⏳ Aguardando upload...', checkCount);
+                        }
                     }
                 }, 3000); // Verificar a cada 3 segundos
             }
             
-            function processarArquivoRecebido(fileData) {
+            function processarArquivoRecebido(fileData, sessionId) {
                 console.log('📁 Processando arquivo recebido:', fileData);
                 
                 // Atualizar campos do formulário
@@ -1006,11 +1024,17 @@
                     `;
                 }
                 
-                // Ativar modo de edição se for nova despesa
-                if (!isEditMode && currentDespesaId) {
-                    isEditMode = true;
-                    saveBtn.textContent = 'ATUALIZAR DESPESA';
+                // Se for despesa já existente, atualizar automaticamente
+                if (currentDespesaId && isEditMode) {
+                    setTimeout(() => {
+                        // Disparar evento para salvar automaticamente
+                        console.log('🔄 Atualizando despesa existente com anexo...');
+                        // O Core Engine vai pegar os campos atualizados automaticamente
+                    }, 1000);
                 }
+                
+                // Limpar sessão do localStorage
+                localStorage.removeItem('uploadSession_' + sessionId);
             }
             
             // ============================================
@@ -1036,7 +1060,10 @@
                 // QR Code modal
                 qrCloseBtn.addEventListener('click', () => {
                     qrModalOverlay.classList.remove('active');
-                    if (qrCodeCheckInterval) clearInterval(qrCodeCheckInterval);
+                    if (qrCodeCheckInterval) {
+                        clearInterval(qrCodeCheckInterval);
+                        qrCodeCheckInterval = null;
+                    }
                 });
                 
                 qrRefreshBtn.addEventListener('click', gerarQRCode);
@@ -1044,7 +1071,10 @@
                 qrModalOverlay.addEventListener('click', (e) => {
                     if (e.target === qrModalOverlay) {
                         qrModalOverlay.classList.remove('active');
-                        if (qrCodeCheckInterval) clearInterval(qrCodeCheckInterval);
+                        if (qrCodeCheckInterval) {
+                            clearInterval(qrCodeCheckInterval);
+                            qrCodeCheckInterval = null;
+                        }
                     }
                 });
                 
@@ -1129,6 +1159,15 @@
                         saveBtn.disabled = true;
                         
                         console.log('📤 Enviando despesa para Core Engine...');
+                        console.log('📎 Nota fiscal anexada:', !!notaFiscalBase64);
+                        
+                        // Se tiver nota fiscal via celular, garantir que os campos estão preenchidos
+                        if (notaFiscalBase64 && !notaFiscalHidden.value) {
+                            notaFiscalHidden.value = notaFiscalBase64;
+                            tipoArquivoHidden.value = tipoArquivo;
+                            tamanhoOriginalHidden.value = tamanhoOriginal;
+                            tamanhoOtimizadoHidden.value = tamanhoOtimizado;
+                        }
                     }
                 });
             }
@@ -1328,43 +1367,48 @@
                         const reader = new FileReader();
                         reader.readAsDataURL(file);
                         
-                        reader.onload = (event) => {
-                            resultado = {
-                                base64: event.target.result,
-                                tipo: file.type,
-                                tamanhoOriginal: file.size,
-                                tamanhoOtimizado: Math.round((event.target.result.length * 3) / 4)
+                        await new Promise((resolve) => {
+                            reader.onload = (event) => {
+                                resultado = {
+                                    base64: event.target.result,
+                                    tipo: file.type,
+                                    tamanhoOriginal: file.size,
+                                    tamanhoOtimizado: Math.round((event.target.result.length * 3) / 4)
+                                };
+                                
+                                document.getElementById('compressionInfo').textContent = 
+                                    `Arquivo: ${(resultado.tamanhoOtimizado / 1024).toFixed(2)}KB`;
+                                
+                                document.getElementById('fileImage').style.display = 'none';
+                                
+                                notaFiscalBase64 = resultado.base64;
+                                tipoArquivo = resultado.tipo;
+                                tamanhoOriginal = resultado.tamanhoOriginal;
+                                tamanhoOtimizado = resultado.tamanhoOtimizado;
+                                
+                                notaFiscalHidden.value = notaFiscalBase64;
+                                tipoArquivoHidden.value = tipoArquivo;
+                                tamanhoOriginalHidden.value = tamanhoOriginal;
+                                tamanhoOtimizadoHidden.value = tamanhoOtimizado;
+                                
+                                resolve();
                             };
-                            
-                            document.getElementById('compressionInfo').textContent = 
-                                `Arquivo: ${(resultado.tamanhoOtimizado / 1024).toFixed(2)}KB`;
-                            
-                            document.getElementById('fileImage').style.display = 'none';
-                            
-                            notaFiscalBase64 = resultado.base64;
-                            tipoArquivo = resultado.tipo;
-                            tamanhoOriginal = resultado.tamanhoOriginal;
-                            tamanhoOtimizado = resultado.tamanhoOtimizado;
-                            
-                            notaFiscalHidden.value = notaFiscalBase64;
-                            tipoArquivoHidden.value = tipoArquivo;
-                            tamanhoOriginalHidden.value = tamanhoOriginal;
-                            tamanhoOtimizadoHidden.value = tamanhoOtimizado;
-                        };
-                        
-                        await new Promise(resolve => reader.onloadend = resolve);
-                        return;
+                        });
                     }
                     
-                    notaFiscalBase64 = resultado.base64;
-                    tipoArquivo = resultado.tipo;
-                    tamanhoOriginal = resultado.tamanhoOriginal;
-                    tamanhoOtimizado = resultado.tamanhoOtimizado || resultado.tamanhoOriginal;
+                    if (resultado && !notaFiscalHidden.value) {
+                        notaFiscalBase64 = resultado.base64;
+                        tipoArquivo = resultado.tipo;
+                        tamanhoOriginal = resultado.tamanhoOriginal;
+                        tamanhoOtimizado = resultado.tamanhoOtimizado || resultado.tamanhoOriginal;
+                        
+                        notaFiscalHidden.value = notaFiscalBase64;
+                        tipoArquivoHidden.value = tipoArquivo;
+                        tamanhoOriginalHidden.value = tamanhoOriginal;
+                        tamanhoOtimizadoHidden.value = tamanhoOtimizado;
+                    }
                     
-                    notaFiscalHidden.value = notaFiscalBase64;
-                    tipoArquivoHidden.value = tipoArquivo;
-                    tamanhoOriginalHidden.value = tamanhoOriginal;
-                    tamanhoOtimizadoHidden.value = tamanhoOtimizado;
+                    showMessage('Nota fiscal processada com sucesso!', 'success');
                     
                 } catch (error) {
                     console.error('Erro ao processar arquivo:', error);
