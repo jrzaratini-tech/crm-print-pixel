@@ -1045,10 +1045,9 @@
                 console.log('📊 Dashboard atualizado com sucesso para período:', periodoAtual);
             }
             
-            // Filtrar eventos por período - FUNÇÃO CORRIGIDA E MELHORADA
+            // Filtrar eventos por período - FUNÇÃO CORRIGIDA (MÊS ATUAL CORRIGIDO)
             function filtrarEventosPorPeriodo(eventos, periodo) {
                 const agora = new Date();
-                const hoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate());
                 
                 let dataInicio, dataFim;
                 
@@ -1058,7 +1057,7 @@
                         const mesAnterior = agora.getMonth() === 0 ? 11 : agora.getMonth() - 1;
                         const anoMesAnterior = agora.getMonth() === 0 ? agora.getFullYear() - 1 : agora.getFullYear();
                         dataInicio = new Date(anoMesAnterior, mesAnterior, 1);
-                        dataFim = new Date(anoMesAnterior, mesAnterior + 1, 0); // Último dia do mês anterior
+                        dataFim = new Date(anoMesAnterior, mesAnterior + 1, 0, 23, 59, 59, 999); // Último dia do mês anterior
                         break;
                         
                     case 'trimestre':
@@ -1068,17 +1067,17 @@
                         // Se estamos em Janeiro, Fevereiro ou Março, ajustar o ano
                         if (mesTrimestre < 3) {
                             dataInicio = new Date(anoTrimestre - 1, 9 + mesTrimestre, 1); // Outubro, Novembro ou Dezembro do ano anterior
-                            dataFim = new Date(anoTrimestre - 1, 12 + mesTrimestre, 0); // Último dia do mês
+                            dataFim = new Date(anoTrimestre - 1, 12 + mesTrimestre, 0, 23, 59, 59, 999); // Último dia do mês
                         } else {
                             dataInicio = new Date(anoTrimestre, mesTrimestre - 3, 1);
-                            dataFim = new Date(anoTrimestre, mesTrimestre, 0); // Último dia do mês anterior
+                            dataFim = new Date(anoTrimestre, mesTrimestre, 0, 23, 59, 59, 999); // Último dia do mês anterior
                         }
                         break;
                         
                     case 'ano_atual':
-                        // Desde o início do ano até HOJE (não fim do ano)
+                        // Desde o início do ano até HOJE (inclusive)
                         dataInicio = new Date(agora.getFullYear(), 0, 1);
-                        dataFim = hoje;
+                        dataFim = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 23, 59, 59, 999);
                         break;
                         
                     case 'todos':
@@ -1087,9 +1086,11 @@
                         
                     case 'mes_atual':
                     default:
-                        // Mês atual até HOJE (não o mês completo)
+                        // CORREÇÃO CRÍTICA: Mês atual do primeiro dia até o fim do dia atual
+                        // O problema estava aqui: dataFim estava como 'hoje' (sem horas), então eventos
+                        // de hoje com hora eram excluídos
                         dataInicio = new Date(agora.getFullYear(), agora.getMonth(), 1);
-                        dataFim = hoje;
+                        dataFim = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate(), 23, 59, 59, 999);
                 }
                 
                 console.log(`📅 Filtrando eventos de ${dataInicio.toLocaleDateString('pt-PT')} até ${dataFim.toLocaleDateString('pt-PT')}`);
@@ -1106,7 +1107,7 @@
                         return false;
                     }
                     
-                    // Verificar se a data do evento está dentro do período
+                    // Verificar se a data do evento está dentro do período (incluindo horas)
                     return dataEvento >= dataInicio && dataEvento <= dataFim;
                 });
             }
@@ -1187,11 +1188,11 @@
                 
                 // Calcular datas do mês anterior para comparação
                 const dataInicioMesAnterior = new Date(anoMesAnterior, mesAnterior, 1);
-                const dataFimMesAnterior = new Date(anoMesAnterior, mesAnterior + 1, 0);
+                const dataFimMesAnterior = new Date(anoMesAnterior, mesAnterior + 1, 0, 23, 59, 59, 999);
                 
                 // Calcular dados do mês atual para comparação
                 const dataInicioMesAtual = new Date(anoAtual, mesAtual, 1);
-                const dataFimMesAtual = new Date(anoAtual, mesAtual + 1, 0);
+                const dataFimMesAtual = new Date(anoAtual, mesAtual + 1, 0, 23, 59, 59, 999);
                 
                 // Processar todos os eventos
                 eventos.forEach((evento) => {

@@ -860,11 +860,11 @@
                 
                 configurarEventListeners();
                 calcularTotais();
-                showMessage('Formulário pronto para nova despesa.', 'success');
+                showMessage('Formulário pronto para ' + (isEditMode ? 'edição de despesa' : 'nova despesa') + '.', 'success');
             }
             
             // ============================================
-            // SISTEMA DE QR CODE (CORRIGIDO)
+            // SISTEMA DE QR CODE (CORRIGIDO PARA EDIÇÃO)
             // ============================================
             
             function gerarUploadSession() {
@@ -874,17 +874,23 @@
             }
             
             function gerarQRCode() {
-                // GERAR SEMPRE, MESMO SEM DESPESA SALVA
+                // Se estiver em modo de edição, usar o currentDespesaId
+                // Se for nova despesa, gerar um ID temporário
                 const sessionId = gerarUploadSession();
                 
-                // Usar ID temporário se não tiver ID real
+                // 🔥 CORREÇÃO CRÍTICA: Usar o currentDespesaId quando estiver em modo de edição
+                // Este é o problema principal - na edição, o currentDespesaId já existe
                 temporaryDespesaId = currentDespesaId || 'pending-' + Date.now();
                 
+                console.log('🔑 ID da despesa para QR Code:', temporaryDespesaId);
+                console.log('📱 Modo:', isEditMode ? 'EDIÇÃO' : 'CRIAÇÃO');
+                
                 // URL que será escaneada pelo iPhone
-                const uploadUrl = `${window.location.origin}/upload-mobile.html?session=${sessionId}&despesa=${temporaryDespesaId}`;
+                const uploadUrl = `${window.location.origin}/upload-mobile.html?session=${sessionId}&despesa=${encodeURIComponent(temporaryDespesaId)}&edit=${isEditMode ? 'true' : 'false'}`;
                 
                 console.log('🔗 URL para QR Code:', uploadUrl);
                 console.log('📋 ID da despesa:', temporaryDespesaId);
+                console.log('✏️ Modo edição?', isEditMode);
                 
                 // Gerar QR Code visual
                 qrCodeDisplay.innerHTML = `
@@ -898,6 +904,7 @@
                         <div style="margin-top: 15px; color: #64748b; font-size: 12px;">
                             Válido por 15 minutos
                         </div>
+                        ${isEditMode ? '<div style="margin-top: 10px; color: #3b82f6; font-size: 12px; font-weight: bold;"><i class="fas fa-edit"></i> Modo Edição</div>' : ''}
                     </div>
                 `;
                 
@@ -907,6 +914,7 @@
                     despesaId: temporaryDespesaId,
                     timestamp: Date.now(),
                     status: 'waiting',
+                    isEditMode: isEditMode,
                     isTemporary: !currentDespesaId
                 }));
                 
@@ -975,6 +983,7 @@
             
             function processarArquivoRecebido(fileData, sessionId) {
                 console.log('📁 Processando arquivo recebido:', fileData);
+                console.log('✏️ Modo de edição?', isEditMode);
                 
                 // Atualizar campos do formulário
                 notaFiscalBase64 = fileData.base64;
@@ -999,6 +1008,7 @@
                                 <div style="font-weight: 600; color: #1e293b;">Nota Fiscal (Recebida via Celular)</div>
                                 <div style="font-size: 12px; color: #64748b;">
                                     ${(tamanhoOtimizado / 1024).toFixed(2)}KB • ${new Date().toLocaleTimeString()}
+                                    ${isEditMode ? ' • <span style="color: #10b981;"><i class="fas fa-edit"></i> Modo Edição</span>' : ''}
                                 </div>
                             </div>
                             <button type="button" onclick="limparNotaFiscal()" style="margin-left: auto; background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
@@ -1015,6 +1025,7 @@
                                 <div style="font-weight: 600; color: #1e293b;">Nota Fiscal (Recebida via Celular)</div>
                                 <div style="font-size: 12px; color: #64748b;">
                                     ${(tamanhoOtimizado / 1024).toFixed(2)}KB • ${new Date().toLocaleTimeString()}
+                                    ${isEditMode ? ' • <span style="color: #10b981;"><i class="fas fa-edit"></i> Modo Edição</span>' : ''}
                                 </div>
                             </div>
                             <button type="button" onclick="limparNotaFiscal()" style="margin-left: auto; background: #ef4444; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 12px;">
@@ -1026,11 +1037,8 @@
                 
                 // Se for despesa já existente, atualizar automaticamente
                 if (currentDespesaId && isEditMode) {
-                    setTimeout(() => {
-                        // Disparar evento para salvar automaticamente
-                        console.log('🔄 Atualizando despesa existente com anexo...');
-                        // O Core Engine vai pegar os campos atualizados automaticamente
-                    }, 1000);
+                    console.log('🔄 Atualizando despesa existente com anexo...');
+                    // O Core Engine vai pegar os campos atualizados automaticamente
                 }
                 
                 // Limpar sessão do localStorage
@@ -1054,6 +1062,14 @@
                     uploadMobileBtn.classList.add('active');
                     uploadPcBtn.classList.remove('active');
                     notaFiscalInput.style.display = 'none';
+                    
+                    // 🔥 CRÍTICO: Verificar se estamos em modo de edição
+                    if (isEditMode && currentDespesaId) {
+                        console.log('📱 Gerando QR Code para edição da despesa:', currentDespesaId);
+                    } else {
+                        console.log('📱 Gerando QR Code para nova despesa');
+                    }
+                    
                     gerarQRCode();
                 });
                 
@@ -1160,6 +1176,7 @@
                         
                         console.log('📤 Enviando despesa para Core Engine...');
                         console.log('📎 Nota fiscal anexada:', !!notaFiscalBase64);
+                        console.log('✏️ Modo:', isEditMode ? 'EDIÇÃO' : 'CRIAÇÃO');
                         
                         // Se tiver nota fiscal via celular, garantir que os campos estão preenchidos
                         if (notaFiscalBase64 && !notaFiscalHidden.value) {
@@ -1211,6 +1228,7 @@
             async function loadDespesaForEdit(despesaId) {
                 try {
                     console.log(`📥 Carregando despesa para edição: ${despesaId}`);
+                    showMessage('Carregando dados da despesa para edição...', 'info');
                     
                     const response = await fetch('/api/database/query', {
                         method: 'POST',
@@ -1230,10 +1248,17 @@
                     if (!despesaEvento) throw new Error('Despesa não encontrada');
                     
                     const despesa = despesaEvento.payload;
-                    console.log('💰 Despesa carregada:', despesa);
+                    console.log('💰 Despesa carregada para edição:', despesa);
                     
+                    // 🔥 CRÍTICO: Definir as variáveis globais ANTES de preencher o formulário
                     currentDespesaId = despesaEvento.id;
-                    despesaIdInput.value = currentDespesaId;
+                    isEditMode = true;
+                    
+                    // Atualizar o campo hidden do ID
+                    if (despesaIdInput) {
+                        despesaIdInput.value = currentDespesaId;
+                        console.log('✅ ID da despesa definido:', currentDespesaId);
+                    }
                     
                     // Preencher campos do formulário
                     document.getElementById('fornecedor').value = despesa.fornecedor || '';
@@ -1275,14 +1300,20 @@
                     
                     // Categoria "Outros"
                     if (despesa.categoria === 'OUTROS' && despesa.outraCategoria) {
-                        categoriaSelect.dispatchEvent(new Event('change'));
-                        outraCategoriaInput.value = despesa.outraCategoria;
+                        categoriaSelect.value = 'OUTROS';
+                        setTimeout(() => {
+                            categoriaSelect.dispatchEvent(new Event('change'));
+                            outraCategoriaInput.value = despesa.outraCategoria;
+                        }, 100);
                     }
                     
                     // Forma de pagamento "Outro"
                     if (despesa.formaPagamento === 'outro' && despesa.outroPagamento) {
-                        formaPagamentoSelect.dispatchEvent(new Event('change'));
-                        outroPagamentoInput.value = despesa.outroPagamento;
+                        formaPagamentoSelect.value = 'outro';
+                        setTimeout(() => {
+                            formaPagamentoSelect.dispatchEvent(new Event('change'));
+                            outroPagamentoInput.value = despesa.outroPagamento;
+                        }, 100);
                     }
                     
                     // Nota fiscal (se existir)
@@ -1292,13 +1323,19 @@
                         tamanhoOriginal = despesa.tamanhoOriginal || 0;
                         tamanhoOtimizado = despesa.tamanhoOtimizado || 0;
                         
+                        // Atualizar campos ocultos
+                        notaFiscalHidden.value = notaFiscalBase64;
+                        tipoArquivoHidden.value = tipoArquivo;
+                        tamanhoOriginalHidden.value = tamanhoOriginal;
+                        tamanhoOtimizadoHidden.value = tamanhoOtimizado;
+                        
                         filePreview.style.display = 'block';
                         filePreview.innerHTML = `
                             <div style="margin-top: 10px; padding: 10px; background: #f0f9ff; border: 1px solid #0ea5e9; border-radius: 6px;">
                                 <div style="display: flex; align-items: center; gap: 10px;">
                                     <i class="fas fa-file-alt" style="color: #0ea5e9;"></i>
                                     <div>
-                                        <div style="font-weight: 600; color: #0c4a6e;">Nota Fiscal existente</div>
+                                        <div style="font-weight: 600; color: #0c4a6e;">Nota Fiscal existente (Modo Edição)</div>
                                         <div style="font-size: 12px; color: #64748b;">
                                             Tamanho: ${(tamanhoOtimizado / 1024).toFixed(2)}KB
                                         </div>
@@ -1307,19 +1344,21 @@
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </div>
+                                ${tipoArquivo.startsWith('image/') ? `
+                                    <img src="${notaFiscalBase64}" style="max-width: 100%; max-height: 150px; border-radius: 6px; margin-top: 10px; border: 1px solid #e2e8f0;">
+                                ` : ''}
                             </div>
                         `;
-                        
-                        notaFiscalHidden.value = notaFiscalBase64;
-                        tipoArquivoHidden.value = tipoArquivo;
-                        tamanhoOriginalHidden.value = tamanhoOriginal;
-                        tamanhoOtimizadoHidden.value = tamanhoOtimizado;
                     }
                     
-                    isEditMode = true;
                     saveBtn.textContent = 'ATUALIZAR DESPESA';
                     calcularTotais();
-                    showMessage('Despesa carregada com sucesso para edição!', 'success');
+                    
+                    // Configurar evento listeners após carregar dados
+                    setTimeout(() => {
+                        configurarEventListeners();
+                        showMessage('Despesa carregada com sucesso para edição! Agora você pode anexar uma nova nota fiscal via QR Code.', 'success');
+                    }, 500);
                     
                 } catch (error) {
                     console.error('❌ Erro ao carregar despesa:', error);
@@ -1470,19 +1509,21 @@
             }
             
             window.limparNotaFiscal = function() {
-                notaFiscalBase64 = '';
-                tipoArquivo = '';
-                tamanhoOriginal = 0;
-                tamanhoOtimizado = 0;
-                filePreview.style.display = 'none';
-                notaFiscalInput.value = '';
-                
-                notaFiscalHidden.value = '';
-                tipoArquivoHidden.value = '';
-                tamanhoOriginalHidden.value = '';
-                tamanhoOtimizadoHidden.value = '';
-                
-                showMessage('Nota fiscal removida.', 'info');
+                if (confirm('Tem certeza que deseja remover a nota fiscal?')) {
+                    notaFiscalBase64 = '';
+                    tipoArquivo = '';
+                    tamanhoOriginal = 0;
+                    tamanhoOtimizado = 0;
+                    filePreview.style.display = 'none';
+                    notaFiscalInput.value = '';
+                    
+                    notaFiscalHidden.value = '';
+                    tipoArquivoHidden.value = '';
+                    tamanhoOriginalHidden.value = '';
+                    tamanhoOtimizadoHidden.value = '';
+                    
+                    showMessage('Nota fiscal removida.', 'info');
+                }
             };
             
             // ============================================
