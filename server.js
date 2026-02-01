@@ -308,74 +308,13 @@ app.post('/api/upload/nota-fiscal', async (req, res) => {
       despesaId: despesaId,
       fileSize: fileData.tamanhoOtimizado
     });
-    
   } catch (error) {
-    console.error(' Erro no upload:', error);
+    console.error('❌ Erro no upload:', error);
+    res.status(500).json({ 
       success: false, 
-      message: 'Dados incompletos' 
+      message: `Erro no servidor: ${error.message}` 
     });
   }
-  
-  console.log(` Upload recebido: sessão=${sessionId}, despesa=${despesaId}`);
-  console.log(` Tamanho: ${fileData.tamanhoOtimizado} bytes`);
-  
-  // Buscar a despesa correspondente
-  let despesaRef;
-  
-  if (despesaId.startsWith('pending-')) {
-    // Despesa ainda não foi salva, criar temporariamente
-    const tempId = despesaId.replace('pending-', '');
-    despesaRef = db.collection('temp_uploads').doc(sessionId);
-  } else {
-    // Despesa já existe, atualizar
-    despesaRef = db.collection('events').doc(despesaId);
-    const despesaDoc = await despesaRef.get();
-    
-    if (!despesaDoc.exists) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Despesa não encontrada' 
-      });
-    }
-  }
-  
-  // Salvar upload temporário
-  await db.collection('mobile_uploads').doc(sessionId).set({
-    sessionId: sessionId,
-    despesaId: despesaId,
-    fileData: fileData,
-    timestamp: new Date().toISOString(),
-    status: 'uploaded'
-  });
-  
-  // Se a despesa já existe, atualizar com o anexo
-  if (!despesaId.startsWith('pending-')) {
-    const despesaData = (await despesaRef.get()).data();
-    
-    await despesaRef.update({
-      'payload.notaFiscal': fileData.base64,
-      'payload.tipoArquivo': fileData.tipo,
-      'payload.tamanhoOriginal': fileData.tamanhoOriginal,
-      'payload.tamanhoOtimizado': fileData.tamanhoOtimizado,
-      'payload.updated_at': new Date().toISOString()
-    });
-  }
-  
-  res.json({
-    success: true,
-    message: 'Nota fiscal recebida com sucesso',
-    sessionId: sessionId,
-    despesaId: despesaId,
-    fileSize: fileData.tamanhoOtimizado
-  });
-  
-} catch (error) {
-  console.error(' Erro no upload:', error);
-  res.status(500).json({ 
-    success: false, 
-    message: `Erro no servidor: ${error.message}` 
-  });
-}
 });
 
 // API para verificar upload (usada pelo QR Code)
