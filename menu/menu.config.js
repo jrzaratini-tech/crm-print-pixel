@@ -67,5 +67,15 @@
         pos: 7,
         hidden: false,
         deleted: false
+    },
+
+    {
+        id: "nav_contabilidade",
+        name: "Contabilidade",
+        file: "pages/contabilidade.html",
+        type: "READ",
+        pos: 8,
+        hidden: false,
+        deleted: false
     }
 ];
