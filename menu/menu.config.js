@@ -77,5 +77,15 @@
         pos: 8,
         hidden: false,
         deleted: false
+    },
+
+    {
+        id: "nav_verificacao",
+        name: "Verificação",
+        file: "pages/verificacao.html",
+        type: "READ",
+        pos: 9,
+        hidden: false,
+        deleted: false
     }
 ];

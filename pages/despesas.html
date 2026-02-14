@@ -443,14 +443,14 @@
             flex: 1;
         }
         
-        .despesa-descricao {
+        .despesa-fornecedor {
             font-size: 18px;
             font-weight: 600;
             margin-bottom: 4px;
             color: var(--text-primary);
         }
         
-        .despesa-fornecedor {
+        .despesa-descricao {
             font-size: 14px;
             color: var(--text-secondary);
             margin-bottom: 8px;
@@ -521,7 +521,7 @@
             }
         }
         
-        .despesa-detais {
+        .despesa-detalhes {
             flex: 2;
         }
         
@@ -950,7 +950,7 @@
             
             <div class="search-box">
                 <i class="fas fa-search search-icon"></i>
-                <input type="text" class="search-input" id="searchInput" placeholder="Buscar descrição ou fornecedor...">
+                <input type="text" class="search-input" id="searchInput" placeholder="Buscar fornecedor ou descrição...">
             </div>
         </div>
     </section>
@@ -1001,7 +1001,7 @@
 
     <script>
         // ============================================
-        // SISTEMA DE GESTÃO DE DESPESAS - VERSÃO CORRIGIDA (PADRÃO PEDIDOS)
+        // SISTEMA DE GESTÃO DE DESPESAS - CORRIGIDO (FORNECEDOR EM DESTAQUE)
         // ============================================
         
         document.addEventListener('DOMContentLoaded', function() {
@@ -1023,7 +1023,7 @@
             let termoBusca = '';
             
             // ============================================
-            // FUNÇÕES PRINCIPAIS - SEGUINDO PADRÃO PEDIDOS
+            // FUNÇÕES PRINCIPAIS
             // ============================================
             
             // Carregar despesas do Firebase via API Core
@@ -1066,12 +1066,36 @@
             function processarDespesas(events) {
                 console.log('📦 Processando eventos do Firebase:', events.length);
                 
-                // Filtrar apenas eventos do schema "despesa" e não deletados
-                todasDespesas = events
-                    .filter(event => {
-                        const isValid = event.schema === 'despesa' && !event.deleted;
-                        return isValid;
-                    })
+                // 🔥 CORREÇÃO: Agrupar eventos por ID (pegar o mais recente de cada)
+                const despesasMap = new Map();
+                
+                events
+                    .filter(event => event.schema === 'despesa' && !event.deleted)
+                    .forEach(event => {
+                        const despesaId = event.id;
+                        
+                        // Se já existe uma despesa com este ID, comparar timestamps
+                        if (despesasMap.has(despesaId)) {
+                            const existing = despesasMap.get(despesaId);
+                            const existingTime = new Date(existing.timestamp || existing.created_at || 0).getTime();
+                            const newTime = new Date(event.timestamp || event.created_at || 0).getTime();
+                            
+                            // Manter o mais recente
+                            if (newTime > existingTime) {
+                                despesasMap.set(despesaId, event);
+                            }
+                        } else {
+                            despesasMap.set(despesaId, event);
+                        }
+                    });
+                
+                // Converter mapa para array
+                const eventosUnicos = Array.from(despesasMap.values());
+                
+                console.log(`✅ ${eventosUnicos.length} despesas únicas após agrupamento (de ${events.length} eventos)`);
+                
+                // Processar cada evento único
+                todasDespesas = eventosUnicos
                     .map(event => {
                         // Garantir que payload seja um objeto válido
                         let payload = event.payload;
@@ -1108,8 +1132,8 @@
                         const despesaFormatada = {
                             // Campos do schema "despesa"
                             id: event.id,
-                            descricao: payload.descricao || 'Despesa sem descrição',
                             fornecedor: payload.fornecedor || 'Fornecedor não informado',
+                            descricao: payload.descricao || 'Despesa sem descrição',
                             valorBruto: valorBruto,
                             valorIVA: valorIVA,
                             valorTotal: valorTotal,
@@ -1201,15 +1225,15 @@
                     });
                 }
                 
-                // Aplicar busca
+                // Aplicar busca - priorizando fornecedor
                 if (termoBusca.trim() !== '') {
                     const busca = termoBusca.toLowerCase();
                     despesasFiltradas = despesasFiltradas.filter(d => {
-                        const descricao = (d.descricao || '').toLowerCase();
                         const fornecedor = (d.fornecedor || '').toLowerCase();
+                        const descricao = (d.descricao || '').toLowerCase();
                         
-                        return descricao.includes(busca) || 
-                               fornecedor.includes(busca);
+                        return fornecedor.includes(busca) || 
+                               descricao.includes(busca);
                     });
                 }
                 
@@ -1234,15 +1258,9 @@
                     const card = criarCardDespesa(despesa);
                     despesasGrid.appendChild(card);
                 });
-                
-                // Adicionar animação de entrada
-                const cards = document.querySelectorAll('.despesa-card');
-                cards.forEach((card, index) => {
-                    card.style.animationDelay = `${index * 0.05}s`;
-                });
             }
             
-            // Criar card de despesa (formato profissional)
+            // Criar card de despesa (FORNECEDOR em destaque, DESCRIÇÃO abaixo)
             function criarCardDespesa(despesa) {
                 const valorTotal = despesa.valorTotal || 0;
                 const status = despesa.statusPagamento;
@@ -1277,8 +1295,8 @@
                 card.innerHTML = `
                     <div class="despesa-header">
                         <div class="despesa-info">
-                            <div class="despesa-descricao">${despesa.descricao}</div>
                             <div class="despesa-fornecedor">${despesa.fornecedor}</div>
+                            <div class="despesa-descricao">${despesa.descricao}</div>
                             <div class="despesa-meta">
                                 <div class="despesa-meta-item">
                                     <i class="fas fa-calendar-alt"></i>
@@ -1301,7 +1319,7 @@
                     </div>
                     
                     <div class="despesa-content">
-                        <div class="despesa-detais">
+                        <div class="despesa-detalhes">
                             <div class="detalhe-item">
                                 <span class="detalhe-label">Categoria:</span>
                                 <span class="detalhe-value">
@@ -1332,10 +1350,6 @@
                             <div class="resumo-item resumo-total">
                                 <span>Total:</span>
                                 <span>${formatarMoeda(valorTotal)}</span>
-                            </div>
-                            <div class="resumo-item">
-                                <span>Status:</span>
-                                <span>${statusTexto}</span>
                             </div>
                         </div>
                     </div>
@@ -1399,12 +1413,12 @@
                         <h3 class="section-title">Informações da Despesa</h3>
                         <div class="info-grid">
                             <div class="info-item">
-                                <div class="info-label">Descrição</div>
-                                <div class="info-value">${despesa.descricao}</div>
-                            </div>
-                            <div class="info-item">
                                 <div class="info-label">Fornecedor</div>
                                 <div class="info-value">${despesa.fornecedor}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Descrição</div>
+                                <div class="info-value">${despesa.descricao}</div>
                             </div>
                             <div class="info-item">
                                 <div class="info-label">Telefone</div>
@@ -1463,32 +1477,21 @@
                             </div>
                         </div>
                     ` : ''}
-                    
-                    <div class="modal-section">
-                        <h3 class="section-title">Ações</h3>
-                        <div style="display: flex; gap: 12px;">
-                            <button class="btn-new" onclick="editarDespesaModal('${despesa.id}')" style="margin-right: 0;">
-                                <i class="fas fa-edit"></i>
-                                Editar Despesa
-                            </button>
-                        </div>
-                    </div>
                 `;
                 
                 modalOverlay.classList.add('active');
             }
             
-            // Função para editar via modal
-            function editarDespesaModal(despesaId) {
-                editarDespesa(despesaId);
-            }
-            
-            // Atualizar status da despesa via API Core - CORRIGIDO (PADRÃO PEDIDOS)
+            // Atualizar status da despesa - SEGUINDO MESMA LÓGICA DOS PEDIDOS
             async function atualizarStatusDespesa(despesaId, novoStatus) {
                 try {
                     console.log(`🔄 Atualizando status da despesa ${despesaId} para: ${novoStatus}`);
                     
-                    // 🔥 CORREÇÃO: Buscar todos e filtrar localmente
+                    const card = document.querySelector(`.despesa-card[data-id="${despesaId}"]`);
+                    const statusSelect = card.querySelector('.status-select');
+                    statusSelect.disabled = true;
+                    
+                    // Buscar todas as despesas
                     const response = await fetch('/api/database/query', {
                         method: 'POST',
                         headers: {
@@ -1496,7 +1499,7 @@
                         },
                         body: JSON.stringify({
                             schema: 'despesa',
-                            filters: {}  // ✅ Buscar TODOS os pedidos
+                            filters: {}
                         })
                     });
                     
@@ -1507,31 +1510,42 @@
                     const result = await response.json();
                     const eventos = result.events || [];
                     
-                    // 🔥 CORREÇÃO: Filtrar pelo ID correto
-                    const eventoOriginal = eventos.find(evento => evento.id === despesaId);
+                    // Filtrar pelo ID correto e pegar o mais recente
+                    const eventosDaDespesa = eventos
+                        .filter(evento => evento.id === despesaId && evento.schema === 'despesa' && !evento.deleted)
+                        .sort((a, b) => {
+                            const timeA = new Date(a.timestamp || a.created_at || 0).getTime();
+                            const timeB = new Date(b.timestamp || b.created_at || 0).getTime();
+                            return timeB - timeA;
+                        });
                     
-                    if (!eventoOriginal) {
+                    if (eventosDaDespesa.length === 0) {
                         throw new Error('Despesa não encontrada');
                     }
                     
+                    const eventoMaisRecente = eventosDaDespesa[0];
+                    
+                    // Criar payload atualizado
                     const payloadAtualizado = {
-                        ...eventoOriginal.payload,
+                        ...eventoMaisRecente.payload,
                         statusPagamento: novoStatus,
                         dataPagamento: novoStatus === 'paga' ? new Date().toISOString().split('T')[0] : '',
                         updated_at: new Date().toISOString()
                     };
                     
-                    // Atualizar documento existente - SEGUINDO PADRÃO PEDIDOS
+                    // Enviar atualização - MESMO ID
                     const commitResponse = await fetch('/api/database/commit', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
                         },
                         body: JSON.stringify({
+                            id: despesaId,
                             schema: 'despesa',
                             payload: payloadAtualizado,
                             pageId: 'despesas',
-                            id: despesaId  // 🔥 CRÍTICO: ID do documento
+                            timestamp: new Date().toISOString(),
+                            deleted: false
                         })
                     });
                     
@@ -1547,17 +1561,15 @@
                     }
                     
                     // Feedback visual
-                    const card = document.querySelector(`.despesa-card[data-id="${despesaId}"]`);
                     if (card) {
                         card.className = `despesa-card ${novoStatus}`;
-                        
-                        const statusSelect = card.querySelector('.status-select');
                         statusSelect.style.backgroundColor = '#10b981';
                         statusSelect.style.color = 'white';
                         
                         setTimeout(() => {
                             statusSelect.style.backgroundColor = '';
                             statusSelect.style.color = '';
+                            statusSelect.disabled = false;
                         }, 1000);
                     }
                     
@@ -1566,6 +1578,20 @@
                     
                 } catch (error) {
                     console.error('❌ Erro ao atualizar status:', error);
+                    
+                    const card = document.querySelector(`.despesa-card[data-id="${despesaId}"]`);
+                    if (card) {
+                        const statusSelect = card.querySelector('.status-select');
+                        statusSelect.disabled = false;
+                        statusSelect.style.backgroundColor = '#ef4444';
+                        statusSelect.style.color = 'white';
+                        
+                        setTimeout(() => {
+                            statusSelect.style.backgroundColor = '';
+                            statusSelect.style.color = '';
+                        }, 2000);
+                    }
+                    
                     alert('Erro ao atualizar status da despesa. Tente novamente.');
                 }
             }
@@ -1574,7 +1600,6 @@
             // FUNÇÕES DE EDIÇÃO
             // ============================================
             
-            // Função para editar uma despesa (redireciona para o formulário)
             function editarDespesa(despesaId) {
                 console.log('✏️ Editando despesa:', despesaId);
                 window.location.href = `novadespesa.html?edit=${despesaId}`;
@@ -1612,7 +1637,6 @@
             // EVENT LISTENERS
             // ============================================
             
-            // Filtrar despesas por status
             filterButtons.forEach(btn => {
                 btn.addEventListener('click', () => {
                     filterButtons.forEach(b => b.classList.remove('active'));
@@ -1622,13 +1646,11 @@
                 });
             });
             
-            // Buscar despesas
             searchInput.addEventListener('input', (e) => {
                 termoBusca = e.target.value.toLowerCase();
                 aplicarFiltrosEBusca();
             });
             
-            // Fechar modal
             modalClose.addEventListener('click', () => {
                 modalOverlay.classList.remove('active');
             });
@@ -1639,12 +1661,6 @@
                 }
             });
             
-            // Escutar eventos do Core Engine
-            document.addEventListener('coreDataChanged', () => {
-                console.log('🔄 Dados atualizados pelo Core Engine');
-                carregarDespesas();
-            });
-            
             // Auto-refresh a cada 30 segundos
             setInterval(carregarDespesas, 30000);
             
@@ -1652,9 +1668,7 @@
             // INICIALIZAÇÃO
             // ============================================
             
-            // Iniciar carregamento das despesas
             carregarDespesas();
-            
             console.log('✅ Sistema de gestão de despesas inicializado');
         });
     </script>

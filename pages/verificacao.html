@@ -1,0 +1,1240 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrintPixel - Verificação de Duplicatas</title>
+    
+    <!-- BIBLIOTECAS EXTERNAS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ============================================
+           VARIÁVEIS DE CORES E ESTILOS
+           ============================================ */
+        :root {
+            --primary-color: #1a237e;
+            --secondary-color: #283593;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --info-color: #3b82f6;
+            --purple-color: #8b5cf6;
+            --light-bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border-color: #e2e8f0;
+            --hover-bg: #f1f5f9;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+        }
+        
+        /* ============================================
+           RESET E CONFIGURAÇÕES GERAIS
+           ============================================ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        
+        body {
+            background-color: var(--light-bg);
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        /* ============================================
+           HEADER
+           ============================================ */
+        .page-header {
+            background: var(--card-bg);
+            padding: 24px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            margin-bottom: 24px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .header-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--purple-color) 0%, #7c3aed 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+        }
+        
+        .header-text h1 {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: var(--purple-color);
+        }
+        
+        .header-text p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 400;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .btn-refresh {
+            background-color: var(--card-bg);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            padding: 12px 24px;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+        
+        .btn-refresh:hover {
+            background-color: var(--hover-bg);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+        
+        .btn-refresh i {
+            color: var(--purple-color);
+        }
+        
+        /* ============================================
+           CONTADORES DE DUPLICATAS
+           ============================================ */
+        .counters-section {
+            margin-bottom: 24px;
+        }
+        
+        .counters-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+        }
+        
+        @media (max-width: 768px) {
+            .counters-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .counters-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .counter-card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
+            text-align: center;
+            transition: transform 0.2s;
+        }
+        
+        .counter-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .counter-card.por-id {
+            border-top: 4px solid var(--danger-color);
+        }
+        
+        .counter-card.por-cliente {
+            border-top: 4px solid var(--warning-color);
+        }
+        
+        .counter-card.por-valor {
+            border-top: 4px solid var(--info-color);
+        }
+        
+        .counter-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            margin: 0 auto 12px;
+        }
+        
+        .counter-card.por-id .counter-icon {
+            background: #fee2e2;
+            color: var(--danger-color);
+        }
+        
+        .counter-card.por-cliente .counter-icon {
+            background: #fef3c7;
+            color: var(--warning-color);
+        }
+        
+        .counter-card.por-valor .counter-icon {
+            background: #dbeafe;
+            color: var(--info-color);
+        }
+        
+        .counter-value {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        
+        .counter-card.por-id .counter-value {
+            color: var(--danger-color);
+        }
+        
+        .counter-card.por-cliente .counter-value {
+            color: var(--warning-color);
+        }
+        
+        .counter-card.por-valor .counter-value {
+            color: var(--info-color);
+        }
+        
+        .counter-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        
+        /* ============================================
+           CONTROLES E FILTROS
+           ============================================ */
+        .controls-section {
+            margin-bottom: 24px;
+        }
+        
+        .filters-container {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        
+        .filter-group {
+            display: flex;
+            gap: 8px;
+            background: var(--card-bg);
+            padding: 8px 12px;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
+            flex-wrap: wrap;
+        }
+        
+        .filter-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 20px;
+            background: transparent;
+            color: var(--text-secondary);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .filter-btn:hover {
+            background: var(--hover-bg);
+        }
+        
+        .filter-btn.active {
+            background: var(--purple-color);
+            color: white;
+        }
+        
+        .tipo-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+        
+        .tipo-pedido {
+            background: #e0e7ff;
+            color: var(--primary-color);
+        }
+        
+        .tipo-despesa {
+            background: #fee2e2;
+            color: var(--danger-color);
+        }
+        
+        .search-box {
+            flex: 1;
+            max-width: 400px;
+            position: relative;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 12px 20px 12px 44px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background: var(--card-bg);
+            font-size: 14px;
+            transition: all 0.2s;
+            box-shadow: var(--shadow-sm);
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: var(--purple-color);
+            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+        }
+        
+        .search-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+        }
+        
+        /* ============================================
+           LISTA DE DUPLICATAS
+           ============================================ */
+        .duplicatas-container {
+            margin-bottom: 32px;
+        }
+        
+        .grupos-grid {
+            display: grid;
+            gap: 24px;
+        }
+        
+        .grupo-card {
+            background: var(--card-bg);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+        }
+        
+        .grupo-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--border-color);
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        
+        .grupo-titulo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .grupo-icone {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+        
+        .grupo-icone.por-id {
+            background: #fee2e2;
+            color: var(--danger-color);
+        }
+        
+        .grupo-icone.por-cliente {
+            background: #fef3c7;
+            color: var(--warning-color);
+        }
+        
+        .grupo-icone.por-valor {
+            background: #dbeafe;
+            color: var(--info-color);
+        }
+        
+        .grupo-info h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .grupo-info p {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        
+        .grupo-badge {
+            background: var(--hover-bg);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .grupo-badge i {
+            color: var(--warning-color);
+        }
+        
+        /* Tabela de registros duplicados */
+        .registros-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 12px;
+        }
+        
+        .registros-table th {
+            text-align: left;
+            padding: 12px;
+            background: var(--hover-bg);
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid var(--border-color);
+        }
+        
+        .registros-table td {
+            padding: 16px 12px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 14px;
+            vertical-align: middle;
+        }
+        
+        .registros-table tr:hover td {
+            background: var(--hover-bg);
+        }
+        
+        .registros-table tr.original-row {
+            background-color: rgba(16, 185, 129, 0.05);
+            border-left: 4px solid var(--success-color);
+        }
+        
+        .registros-table tr.copia-row {
+            background-color: rgba(239, 68, 68, 0.05);
+            border-left: 4px solid var(--warning-color);
+        }
+        
+        .badge-original {
+            background: var(--success-color);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .badge-copia {
+            background: var(--warning-color);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        
+        .info-detalhe {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+        
+        .valor-destacado {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+        
+        .status-badge-small {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .status-pendente {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .status-processamento {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .status-concluido {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .status-paga {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        /* ============================================
+           MENSAGEM DE VAZIO
+           ============================================ */
+        .empty-state {
+            text-align: center;
+            padding: 60px 32px;
+            color: var(--text-secondary);
+            background: var(--card-bg);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-sm);
+        }
+        
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: 24px;
+            color: var(--success-color);
+        }
+        
+        .empty-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+        
+        .empty-text {
+            font-size: 14px;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        
+        /* ============================================
+           LOADING
+           ============================================ */
+        .loading-container {
+            text-align: center;
+            padding: 60px;
+        }
+        
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top: 3px solid var(--purple-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* ============================================
+           RESPONSIVIDADE
+           ============================================ */
+        @media (max-width: 768px) {
+            body {
+                padding: 16px;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .filters-container {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .search-box {
+                max-width: none;
+            }
+            
+            .filter-group {
+                justify-content: center;
+            }
+            
+            .grupo-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .registros-table {
+                display: block;
+                overflow-x: auto;
+                white-space: nowrap;
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .header-title {
+                flex-direction: column;
+                text-align: center;
+            }
+            
+            .filter-group {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body data-page-id="verificacao" data-page-type="READ">
+    <!-- ============================================
+         HEADER
+         ============================================ -->
+    <header class="page-header">
+        <div class="header-content">
+            <div class="header-title">
+                <div class="header-icon">
+                    <i class="fas fa-shield-alt"></i>
+                </div>
+                <div class="header-text">
+                    <h1>Verificação de Duplicatas</h1>
+                    <p>Identifica pedidos ou despesas duplicadas por ID, nome ou valor</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="btn-refresh" onclick="window.location.reload()">
+                    <i class="fas fa-sync-alt"></i>
+                    Atualizar Verificação
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- ============================================
+         CONTADORES DE DUPLICATAS
+         ============================================ -->
+    <section class="counters-section">
+        <div class="counters-grid" id="countersGrid">
+            <div class="counter-card por-id">
+                <div class="counter-icon">
+                    <i class="fas fa-fingerprint"></i>
+                </div>
+                <div class="counter-value" id="countPorId">0</div>
+                <div class="counter-label">Duplicatas por ID</div>
+            </div>
+            
+            <div class="counter-card por-cliente">
+                <div class="counter-icon">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="counter-value" id="countPorCliente">0</div>
+                <div class="counter-label">Duplicatas por Nome</div>
+            </div>
+            
+            <div class="counter-card por-valor">
+                <div class="counter-icon">
+                    <i class="fas fa-euro-sign"></i>
+                </div>
+                <div class="counter-value" id="countPorValor">0</div>
+                <div class="counter-label">Duplicatas por Valor</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================
+         CONTROLES E FILTROS
+         ============================================ -->
+    <section class="controls-section">
+        <div class="filters-container">
+            <div class="filter-group">
+                <button class="filter-btn active" data-filter="all">
+                    <i class="fas fa-layer-group"></i>
+                    Todas
+                </button>
+                <button class="filter-btn" data-filter="por-id">
+                    <i class="fas fa-fingerprint" style="color: var(--danger-color);"></i>
+                    Por ID
+                </button>
+                <button class="filter-btn" data-filter="por-cliente">
+                    <i class="fas fa-user" style="color: var(--warning-color);"></i>
+                    Por Nome
+                </button>
+                <button class="filter-btn" data-filter="por-valor">
+                    <i class="fas fa-euro-sign" style="color: var(--info-color);"></i>
+                    Por Valor
+                </button>
+            </div>
+            
+            <div class="search-box">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" class="search-input" id="searchInput" placeholder="Buscar por ID, nome ou valor...">
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================
+         LISTA DE DUPLICATAS
+         ============================================ -->
+    <section class="duplicatas-container">
+        <div id="loadingState" class="loading-container">
+            <div class="loading-spinner"></div>
+            <p>Verificando duplicatas...</p>
+        </div>
+        
+        <div class="grupos-grid" id="gruposGrid" style="display: none;">
+            <!-- Os grupos de duplicatas serão carregados dinamicamente aqui -->
+        </div>
+        
+        <!-- Estado vazio (sem duplicatas) -->
+        <div class="empty-state" id="emptyState" style="display: none;">
+            <div class="empty-icon">
+                <i class="fas fa-check-circle"></i>
+            </div>
+            <h3 class="empty-title">Nenhuma Duplicata Encontrada</h3>
+            <p class="empty-text">Todos os registros estão consistentes. Nenhum pedido ou despesa duplicada foi identificado.</p>
+        </div>
+    </section>
+
+    <script>
+        // ============================================
+        // SISTEMA DE VERIFICAÇÃO DE DUPLICATAS
+        // ============================================
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🔍 Página de Verificação de Duplicatas carregada');
+            
+            // Elementos do DOM
+            const gruposGrid = document.getElementById('gruposGrid');
+            const emptyState = document.getElementById('emptyState');
+            const loadingState = document.getElementById('loadingState');
+            const searchInput = document.getElementById('searchInput');
+            const filterButtons = document.querySelectorAll('.filter-btn');
+            const countPorId = document.getElementById('countPorId');
+            const countPorCliente = document.getElementById('countPorCliente');
+            const countPorValor = document.getElementById('countPorValor');
+            
+            // Estado da aplicação
+            let todosPedidos = [];
+            let todasDespesas = [];
+            let gruposDuplicatas = {
+                porId: [],
+                porCliente: [],
+                porValor: []
+            };
+            let filtroAtual = 'all';
+            let termoBusca = '';
+            
+            // ============================================
+            // FUNÇÕES PRINCIPAIS
+            // ============================================
+            
+            // Carregar todos os dados do Firebase
+            async function carregarDados() {
+                try {
+                    console.log('🔄 Carregando dados para verificação...');
+                    
+                    // Buscar pedidos
+                    const responsePedidos = await fetch('/api/database/query', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            schema: 'pedido',
+                            filters: { deleted: false }
+                        })
+                    });
+                    
+                    // Buscar despesas
+                    const responseDespesas = await fetch('/api/database/query', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            schema: 'despesa',
+                            filters: { deleted: false }
+                        })
+                    });
+                    
+                    if (!responsePedidos.ok || !responseDespesas.ok) {
+                        throw new Error('Erro ao carregar dados');
+                    }
+                    
+                    const resultPedidos = await responsePedidos.json();
+                    const resultDespesas = await responseDespesas.json();
+                    
+                    console.log(`✅ Recebidos: ${resultPedidos.events?.length || 0} pedidos, ${resultDespesas.events?.length || 0} despesas`);
+                    
+                    processarPedidos(resultPedidos.events || []);
+                    processarDespesas(resultDespesas.events || []);
+                    identificarDuplicatas();
+                    
+                } catch (error) {
+                    console.error('❌ Erro ao carregar dados:', error);
+                    mostrarErro('Erro ao carregar dados. Verifique a conexão com o servidor.');
+                }
+            }
+            
+            // Processar pedidos (agrupando por ID)
+            function processarPedidos(events) {
+                const pedidosMap = new Map();
+                
+                events
+                    .filter(event => event.schema === 'pedido' && !event.deleted)
+                    .forEach(event => {
+                        const pedidoId = event.id;
+                        
+                        if (pedidosMap.has(pedidoId)) {
+                            const existing = pedidosMap.get(pedidoId);
+                            const existingTime = new Date(existing.timestamp || existing.created_at || 0).getTime();
+                            const newTime = new Date(event.timestamp || event.created_at || 0).getTime();
+                            
+                            if (newTime > existingTime) {
+                                pedidosMap.set(pedidoId, event);
+                            }
+                        } else {
+                            pedidosMap.set(pedidoId, event);
+                        }
+                    });
+                
+                todosPedidos = Array.from(pedidosMap.values()).map(event => {
+                    let payload = event.payload;
+                    if (typeof payload === 'string') {
+                        try {
+                            payload = JSON.parse(payload);
+                        } catch (e) {
+                            payload = {};
+                        }
+                    }
+                    
+                    return {
+                        id: event.id,
+                        tipo: 'pedido',
+                        nome: payload.cliente || 'Cliente não informado',
+                        empresa: payload.empresa || '',
+                        valor: parseFloat(payload.total) || 0,
+                        status: payload.status || 'pendente',
+                        data: event.timestamp || event.created_at || new Date().toISOString(),
+                        payload: payload,
+                        evento: event
+                    };
+                });
+            }
+            
+            // Processar despesas (agrupando por ID)
+            function processarDespesas(events) {
+                const despesasMap = new Map();
+                
+                events
+                    .filter(event => event.schema === 'despesa' && !event.deleted)
+                    .forEach(event => {
+                        const despesaId = event.id;
+                        
+                        if (despesasMap.has(despesaId)) {
+                            const existing = despesasMap.get(despesaId);
+                            const existingTime = new Date(existing.timestamp || existing.created_at || 0).getTime();
+                            const newTime = new Date(event.timestamp || event.created_at || 0).getTime();
+                            
+                            if (newTime > existingTime) {
+                                despesasMap.set(despesaId, event);
+                            }
+                        } else {
+                            despesasMap.set(despesaId, event);
+                        }
+                    });
+                
+                todasDespesas = Array.from(despesasMap.values()).map(event => {
+                    let payload = event.payload;
+                    if (typeof payload === 'string') {
+                        try {
+                            payload = JSON.parse(payload);
+                        } catch (e) {
+                            payload = {};
+                        }
+                    }
+                    
+                    return {
+                        id: event.id,
+                        tipo: 'despesa',
+                        nome: payload.fornecedor || 'Fornecedor não informado',
+                        descricao: payload.descricao || '',
+                        valor: parseFloat(payload.valorTotal) || parseFloat(payload.valorBruto) || 0,
+                        status: payload.statusPagamento || 'pendente',
+                        data: event.timestamp || event.created_at || new Date().toISOString(),
+                        payload: payload,
+                        evento: event
+                    };
+                });
+            }
+            
+            // Identificar duplicatas
+            function identificarDuplicatas() {
+                const todosRegistros = [...todosPedidos, ...todasDespesas];
+                
+                // Reset grupos
+                gruposDuplicatas = {
+                    porId: [],
+                    porCliente: [],
+                    porValor: []
+                };
+                
+                // 1. DUPLICATAS POR ID
+                const idMap = new Map();
+                todosRegistros.forEach(registro => {
+                    if (!idMap.has(registro.id)) {
+                        idMap.set(registro.id, []);
+                    }
+                    idMap.get(registro.id).push(registro);
+                });
+                
+                idMap.forEach((registros, id) => {
+                    if (registros.length > 1) {
+                        gruposDuplicatas.porId.push({
+                            chave: id,
+                            tipo: 'ID',
+                            registros: registros.sort((a, b) => new Date(a.data) - new Date(b.data))
+                        });
+                    }
+                });
+                
+                // 2. DUPLICATAS POR NOME (cliente/fornecedor)
+                const nomeMap = new Map();
+                todosRegistros.forEach(registro => {
+                    const nome = registro.nome.toLowerCase().trim();
+                    if (nome && nome !== 'cliente não informado' && nome !== 'fornecedor não informado') {
+                        if (!nomeMap.has(nome)) {
+                            nomeMap.set(nome, []);
+                        }
+                        nomeMap.get(nome).push(registro);
+                    }
+                });
+                
+                nomeMap.forEach((registros, nome) => {
+                    if (registros.length > 1) {
+                        gruposDuplicatas.porCliente.push({
+                            chave: nome,
+                            tipo: 'Nome',
+                            registros: registros.sort((a, b) => new Date(a.data) - new Date(b.data))
+                        });
+                    }
+                });
+                
+                // 3. DUPLICATAS POR VALOR (mesmo valor exato)
+                const valorMap = new Map();
+                todosRegistros.forEach(registro => {
+                    if (registro.valor > 0) {
+                        const valorKey = registro.valor.toFixed(2);
+                        if (!valorMap.has(valorKey)) {
+                            valorMap.set(valorKey, []);
+                        }
+                        valorMap.get(valorKey).push(registro);
+                    }
+                });
+                
+                valorMap.forEach((registros, valor) => {
+                    if (registros.length > 1) {
+                        gruposDuplicatas.porValor.push({
+                            chave: parseFloat(valor),
+                            tipo: 'Valor',
+                            registros: registros.sort((a, b) => new Date(a.data) - new Date(b.data))
+                        });
+                    }
+                });
+                
+                // Atualizar contadores
+                countPorId.textContent = gruposDuplicatas.porId.length;
+                countPorCliente.textContent = gruposDuplicatas.porCliente.length;
+                countPorValor.textContent = gruposDuplicatas.porValor.length;
+                
+                // Renderizar
+                aplicarFiltrosEBusca();
+                
+                // Ocultar loading
+                loadingState.style.display = 'none';
+                
+                // Mostrar mensagem se não houver duplicatas
+                const totalDuplicatas = gruposDuplicatas.porId.length + gruposDuplicatas.porCliente.length + gruposDuplicatas.porValor.length;
+                if (totalDuplicatas === 0) {
+                    emptyState.style.display = 'block';
+                    gruposGrid.style.display = 'none';
+                } else {
+                    emptyState.style.display = 'none';
+                    gruposGrid.style.display = 'grid';
+                }
+            }
+            
+            // Aplicar filtros e busca
+            function aplicarFiltrosEBusca() {
+                let gruposFiltrados = {
+                    porId: [...gruposDuplicatas.porId],
+                    porCliente: [...gruposDuplicatas.porCliente],
+                    porValor: [...gruposDuplicatas.porValor]
+                };
+                
+                // Aplicar filtro por tipo
+                if (filtroAtual !== 'all') {
+                    if (filtroAtual === 'por-id') {
+                        gruposFiltrados.porCliente = [];
+                        gruposFiltrados.porValor = [];
+                    } else if (filtroAtual === 'por-cliente') {
+                        gruposFiltrados.porId = [];
+                        gruposFiltrados.porValor = [];
+                    } else if (filtroAtual === 'por-valor') {
+                        gruposFiltrados.porId = [];
+                        gruposFiltrados.porCliente = [];
+                    }
+                }
+                
+                // Aplicar busca
+                if (termoBusca.trim() !== '') {
+                    const busca = termoBusca.toLowerCase();
+                    
+                    // Filtrar cada tipo
+                    gruposFiltrados.porId = gruposFiltrados.porId.filter(grupo => 
+                        grupo.chave.toLowerCase().includes(busca)
+                    );
+                    
+                    gruposFiltrados.porCliente = gruposFiltrados.porCliente.filter(grupo => 
+                        grupo.chave.toLowerCase().includes(busca)
+                    );
+                    
+                    gruposFiltrados.porValor = gruposFiltrados.porValor.filter(grupo => 
+                        grupo.chave.toString().includes(busca)
+                    );
+                }
+                
+                renderizarGrupos(gruposFiltrados);
+            }
+            
+            // Renderizar grupos de duplicatas
+            function renderizarGrupos(grupos) {
+                gruposGrid.innerHTML = '';
+                
+                // Renderizar grupos por ID
+                grupos.porId.forEach(grupo => {
+                    gruposGrid.appendChild(criarGrupoCard(grupo, 'por-id'));
+                });
+                
+                // Renderizar grupos por Nome
+                grupos.porCliente.forEach(grupo => {
+                    gruposGrid.appendChild(criarGrupoCard(grupo, 'por-cliente'));
+                });
+                
+                // Renderizar grupos por Valor
+                grupos.porValor.forEach(grupo => {
+                    gruposGrid.appendChild(criarGrupoCard(grupo, 'por-valor'));
+                });
+            }
+            
+            // Criar card de grupo de duplicatas
+            function criarGrupoCard(grupo, tipo) {
+                const card = document.createElement('div');
+                card.className = 'grupo-card';
+                
+                // Ícone e cores baseado no tipo
+                let icone, titulo, corClasse;
+                if (tipo === 'por-id') {
+                    icone = 'fa-fingerprint';
+                    titulo = `Duplicatas por ID: ${grupo.chave}`;
+                    corClasse = 'por-id';
+                } else if (tipo === 'por-cliente') {
+                    icone = 'fa-user';
+                    titulo = `Duplicatas por Nome: ${grupo.chave}`;
+                    corClasse = 'por-cliente';
+                } else {
+                    icone = 'fa-euro-sign';
+                    titulo = `Duplicatas por Valor: ${formatarMoeda(grupo.chave)}`;
+                    corClasse = 'por-valor';
+                }
+                
+                card.innerHTML = `
+                    <div class="grupo-header">
+                        <div class="grupo-titulo">
+                            <div class="grupo-icone ${corClasse}">
+                                <i class="fas ${icone}"></i>
+                            </div>
+                            <div class="grupo-info">
+                                <h3>${titulo}</h3>
+                                <p>${grupo.registros.length} registros encontrados</p>
+                            </div>
+                        </div>
+                        <div class="grupo-badge">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            Possível duplicata
+                        </div>
+                    </div>
+                    
+                    <table class="registros-table">
+                        <thead>
+                            <tr>
+                                <th>Tipo</th>
+                                <th>ID</th>
+                                <th>Nome/Fornecedor</th>
+                                <th>Valor</th>
+                                <th>Status</th>
+                                <th>Data</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${grupo.registros.map((registro, index) => {
+                                const isOriginal = index === 0;
+                                const tipoClasse = registro.tipo === 'pedido' ? 'tipo-pedido' : 'tipo-despesa';
+                                const tipoTexto = registro.tipo === 'pedido' ? 'Pedido' : 'Despesa';
+                                
+                                let statusClasse = '';
+                                if (registro.tipo === 'pedido') {
+                                    statusClasse = registro.status === 'pendente' ? 'status-pendente' :
+                                                  registro.status === 'processamento' ? 'status-processamento' :
+                                                  'status-concluido';
+                                } else {
+                                    statusClasse = registro.status === 'paga' ? 'status-paga' : 'status-pendente';
+                                }
+                                
+                                return `
+                                    <tr class="${isOriginal ? 'original-row' : 'copia-row'}">
+                                        <td>
+                                            <span class="tipo-badge ${tipoClasse}">${tipoTexto}</span>
+                                            ${isOriginal ? '<span class="badge-original"><i class="fas fa-check-circle"></i> Original</span>' : '<span class="badge-copia"><i class="fas fa-copy"></i> Cópia</span>'}
+                                        </td>
+                                        <td><code>${registro.id.substring(0, 8)}...</code></td>
+                                        <td>
+                                            <strong>${registro.nome}</strong>
+                                            ${registro.empresa ? `<div class="info-detalhe">${registro.empresa}</div>` : ''}
+                                            ${registro.descricao ? `<div class="info-detalhe">${registro.descricao}</div>` : ''}
+                                        </td>
+                                        <td class="valor-destacado">${formatarMoeda(registro.valor)}</td>
+                                        <td><span class="status-badge-small ${statusClasse}">${registro.status}</span></td>
+                                        <td>${formatarData(registro.data)}</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                `;
+                
+                return card;
+            }
+            
+            // ============================================
+            // FUNÇÕES AUXILIARES
+            // ============================================
+            
+            function formatarData(dataStr) {
+                if (!dataStr) return 'N/A';
+                try {
+                    const data = new Date(dataStr);
+                    return data.toLocaleDateString('pt-PT') + ' ' + 
+                           data.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
+                } catch (e) {
+                    return dataStr;
+                }
+            }
+            
+            function formatarMoeda(valor) {
+                return new Intl.NumberFormat('pt-PT', {
+                    style: 'currency',
+                    currency: 'EUR',
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                }).format(valor);
+            }
+            
+            function mostrarErro(mensagem) {
+                console.error('❌ Erro:', mensagem);
+                loadingState.innerHTML = `
+                    <div style="color: var(--danger-color);">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px;"></i>
+                        <h3>Erro ao carregar dados</h3>
+                        <p>${mensagem}</p>
+                        <button class="btn-refresh" onclick="location.reload()" style="margin-top: 16px;">
+                            <i class="fas fa-redo"></i>
+                            Tentar Novamente
+                        </button>
+                    </div>
+                `;
+            }
+            
+            // ============================================
+            // EVENT LISTENERS
+            // ============================================
+            
+            filterButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    filterButtons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    filtroAtual = btn.dataset.filter;
+                    aplicarFiltrosEBusca();
+                });
+            });
+            
+            searchInput.addEventListener('input', (e) => {
+                termoBusca = e.target.value.toLowerCase();
+                aplicarFiltrosEBusca();
+            });
+            
+            // Auto-refresh a cada 60 segundos
+            setInterval(carregarDados, 60000);
+            
+            // ============================================
+            // INICIALIZAÇÃO
+            // ============================================
+            
+            carregarDados();
+            console.log('✅ Sistema de verificação de duplicatas inicializado');
+        });
+    </script>
+    
+    <!-- CONEXÃO COM O CORE ENGINE (OBRIGATÓRIO) -->
+    <script src="../core/engine.js"></script>
+</body>
+</html>
