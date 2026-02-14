@@ -1115,12 +1115,36 @@
             function processarPedidos(events) {
                 console.log('📦 Processando eventos do Firebase:', events.length);
                 
-                // Filtrar apenas eventos do schema "pedido" e não deletados
-                todosPedidos = events
-                    .filter(event => {
-                        const isValid = event.schema === 'pedido' && !event.deleted;
-                        return isValid;
-                    })
+                // 🔥 CORREÇÃO: Agrupar eventos por pedido (pegar o mais recente de cada)
+                const pedidosMap = new Map();
+                
+                events
+                    .filter(event => event.schema === 'pedido' && !event.deleted)
+                    .forEach(event => {
+                        const pedidoId = event.id;
+                        
+                        // Se já existe um pedido com este ID, comparar timestamps
+                        if (pedidosMap.has(pedidoId)) {
+                            const existing = pedidosMap.get(pedidoId);
+                            const existingTime = new Date(existing.timestamp || existing.created_at || 0).getTime();
+                            const newTime = new Date(event.timestamp || event.created_at || 0).getTime();
+                            
+                            // Manter o mais recente
+                            if (newTime > existingTime) {
+                                pedidosMap.set(pedidoId, event);
+                            }
+                        } else {
+                            pedidosMap.set(pedidoId, event);
+                        }
+                    });
+                
+                // Converter mapa para array
+                const eventosUnicos = Array.from(pedidosMap.values());
+                
+                console.log(`✅ ${eventosUnicos.length} pedidos únicos após agrupamento (de ${events.length} eventos)`);
+                
+                // Processar cada evento único
+                todosPedidos = eventosUnicos
                     .map(event => {
                         // Garantir que payload seja um objeto válido
                         let payload = event.payload;
@@ -1467,7 +1491,7 @@
                 
                 editBtn.addEventListener('click', () => editarPedido(pedido.id));
                 viewBtn.addEventListener('click', () => abrirModalDetalhes(pedido));
-                statusSelect.addEventListener('change', (e) => atualizarStatusPedido(pedido.id, e.target.value));
+                statusSelect.addEventListener('change', (e) => atualizarStatusPedido(pedido.id, e.target.value, card));
                 
                 return card;
             }
@@ -1753,12 +1777,16 @@
                 }
             }
             
-            // Atualizar status do pedido via API Core
-            async function atualizarStatusPedido(pedidoId, novoStatus) {
+            // 🔥 FUNÇÃO CORRIGIDA: Atualizar status do pedido sem duplicar
+            async function atualizarStatusPedido(pedidoId, novoStatus, cardElement) {
                 try {
                     console.log(`🔄 Atualizando status do pedido ${pedidoId} para: ${novoStatus}`);
                     
-                    // 🔥 CORREÇÃO: Buscar todos e filtrar localmente
+                    // Desabilitar o select durante a atualização
+                    const statusSelect = cardElement.querySelector('.status-select');
+                    statusSelect.disabled = true;
+                    
+                    // Buscar o evento original do pedido
                     const response = await fetch('/api/database/query', {
                         method: 'POST',
                         headers: {
@@ -1777,21 +1805,34 @@
                     const result = await response.json();
                     const eventos = result.events || [];
                     
-                    // 🔥 CORREÇÃO: Filtrar pelo ID correto
-                    const eventoOriginal = eventos.find(evento => evento.id === pedidoId);
+                    // 🔥 CORREÇÃO: Encontrar o evento mais recente para este pedido
+                    const eventosDoPedido = eventos
+                        .filter(evento => evento.id === pedidoId && evento.schema === 'pedido' && !evento.deleted)
+                        .sort((a, b) => {
+                            const timeA = new Date(a.timestamp || a.created_at || 0).getTime();
+                            const timeB = new Date(b.timestamp || b.created_at || 0).getTime();
+                            return timeB - timeA; // Mais recente primeiro
+                        });
                     
-                    if (!eventoOriginal) {
+                    if (eventosDoPedido.length === 0) {
                         throw new Error('Pedido não encontrado');
                     }
                     
+                    // Usar o evento mais recente como base
+                    const eventoMaisRecente = eventosDoPedido[0];
+                    
+                    // Criar payload atualizado mantendo todos os dados originais
                     const payloadAtualizado = {
-                        ...eventoOriginal.payload,
+                        ...eventoMaisRecente.payload,
                         status: novoStatus,
                         updated_at: new Date().toISOString()
                     };
                     
-                    // Criar novo evento de atualização
+                    // 🔥 CORREÇÃO: Usar o mesmo ID do pedido original (não criar novo)
+                    // No Firebase com Event Sourcing, cada alteração é um novo documento
+                    // mas com o MESMO ID de pedido para manter a "linha do tempo"
                     const eventoAtualizacao = {
+                        id: pedidoId, // Manter o mesmo ID para linkar ao pedido original
                         schema: 'pedido',
                         payload: payloadAtualizado,
                         pageId: 'pedidos',
@@ -1812,32 +1853,56 @@
                         throw new Error('Erro ao atualizar pedido');
                     }
                     
-                    // Atualizar localmente
-                    const pedidoIndex = todosPedidos.findIndex(p => p.id === pedidoId);
-                    if (pedidoIndex !== -1) {
-                        todosPedidos[pedidoIndex].status = novoStatus;
-                    }
+                    const commitResult = await commitResponse.json();
                     
-                    // Feedback visual
-                    const card = document.querySelector(`.pedido-card[data-id="${pedidoId}"]`);
-                    if (card) {
-                        card.className = `pedido-card ${novoStatus}`;
+                    if (commitResult.success) {
+                        console.log(`✅ Status do pedido ${pedidoId} atualizado para: ${novoStatus}`);
                         
-                        const statusSelect = card.querySelector('.status-select');
+                        // Feedback visual de sucesso
                         statusSelect.style.backgroundColor = '#10b981';
                         statusSelect.style.color = 'white';
                         
                         setTimeout(() => {
                             statusSelect.style.backgroundColor = '';
                             statusSelect.style.color = '';
+                            statusSelect.disabled = false;
                         }, 1000);
+                        
+                        // 🔥 CORREÇÃO: Atualizar localmente SEM duplicar
+                        // Encontrar o pedido no array local e atualizar
+                        const pedidoIndex = todosPedidos.findIndex(p => p.id === pedidoId);
+                        if (pedidoIndex !== -1) {
+                            todosPedidos[pedidoIndex].status = novoStatus;
+                        }
+                        
+                        // Atualizar a classe do card
+                        cardElement.className = `pedido-card ${novoStatus}`;
+                        
+                        // Recarregar todos os pedidos para garantir consistência
+                        // (opcional, mas seguro para garantir que todos os dados estão sincronizados)
+                        setTimeout(() => {
+                            carregarPedidos();
+                        }, 500);
+                    } else {
+                        throw new Error('Falha ao salvar no Firebase');
                     }
-                    
-                    atualizarContadores();
-                    console.log(`✅ Status do pedido ${pedidoId} atualizado para: ${novoStatus}`);
                     
                 } catch (error) {
                     console.error('❌ Erro ao atualizar status:', error);
+                    
+                    // Reativar o select em caso de erro
+                    const statusSelect = cardElement?.querySelector('.status-select');
+                    if (statusSelect) {
+                        statusSelect.disabled = false;
+                        statusSelect.style.backgroundColor = '#ef4444';
+                        statusSelect.style.color = 'white';
+                        
+                        setTimeout(() => {
+                            statusSelect.style.backgroundColor = '';
+                            statusSelect.style.color = '';
+                        }, 2000);
+                    }
+                    
                     alert('Erro ao atualizar status do pedido. Tente novamente.');
                 }
             }
