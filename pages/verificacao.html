@@ -27,22 +27,19 @@
             --text-secondary: #64748b;
             --border-color: #e2e8f0;
             --hover-bg: #f1f5f9;
-            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
-            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 25px -5px rgba(0,0,0,0.1);
             --radius-sm: 8px;
             --radius-md: 12px;
             --radius-lg: 16px;
         }
         
-        /* ============================================
-           RESET E CONFIGURAÇÕES GERAIS
-           ============================================ */
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+            font-family: 'Inter', sans-serif;
         }
         
         body {
@@ -53,9 +50,7 @@
             padding: 20px;
         }
         
-        /* ============================================
-           HEADER
-           ============================================ */
+        /* HEADER */
         .page-header {
             background: var(--card-bg);
             padding: 24px;
@@ -94,19 +89,12 @@
         .header-text h1 {
             font-size: 24px;
             font-weight: 700;
-            letter-spacing: -0.5px;
             color: var(--purple-color);
         }
         
         .header-text p {
             color: var(--text-secondary);
             font-size: 14px;
-            font-weight: 400;
-        }
-        
-        .header-actions {
-            display: flex;
-            gap: 12px;
         }
         
         .btn-refresh {
@@ -129,27 +117,15 @@
             box-shadow: var(--shadow-md);
         }
         
-        .btn-refresh i {
-            color: var(--purple-color);
-        }
-        
-        /* ============================================
-           CONTADORES DE DUPLICATAS
-           ============================================ */
+        /* CONTADORES */
         .counters-section {
             margin-bottom: 24px;
         }
         
         .counters-grid {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
+            grid-template-columns: repeat(2, 1fr);
             gap: 16px;
-        }
-        
-        @media (max-width: 768px) {
-            .counters-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
         }
         
         @media (max-width: 480px) {
@@ -165,23 +141,14 @@
             box-shadow: var(--shadow-sm);
             border: 1px solid var(--border-color);
             text-align: center;
-            transition: transform 0.2s;
-        }
-        
-        .counter-card:hover {
-            transform: translateY(-2px);
         }
         
         .counter-card.por-id {
             border-top: 4px solid var(--danger-color);
         }
         
-        .counter-card.por-cliente {
+        .counter-card.por-nome-valor {
             border-top: 4px solid var(--warning-color);
-        }
-        
-        .counter-card.por-valor {
-            border-top: 4px solid var(--info-color);
         }
         
         .counter-icon {
@@ -200,14 +167,9 @@
             color: var(--danger-color);
         }
         
-        .counter-card.por-cliente .counter-icon {
+        .counter-card.por-nome-valor .counter-icon {
             background: #fef3c7;
             color: var(--warning-color);
-        }
-        
-        .counter-card.por-valor .counter-icon {
-            background: #dbeafe;
-            color: var(--info-color);
         }
         
         .counter-value {
@@ -220,12 +182,8 @@
             color: var(--danger-color);
         }
         
-        .counter-card.por-cliente .counter-value {
+        .counter-card.por-nome-valor .counter-value {
             color: var(--warning-color);
-        }
-        
-        .counter-card.por-valor .counter-value {
-            color: var(--info-color);
         }
         
         .counter-label {
@@ -234,9 +192,7 @@
             font-weight: 500;
         }
         
-        /* ============================================
-           CONTROLES E FILTROS
-           ============================================ */
+        /* FILTROS */
         .controls-section {
             margin-bottom: 24px;
         }
@@ -246,18 +202,16 @@
             gap: 16px;
             align-items: center;
             flex-wrap: wrap;
-            margin-bottom: 16px;
         }
         
         .filter-group {
             display: flex;
             gap: 8px;
             background: var(--card-bg);
-            padding: 8px 12px;
+            padding: 8px;
             border-radius: var(--radius-md);
             box-shadow: var(--shadow-sm);
             border: 1px solid var(--border-color);
-            flex-wrap: wrap;
         }
         
         .filter-btn {
@@ -284,60 +238,11 @@
             color: white;
         }
         
-        .tipo-badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            letter-spacing: 0.3px;
+        .filter-btn.active i {
+            color: white;
         }
         
-        .tipo-pedido {
-            background: #e0e7ff;
-            color: var(--primary-color);
-        }
-        
-        .tipo-despesa {
-            background: #fee2e2;
-            color: var(--danger-color);
-        }
-        
-        .search-box {
-            flex: 1;
-            max-width: 400px;
-            position: relative;
-        }
-        
-        .search-input {
-            width: 100%;
-            padding: 12px 20px 12px 44px;
-            border: 1px solid var(--border-color);
-            border-radius: var(--radius-md);
-            background: var(--card-bg);
-            font-size: 14px;
-            transition: all 0.2s;
-            box-shadow: var(--shadow-sm);
-        }
-        
-        .search-input:focus {
-            outline: none;
-            border-color: var(--purple-color);
-            box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
-        }
-        
-        .search-icon {
-            position: absolute;
-            left: 16px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--text-secondary);
-        }
-        
-        /* ============================================
-           LISTA DE DUPLICATAS
-           ============================================ */
+        /* LISTA DE DUPLICATAS */
         .duplicatas-container {
             margin-bottom: 32px;
         }
@@ -353,7 +258,6 @@
             padding: 20px;
             box-shadow: var(--shadow-md);
             border: 1px solid var(--border-color);
-            overflow: hidden;
         }
         
         .grupo-header {
@@ -371,7 +275,6 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            flex-wrap: wrap;
         }
         
         .grupo-icone {
@@ -389,14 +292,9 @@
             color: var(--danger-color);
         }
         
-        .grupo-icone.por-cliente {
+        .grupo-icone.por-nome-valor {
             background: #fef3c7;
             color: var(--warning-color);
-        }
-        
-        .grupo-icone.por-valor {
-            background: #dbeafe;
-            color: var(--info-color);
         }
         
         .grupo-info h3 {
@@ -421,15 +319,10 @@
             gap: 6px;
         }
         
-        .grupo-badge i {
-            color: var(--warning-color);
-        }
-        
-        /* Tabela de registros duplicados */
+        /* TABELA */
         .registros-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 12px;
         }
         
         .registros-table th {
@@ -440,7 +333,6 @@
             font-weight: 600;
             color: var(--text-secondary);
             text-transform: uppercase;
-            letter-spacing: 0.5px;
             border-bottom: 2px solid var(--border-color);
         }
         
@@ -451,10 +343,6 @@
             vertical-align: middle;
         }
         
-        .registros-table tr:hover td {
-            background: var(--hover-bg);
-        }
-        
         .registros-table tr.original-row {
             background-color: rgba(16, 185, 129, 0.05);
             border-left: 4px solid var(--success-color);
@@ -462,7 +350,7 @@
         
         .registros-table tr.copia-row {
             background-color: rgba(239, 68, 68, 0.05);
-            border-left: 4px solid var(--warning-color);
+            border-left: 4px solid var(--danger-color);
         }
         
         .badge-original {
@@ -475,10 +363,11 @@
             display: inline-flex;
             align-items: center;
             gap: 4px;
+            margin-left: 8px;
         }
         
         .badge-copia {
-            background: var(--warning-color);
+            background: var(--danger-color);
             color: white;
             padding: 4px 8px;
             border-radius: 12px;
@@ -487,17 +376,26 @@
             display: inline-flex;
             align-items: center;
             gap: 4px;
+            margin-left: 8px;
         }
         
-        .info-detalhe {
+        .tipo-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            border-radius: 20px;
             font-size: 12px;
-            color: var(--text-secondary);
-            margin-top: 4px;
+            font-weight: 600;
         }
         
-        .valor-destacado {
-            font-weight: 600;
+        .tipo-pedido {
+            background: #e0e7ff;
             color: var(--primary-color);
+        }
+        
+        .tipo-despesa {
+            background: #fee2e2;
+            color: var(--danger-color);
         }
         
         .status-badge-small {
@@ -529,17 +427,24 @@
             color: #065f46;
         }
         
-        /* ============================================
-           MENSAGEM DE VAZIO
-           ============================================ */
+        .valor-destacado {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+        
+        .info-detalhe {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+        
+        /* ESTADOS */
         .empty-state {
             text-align: center;
             padding: 60px 32px;
-            color: var(--text-secondary);
             background: var(--card-bg);
             border-radius: var(--radius-md);
             border: 1px solid var(--border-color);
-            box-shadow: var(--shadow-sm);
         }
         
         .empty-icon {
@@ -552,18 +457,8 @@
             font-size: 18px;
             font-weight: 600;
             margin-bottom: 8px;
-            color: var(--text-primary);
         }
         
-        .empty-text {
-            font-size: 14px;
-            max-width: 400px;
-            margin: 0 auto;
-        }
-        
-        /* ============================================
-           LOADING
-           ============================================ */
         .loading-container {
             text-align: center;
             padding: 60px;
@@ -584,61 +479,20 @@
             100% { transform: rotate(360deg); }
         }
         
-        /* ============================================
-           RESPONSIVIDADE
-           ============================================ */
+        /* RESPONSIVIDADE */
         @media (max-width: 768px) {
-            body {
-                padding: 16px;
-            }
+            body { padding: 16px; }
             
-            .header-content {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            
-            .filters-container {
-                flex-direction: column;
-                align-items: stretch;
-            }
-            
-            .search-box {
-                max-width: none;
-            }
-            
-            .filter-group {
-                justify-content: center;
-            }
-            
-            .grupo-header {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-            
-            .registros-table {
-                display: block;
-                overflow-x: auto;
-                white-space: nowrap;
-            }
-        }
-        
-        @media (max-width: 480px) {
-            .header-title {
-                flex-direction: column;
-                text-align: center;
-            }
-            
-            .filter-group {
-                flex-wrap: wrap;
-                justify-content: center;
-            }
+            .header-content { flex-direction: column; }
+            .filters-container { flex-direction: column; }
+            .filter-group { width: 100%; justify-content: center; }
+            .grupo-header { flex-direction: column; align-items: flex-start; }
+            .registros-table { display: block; overflow-x: auto; }
         }
     </style>
 </head>
 <body data-page-id="verificacao" data-page-type="READ">
-    <!-- ============================================
-         HEADER
-         ============================================ -->
+    <!-- HEADER -->
     <header class="page-header">
         <div class="header-content">
             <div class="header-title">
@@ -647,21 +501,19 @@
                 </div>
                 <div class="header-text">
                     <h1>Verificação de Duplicatas</h1>
-                    <p>Identifica pedidos ou despesas duplicadas por ID, nome ou valor</p>
+                    <p>Identifica registros duplicados por ID ou por Nome + Valor</p>
                 </div>
             </div>
             <div class="header-actions">
                 <button class="btn-refresh" onclick="window.location.reload()">
                     <i class="fas fa-sync-alt"></i>
-                    Atualizar Verificação
+                    Atualizar
                 </button>
             </div>
         </div>
     </header>
 
-    <!-- ============================================
-         CONTADORES DE DUPLICATAS
-         ============================================ -->
+    <!-- CONTADORES -->
     <section class="counters-section">
         <div class="counters-grid" id="countersGrid">
             <div class="counter-card por-id">
@@ -672,27 +524,17 @@
                 <div class="counter-label">Duplicatas por ID</div>
             </div>
             
-            <div class="counter-card por-cliente">
+            <div class="counter-card por-nome-valor">
                 <div class="counter-icon">
-                    <i class="fas fa-user"></i>
+                    <i class="fas fa-user-tag"></i>
                 </div>
-                <div class="counter-value" id="countPorCliente">0</div>
-                <div class="counter-label">Duplicatas por Nome</div>
-            </div>
-            
-            <div class="counter-card por-valor">
-                <div class="counter-icon">
-                    <i class="fas fa-euro-sign"></i>
-                </div>
-                <div class="counter-value" id="countPorValor">0</div>
-                <div class="counter-label">Duplicatas por Valor</div>
+                <div class="counter-value" id="countPorNomeValor">0</div>
+                <div class="counter-label">Duplicatas por Nome + Valor</div>
             </div>
         </div>
     </section>
 
-    <!-- ============================================
-         CONTROLES E FILTROS
-         ============================================ -->
+    <!-- FILTROS -->
     <section class="controls-section">
         <div class="filters-container">
             <div class="filter-group">
@@ -701,162 +543,105 @@
                     Todas
                 </button>
                 <button class="filter-btn" data-filter="por-id">
-                    <i class="fas fa-fingerprint" style="color: var(--danger-color);"></i>
+                    <i class="fas fa-fingerprint"></i>
                     Por ID
                 </button>
-                <button class="filter-btn" data-filter="por-cliente">
-                    <i class="fas fa-user" style="color: var(--warning-color);"></i>
-                    Por Nome
+                <button class="filter-btn" data-filter="por-nome-valor">
+                    <i class="fas fa-user-tag"></i>
+                    Por Nome + Valor
                 </button>
-                <button class="filter-btn" data-filter="por-valor">
-                    <i class="fas fa-euro-sign" style="color: var(--info-color);"></i>
-                    Por Valor
-                </button>
-            </div>
-            
-            <div class="search-box">
-                <i class="fas fa-search search-icon"></i>
-                <input type="text" class="search-input" id="searchInput" placeholder="Buscar por ID, nome ou valor...">
             </div>
         </div>
     </section>
 
-    <!-- ============================================
-         LISTA DE DUPLICATAS
-         ============================================ -->
+    <!-- LISTA DE DUPLICATAS -->
     <section class="duplicatas-container">
         <div id="loadingState" class="loading-container">
             <div class="loading-spinner"></div>
             <p>Verificando duplicatas...</p>
         </div>
         
-        <div class="grupos-grid" id="gruposGrid" style="display: none;">
-            <!-- Os grupos de duplicatas serão carregados dinamicamente aqui -->
-        </div>
+        <div class="grupos-grid" id="gruposGrid" style="display: none;"></div>
         
-        <!-- Estado vazio (sem duplicatas) -->
         <div class="empty-state" id="emptyState" style="display: none;">
             <div class="empty-icon">
                 <i class="fas fa-check-circle"></i>
             </div>
             <h3 class="empty-title">Nenhuma Duplicata Encontrada</h3>
-            <p class="empty-text">Todos os registros estão consistentes. Nenhum pedido ou despesa duplicada foi identificado.</p>
+            <p class="empty-text">Todos os registros estão consistentes no sistema.</p>
         </div>
     </section>
 
     <script>
-        // ============================================
-        // SISTEMA DE VERIFICAÇÃO DE DUPLICATAS
-        // ============================================
-        
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('🔍 Página de Verificação de Duplicatas carregada');
+            console.log('🔍 Página de Verificação carregada');
             
-            // Elementos do DOM
+            // Elementos DOM
             const gruposGrid = document.getElementById('gruposGrid');
             const emptyState = document.getElementById('emptyState');
             const loadingState = document.getElementById('loadingState');
-            const searchInput = document.getElementById('searchInput');
             const filterButtons = document.querySelectorAll('.filter-btn');
             const countPorId = document.getElementById('countPorId');
-            const countPorCliente = document.getElementById('countPorCliente');
-            const countPorValor = document.getElementById('countPorValor');
+            const countPorNomeValor = document.getElementById('countPorNomeValor');
             
-            // Estado da aplicação
+            // Estado
             let todosPedidos = [];
             let todasDespesas = [];
-            let gruposDuplicatas = {
+            let duplicatas = {
                 porId: [],
-                porCliente: [],
-                porValor: []
+                porNomeValor: []
             };
             let filtroAtual = 'all';
-            let termoBusca = '';
             
-            // ============================================
-            // FUNÇÕES PRINCIPAIS
-            // ============================================
-            
-            // Carregar todos os dados do Firebase
+            // ========== CARREGAR DADOS ==========
             async function carregarDados() {
                 try {
-                    console.log('🔄 Carregando dados para verificação...');
+                    console.log('🔄 Carregando dados...');
                     
-                    // Buscar pedidos
-                    const responsePedidos = await fetch('/api/database/query', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            schema: 'pedido',
-                            filters: { deleted: false }
+                    const [pedidosRes, despesasRes] = await Promise.all([
+                        fetch('/api/database/query', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ schema: 'pedido', filters: { deleted: false } })
+                        }),
+                        fetch('/api/database/query', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ schema: 'despesa', filters: { deleted: false } })
                         })
-                    });
+                    ]);
                     
-                    // Buscar despesas
-                    const responseDespesas = await fetch('/api/database/query', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            schema: 'despesa',
-                            filters: { deleted: false }
-                        })
-                    });
+                    const pedidosData = await pedidosRes.json();
+                    const despesasData = await despesasRes.json();
                     
-                    if (!responsePedidos.ok || !responseDespesas.ok) {
-                        throw new Error('Erro ao carregar dados');
-                    }
-                    
-                    const resultPedidos = await responsePedidos.json();
-                    const resultDespesas = await responseDespesas.json();
-                    
-                    console.log(`✅ Recebidos: ${resultPedidos.events?.length || 0} pedidos, ${resultDespesas.events?.length || 0} despesas`);
-                    
-                    processarPedidos(resultPedidos.events || []);
-                    processarDespesas(resultDespesas.events || []);
+                    processarPedidos(pedidosData.events || []);
+                    processarDespesas(despesasData.events || []);
                     identificarDuplicatas();
                     
                 } catch (error) {
-                    console.error('❌ Erro ao carregar dados:', error);
-                    mostrarErro('Erro ao carregar dados. Verifique a conexão com o servidor.');
+                    console.error('❌ Erro:', error);
+                    mostrarErro('Erro ao carregar dados');
                 }
             }
             
-            // Processar pedidos (agrupando por ID)
+            // ========== PROCESSAR DADOS ==========
             function processarPedidos(events) {
                 const pedidosMap = new Map();
                 
-                events
-                    .filter(event => event.schema === 'pedido' && !event.deleted)
-                    .forEach(event => {
-                        const pedidoId = event.id;
-                        
-                        if (pedidosMap.has(pedidoId)) {
-                            const existing = pedidosMap.get(pedidoId);
-                            const existingTime = new Date(existing.timestamp || existing.created_at || 0).getTime();
-                            const newTime = new Date(event.timestamp || event.created_at || 0).getTime();
-                            
-                            if (newTime > existingTime) {
-                                pedidosMap.set(pedidoId, event);
-                            }
-                        } else {
-                            pedidosMap.set(pedidoId, event);
-                        }
-                    });
+                events.filter(e => e.schema === 'pedido' && !e.deleted).forEach(event => {
+                    const id = event.id;
+                    if (pedidosMap.has(id)) {
+                        const existing = pedidosMap.get(id);
+                        const existingTime = new Date(existing.timestamp || 0).getTime();
+                        const newTime = new Date(event.timestamp || 0).getTime();
+                        if (newTime > existingTime) pedidosMap.set(id, event);
+                    } else {
+                        pedidosMap.set(id, event);
+                    }
+                });
                 
                 todosPedidos = Array.from(pedidosMap.values()).map(event => {
-                    let payload = event.payload;
-                    if (typeof payload === 'string') {
-                        try {
-                            payload = JSON.parse(payload);
-                        } catch (e) {
-                            payload = {};
-                        }
-                    }
-                    
+                    const payload = typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload;
                     return {
                         id: event.id,
                         tipo: 'pedido',
@@ -865,146 +650,97 @@
                         valor: parseFloat(payload.total) || 0,
                         status: payload.status || 'pendente',
                         data: event.timestamp || event.created_at || new Date().toISOString(),
-                        payload: payload,
-                        evento: event
+                        payload: payload
                     };
                 });
             }
             
-            // Processar despesas (agrupando por ID)
             function processarDespesas(events) {
                 const despesasMap = new Map();
                 
-                events
-                    .filter(event => event.schema === 'despesa' && !event.deleted)
-                    .forEach(event => {
-                        const despesaId = event.id;
-                        
-                        if (despesasMap.has(despesaId)) {
-                            const existing = despesasMap.get(despesaId);
-                            const existingTime = new Date(existing.timestamp || existing.created_at || 0).getTime();
-                            const newTime = new Date(event.timestamp || event.created_at || 0).getTime();
-                            
-                            if (newTime > existingTime) {
-                                despesasMap.set(despesaId, event);
-                            }
-                        } else {
-                            despesasMap.set(despesaId, event);
-                        }
-                    });
+                events.filter(e => e.schema === 'despesa' && !e.deleted).forEach(event => {
+                    const id = event.id;
+                    if (despesasMap.has(id)) {
+                        const existing = despesasMap.get(id);
+                        const existingTime = new Date(existing.timestamp || 0).getTime();
+                        const newTime = new Date(event.timestamp || 0).getTime();
+                        if (newTime > existingTime) despesasMap.set(id, event);
+                    } else {
+                        despesasMap.set(id, event);
+                    }
+                });
                 
                 todasDespesas = Array.from(despesasMap.values()).map(event => {
-                    let payload = event.payload;
-                    if (typeof payload === 'string') {
-                        try {
-                            payload = JSON.parse(payload);
-                        } catch (e) {
-                            payload = {};
-                        }
-                    }
-                    
+                    const payload = typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload;
+                    const valorTotal = parseFloat(payload.valorTotal) || parseFloat(payload.valorBruto) || 0;
                     return {
                         id: event.id,
                         tipo: 'despesa',
                         nome: payload.fornecedor || 'Fornecedor não informado',
                         descricao: payload.descricao || '',
-                        valor: parseFloat(payload.valorTotal) || parseFloat(payload.valorBruto) || 0,
-                        status: payload.statusPagamento || 'pendente',
+                        valor: valorTotal,
+                        status: payload.statusPagamento === 'paga' ? 'paga' : 'pendente',
                         data: event.timestamp || event.created_at || new Date().toISOString(),
-                        payload: payload,
-                        evento: event
+                        payload: payload
                     };
                 });
             }
             
-            // Identificar duplicatas
+            // ========== IDENTIFICAR DUPLICATAS ==========
             function identificarDuplicatas() {
                 const todosRegistros = [...todosPedidos, ...todasDespesas];
                 
-                // Reset grupos
-                gruposDuplicatas = {
-                    porId: [],
-                    porCliente: [],
-                    porValor: []
-                };
+                // Reset
+                duplicatas = { porId: [], porNomeValor: [] };
                 
                 // 1. DUPLICATAS POR ID
                 const idMap = new Map();
-                todosRegistros.forEach(registro => {
-                    if (!idMap.has(registro.id)) {
-                        idMap.set(registro.id, []);
-                    }
-                    idMap.get(registro.id).push(registro);
+                todosRegistros.forEach(r => {
+                    if (!idMap.has(r.id)) idMap.set(r.id, []);
+                    idMap.get(r.id).push(r);
                 });
                 
                 idMap.forEach((registros, id) => {
                     if (registros.length > 1) {
-                        gruposDuplicatas.porId.push({
+                        duplicatas.porId.push({
                             chave: id,
-                            tipo: 'ID',
                             registros: registros.sort((a, b) => new Date(a.data) - new Date(b.data))
                         });
                     }
                 });
                 
-                // 2. DUPLICATAS POR NOME (cliente/fornecedor)
-                const nomeMap = new Map();
-                todosRegistros.forEach(registro => {
-                    const nome = registro.nome.toLowerCase().trim();
-                    if (nome && nome !== 'cliente não informado' && nome !== 'fornecedor não informado') {
-                        if (!nomeMap.has(nome)) {
-                            nomeMap.set(nome, []);
-                        }
-                        nomeMap.get(nome).push(registro);
+                // 2. DUPLICATAS POR NOME + VALOR
+                const nomeValorMap = new Map();
+                todosRegistros.forEach(r => {
+                    if (r.nome && r.nome !== 'Cliente não informado' && r.nome !== 'Fornecedor não informado') {
+                        const chave = `${r.nome.toLowerCase().trim()}|${r.valor.toFixed(2)}`;
+                        if (!nomeValorMap.has(chave)) nomeValorMap.set(chave, []);
+                        nomeValorMap.get(chave).push(r);
                     }
                 });
                 
-                nomeMap.forEach((registros, nome) => {
+                nomeValorMap.forEach((registros, chave) => {
                     if (registros.length > 1) {
-                        gruposDuplicatas.porCliente.push({
-                            chave: nome,
-                            tipo: 'Nome',
-                            registros: registros.sort((a, b) => new Date(a.data) - new Date(b.data))
-                        });
-                    }
-                });
-                
-                // 3. DUPLICATAS POR VALOR (mesmo valor exato)
-                const valorMap = new Map();
-                todosRegistros.forEach(registro => {
-                    if (registro.valor > 0) {
-                        const valorKey = registro.valor.toFixed(2);
-                        if (!valorMap.has(valorKey)) {
-                            valorMap.set(valorKey, []);
-                        }
-                        valorMap.get(valorKey).push(registro);
-                    }
-                });
-                
-                valorMap.forEach((registros, valor) => {
-                    if (registros.length > 1) {
-                        gruposDuplicatas.porValor.push({
-                            chave: parseFloat(valor),
-                            tipo: 'Valor',
+                        const [nome, valor] = chave.split('|');
+                        duplicatas.porNomeValor.push({
+                            chave: { nome, valor: parseFloat(valor) },
                             registros: registros.sort((a, b) => new Date(a.data) - new Date(b.data))
                         });
                     }
                 });
                 
                 // Atualizar contadores
-                countPorId.textContent = gruposDuplicatas.porId.length;
-                countPorCliente.textContent = gruposDuplicatas.porCliente.length;
-                countPorValor.textContent = gruposDuplicatas.porValor.length;
+                countPorId.textContent = duplicatas.porId.length;
+                countPorNomeValor.textContent = duplicatas.porNomeValor.length;
                 
                 // Renderizar
-                aplicarFiltrosEBusca();
+                aplicarFiltro();
                 
-                // Ocultar loading
+                // Loading e empty state
                 loadingState.style.display = 'none';
+                const total = duplicatas.porId.length + duplicatas.porNomeValor.length;
                 
-                // Mostrar mensagem se não houver duplicatas
-                const totalDuplicatas = gruposDuplicatas.porId.length + gruposDuplicatas.porCliente.length + gruposDuplicatas.porValor.length;
-                if (totalDuplicatas === 0) {
+                if (total === 0) {
                     emptyState.style.display = 'block';
                     gruposGrid.style.display = 'none';
                 } else {
@@ -1013,104 +749,42 @@
                 }
             }
             
-            // Aplicar filtros e busca
-            function aplicarFiltrosEBusca() {
-                let gruposFiltrados = {
-                    porId: [...gruposDuplicatas.porId],
-                    porCliente: [...gruposDuplicatas.porCliente],
-                    porValor: [...gruposDuplicatas.porValor]
-                };
-                
-                // Aplicar filtro por tipo
-                if (filtroAtual !== 'all') {
-                    if (filtroAtual === 'por-id') {
-                        gruposFiltrados.porCliente = [];
-                        gruposFiltrados.porValor = [];
-                    } else if (filtroAtual === 'por-cliente') {
-                        gruposFiltrados.porId = [];
-                        gruposFiltrados.porValor = [];
-                    } else if (filtroAtual === 'por-valor') {
-                        gruposFiltrados.porId = [];
-                        gruposFiltrados.porCliente = [];
-                    }
-                }
-                
-                // Aplicar busca
-                if (termoBusca.trim() !== '') {
-                    const busca = termoBusca.toLowerCase();
-                    
-                    // Filtrar cada tipo
-                    gruposFiltrados.porId = gruposFiltrados.porId.filter(grupo => 
-                        grupo.chave.toLowerCase().includes(busca)
-                    );
-                    
-                    gruposFiltrados.porCliente = gruposFiltrados.porCliente.filter(grupo => 
-                        grupo.chave.toLowerCase().includes(busca)
-                    );
-                    
-                    gruposFiltrados.porValor = gruposFiltrados.porValor.filter(grupo => 
-                        grupo.chave.toString().includes(busca)
-                    );
-                }
-                
-                renderizarGrupos(gruposFiltrados);
-            }
-            
-            // Renderizar grupos de duplicatas
-            function renderizarGrupos(grupos) {
+            // ========== APLICAR FILTRO ==========
+            function aplicarFiltro() {
                 gruposGrid.innerHTML = '';
                 
-                // Renderizar grupos por ID
-                grupos.porId.forEach(grupo => {
-                    gruposGrid.appendChild(criarGrupoCard(grupo, 'por-id'));
-                });
+                if (filtroAtual === 'all' || filtroAtual === 'por-id') {
+                    duplicatas.porId.forEach(grupo => {
+                        gruposGrid.appendChild(criarCardPorId(grupo));
+                    });
+                }
                 
-                // Renderizar grupos por Nome
-                grupos.porCliente.forEach(grupo => {
-                    gruposGrid.appendChild(criarGrupoCard(grupo, 'por-cliente'));
-                });
-                
-                // Renderizar grupos por Valor
-                grupos.porValor.forEach(grupo => {
-                    gruposGrid.appendChild(criarGrupoCard(grupo, 'por-valor'));
-                });
+                if (filtroAtual === 'all' || filtroAtual === 'por-nome-valor') {
+                    duplicatas.porNomeValor.forEach(grupo => {
+                        gruposGrid.appendChild(criarCardPorNomeValor(grupo));
+                    });
+                }
             }
             
-            // Criar card de grupo de duplicatas
-            function criarGrupoCard(grupo, tipo) {
+            // ========== CRIAR CARD POR ID ==========
+            function criarCardPorId(grupo) {
                 const card = document.createElement('div');
                 card.className = 'grupo-card';
-                
-                // Ícone e cores baseado no tipo
-                let icone, titulo, corClasse;
-                if (tipo === 'por-id') {
-                    icone = 'fa-fingerprint';
-                    titulo = `Duplicatas por ID: ${grupo.chave}`;
-                    corClasse = 'por-id';
-                } else if (tipo === 'por-cliente') {
-                    icone = 'fa-user';
-                    titulo = `Duplicatas por Nome: ${grupo.chave}`;
-                    corClasse = 'por-cliente';
-                } else {
-                    icone = 'fa-euro-sign';
-                    titulo = `Duplicatas por Valor: ${formatarMoeda(grupo.chave)}`;
-                    corClasse = 'por-valor';
-                }
                 
                 card.innerHTML = `
                     <div class="grupo-header">
                         <div class="grupo-titulo">
-                            <div class="grupo-icone ${corClasse}">
-                                <i class="fas ${icone}"></i>
+                            <div class="grupo-icone por-id">
+                                <i class="fas fa-fingerprint"></i>
                             </div>
                             <div class="grupo-info">
-                                <h3>${titulo}</h3>
-                                <p>${grupo.registros.length} registros encontrados</p>
+                                <h3>ID Duplicado: ${grupo.chave.substring(0, 8)}...</h3>
+                                <p>${grupo.registros.length} registros com o mesmo ID</p>
                             </div>
                         </div>
                         <div class="grupo-badge">
-                            <i class="fas fa-exclamation-triangle"></i>
-                            Possível duplicata
+                            <i class="fas fa-exclamation-triangle" style="color: var(--danger-color);"></i>
+                            Possível duplicata por ID
                         </div>
                     </div>
                     
@@ -1118,26 +792,24 @@
                         <thead>
                             <tr>
                                 <th>Tipo</th>
-                                <th>ID</th>
-                                <th>Nome/Fornecedor</th>
+                                <th>Nome</th>
                                 <th>Valor</th>
                                 <th>Status</th>
                                 <th>Data</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${grupo.registros.map((registro, index) => {
-                                const isOriginal = index === 0;
-                                const tipoClasse = registro.tipo === 'pedido' ? 'tipo-pedido' : 'tipo-despesa';
-                                const tipoTexto = registro.tipo === 'pedido' ? 'Pedido' : 'Despesa';
+                            ${grupo.registros.map((r, idx) => {
+                                const isOriginal = idx === 0;
+                                const tipoClasse = r.tipo === 'pedido' ? 'tipo-pedido' : 'tipo-despesa';
+                                const tipoTexto = r.tipo === 'pedido' ? 'Pedido' : 'Despesa';
                                 
                                 let statusClasse = '';
-                                if (registro.tipo === 'pedido') {
-                                    statusClasse = registro.status === 'pendente' ? 'status-pendente' :
-                                                  registro.status === 'processamento' ? 'status-processamento' :
-                                                  'status-concluido';
+                                if (r.tipo === 'pedido') {
+                                    statusClasse = r.status === 'pendente' ? 'status-pendente' :
+                                                  r.status === 'processamento' ? 'status-processamento' : 'status-concluido';
                                 } else {
-                                    statusClasse = registro.status === 'paga' ? 'status-paga' : 'status-pendente';
+                                    statusClasse = r.status === 'paga' ? 'status-paga' : 'status-pendente';
                                 }
                                 
                                 return `
@@ -1146,15 +818,14 @@
                                             <span class="tipo-badge ${tipoClasse}">${tipoTexto}</span>
                                             ${isOriginal ? '<span class="badge-original"><i class="fas fa-check-circle"></i> Original</span>' : '<span class="badge-copia"><i class="fas fa-copy"></i> Cópia</span>'}
                                         </td>
-                                        <td><code>${registro.id.substring(0, 8)}...</code></td>
                                         <td>
-                                            <strong>${registro.nome}</strong>
-                                            ${registro.empresa ? `<div class="info-detalhe">${registro.empresa}</div>` : ''}
-                                            ${registro.descricao ? `<div class="info-detalhe">${registro.descricao}</div>` : ''}
+                                            <strong>${r.nome}</strong>
+                                            ${r.empresa ? `<div class="info-detalhe">${r.empresa}</div>` : ''}
+                                            ${r.descricao ? `<div class="info-detalhe">${r.descricao}</div>` : ''}
                                         </td>
-                                        <td class="valor-destacado">${formatarMoeda(registro.valor)}</td>
-                                        <td><span class="status-badge-small ${statusClasse}">${registro.status}</span></td>
-                                        <td>${formatarData(registro.data)}</td>
+                                        <td class="valor-destacado">${formatarMoeda(r.valor)}</td>
+                                        <td><span class="status-badge-small ${statusClasse}">${r.status}</span></td>
+                                        <td>${formatarData(r.data)}</td>
                                     </tr>
                                 `;
                             }).join('')}
@@ -1165,17 +836,85 @@
                 return card;
             }
             
-            // ============================================
-            // FUNÇÕES AUXILIARES
-            // ============================================
+            // ========== CRIAR CARD POR NOME + VALOR ==========
+            function criarCardPorNomeValor(grupo) {
+                const card = document.createElement('div');
+                card.className = 'grupo-card';
+                
+                card.innerHTML = `
+                    <div class="grupo-header">
+                        <div class="grupo-titulo">
+                            <div class="grupo-icone por-nome-valor">
+                                <i class="fas fa-user-tag"></i>
+                            </div>
+                            <div class="grupo-info">
+                                <h3>Nome + Valor Duplicado: ${grupo.chave.nome}</h3>
+                                <p>${grupo.registros.length} registros com mesmo nome e valor de ${formatarMoeda(grupo.chave.valor)}</p>
+                            </div>
+                        </div>
+                        <div class="grupo-badge">
+                            <i class="fas fa-exclamation-triangle" style="color: var(--warning-color);"></i>
+                            Possível duplicata por Nome + Valor
+                        </div>
+                    </div>
+                    
+                    <table class="registros-table">
+                        <thead>
+                            <tr>
+                                <th>Tipo</th>
+                                <th>ID</th>
+                                <th>Nome</th>
+                                <th>Valor</th>
+                                <th>Status</th>
+                                <th>Data</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${grupo.registros.map((r, idx) => {
+                                const isOriginal = idx === 0;
+                                const tipoClasse = r.tipo === 'pedido' ? 'tipo-pedido' : 'tipo-despesa';
+                                const tipoTexto = r.tipo === 'pedido' ? 'Pedido' : 'Despesa';
+                                
+                                let statusClasse = '';
+                                if (r.tipo === 'pedido') {
+                                    statusClasse = r.status === 'pendente' ? 'status-pendente' :
+                                                  r.status === 'processamento' ? 'status-processamento' : 'status-concluido';
+                                } else {
+                                    statusClasse = r.status === 'paga' ? 'status-paga' : 'status-pendente';
+                                }
+                                
+                                return `
+                                    <tr class="${isOriginal ? 'original-row' : 'copia-row'}">
+                                        <td>
+                                            <span class="tipo-badge ${tipoClasse}">${tipoTexto}</span>
+                                            ${isOriginal ? '<span class="badge-original"><i class="fas fa-check-circle"></i> Original</span>' : '<span class="badge-copia"><i class="fas fa-copy"></i> Cópia</span>'}
+                                        </td>
+                                        <td><code>${r.id.substring(0, 8)}...</code></td>
+                                        <td>
+                                            <strong>${r.nome}</strong>
+                                            ${r.empresa ? `<div class="info-detalhe">${r.empresa}</div>` : ''}
+                                            ${r.descricao ? `<div class="info-detalhe">${r.descricao}</div>` : ''}
+                                        </td>
+                                        <td class="valor-destacado">${formatarMoeda(r.valor)}</td>
+                                        <td><span class="status-badge-small ${statusClasse}">${r.status}</span></td>
+                                        <td>${formatarData(r.data)}</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                `;
+                
+                return card;
+            }
             
+            // ========== UTILITÁRIOS ==========
             function formatarData(dataStr) {
-                if (!dataStr) return 'N/A';
                 try {
                     const data = new Date(dataStr);
                     return data.toLocaleDateString('pt-PT') + ' ' + 
                            data.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' });
-                } catch (e) {
+                } catch {
                     return dataStr;
                 }
             }
@@ -1183,58 +922,41 @@
             function formatarMoeda(valor) {
                 return new Intl.NumberFormat('pt-PT', {
                     style: 'currency',
-                    currency: 'EUR',
-                    minimumFractionDigits: 2,
-                    maximumFractionDigits: 2
+                    currency: 'EUR'
                 }).format(valor);
             }
             
-            function mostrarErro(mensagem) {
-                console.error('❌ Erro:', mensagem);
+            function mostrarErro(msg) {
                 loadingState.innerHTML = `
                     <div style="color: var(--danger-color);">
-                        <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px;"></i>
-                        <h3>Erro ao carregar dados</h3>
-                        <p>${mensagem}</p>
+                        <i class="fas fa-exclamation-triangle" style="font-size: 48px;"></i>
+                        <h3>Erro</h3>
+                        <p>${msg}</p>
                         <button class="btn-refresh" onclick="location.reload()" style="margin-top: 16px;">
-                            <i class="fas fa-redo"></i>
-                            Tentar Novamente
+                            <i class="fas fa-redo"></i> Tentar Novamente
                         </button>
                     </div>
                 `;
             }
             
-            // ============================================
-            // EVENT LISTENERS
-            // ============================================
-            
+            // ========== EVENTOS ==========
             filterButtons.forEach(btn => {
                 btn.addEventListener('click', () => {
                     filterButtons.forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                     filtroAtual = btn.dataset.filter;
-                    aplicarFiltrosEBusca();
+                    aplicarFiltro();
                 });
             });
             
-            searchInput.addEventListener('input', (e) => {
-                termoBusca = e.target.value.toLowerCase();
-                aplicarFiltrosEBusca();
-            });
+            // Auto-refresh a cada 30 segundos
+            setInterval(carregarDados, 30000);
             
-            // Auto-refresh a cada 60 segundos
-            setInterval(carregarDados, 60000);
-            
-            // ============================================
-            // INICIALIZAÇÃO
-            // ============================================
-            
+            // Iniciar
             carregarDados();
-            console.log('✅ Sistema de verificação de duplicatas inicializado');
         });
     </script>
     
-    <!-- CONEXÃO COM O CORE ENGINE (OBRIGATÓRIO) -->
     <script src="../core/engine.js"></script>
 </body>
 </html>
