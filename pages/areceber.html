@@ -1,0 +1,1814 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrintPixel - Contas a Receber</title>
+    
+    <!-- BIBLIOTECAS EXTERNAS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ============================================
+           VARIÁVEIS DE CORES E ESTILOS
+           ============================================ */
+        :root {
+            --primary-color: #1a237e;
+            --secondary-color: #283593;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --info-color: #3b82f6;
+            --light-bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border-color: #e2e8f0;
+            --hover-bg: #f1f5f9;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            
+            /* Cores específicas para a receber */
+            --receber-primary: #b91c1c;
+            --receber-secondary: #991b1b;
+            --receber-light: #fee2e2;
+            --receber-warning: #ea580c;
+            --receber-info: #0284c7;
+        }
+        
+        /* ============================================
+           RESET E CONFIGURAÇÕES GERAIS
+           ============================================ */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+        
+        body {
+            background-color: var(--light-bg);
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        /* ============================================
+           HEADER ESPECIALIZADO - A RECEBER
+           ============================================ */
+        .page-header {
+            background: linear-gradient(135deg, var(--receber-primary) 0%, var(--receber-secondary) 100%);
+            padding: 24px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            margin-bottom: 24px;
+            color: white;
+        }
+        
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .header-icon {
+            width: 56px;
+            height: 56px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            color: white;
+            backdrop-filter: blur(4px);
+        }
+        
+        .header-text h1 {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            margin-bottom: 4px;
+        }
+        
+        .header-text p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .btn-primary {
+            background: white;
+            color: var(--receber-primary);
+            border: none;
+            padding: 12px 24px;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            box-shadow: var(--shadow-md);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+        
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.15);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 12px 24px;
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            backdrop-filter: blur(4px);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+        
+        /* ============================================
+           RESUMO FINANCEiro - A RECEBER
+           ============================================ */
+        .summary-section {
+            margin-bottom: 24px;
+        }
+        
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+        
+        @media (max-width: 768px) {
+            .summary-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        @media (max-width: 480px) {
+            .summary-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .summary-card {
+            background: var(--card-bg);
+            padding: 24px;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .summary-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+        }
+        
+        .summary-card.total::before {
+            background: var(--receber-primary);
+        }
+        
+        .summary-card.pendente::before {
+            background: var(--warning-color);
+        }
+        
+        .summary-card.parcial::before {
+            background: var(--receber-warning);
+        }
+        
+        .summary-card.atrasado::before {
+            background: var(--danger-color);
+        }
+        
+        .summary-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            margin-bottom: 16px;
+        }
+        
+        .summary-card.total .summary-icon {
+            background: #fee2e2;
+            color: var(--receber-primary);
+        }
+        
+        .summary-card.pendente .summary-icon {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .summary-card.parcial .summary-icon {
+            background: #ffedd5;
+            color: #9a3412;
+        }
+        
+        .summary-card.atrasado .summary-icon {
+            background: #fee2e2;
+            color: var(--danger-color);
+        }
+        
+        .summary-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .summary-value {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+        
+        .summary-card.total .summary-value {
+            color: var(--receber-primary);
+        }
+        
+        .summary-card.pendente .summary-value {
+            color: var(--warning-color);
+        }
+        
+        .summary-card.parcial .summary-value {
+            color: var(--receber-warning);
+        }
+        
+        .summary-card.atrasado .summary-value {
+            color: var(--danger-color);
+        }
+        
+        .summary-sub {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        
+        /* ============================================
+           CONTROLES E FILTROS ESPECÍFICOS
+           ============================================ */
+        .controls-section {
+            margin-bottom: 24px;
+        }
+        
+        .filters-container {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+        
+        .filter-group {
+            display: flex;
+            gap: 8px;
+            background: var(--card-bg);
+            padding: 8px 12px;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
+            flex-wrap: wrap;
+        }
+        
+        .filter-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 20px;
+            background: transparent;
+            color: var(--text-secondary);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .filter-btn:hover {
+            background: var(--hover-bg);
+        }
+        
+        .filter-btn.active {
+            background: var(--receber-primary);
+            color: white;
+        }
+        
+        .filter-btn i {
+            font-size: 12px;
+        }
+        
+        .search-box {
+            flex: 1;
+            max-width: 400px;
+            position: relative;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 12px 20px 12px 44px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            background: var(--card-bg);
+            font-size: 14px;
+            transition: all 0.2s;
+            box-shadow: var(--shadow-sm);
+        }
+        
+        .search-input:focus {
+            outline: none;
+            border-color: var(--receber-primary);
+            box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.1);
+        }
+        
+        .search-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-secondary);
+        }
+        
+        /* BADGES DE STATUS DE PAGAMENTO */
+        .payment-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            letter-spacing: 0.3px;
+        }
+        
+        .payment-pendente {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .payment-parcial {
+            background: #ffedd5;
+            color: #9a3412;
+        }
+        
+        .payment-pago {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .payment-atrasado {
+            background: #fee2e2;
+            color: #b91c1c;
+        }
+        
+        .status-pedido-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .status-pendente {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        .status-processamento {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        
+        .status-concluido {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        /* ============================================
+           LISTA DE PEDIDOS A RECEBER
+           ============================================ */
+        .receber-container {
+            margin-bottom: 32px;
+        }
+        
+        .receber-grid {
+            display: grid;
+            gap: 20px;
+        }
+        
+        .receber-card {
+            background: var(--card-bg);
+            border-radius: var(--radius-md);
+            padding: 24px;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
+            transition: all 0.3s;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .receber-card:hover {
+            box-shadow: var(--shadow-lg);
+            transform: translateY(-2px);
+        }
+        
+        .receber-card::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 4px;
+            height: 100%;
+        }
+        
+        .receber-card.pendente::before {
+            background: var(--warning-color);
+        }
+        
+        .receber-card.parcial::before {
+            background: var(--receber-warning);
+        }
+        
+        .receber-card.atrasado::before {
+            background: var(--danger-color);
+        }
+        
+        /* CABEÇALHO DO CARD */
+        .receber-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        
+        .cliente-info {
+            flex: 1;
+        }
+        
+        .cliente-nome {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .cliente-empresa {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .cliente-contato {
+            display: flex;
+            gap: 16px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            flex-wrap: wrap;
+        }
+        
+        .cliente-contato i {
+            width: 16px;
+            color: var(--receber-primary);
+        }
+        
+        /* VALOR EM DESTAQUE */
+        .valor-destaque {
+            background: linear-gradient(135deg, #fee2e2 0%, #fff5f5 100%);
+            padding: 16px 24px;
+            border-radius: var(--radius-md);
+            min-width: 250px;
+            text-align: center;
+            border: 1px solid #fecaca;
+        }
+        
+        .valor-label {
+            font-size: 12px;
+            color: var(--receber-primary);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        
+        .valor-number {
+            font-size: 36px;
+            font-weight: 800;
+            color: var(--receber-primary);
+            line-height: 1.2;
+            margin-bottom: 4px;
+        }
+        
+        .valor-sub {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        
+        .valor-pago {
+            color: var(--success-color);
+            font-weight: 600;
+        }
+        
+        /* INFORMAÇÕES DO PEDIDO */
+        .pedido-info-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+            padding: 16px;
+            background: var(--light-bg);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+        }
+        
+        @media (max-width: 768px) {
+            .pedido-info-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        
+        .info-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .info-value {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .info-value small {
+            font-weight: 400;
+            color: var(--text-secondary);
+            font-size: 12px;
+        }
+        
+        /* DETALHES DOS PRODUTOS */
+        .produtos-section {
+            margin-bottom: 20px;
+        }
+        
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .section-title i {
+            color: var(--receber-primary);
+        }
+        
+        .produtos-list {
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+        }
+        
+        .produto-header {
+            display: grid;
+            grid-template-columns: 3fr 1fr 1fr 1fr;
+            background: var(--hover-bg);
+            padding: 10px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .produto-row {
+            display: grid;
+            grid-template-columns: 3fr 1fr 1fr 1fr;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 13px;
+            align-items: center;
+        }
+        
+        .produto-row:last-child {
+            border-bottom: none;
+        }
+        
+        .produto-nome {
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+        
+        .produto-detalhe {
+            color: var(--text-secondary);
+        }
+        
+        .produto-total {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        /* DETALHES DOS PAGAMENTOS */
+        .pagamentos-section {
+            margin-bottom: 20px;
+        }
+        
+        .pagamentos-list {
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+        }
+        
+        .pagamento-header {
+            display: grid;
+            grid-template-columns: 1fr 1.5fr 1fr 1.5fr 1fr;
+            background: var(--hover-bg);
+            padding: 10px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .pagamento-row {
+            display: grid;
+            grid-template-columns: 1fr 1.5fr 1fr 1.5fr 1fr;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 13px;
+            align-items: center;
+        }
+        
+        .pagamento-row:last-child {
+            border-bottom: none;
+        }
+        
+        .pagamento-tipo {
+            font-weight: 500;
+        }
+        
+        .pagamento-data {
+            color: var(--text-secondary);
+        }
+        
+        .pagamento-valor {
+            font-weight: 600;
+            color: var(--success-color);
+        }
+        
+        .pagamento-forma {
+            color: var(--text-secondary);
+        }
+        
+        .pagamento-status {
+            display: inline-flex;
+            align-items: center;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .pagamento-status.pago {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .pagamento-status.pendente {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        
+        /* RODAPÉ DO CARD */
+        .receber-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 20px;
+            border-top: 1px solid var(--border-color);
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        
+        .observacoes {
+            flex: 1;
+            font-size: 13px;
+            color: var(--text-secondary);
+            font-style: italic;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .observacoes i {
+            color: var(--receber-primary);
+        }
+        
+        .footer-actions {
+            display: flex;
+            gap: 12px;
+        }
+        
+        .action-btn {
+            padding: 8px 16px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-color);
+            background: var(--card-bg);
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        
+        .action-btn:hover {
+            background: var(--hover-bg);
+        }
+        
+        .action-btn.primary:hover {
+            background: var(--receber-primary);
+            color: white;
+            border-color: var(--receber-primary);
+        }
+        
+        .action-btn.success:hover {
+            background: var(--success-color);
+            color: white;
+            border-color: var(--success-color);
+        }
+        
+        /* ============================================
+           MODAL DE DETALHES FINANCEIROS
+           ============================================ */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            backdrop-filter: blur(4px);
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal-container {
+            background: var(--card-bg);
+            border-radius: var(--radius-lg);
+            width: 90%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-lg);
+            animation: modalSlideIn 0.3s ease-out;
+        }
+        
+        @keyframes modalSlideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .modal-header {
+            padding: 24px;
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(135deg, var(--receber-primary) 0%, var(--receber-secondary) 100%);
+            color: white;
+        }
+        
+        .modal-title {
+            font-size: 20px;
+            font-weight: 700;
+        }
+        
+        .modal-close {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            border: none;
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+        }
+        
+        .modal-close:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        
+        .modal-content {
+            padding: 24px;
+        }
+        
+        /* ============================================
+           ESTADOS DE CARREGAMENTO E VAZIO
+           ============================================ */
+        .loading-container {
+            text-align: center;
+            padding: 60px;
+            background: var(--card-bg);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+        }
+        
+        .loading-spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid var(--border-color);
+            border-top: 4px solid var(--receber-primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 32px;
+            background: var(--card-bg);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+        }
+        
+        .empty-icon {
+            font-size: 64px;
+            color: var(--border-color);
+            margin-bottom: 24px;
+        }
+        
+        .empty-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 8px;
+        }
+        
+        .empty-text {
+            font-size: 14px;
+            color: var(--text-secondary);
+            max-width: 400px;
+            margin: 0 auto 20px;
+        }
+        
+        /* ============================================
+           RESPONSIVIDADE
+           ============================================ */
+        @media (max-width: 1024px) {
+            .produto-header,
+            .produto-row {
+                grid-template-columns: 2fr 1fr 1fr 1fr;
+            }
+            
+            .pagamento-header,
+            .pagamento-row {
+                grid-template-columns: 1fr 1.2fr 1fr 1.2fr 1fr;
+                font-size: 12px;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            body {
+                padding: 16px;
+            }
+            
+            .header-content {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .header-actions {
+                justify-content: center;
+            }
+            
+            .filters-container {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .search-box {
+                max-width: none;
+            }
+            
+            .filter-group {
+                justify-content: center;
+            }
+            
+            .receber-header {
+                flex-direction: column;
+            }
+            
+            .valor-destaque {
+                width: 100%;
+            }
+            
+            .produto-header,
+            .produto-row {
+                grid-template-columns: 1fr;
+                gap: 8px;
+            }
+            
+            .produto-header {
+                display: none;
+            }
+            
+            .produto-row {
+                padding: 16px;
+                border: 1px solid var(--border-color);
+                margin-bottom: 8px;
+                border-radius: var(--radius-sm);
+            }
+            
+            .produto-row > div {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            
+            .produto-row > div::before {
+                content: attr(data-label);
+                font-weight: 600;
+                color: var(--text-secondary);
+                font-size: 12px;
+            }
+            
+            .pagamento-header {
+                display: none;
+            }
+            
+            .pagamento-row {
+                grid-template-columns: 1fr;
+                gap: 8px;
+                padding: 16px;
+                border: 1px solid var(--border-color);
+                margin-bottom: 8px;
+                border-radius: var(--radius-sm);
+            }
+            
+            .pagamento-row > div {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            
+            .pagamento-row > div::before {
+                content: attr(data-label);
+                font-weight: 600;
+                color: var(--text-secondary);
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body data-page-id="a-receber" data-page-type="READ">
+    <!-- ============================================
+         HEADER ESPECIALIZADO - A RECEBER
+         ============================================ -->
+    <header class="page-header">
+        <div class="header-content">
+            <div class="header-title">
+                <div class="header-icon">
+                    <i class="fas fa-hand-holding-usd"></i>
+                </div>
+                <div class="header-text">
+                    <h1>📋 Contas a Receber</h1>
+                    <p>Acompanhamento de pedidos com pagamento pendente ou parcial</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="btn-primary" onclick="window.location.href='pedidos.html'">
+                    <i class="fas fa-clipboard-list"></i>
+                    Ver Todos Pedidos
+                </button>
+                <button class="btn-secondary" onclick="window.location.href='novopedido.html'">
+                    <i class="fas fa-plus"></i>
+                    Novo Pedido
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- ============================================
+         RESUMO FINANCEIRO - A RECEBER
+         ============================================ -->
+    <section class="summary-section">
+        <div class="summary-grid">
+            <div class="summary-card total">
+                <div class="summary-icon">
+                    <i class="fas fa-chart-pie"></i>
+                </div>
+                <div class="summary-label">Total a Receber</div>
+                <div class="summary-value" data-bind="receber.total">€ 0,00</div>
+                <div class="summary-sub">Valor total pendente</div>
+            </div>
+            
+            <div class="summary-card pendente">
+                <div class="summary-icon">
+                    <i class="fas fa-clock"></i>
+                </div>
+                <div class="summary-label">Pendentes</div>
+                <div class="summary-value" data-bind="receber.pendentes">€ 0,00</div>
+                <div class="summary-sub" data-bind="receber.pendentesCount">0 pedidos</div>
+            </div>
+            
+            <div class="summary-card parcial">
+                <div class="summary-icon">
+                    <i class="fas fa-adjust"></i>
+                </div>
+                <div class="summary-label">Parcialmente Pagos</div>
+                <div class="summary-value" data-bind="receber.parciais">€ 0,00</div>
+                <div class="summary-sub" data-bind="receber.parciaisCount">0 pedidos</div>
+            </div>
+            
+            <div class="summary-card atrasado">
+                <div class="summary-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div class="summary-label">Vencidos (Atrasados)</div>
+                <div class="summary-value" data-bind="receber.atrasados">€ 0,00</div>
+                <div class="summary-sub" data-bind="receber.atrasadosCount">0 pedidos</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================
+         CONTROLES E FILTROS
+         ============================================ -->
+    <section class="controls-section">
+        <div class="filters-container">
+            <div class="filter-group">
+                <button class="filter-btn active" data-filter="all">
+                    <i class="fas fa-layer-group"></i>
+                    Todos a Receber
+                </button>
+                <button class="filter-btn" data-filter="pendente">
+                    <span class="payment-badge payment-pendente">●</span>
+                    Pendentes
+                </button>
+                <button class="filter-btn" data-filter="parcial">
+                    <span class="payment-badge payment-parcial">●</span>
+                    Parciais
+                </button>
+                <button class="filter-btn" data-filter="atrasado">
+                    <span class="payment-badge payment-atrasado">●</span>
+                    Vencidos
+                </button>
+            </div>
+            
+            <div class="search-box">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" class="search-input" id="searchInput" placeholder="Buscar cliente, empresa, nº pedido...">
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================
+         LISTA DE PEDIDOS A RECEBER
+         ============================================ -->
+    <section class="receber-container">
+        <div id="loadingState" class="loading-container">
+            <div class="loading-spinner"></div>
+            <p>Carregando pedidos com pagamento pendente...</p>
+        </div>
+        
+        <div class="receber-grid" id="receberGrid" style="display: none;">
+            <!-- Os pedidos serão carregados dinamicamente aqui -->
+        </div>
+        
+        <!-- Estado vazio -->
+        <div class="empty-state" id="emptyState" style="display: none;">
+            <div class="empty-icon">
+                <i class="fas fa-check-circle" style="color: var(--success-color);"></i>
+            </div>
+            <h3 class="empty-title">Nenhum valor a receber!</h3>
+            <p class="empty-text">Todos os pedidos estão com pagamento em dia ou já foram quitados. 🎉</p>
+            <button class="btn-primary" onclick="window.location.href='novopedido.html'">
+                <i class="fas fa-plus"></i>
+                Criar Novo Pedido
+            </button>
+        </div>
+    </section>
+
+    <!-- ============================================
+         MODAL DE DETALHES FINANCEIROS
+         ============================================ -->
+    <div class="modal-overlay" id="modalOverlay">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 class="modal-title">Detalhes Financeiros do Pedido</h2>
+                <button class="modal-close" id="modalClose">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-content" id="modalContent">
+                <!-- Conteúdo será preenchido dinamicamente -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // SISTEMA DE CONTAS A RECEBER - v1.0
+        // ============================================
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('💰 Página de Contas a Receber carregada');
+            
+            // Elementos do DOM
+            const receberGrid = document.getElementById('receberGrid');
+            const emptyState = document.getElementById('emptyState');
+            const loadingState = document.getElementById('loadingState');
+            const searchInput = document.getElementById('searchInput');
+            const filterButtons = document.querySelectorAll('.filter-btn');
+            const modalOverlay = document.getElementById('modalOverlay');
+            const modalClose = document.getElementById('modalClose');
+            const modalContent = document.getElementById('modalContent');
+            
+            // Estado da aplicação
+            let todosPedidos = [];
+            let filtroAtual = 'all';
+            let termoBusca = '';
+            let modalPedidoAtual = null;
+            
+            // ============================================
+            // FUNÇÕES PRINCIPAIS
+            // ============================================
+            
+            // Carregar pedidos do Firebase via API Core
+            async function carregarPedidos() {
+                try {
+                    console.log('🔄 Carregando pedidos do Firebase...');
+                    
+                    const response = await fetch('/api/database/query', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            schema: 'pedido',
+                            filters: {}
+                        })
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`Erro na API: ${response.status}`);
+                    }
+                    
+                    const result = await response.json();
+                    
+                    if (result.success && result.events) {
+                        console.log(`✅ ${result.events.length} pedidos recebidos do Firebase`);
+                        processarPedidos(result.events);
+                    } else {
+                        console.warn('⚠️ Nenhum pedido recebido');
+                        processarPedidos([]);
+                    }
+                    
+                } catch (error) {
+                    console.error('❌ Erro ao buscar pedidos:', error);
+                    mostrarErro('Erro ao carregar pedidos. Verifique a conexão com o servidor.');
+                }
+            }
+            
+            // Processar pedidos e calcular valores a receber
+            function processarPedidos(events) {
+                console.log('📦 Processando eventos do Firebase:', events.length);
+                
+                // Agrupar eventos por pedido (manter o mais recente)
+                const pedidosMap = new Map();
+                
+                events
+                    .filter(event => event.schema === 'pedido' && !event.deleted)
+                    .forEach(event => {
+                        const pedidoId = event.id;
+                        
+                        if (pedidosMap.has(pedidoId)) {
+                            const existing = pedidosMap.get(pedidoId);
+                            const existingTime = new Date(existing.timestamp || existing.created_at || 0).getTime();
+                            const newTime = new Date(event.timestamp || event.created_at || 0).getTime();
+                            
+                            if (newTime > existingTime) {
+                                pedidosMap.set(pedidoId, event);
+                            }
+                        } else {
+                            pedidosMap.set(pedidoId, event);
+                        }
+                    });
+                
+                const eventosUnicos = Array.from(pedidosMap.values());
+                console.log(`✅ ${eventosUnicos.length} pedidos únicos`);
+                
+                // Processar cada pedido e calcular valores financeiros
+                todosPedidos = eventosUnicos
+                    .map(event => {
+                        let payload = event.payload;
+                        if (typeof payload === 'string') {
+                            try {
+                                payload = JSON.parse(payload);
+                            } catch (e) {
+                                console.warn('⚠️ Payload inválido');
+                                payload = {};
+                            }
+                        }
+                        
+                        // Calcular totais
+                        const totalPedido = parseFloat(payload.total) || 0;
+                        
+                        // Calcular total pago baseado nos pagamentos
+                        let totalPago = 0;
+                        if (payload.pagamentos && Array.isArray(payload.pagamentos)) {
+                            totalPago = payload.pagamentos
+                                .filter(p => p.status === 'pago')
+                                .reduce((sum, p) => sum + (parseFloat(p.valor) || 0), 0);
+                        }
+                        
+                        const saldoPendente = totalPedido - totalPago;
+                        
+                        // Determinar status de pagamento
+                        let statusPagamento = 'pago';
+                        if (totalPago === 0) {
+                            statusPagamento = 'pendente';
+                        } else if (totalPago > 0 && totalPago < totalPedido) {
+                            statusPagamento = 'parcial';
+                        } else if (totalPago >= totalPedido) {
+                            statusPagamento = 'pago';
+                        }
+                        
+                        // Verificar se está atrasado (data de entrega passou e não está pago)
+                        const hoje = new Date();
+                        let statusAtraso = false;
+                        if (payload.dataEntrega && statusPagamento !== 'pago') {
+                            const dataEntrega = new Date(payload.dataEntrega);
+                            if (dataEntrega < hoje) {
+                                statusAtraso = true;
+                            }
+                        }
+                        
+                        return {
+                            id: event.id,
+                            cliente: payload.cliente || 'Cliente não informado',
+                            empresa: payload.empresa || 'Empresa não informada',
+                            nif: payload.nif || '',
+                            morada: payload.morada || '',
+                            telemovel: payload.telemovel || '',
+                            numero: payload.numero || `PED-${event.id.substring(0, 8)}`,
+                            numeroFatura: payload.numeroFatura || '',
+                            produtos: Array.isArray(payload.produtos) ? payload.produtos : [],
+                            pagamentos: Array.isArray(payload.pagamentos) ? payload.pagamentos : [],
+                            totalPedido: totalPedido,
+                            totalPago: totalPago,
+                            saldoPendente: saldoPendente,
+                            statusPagamento: statusPagamento,
+                            statusAtraso: statusAtraso,
+                            statusPedido: payload.status || 'pendente',
+                            dataEntrega: payload.dataEntrega || '',
+                            dataFechamento: payload.dataFechamento || '',
+                            atendente: payload.atendente || '',
+                            observacoes: payload.observacoes || '',
+                            createdAt: event.timestamp || event.created_at || new Date().toISOString()
+                        };
+                    })
+                    // 🔥 FILTRO PRINCIPAL: Manter apenas pedidos com saldo pendente (NÃO PAGOS)
+                    .filter(pedido => pedido.saldoPendente > 0)
+                    .sort((a, b) => {
+                        // Ordenar por: atrasados primeiro, depois maior saldo
+                        if (a.statusAtraso && !b.statusAtraso) return -1;
+                        if (!a.statusAtraso && b.statusAtraso) return 1;
+                        return b.saldoPendente - a.saldoPendente;
+                    });
+                
+                console.log(`💰 ${todosPedidos.length} pedidos com saldo a receber`);
+                
+                // Atualizar contadores
+                atualizarContadores();
+                
+                // Aplicar filtros e renderizar
+                aplicarFiltrosEBusca();
+                
+                // Ocultar loading, mostrar grid
+                loadingState.style.display = 'none';
+                
+                if (todosPedidos.length > 0) {
+                    receberGrid.style.display = 'grid';
+                } else {
+                    emptyState.style.display = 'block';
+                }
+            }
+            
+            // Atualizar contadores do resumo financeiro
+            function atualizarContadores() {
+                let totalReceber = 0;
+                let totalPendentes = 0;
+                let totalParciais = 0;
+                let totalAtrasados = 0;
+                let countPendentes = 0;
+                let countParciais = 0;
+                let countAtrasados = 0;
+                
+                todosPedidos.forEach(pedido => {
+                    totalReceber += pedido.saldoPendente;
+                    
+                    if (pedido.statusAtraso) {
+                        totalAtrasados += pedido.saldoPendente;
+                        countAtrasados++;
+                    } else if (pedido.statusPagamento === 'pendente') {
+                        totalPendentes += pedido.saldoPendente;
+                        countPendentes++;
+                    } else if (pedido.statusPagamento === 'parcial') {
+                        totalParciais += pedido.saldoPendente;
+                        countParciais++;
+                    }
+                });
+                
+                console.log('📊 Resumo Financeiro:', {
+                    totalReceber,
+                    pendentes: totalPendentes,
+                    parciais: totalParciais,
+                    atrasados: totalAtrasados
+                });
+                
+                // Atualizar elementos com data-bind
+                document.querySelector('[data-bind="receber.total"]').textContent = formatarMoeda(totalReceber);
+                document.querySelector('[data-bind="receber.pendentes"]').textContent = formatarMoeda(totalPendentes);
+                document.querySelector('[data-bind="receber.pendentesCount"]').textContent = `${countPendentes} pedido${countPendentes !== 1 ? 's' : ''}`;
+                document.querySelector('[data-bind="receber.parciais"]').textContent = formatarMoeda(totalParciais);
+                document.querySelector('[data-bind="receber.parciaisCount"]').textContent = `${countParciais} pedido${countParciais !== 1 ? 's' : ''}`;
+                document.querySelector('[data-bind="receber.atrasados"]').textContent = formatarMoeda(totalAtrasados);
+                document.querySelector('[data-bind="receber.atrasadosCount"]').textContent = `${countAtrasados} pedido${countAtrasados !== 1 ? 's' : ''}`;
+            }
+            
+            // Aplicar filtros e busca
+            function aplicarFiltrosEBusca() {
+                let pedidosFiltrados = [...todosPedidos];
+                
+                // Aplicar filtro de status
+                if (filtroAtual !== 'all') {
+                    if (filtroAtual === 'pendente') {
+                        pedidosFiltrados = pedidosFiltrados.filter(p => 
+                            p.statusPagamento === 'pendente' && !p.statusAtraso
+                        );
+                    } else if (filtroAtual === 'parcial') {
+                        pedidosFiltrados = pedidosFiltrados.filter(p => 
+                            p.statusPagamento === 'parcial' && !p.statusAtraso
+                        );
+                    } else if (filtroAtual === 'atrasado') {
+                        pedidosFiltrados = pedidosFiltrados.filter(p => p.statusAtraso);
+                    }
+                }
+                
+                // Aplicar busca
+                if (termoBusca.trim() !== '') {
+                    const busca = termoBusca.toLowerCase();
+                    pedidosFiltrados = pedidosFiltrados.filter(p => {
+                        return (p.cliente || '').toLowerCase().includes(busca) ||
+                               (p.empresa || '').toLowerCase().includes(busca) ||
+                               (p.numero || '').toLowerCase().includes(busca) ||
+                               (p.numeroFatura || '').toLowerCase().includes(busca);
+                    });
+                }
+                
+                // Renderizar pedidos
+                renderizarPedidos(pedidosFiltrados);
+                
+                // Mostrar/ocultar estado vazio
+                if (pedidosFiltrados.length === 0) {
+                    if (todosPedidos.length > 0) {
+                        // Tem pedidos, mas nenhum corresponde aos filtros
+                        emptyState.innerHTML = `
+                            <div class="empty-icon">
+                                <i class="fas fa-filter"></i>
+                            </div>
+                            <h3 class="empty-title">Nenhum pedido encontrado</h3>
+                            <p class="empty-text">Nenhum pedido corresponde aos filtros atuais. Tente ajustar os filtros.</p>
+                            <button class="btn-primary" onclick="window.location.reload()">
+                                <i class="fas fa-redo"></i>
+                                Recarregar
+                            </button>
+                        `;
+                        emptyState.style.display = 'block';
+                        receberGrid.style.display = 'none';
+                    } else {
+                        // Não tem nenhum pedido a receber
+                        emptyState.innerHTML = `
+                            <div class="empty-icon">
+                                <i class="fas fa-check-circle" style="color: var(--success-color);"></i>
+                            </div>
+                            <h3 class="empty-title">Nenhum valor a receber!</h3>
+                            <p class="empty-text">Todos os pedidos estão com pagamento em dia ou já foram quitados. 🎉</p>
+                            <button class="btn-primary" onclick="window.location.href='novopedido.html'">
+                                <i class="fas fa-plus"></i>
+                                Criar Novo Pedido
+                            </button>
+                        `;
+                        emptyState.style.display = 'block';
+                        receberGrid.style.display = 'none';
+                    }
+                } else {
+                    emptyState.style.display = 'none';
+                    receberGrid.style.display = 'grid';
+                }
+            }
+            
+            // Renderizar lista de pedidos
+            function renderizarPedidos(pedidos) {
+                receberGrid.innerHTML = '';
+                
+                pedidos.forEach(pedido => {
+                    const card = criarCardPedido(pedido);
+                    receberGrid.appendChild(card);
+                });
+            }
+            
+            // Criar card de pedido focado em contas a receber
+            function criarCardPedido(pedido) {
+                const card = document.createElement('div');
+                card.className = `receber-card ${pedido.statusAtraso ? 'atrasado' : pedido.statusPagamento}`;
+                card.dataset.id = pedido.id;
+                
+                // Determinar classe de status para exibição
+                const statusPagamentoClass = pedido.statusAtraso ? 'payment-atrasado' : 
+                                              (pedido.statusPagamento === 'pendente' ? 'payment-pendente' : 'payment-parcial');
+                
+                const statusPagamentoText = pedido.statusAtraso ? 'VENCIDO' : 
+                                            (pedido.statusPagamento === 'pendente' ? 'Pendente' : 'Parcial');
+                
+                const statusPedidoClass = `status-${pedido.statusPedido}`;
+                const statusPedidoText = pedido.statusPedido === 'pendente' ? 'Pendente' :
+                                         (pedido.statusPedido === 'processamento' ? 'Em Processo' : 'Concluído');
+                
+                card.innerHTML = `
+                    <!-- CABEÇALHO COM INFORMAÇÕES DO CLIENTE -->
+                    <div class="receber-header">
+                        <div class="cliente-info">
+                            <div class="cliente-nome">
+                                ${pedido.cliente}
+                                <span class="payment-badge ${statusPagamentoClass}">
+                                    ${statusPagamentoText}
+                                </span>
+                                <span class="status-pedido-badge ${statusPedidoClass}">
+                                    ${statusPedidoText}
+                                </span>
+                            </div>
+                            <div class="cliente-empresa">
+                                <i class="fas fa-building"></i> ${pedido.empresa}
+                                <i class="fas fa-id-card" style="margin-left: 12px;"></i> NIF: ${pedido.nif || '---'}
+                            </div>
+                            <div class="cliente-contato">
+                                <span><i class="fas fa-phone"></i> ${pedido.telemovel || '---'}</span>
+                                <span><i class="fas fa-map-marker-alt"></i> ${pedido.morada || '---'}</span>
+                            </div>
+                        </div>
+                        
+                        <div class="valor-destaque">
+                            <div class="valor-label">SALDO A RECEBER</div>
+                            <div class="valor-number">${formatarMoeda(pedido.saldoPendente)}</div>
+                            <div class="valor-sub">
+                                Total Pedido: ${formatarMoeda(pedido.totalPedido)} • 
+                                <span class="valor-pago">Pago: ${formatarMoeda(pedido.totalPago)}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- INFORMAÇÕES DO PEDIDO -->
+                    <div class="pedido-info-grid">
+                        <div class="info-item">
+                            <span class="info-label">Nº Pedido</span>
+                            <span class="info-value">${pedido.numero}</span>
+                        </div>
+                        ${pedido.numeroFatura ? `
+                        <div class="info-item">
+                            <span class="info-label">Nº Fatura</span>
+                            <span class="info-value">${pedido.numeroFatura}</span>
+                        </div>
+                        ` : ''}
+                        <div class="info-item">
+                            <span class="info-label">Data Entrega</span>
+                            <span class="info-value">${formatarData(pedido.dataEntrega)} 
+                                ${pedido.statusAtraso ? '<small>(Vencido)</small>' : ''}
+                            </span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Atendente</span>
+                            <span class="info-value">${pedido.atendente || '---'}</span>
+                        </div>
+                    </div>
+                    
+                    <!-- PRODUTOS (RESUMO) -->
+                    <div class="produtos-section">
+                        <div class="section-title">
+                            <i class="fas fa-box"></i> Produtos (${pedido.produtos.length})
+                        </div>
+                        <div class="produtos-list">
+                            <div class="produto-header">
+                                <div>Produto</div>
+                                <div>Quantidade</div>
+                                <div>Valor Unit.</div>
+                                <div>Total</div>
+                            </div>
+                            ${pedido.produtos.slice(0, 3).map(prod => `
+                                <div class="produto-row">
+                                    <div data-label="Produto">${prod.nome || 'Produto'} ${prod.tamanho ? `(${prod.tamanho})` : ''}</div>
+                                    <div data-label="Quantidade">${prod.quantidade || 1}x</div>
+                                    <div data-label="Valor Unit.">${formatarMoeda(prod.valor || 0)}</div>
+                                    <div data-label="Total">${formatarMoeda((prod.valor || 0) * (prod.quantidade || 1))}</div>
+                                </div>
+                            `).join('')}
+                            ${pedido.produtos.length > 3 ? `
+                                <div style="padding: 12px 16px; background: var(--hover-bg); text-align: center; font-size: 13px; color: var(--text-secondary);">
+                                    + ${pedido.produtos.length - 3} outros produtos
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                    
+                    <!-- PAGAMENTOS REALIZADOS -->
+                    <div class="pagamentos-section">
+                        <div class="section-title">
+                            <i class="fas fa-credit-card"></i> Pagamentos Realizados (${pedido.pagamentos.length})
+                        </div>
+                        ${pedido.pagamentos.length > 0 ? `
+                            <div class="pagamentos-list">
+                                <div class="pagamento-header">
+                                    <div>Tipo</div>
+                                    <div>Data</div>
+                                    <div>Valor</div>
+                                    <div>Forma</div>
+                                    <div>Status</div>
+                                </div>
+                                ${pedido.pagamentos.map(pag => `
+                                    <div class="pagamento-row">
+                                        <div data-label="Tipo" class="pagamento-tipo">
+                                            ${pag.tipo === 'entrada' ? 'Entrada' : 
+                                              (pag.tipo === 'parcela' ? 'Parcela' : 
+                                               (pag.tipo === 'final' ? 'Final' : pag.tipo))}
+                                        </div>
+                                        <div data-label="Data" class="pagamento-data">${formatarData(pag.data)}</div>
+                                        <div data-label="Valor" class="pagamento-valor">${formatarMoeda(pag.valor || 0)}</div>
+                                        <div data-label="Forma" class="pagamento-forma">${pag.formaPagamento || '---'}</div>
+                                        <div data-label="Status">
+                                            <span class="pagamento-status ${pag.status === 'pago' ? 'pago' : 'pendente'}">
+                                                ${pag.status === 'pago' ? 'Pago' : 'Pendente'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : `
+                            <div style="padding: 16px; text-align: center; color: var(--text-secondary); background: var(--light-bg); border-radius: var(--radius-md); border: 1px dashed var(--border-color);">
+                                Nenhum pagamento registrado ainda
+                            </div>
+                        `}
+                    </div>
+                    
+                    <!-- RODAPÉ COM OBSERVAÇÕES E AÇÕES -->
+                    <div class="receber-footer">
+                        <div class="observacoes">
+                            <i class="fas fa-comment-alt"></i>
+                            ${pedido.observacoes ? pedido.observacoes.substring(0, 100) + (pedido.observacoes.length > 100 ? '...' : '') : 'Sem observações'}
+                        </div>
+                        <div class="footer-actions">
+                            <button class="action-btn primary" onclick="window.location.href='novopedido.html?edit=${pedido.id}'">
+                                <i class="fas fa-edit"></i> Editar
+                            </button>
+                            <button class="action-btn success" onclick="abrirModalFinanceiro('${pedido.id}')">
+                                <i class="fas fa-chart-line"></i> Detalhes
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                return card;
+            }
+            
+            // ============================================
+            // FUNÇÕES AUXILIARES
+            // ============================================
+            
+            function formatarMoeda(valor) {
+                return new Intl.NumberFormat('pt-PT', {
+                    style: 'currency',
+                    currency: 'EUR',
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2
+                }).format(valor || 0);
+            }
+            
+            function formatarData(dataStr) {
+                if (!dataStr) return '---';
+                try {
+                    const data = new Date(dataStr);
+                    return data.toLocaleDateString('pt-PT');
+                } catch (e) {
+                    return dataStr;
+                }
+            }
+            
+            function mostrarErro(mensagem) {
+                console.error('❌ Erro:', mensagem);
+                loadingState.innerHTML = `
+                    <div style="color: var(--danger-color);">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px;"></i>
+                        <h3>Erro ao carregar dados</h3>
+                        <p>${mensagem}</p>
+                        <button class="btn-primary" onclick="location.reload()" style="margin-top: 16px;">
+                            <i class="fas fa-redo"></i>
+                            Tentar Novamente
+                        </button>
+                    </div>
+                `;
+            }
+            
+            // Abrir modal com detalhes financeiros
+            function abrirModalFinanceiro(pedidoId) {
+                const pedido = todosPedidos.find(p => p.id === pedidoId);
+                if (!pedido) return;
+                
+                modalPedidoAtual = pedido;
+                
+                const produtos = pedido.produtos || [];
+                const pagamentos = pedido.pagamentos || [];
+                
+                modalContent.innerHTML = `
+                    <div style="margin-bottom: 24px;">
+                        <h3 style="color: var(--receber-primary); margin-bottom: 16px;">Resumo Financeiro Detalhado</h3>
+                        
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 24px;">
+                            <div style="background: var(--light-bg); padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                                <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">Total do Pedido</div>
+                                <div style="font-size: 28px; font-weight: 700; color: var(--text-primary);">${formatarMoeda(pedido.totalPedido)}</div>
+                            </div>
+                            <div style="background: var(--light-bg); padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+                                <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">Total Pago</div>
+                                <div style="font-size: 28px; font-weight: 700; color: var(--success-color);">${formatarMoeda(pedido.totalPago)}</div>
+                            </div>
+                            <div style="background: var(--light-bg); padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--border-color); grid-column: span 2;">
+                                <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">SALDO A RECEBER</div>
+                                <div style="font-size: 36px; font-weight: 800; color: var(--receber-primary);">${formatarMoeda(pedido.saldoPendente)}</div>
+                            </div>
+                        </div>
+                        
+                        <h4 style="margin: 24px 0 16px;">Histórico de Pagamentos</h4>
+                        ${pagamentos.length > 0 ? `
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="background: var(--hover-bg);">
+                                        <th style="padding: 12px; text-align: left;">Tipo</th>
+                                        <th style="padding: 12px; text-align: left;">Data</th>
+                                        <th style="padding: 12px; text-align: left;">Valor</th>
+                                        <th style="padding: 12px; text-align: left;">Forma</th>
+                                        <th style="padding: 12px; text-align: left;">Status</th>
+                                        <th style="padding: 12px; text-align: left;">Observações</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${pagamentos.map(pag => `
+                                        <tr style="border-bottom: 1px solid var(--border-color);">
+                                            <td style="padding: 12px;">${pag.tipo || '---'}</td>
+                                            <td style="padding: 12px;">${formatarData(pag.data)}</td>
+                                            <td style="padding: 12px; font-weight: 600;">${formatarMoeda(pag.valor)}</td>
+                                            <td style="padding: 12px;">${pag.formaPagamento || '---'}</td>
+                                            <td style="padding: 12px;">
+                                                <span class="payment-badge ${pag.status === 'pago' ? 'payment-pago' : 'payment-pendente'}">
+                                                    ${pag.status === 'pago' ? 'Pago' : 'Pendente'}
+                                                </span>
+                                            </td>
+                                            <td style="padding: 12px; color: var(--text-secondary);">${pag.observacoes || '---'}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        ` : '<p style="color: var(--text-secondary);">Nenhum pagamento registrado</p>'}
+                    </div>
+                `;
+                
+                modalOverlay.classList.add('active');
+            }
+            
+            // ============================================
+            // EVENT LISTENERS
+            // ============================================
+            
+            // Filtrar pedidos
+            filterButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    filterButtons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    filtroAtual = btn.dataset.filter;
+                    aplicarFiltrosEBusca();
+                });
+            });
+            
+            // Buscar pedidos
+            searchInput.addEventListener('input', (e) => {
+                termoBusca = e.target.value.toLowerCase();
+                aplicarFiltrosEBusca();
+            });
+            
+            // Fechar modal
+            modalClose.addEventListener('click', () => {
+                modalOverlay.classList.remove('active');
+                modalPedidoAtual = null;
+            });
+            
+            modalOverlay.addEventListener('click', (e) => {
+                if (e.target === modalOverlay) {
+                    modalOverlay.classList.remove('active');
+                    modalPedidoAtual = null;
+                }
+            });
+            
+            // ============================================
+            // INICIALIZAÇÃO
+            // ============================================
+            
+            // Tornar função disponível globalmente
+            window.abrirModalFinanceiro = abrirModalFinanceiro;
+            
+            // Iniciar carregamento
+            carregarPedidos();
+            
+            console.log('✅ Sistema de Contas a Receber inicializado');
+        });
+    </script>
+    
+    <!-- CONEXÃO COM O CORE ENGINE (OBRIGATÓRIO) -->
+    <script src="../core/engine.js"></script>
+</body>
+</html>

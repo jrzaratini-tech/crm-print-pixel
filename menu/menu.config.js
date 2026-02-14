@@ -87,5 +87,15 @@
         pos: 9,
         hidden: false,
         deleted: false
+    },
+
+    {
+        id: "nav_areceber",
+        name: "A Receber",
+        file: "pages/areceber.html",
+        type: "READ",
+        pos: 10,
+        hidden: false,
+        deleted: false
     }
 ];
