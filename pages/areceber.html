@@ -18,7 +18,8 @@
             --secondary-color: #283593;
             --success-color: #10b981;
             --warning-color: #f59e0b;
-            --danger-color: #ef4444;
+            --danger-color: #dc2626;
+            --danger-light: #fee2e2;
             --info-color: #3b82f6;
             --light-bg: #f8fafc;
             --card-bg: #ffffff;
@@ -33,12 +34,10 @@
             --radius-md: 12px;
             --radius-lg: 16px;
             
-            /* Cores específicas para a receber */
-            --receber-primary: #b91c1c;
-            --receber-secondary: #991b1b;
-            --receber-light: #fee2e2;
-            --receber-warning: #ea580c;
-            --receber-info: #0284c7;
+            /* Cores específicas para a receber (azul) */
+            --receber-primary: #1a237e;
+            --receber-secondary: #283593;
+            --receber-light: #e0e7ff;
         }
         
         /* ============================================
@@ -60,7 +59,7 @@
         }
         
         /* ============================================
-           HEADER ESPECIALIZADO - A RECEBER
+           HEADER ESPECIALIZADO - A RECEBER (AGORA AZUL)
            ============================================ */
         .page-header {
             background: linear-gradient(135deg, var(--receber-primary) 0%, var(--receber-secondary) 100%);
@@ -155,7 +154,7 @@
         }
         
         /* ============================================
-           RESUMO FINANCEiro - A RECEBER
+           RESUMO FINANCEIRO - A RECEBER (AZUL)
            ============================================ */
         .summary-section {
             margin-bottom: 24px;
@@ -207,7 +206,7 @@
         }
         
         .summary-card.parcial::before {
-            background: var(--receber-warning);
+            background: var(--info-color);
         }
         
         .summary-card.atrasado::before {
@@ -226,7 +225,7 @@
         }
         
         .summary-card.total .summary-icon {
-            background: #fee2e2;
+            background: var(--receber-light);
             color: var(--receber-primary);
         }
         
@@ -236,8 +235,8 @@
         }
         
         .summary-card.parcial .summary-icon {
-            background: #ffedd5;
-            color: #9a3412;
+            background: #dbeafe;
+            color: #1e40af;
         }
         
         .summary-card.atrasado .summary-icon {
@@ -269,7 +268,7 @@
         }
         
         .summary-card.parcial .summary-value {
-            color: var(--receber-warning);
+            color: var(--info-color);
         }
         
         .summary-card.atrasado .summary-value {
@@ -282,7 +281,7 @@
         }
         
         /* ============================================
-           CONTROLES E FILTROS ESPECÍFICOS
+           CONTROLES E FILTROS
            ============================================ */
         .controls-section {
             margin-bottom: 24px;
@@ -355,7 +354,7 @@
         .search-input:focus {
             outline: none;
             border-color: var(--receber-primary);
-            box-shadow: 0 0 0 3px rgba(185, 28, 28, 0.1);
+            box-shadow: 0 0 0 3px rgba(26, 35, 126, 0.1);
         }
         
         .search-icon {
@@ -383,8 +382,8 @@
         }
         
         .payment-parcial {
-            background: #ffedd5;
-            color: #9a3412;
+            background: #dbeafe;
+            color: #1e40af;
         }
         
         .payment-pago {
@@ -458,16 +457,17 @@
             height: 100%;
         }
         
+        /* 🔥 APENAS PEDIDOS VENCIDOS FICAM VERMELHOS */
+        .receber-card.atrasado::before {
+            background: var(--danger-color);
+        }
+        
         .receber-card.pendente::before {
             background: var(--warning-color);
         }
         
         .receber-card.parcial::before {
-            background: var(--receber-warning);
-        }
-        
-        .receber-card.atrasado::before {
-            background: var(--danger-color);
+            background: var(--info-color);
         }
         
         /* CABEÇALHO DO CARD */
@@ -518,14 +518,28 @@
             color: var(--receber-primary);
         }
         
-        /* VALOR EM DESTAQUE */
+        /* VALOR EM DESTAQUE - NEUTRO/AZUL (NÃO VERMELHO) */
         .valor-destaque {
-            background: linear-gradient(135deg, #fee2e2 0%, #fff5f5 100%);
+            background: linear-gradient(135deg, var(--receber-light) 0%, #ffffff 100%);
             padding: 16px 24px;
             border-radius: var(--radius-md);
             min-width: 250px;
             text-align: center;
-            border: 1px solid #fecaca;
+            border: 1px solid var(--border-color);
+        }
+        
+        /* 🔥 APENAS PEDIDOS VENCIDOS TÊM DESTAQUE VERMELHO */
+        .receber-card.atrasado .valor-destaque {
+            background: linear-gradient(135deg, #fee2e2 0%, #ffffff 100%);
+            border-color: #fecaca;
+        }
+        
+        .receber-card.atrasado .valor-label {
+            color: var(--danger-color);
+        }
+        
+        .receber-card.atrasado .valor-number {
+            color: var(--danger-color);
         }
         
         .valor-label {
@@ -597,6 +611,16 @@
             font-weight: 400;
             color: var(--text-secondary);
             font-size: 12px;
+        }
+        
+        /* 🔥 DESTAQUE PARA DATA VENCIDA */
+        .info-value.vencido {
+            color: var(--danger-color);
+            font-weight: 700;
+        }
+        
+        .info-value.vencido small {
+            color: var(--danger-color);
         }
         
         /* DETALHES DOS PRODUTOS */
@@ -1039,7 +1063,7 @@
 </head>
 <body data-page-id="a-receber" data-page-type="READ">
     <!-- ============================================
-         HEADER ESPECIALIZADO - A RECEBER
+         HEADER ESPECIALIZADO - A RECEBER (AGORA AZUL)
          ============================================ -->
     <header class="page-header">
         <div class="header-content">
@@ -1185,7 +1209,7 @@
 
     <script>
         // ============================================
-        // SISTEMA DE CONTAS A RECEBER - v1.0
+        // SISTEMA DE CONTAS A RECEBER - v1.1
         // ============================================
         
         document.addEventListener('DOMContentLoaded', function() {
@@ -1311,11 +1335,15 @@
                             statusPagamento = 'pago';
                         }
                         
-                        // Verificar se está atrasado (data de entrega passou e não está pago)
+                        // 🔥 VERIFICAR SE ESTÁ VENCIDO (data de entrega passou e não está pago)
                         const hoje = new Date();
+                        hoje.setHours(0, 0, 0, 0);
+                        
                         let statusAtraso = false;
                         if (payload.dataEntrega && statusPagamento !== 'pago') {
                             const dataEntrega = new Date(payload.dataEntrega);
+                            dataEntrega.setHours(0, 0, 0, 0);
+                            
                             if (dataEntrega < hoje) {
                                 statusAtraso = true;
                             }
@@ -1355,6 +1383,7 @@
                     });
                 
                 console.log(`💰 ${todosPedidos.length} pedidos com saldo a receber`);
+                console.log(`🔴 ${todosPedidos.filter(p => p.statusAtraso).length} pedidos vencidos (vermelhos)`);
                 
                 // Atualizar contadores
                 atualizarContadores();
@@ -1513,6 +1542,9 @@
                 const statusPedidoText = pedido.statusPedido === 'pendente' ? 'Pendente' :
                                          (pedido.statusPedido === 'processamento' ? 'Em Processo' : 'Concluído');
                 
+                // Verificar se a data está vencida para destacar
+                const dataEntregaClass = pedido.statusAtraso ? 'vencido' : '';
+                
                 card.innerHTML = `
                     <!-- CABEÇALHO COM INFORMAÇÕES DO CLIENTE -->
                     <div class="receber-header">
@@ -1560,7 +1592,7 @@
                         ` : ''}
                         <div class="info-item">
                             <span class="info-label">Data Entrega</span>
-                            <span class="info-value">${formatarData(pedido.dataEntrega)} 
+                            <span class="info-value ${dataEntregaClass}">${formatarData(pedido.dataEntrega)} 
                                 ${pedido.statusAtraso ? '<small>(Vencido)</small>' : ''}
                             </span>
                         </div>
@@ -1720,7 +1752,8 @@
                             </div>
                             <div style="background: var(--light-bg); padding: 20px; border-radius: var(--radius-md); border: 1px solid var(--border-color); grid-column: span 2;">
                                 <div style="font-size: 13px; color: var(--text-secondary); margin-bottom: 8px;">SALDO A RECEBER</div>
-                                <div style="font-size: 36px; font-weight: 800; color: var(--receber-primary);">${formatarMoeda(pedido.saldoPendente)}</div>
+                                <div style="font-size: 36px; font-weight: 800; ${pedido.statusAtraso ? 'color: var(--danger-color);' : 'color: var(--receber-primary);'}">${formatarMoeda(pedido.saldoPendente)}</div>
+                                ${pedido.statusAtraso ? '<div style="color: var(--danger-color); font-size: 14px; margin-top: 8px;"><i class="fas fa-exclamation-triangle"></i> Pedido vencido!</div>' : ''}
                             </div>
                         </div>
                         
