@@ -242,7 +242,7 @@
             color: white;
         }
         
-        /* LISTA DE DUPLICATAS */
+        /* CARDS DE DUPLICATAS */
         .duplicatas-container {
             margin-bottom: 32px;
         }
@@ -319,64 +319,73 @@
             gap: 6px;
         }
         
-        /* TABELA */
-        .registros-table {
-            width: 100%;
-            border-collapse: collapse;
+        /* REGISTROS DUPLICADOS */
+        .registros-duplicados {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
         }
         
-        .registros-table th {
-            text-align: left;
-            padding: 12px;
-            background: var(--hover-bg);
-            font-size: 13px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            border-bottom: 2px solid var(--border-color);
+        .registro-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            background: var(--light-bg);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
         }
         
-        .registros-table td {
-            padding: 16px 12px;
-            border-bottom: 1px solid var(--border-color);
-            font-size: 14px;
-            vertical-align: middle;
-        }
-        
-        .registros-table tr.original-row {
-            background-color: rgba(16, 185, 129, 0.05);
+        .registro-item.original {
             border-left: 4px solid var(--success-color);
+            background-color: rgba(16, 185, 129, 0.05);
         }
         
-        .registros-table tr.copia-row {
-            background-color: rgba(239, 68, 68, 0.05);
+        .registro-item.copia {
             border-left: 4px solid var(--danger-color);
+            background-color: rgba(239, 68, 68, 0.05);
+        }
+        
+        .registro-badge {
+            min-width: 80px;
         }
         
         .badge-original {
             background: var(--success-color);
             color: white;
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 11px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
             font-weight: 600;
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            margin-left: 8px;
         }
         
         .badge-copia {
             background: var(--danger-color);
             color: white;
-            padding: 4px 8px;
-            border-radius: 12px;
-            font-size: 11px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
             font-weight: 600;
             display: inline-flex;
             align-items: center;
             gap: 4px;
-            margin-left: 8px;
+        }
+        
+        .registro-info {
+            flex: 1;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            align-items: center;
+        }
+        
+        .info-tipo {
+            display: flex;
+            align-items: center;
+            gap: 4px;
         }
         
         .tipo-badge {
@@ -398,7 +407,17 @@
             color: var(--danger-color);
         }
         
-        .status-badge-small {
+        .info-nome {
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+        
+        .info-valor {
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+        
+        .info-status {
             display: inline-flex;
             align-items: center;
             padding: 2px 8px;
@@ -427,15 +446,19 @@
             color: #065f46;
         }
         
-        .valor-destacado {
-            font-weight: 600;
-            color: var(--primary-color);
+        .info-data {
+            font-size: 13px;
+            color: var(--text-secondary);
         }
         
-        .info-detalhe {
+        .info-id {
+            font-family: monospace;
             font-size: 12px;
             color: var(--text-secondary);
-            margin-top: 4px;
+            background: var(--card-bg);
+            padding: 2px 6px;
+            border-radius: 4px;
+            border: 1px solid var(--border-color);
         }
         
         /* ESTADOS */
@@ -487,7 +510,17 @@
             .filters-container { flex-direction: column; }
             .filter-group { width: 100%; justify-content: center; }
             .grupo-header { flex-direction: column; align-items: flex-start; }
-            .registros-table { display: block; overflow-x: auto; }
+            
+            .registro-item {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+            
+            .registro-info {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+            }
         }
     </style>
 </head>
@@ -585,8 +618,6 @@
             const countPorNomeValor = document.getElementById('countPorNomeValor');
             
             // Estado
-            let todosPedidos = [];
-            let todasDespesas = [];
             let duplicatas = {
                 porId: [],
                 porNomeValor: []
@@ -614,9 +645,11 @@
                     const pedidosData = await pedidosRes.json();
                     const despesasData = await despesasRes.json();
                     
-                    processarPedidos(pedidosData.events || []);
-                    processarDespesas(despesasData.events || []);
-                    identificarDuplicatas();
+                    const pedidos = processarEventos(pedidosData.events || [], 'pedido');
+                    const despesas = processarEventos(despesasData.events || [], 'despesa');
+                    
+                    const todosRegistros = [...pedidos, ...despesas];
+                    identificarDuplicatas(todosRegistros);
                     
                 } catch (error) {
                     console.error('❌ Erro:', error);
@@ -624,78 +657,62 @@
                 }
             }
             
-            // ========== PROCESSAR DADOS ==========
-            function processarPedidos(events) {
-                const pedidosMap = new Map();
+            // ========== PROCESSAR EVENTOS ==========
+            function processarEventos(events, tipo) {
+                // Agrupar por ID e pegar o mais recente
+                const mapa = new Map();
                 
-                events.filter(e => e.schema === 'pedido' && !e.deleted).forEach(event => {
+                events.filter(e => !e.deleted).forEach(event => {
                     const id = event.id;
-                    if (pedidosMap.has(id)) {
-                        const existing = pedidosMap.get(id);
+                    if (mapa.has(id)) {
+                        const existing = mapa.get(id);
                         const existingTime = new Date(existing.timestamp || 0).getTime();
                         const newTime = new Date(event.timestamp || 0).getTime();
-                        if (newTime > existingTime) pedidosMap.set(id, event);
+                        if (newTime > existingTime) mapa.set(id, event);
                     } else {
-                        pedidosMap.set(id, event);
+                        mapa.set(id, event);
                     }
                 });
                 
-                todosPedidos = Array.from(pedidosMap.values()).map(event => {
-                    const payload = typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload;
-                    return {
-                        id: event.id,
-                        tipo: 'pedido',
-                        nome: payload.cliente || 'Cliente não informado',
-                        empresa: payload.empresa || '',
-                        valor: parseFloat(payload.total) || 0,
-                        status: payload.status || 'pendente',
-                        data: event.timestamp || event.created_at || new Date().toISOString(),
-                        payload: payload
-                    };
-                });
-            }
-            
-            function processarDespesas(events) {
-                const despesasMap = new Map();
-                
-                events.filter(e => e.schema === 'despesa' && !e.deleted).forEach(event => {
-                    const id = event.id;
-                    if (despesasMap.has(id)) {
-                        const existing = despesasMap.get(id);
-                        const existingTime = new Date(existing.timestamp || 0).getTime();
-                        const newTime = new Date(event.timestamp || 0).getTime();
-                        if (newTime > existingTime) despesasMap.set(id, event);
+                // Converter para objetos padronizados
+                return Array.from(mapa.values()).map(event => {
+                    const payload = typeof event.payload === 'string' ? 
+                        JSON.parse(event.payload) : event.payload;
+                    
+                    if (tipo === 'pedido') {
+                        return {
+                            id: event.id,
+                            tipo: 'pedido',
+                            nome: payload.cliente || 'Cliente não informado',
+                            valor: parseFloat(payload.total) || 0,
+                            status: payload.status || 'pendente',
+                            data: event.timestamp || event.created_at || new Date().toISOString(),
+                            detalhe: payload.empresa || ''
+                        };
                     } else {
-                        despesasMap.set(id, event);
+                        const valorTotal = parseFloat(payload.valorTotal) || 
+                                         parseFloat(payload.valorBruto) || 0;
+                        return {
+                            id: event.id,
+                            tipo: 'despesa',
+                            nome: payload.fornecedor || 'Fornecedor não informado',
+                            valor: valorTotal,
+                            status: payload.statusPagamento === 'paga' ? 'paga' : 'pendente',
+                            data: event.timestamp || event.created_at || new Date().toISOString(),
+                            detalhe: payload.descricao || ''
+                        };
                     }
-                });
-                
-                todasDespesas = Array.from(despesasMap.values()).map(event => {
-                    const payload = typeof event.payload === 'string' ? JSON.parse(event.payload) : event.payload;
-                    const valorTotal = parseFloat(payload.valorTotal) || parseFloat(payload.valorBruto) || 0;
-                    return {
-                        id: event.id,
-                        tipo: 'despesa',
-                        nome: payload.fornecedor || 'Fornecedor não informado',
-                        descricao: payload.descricao || '',
-                        valor: valorTotal,
-                        status: payload.statusPagamento === 'paga' ? 'paga' : 'pendente',
-                        data: event.timestamp || event.created_at || new Date().toISOString(),
-                        payload: payload
-                    };
                 });
             }
             
             // ========== IDENTIFICAR DUPLICATAS ==========
-            function identificarDuplicatas() {
-                const todosRegistros = [...todosPedidos, ...todasDespesas];
-                
+            function identificarDuplicatas(registros) {
                 // Reset
                 duplicatas = { porId: [], porNomeValor: [] };
                 
                 // 1. DUPLICATAS POR ID
                 const idMap = new Map();
-                todosRegistros.forEach(r => {
+                registros.forEach(r => {
                     if (!idMap.has(r.id)) idMap.set(r.id, []);
                     idMap.get(r.id).push(r);
                 });
@@ -711,8 +728,11 @@
                 
                 // 2. DUPLICATAS POR NOME + VALOR
                 const nomeValorMap = new Map();
-                todosRegistros.forEach(r => {
-                    if (r.nome && r.nome !== 'Cliente não informado' && r.nome !== 'Fornecedor não informado') {
+                registros.forEach(r => {
+                    // Ignorar nomes genéricos
+                    if (r.nome && 
+                        r.nome !== 'Cliente não informado' && 
+                        r.nome !== 'Fornecedor não informado') {
                         const chave = `${r.nome.toLowerCase().trim()}|${r.valor.toFixed(2)}`;
                         if (!nomeValorMap.has(chave)) nomeValorMap.set(chave, []);
                         nomeValorMap.get(chave).push(r);
@@ -784,53 +804,47 @@
                         </div>
                         <div class="grupo-badge">
                             <i class="fas fa-exclamation-triangle" style="color: var(--danger-color);"></i>
-                            Possível duplicata por ID
+                            Possível duplicata
                         </div>
                     </div>
                     
-                    <table class="registros-table">
-                        <thead>
-                            <tr>
-                                <th>Tipo</th>
-                                <th>Nome</th>
-                                <th>Valor</th>
-                                <th>Status</th>
-                                <th>Data</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${grupo.registros.map((r, idx) => {
-                                const isOriginal = idx === 0;
-                                const tipoClasse = r.tipo === 'pedido' ? 'tipo-pedido' : 'tipo-despesa';
-                                const tipoTexto = r.tipo === 'pedido' ? 'Pedido' : 'Despesa';
-                                
-                                let statusClasse = '';
-                                if (r.tipo === 'pedido') {
-                                    statusClasse = r.status === 'pendente' ? 'status-pendente' :
-                                                  r.status === 'processamento' ? 'status-processamento' : 'status-concluido';
-                                } else {
-                                    statusClasse = r.status === 'paga' ? 'status-paga' : 'status-pendente';
-                                }
-                                
-                                return `
-                                    <tr class="${isOriginal ? 'original-row' : 'copia-row'}">
-                                        <td>
+                    <div class="registros-duplicados">
+                        ${grupo.registros.map((r, idx) => {
+                            const isOriginal = idx === 0;
+                            const tipoClasse = r.tipo === 'pedido' ? 'tipo-pedido' : 'tipo-despesa';
+                            const tipoTexto = r.tipo === 'pedido' ? 'Pedido' : 'Despesa';
+                            
+                            let statusClasse = '';
+                            if (r.tipo === 'pedido') {
+                                statusClasse = r.status === 'pendente' ? 'status-pendente' :
+                                              r.status === 'processamento' ? 'status-processamento' : 'status-concluido';
+                            } else {
+                                statusClasse = r.status === 'paga' ? 'status-paga' : 'status-pendente';
+                            }
+                            
+                            return `
+                                <div class="registro-item ${isOriginal ? 'original' : 'copia'}">
+                                    <div class="registro-badge">
+                                        ${isOriginal ? 
+                                            '<span class="badge-original"><i class="fas fa-check-circle"></i> Original</span>' : 
+                                            '<span class="badge-copia"><i class="fas fa-copy"></i> Cópia</span>'}
+                                    </div>
+                                    <div class="registro-info">
+                                        <div class="info-tipo">
                                             <span class="tipo-badge ${tipoClasse}">${tipoTexto}</span>
-                                            ${isOriginal ? '<span class="badge-original"><i class="fas fa-check-circle"></i> Original</span>' : '<span class="badge-copia"><i class="fas fa-copy"></i> Cópia</span>'}
-                                        </td>
-                                        <td>
-                                            <strong>${r.nome}</strong>
-                                            ${r.empresa ? `<div class="info-detalhe">${r.empresa}</div>` : ''}
-                                            ${r.descricao ? `<div class="info-detalhe">${r.descricao}</div>` : ''}
-                                        </td>
-                                        <td class="valor-destacado">${formatarMoeda(r.valor)}</td>
-                                        <td><span class="status-badge-small ${statusClasse}">${r.status}</span></td>
-                                        <td>${formatarData(r.data)}</td>
-                                    </tr>
-                                `;
-                            }).join('')}
-                        </tbody>
-                    </table>
+                                        </div>
+                                        <div class="info-nome">
+                                            ${r.nome}
+                                            ${r.detalhe ? `<span style="font-size: 12px; color: var(--text-secondary);"> (${r.detalhe})</span>` : ''}
+                                        </div>
+                                        <div class="info-valor">${formatarMoeda(r.valor)}</div>
+                                        <div><span class="info-status ${statusClasse}">${r.status}</span></div>
+                                        <div class="info-data">${formatarData(r.data)}</div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
                 `;
                 
                 return card;
@@ -854,55 +868,45 @@
                         </div>
                         <div class="grupo-badge">
                             <i class="fas fa-exclamation-triangle" style="color: var(--warning-color);"></i>
-                            Possível duplicata por Nome + Valor
+                            Possível duplicata
                         </div>
                     </div>
                     
-                    <table class="registros-table">
-                        <thead>
-                            <tr>
-                                <th>Tipo</th>
-                                <th>ID</th>
-                                <th>Nome</th>
-                                <th>Valor</th>
-                                <th>Status</th>
-                                <th>Data</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${grupo.registros.map((r, idx) => {
-                                const isOriginal = idx === 0;
-                                const tipoClasse = r.tipo === 'pedido' ? 'tipo-pedido' : 'tipo-despesa';
-                                const tipoTexto = r.tipo === 'pedido' ? 'Pedido' : 'Despesa';
-                                
-                                let statusClasse = '';
-                                if (r.tipo === 'pedido') {
-                                    statusClasse = r.status === 'pendente' ? 'status-pendente' :
-                                                  r.status === 'processamento' ? 'status-processamento' : 'status-concluido';
-                                } else {
-                                    statusClasse = r.status === 'paga' ? 'status-paga' : 'status-pendente';
-                                }
-                                
-                                return `
-                                    <tr class="${isOriginal ? 'original-row' : 'copia-row'}">
-                                        <td>
+                    <div class="registros-duplicados">
+                        ${grupo.registros.map((r, idx) => {
+                            const isOriginal = idx === 0;
+                            const tipoClasse = r.tipo === 'pedido' ? 'tipo-pedido' : 'tipo-despesa';
+                            const tipoTexto = r.tipo === 'pedido' ? 'Pedido' : 'Despesa';
+                            
+                            let statusClasse = '';
+                            if (r.tipo === 'pedido') {
+                                statusClasse = r.status === 'pendente' ? 'status-pendente' :
+                                              r.status === 'processamento' ? 'status-processamento' : 'status-concluido';
+                            } else {
+                                statusClasse = r.status === 'paga' ? 'status-paga' : 'status-pendente';
+                            }
+                            
+                            return `
+                                <div class="registro-item ${isOriginal ? 'original' : 'copia'}">
+                                    <div class="registro-badge">
+                                        ${isOriginal ? 
+                                            '<span class="badge-original"><i class="fas fa-check-circle"></i> Original</span>' : 
+                                            '<span class="badge-copia"><i class="fas fa-copy"></i> Cópia</span>'}
+                                    </div>
+                                    <div class="registro-info">
+                                        <div class="info-tipo">
                                             <span class="tipo-badge ${tipoClasse}">${tipoTexto}</span>
-                                            ${isOriginal ? '<span class="badge-original"><i class="fas fa-check-circle"></i> Original</span>' : '<span class="badge-copia"><i class="fas fa-copy"></i> Cópia</span>'}
-                                        </td>
-                                        <td><code>${r.id.substring(0, 8)}...</code></td>
-                                        <td>
-                                            <strong>${r.nome}</strong>
-                                            ${r.empresa ? `<div class="info-detalhe">${r.empresa}</div>` : ''}
-                                            ${r.descricao ? `<div class="info-detalhe">${r.descricao}</div>` : ''}
-                                        </td>
-                                        <td class="valor-destacado">${formatarMoeda(r.valor)}</td>
-                                        <td><span class="status-badge-small ${statusClasse}">${r.status}</span></td>
-                                        <td>${formatarData(r.data)}</td>
-                                    </tr>
-                                `;
-                            }).join('')}
-                        </tbody>
-                    </table>
+                                        </div>
+                                        <div><span class="info-id">${r.id.substring(0, 8)}...</span></div>
+                                        <div class="info-nome">${r.nome}</div>
+                                        <div class="info-valor">${formatarMoeda(r.valor)}</div>
+                                        <div><span class="info-status ${statusClasse}">${r.status}</span></div>
+                                        <div class="info-data">${formatarData(r.data)}</div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
                 `;
                 
                 return card;
