@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>PrintPixel - GESTOR 11/10 🏆</title>
+    <title>PrintPixel - Gestor Financeiro Profissional</title>
     
     <!-- BIBLIOTECAS EXTERNAS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <style>
         /* ============================================
@@ -33,13 +34,10 @@
             --radius-md: 12px;
             --radius-lg: 16px;
             
-            /* Cores de Saúde */
-            --health-critical: #fee2e2;
-            --health-critical-text: #991b1b;
-            --health-warning: #fef3c7;
-            --health-warning-text: #92400e;
-            --health-healthy: #dcfce7;
-            --health-healthy-text: #166534;
+            /* Cores do gráfico */
+            --chart-receita: #3b82f6;
+            --chart-despesa: #f59e0b;
+            --chart-atraso: #ef4444;
         }
 
         * {
@@ -58,11 +56,11 @@
         }
 
         /* ============================================
-           HEADER
+           HEADER PROFISSIONAL
            ============================================ */
         .page-header {
-            background: linear-gradient(135deg, var(--primary-color), #0d1b4e);
-            padding: 24px;
+            background: linear-gradient(135deg, #0f172a, #1e293b);
+            padding: 24px 32px;
             border-radius: var(--radius-lg);
             box-shadow: var(--shadow-lg);
             margin-bottom: 24px;
@@ -77,263 +75,260 @@
             gap: 20px;
         }
 
-        .header-title {
-            display: flex;
-            align-items: center;
-            gap: 16px;
+        .header-title h1 {
+            font-size: 24px;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+            margin-bottom: 4px;
+            opacity: 0.95;
         }
 
-        .header-icon {
-            width: 60px;
-            height: 60px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 30px;
-            color: white;
-            backdrop-filter: blur(4px);
+        .header-title p {
+            font-size: 14px;
+            opacity: 0.7;
         }
 
-        .header-text h1 {
-            font-size: 28px;
-            font-weight: 800;
-            letter-spacing: -0.5px;
+        .header-balance {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 16px 28px;
+            border-radius: 100px;
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+        }
+
+        .balance-label {
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.7;
             margin-bottom: 4px;
         }
 
-        .header-text p {
-            font-size: 14px;
-            opacity: 0.9;
+        .balance-value {
+            font-size: 32px;
+            font-weight: 700;
+            line-height: 1;
+        }
+
+        .balance-value.positive {
+            color: #4ade80;
+        }
+
+        .balance-value.negative {
+            color: #f87171;
         }
 
         .last-update {
-            background: rgba(255, 255, 255, 0.15);
+            background: rgba(255, 255, 255, 0.08);
             padding: 8px 16px;
             border-radius: 30px;
             font-size: 13px;
             display: flex;
             align-items: center;
             gap: 8px;
-            backdrop-filter: blur(4px);
         }
 
         /* ============================================
-           TERMÔMETRO DE SAÚDE
+           BALANÇO PRINCIPAL (RECEITA VS DESPESA)
            ============================================ */
-        .health-section {
+        .balance-section {
             margin-bottom: 24px;
         }
 
-        .health-card {
+        .balance-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .balance-card {
             background: var(--card-bg);
             border-radius: var(--radius-lg);
-            padding: 28px;
-            box-shadow: var(--shadow-lg);
+            padding: 24px;
+            box-shadow: var(--shadow-md);
             border: 1px solid var(--border-color);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 20px;
             position: relative;
             overflow: hidden;
         }
 
-        .health-card::before {
+        .balance-card.receita {
+            background: linear-gradient(135deg, #1e3a8a, #2563eb);
+            color: white;
+        }
+
+        .balance-card.despesa {
+            background: linear-gradient(135deg, #78350f, #b45309);
+            color: white;
+        }
+
+        .balance-card::before {
             content: '';
             position: absolute;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 6px;
-            background: linear-gradient(90deg, var(--danger-color), var(--warning-color), var(--success-color));
+            right: 0;
+            height: 4px;
+            background: rgba(255, 255, 255, 0.3);
         }
 
-        .health-status {
-            display: flex;
-            align-items: center;
-            gap: 24px;
-            flex-wrap: wrap;
-        }
-
-        .health-indicator {
-            width: 80px;
-            height: 80px;
-            border-radius: 40px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 40px;
-            background: #f1f5f9;
-            box-shadow: var(--shadow-md);
-        }
-
-        .health-indicator.critical {
-            background: var(--health-critical);
-            color: var(--health-critical-text);
-        }
-
-        .health-indicator.warning {
-            background: var(--health-warning);
-            color: var(--health-warning-text);
-        }
-
-        .health-indicator.healthy {
-            background: var(--health-healthy);
-            color: var(--health-healthy-text);
-        }
-
-        .health-text h2 {
-            font-size: 26px;
-            font-weight: 800;
-            margin-bottom: 8px;
-        }
-
-        .health-text p {
-            color: var(--text-secondary);
-            font-size: 15px;
-            max-width: 500px;
-        }
-
-        .health-score {
-            text-align: right;
-            background: var(--light-bg);
-            padding: 16px 24px;
-            border-radius: var(--radius-md);
-            border: 1px solid var(--border-color);
-        }
-
-        .score-value {
-            font-size: 48px;
-            font-weight: 800;
-            line-height: 1;
-            color: var(--primary-color);
-        }
-
-        .score-label {
-            font-size: 13px;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-top: 4px;
-        }
-
-        /* ============================================
-           MÉTRICAS PRINCIPAIS
-           ============================================ */
-        .metrics-section {
-            margin-bottom: 24px;
-        }
-
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 16px;
-        }
-
-        @media (max-width: 768px) {
-            .metrics-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-
-        .metric-card {
-            background: var(--card-bg);
-            padding: 20px;
-            border-radius: var(--radius-md);
-            box-shadow: var(--shadow-md);
-            border: 1px solid var(--border-color);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .metric-card.receber {
-            border-left: 4px solid var(--info-color);
-        }
-
-        .metric-card.pagar {
-            border-left: 4px solid var(--warning-color);
-        }
-
-        .metric-card.previsao {
-            border-left: 4px solid var(--success-color);
-        }
-
-        .metric-card.alerta {
-            border-left: 4px solid var(--danger-color);
-            background: #fff5f5;
-        }
-
-        .metric-header {
+        .card-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 12px;
+            margin-bottom: 16px;
         }
 
-        .metric-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 10px;
+        .card-header h3 {
+            font-size: 16px;
+            font-weight: 500;
+            opacity: 0.9;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .card-header i {
+            font-size: 24px;
+            opacity: 0.8;
+        }
+
+        .card-value {
+            font-size: 42px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            line-height: 1;
+        }
+
+        .card-sub {
+            display: flex;
+            gap: 16px;
+            font-size: 14px;
+            opacity: 0.8;
+        }
+
+        .card-sub span {
             display: flex;
             align-items: center;
-            justify-content: center;
-            font-size: 18px;
-        }
-
-        .metric-card.receber .metric-icon {
-            background: #dbeafe;
-            color: #1e40af;
-        }
-
-        .metric-card.pagar .metric-icon {
-            background: #fef3c7;
-            color: #92400e;
-        }
-
-        .metric-card.previsao .metric-icon {
-            background: #d1fae5;
-            color: #065f46;
-        }
-
-        .metric-card.alerta .metric-icon {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-
-        .metric-badge {
-            background: var(--danger-color);
-            color: white;
-            padding: 4px 8px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 600;
-        }
-
-        .metric-value {
-            font-size: 28px;
-            font-weight: 700;
-            margin-bottom: 4px;
-        }
-
-        .metric-label {
-            font-size: 13px;
-            color: var(--text-secondary);
-            font-weight: 500;
-        }
-
-        .metric-sub {
-            font-size: 12px;
-            color: var(--text-secondary);
-            margin-top: 8px;
-            padding-top: 8px;
-            border-top: 1px solid var(--border-color);
+            gap: 4px;
         }
 
         /* ============================================
-           LISTAS COMPLETAS (TUDO VISÍVEL)
+           GRÁFICO PROFISSIONAL
+           ============================================ */
+        .chart-section {
+            margin-bottom: 24px;
+        }
+
+        .chart-card {
+            background: var(--card-bg);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
+        }
+
+        .chart-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .chart-header h2 {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .chart-legend {
+            display: flex;
+            gap: 20px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 4px;
+        }
+
+        .legend-color.receita {
+            background: var(--chart-receita);
+        }
+
+        .legend-color.despesa {
+            background: var(--chart-despesa);
+        }
+
+        .legend-color.atraso {
+            background: var(--chart-atraso);
+        }
+
+        .chart-container {
+            height: 300px;
+            position: relative;
+            margin-bottom: 20px;
+        }
+
+        .insight-card {
+            background: var(--light-bg);
+            border-radius: var(--radius-md);
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .insight-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: #e0e7ff;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .insight-content {
+            flex: 1;
+        }
+
+        .insight-title {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .insight-value {
+            font-size: 24px;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .insight-action {
+            font-size: 14px;
+            color: var(--primary-color);
+            font-weight: 500;
+            padding: 8px 16px;
+            background: white;
+            border-radius: 30px;
+            border: 1px solid var(--border-color);
+        }
+
+        /* ============================================
+           LISTAS PROFISSIONAIS
            ============================================ */
         .lists-section {
             margin-bottom: 24px;
@@ -354,65 +349,64 @@
         .list-card {
             background: var(--card-bg);
             border-radius: var(--radius-lg);
-            padding: 20px;
             box-shadow: var(--shadow-md);
             border: 1px solid var(--border-color);
+            overflow: hidden;
         }
 
         .list-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
-            padding-bottom: 12px;
-            border-bottom: 2px solid;
         }
 
-        .list-header.receber {
-            border-bottom-color: var(--info-color);
+        .list-header.receita {
+            background: linear-gradient(135deg, #1e3a8a15, #2563eb15);
         }
 
-        .list-header.pagar {
-            border-bottom-color: var(--warning-color);
+        .list-header.despesa {
+            background: linear-gradient(135deg, #78350f15, #b4530915);
         }
 
         .list-header h3 {
-            font-size: 18px;
-            font-weight: 700;
+            font-size: 16px;
+            font-weight: 600;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
         }
 
         .list-header h3 i {
-            font-size: 20px;
+            font-size: 18px;
         }
 
-        .list-header.receber h3 i {
-            color: var(--info-color);
+        .list-header.receita h3 {
+            color: #1e3a8a;
         }
 
-        .list-header.pagar h3 i {
-            color: var(--warning-color);
+        .list-header.despesa h3 {
+            color: #b45309;
         }
 
         .list-total {
-            font-size: 22px;
-            font-weight: 800;
+            font-size: 20px;
+            font-weight: 700;
         }
 
-        .list-total.receber {
-            color: var(--info-color);
+        .list-total.receita {
+            color: #2563eb;
         }
 
-        .list-total.pagar {
-            color: var(--warning-color);
+        .list-total.despesa {
+            color: #b45309;
         }
 
         .list-container {
-            max-height: 500px;
+            max-height: 400px;
             overflow-y: auto;
-            padding-right: 8px;
+            padding: 16px;
         }
 
         .list-item {
@@ -434,33 +428,28 @@
 
         .list-item.atrasado {
             border-left: 4px solid var(--danger-color);
-            background: #fff5f5;
-        }
-
-        .list-item.hoje {
-            border-left: 4px solid var(--warning-color);
-            background: #fffbeb;
+            background: #fee2e2;
         }
 
         .list-icon {
-            width: 45px;
-            height: 45px;
-            border-radius: 12px;
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
+            font-size: 16px;
             flex-shrink: 0;
         }
 
-        .list-item.receber .list-icon {
+        .list-item.receita .list-icon {
             background: #dbeafe;
-            color: #1e40af;
+            color: #1e3a8a;
         }
 
-        .list-item.pagar .list-icon {
+        .list-item.despesa .list-icon {
             background: #fef3c7;
-            color: #92400e;
+            color: #b45309;
         }
 
         .list-content {
@@ -470,7 +459,7 @@
 
         .list-title {
             font-weight: 600;
-            font-size: 15px;
+            font-size: 14px;
             margin-bottom: 4px;
             white-space: nowrap;
             overflow: hidden;
@@ -478,7 +467,7 @@
         }
 
         .list-subtitle {
-            font-size: 13px;
+            font-size: 12px;
             color: var(--text-secondary);
             margin-bottom: 4px;
         }
@@ -491,23 +480,18 @@
             flex-wrap: wrap;
         }
 
-        .list-meta i {
-            font-size: 10px;
-            margin-right: 2px;
-        }
-
         .list-value {
             font-weight: 700;
             font-size: 16px;
             white-space: nowrap;
         }
 
-        .list-value.receber {
-            color: var(--info-color);
+        .list-value.receita {
+            color: #2563eb;
         }
 
-        .list-value.pagar {
-            color: var(--warning-color);
+        .list-value.despesa {
+            color: #b45309;
         }
 
         .list-value.atrasado {
@@ -517,9 +501,8 @@
         .badge {
             font-size: 10px;
             padding: 3px 8px;
-            border-radius: 12px;
+            border-radius: 20px;
             font-weight: 600;
-            white-space: nowrap;
         }
 
         .badge.atrasado {
@@ -532,62 +515,8 @@
             color: #92400e;
         }
 
-        .badge.amanha {
-            background: #dbeafe;
-            color: #1e40af;
-        }
-
         /* ============================================
-           PROJEÇÕES INTELIGENTES
-           ============================================ */
-        .projection-section {
-            margin-bottom: 24px;
-        }
-
-        .projection-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 16px;
-        }
-
-        @media (max-width: 768px) {
-            .projection-grid {
-                grid-template-columns: 1fr;
-            }
-        }
-
-        .projection-card {
-            background: var(--card-bg);
-            border-radius: var(--radius-md);
-            padding: 20px;
-            box-shadow: var(--shadow-sm);
-            border: 1px solid var(--border-color);
-        }
-
-        .projection-title {
-            font-size: 14px;
-            color: var(--text-secondary);
-            margin-bottom: 12px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .projection-value {
-            font-size: 24px;
-            font-weight: 700;
-            margin-bottom: 8px;
-        }
-
-        .projection-detail {
-            font-size: 13px;
-            color: var(--text-secondary);
-            padding-top: 8px;
-            border-top: 1px dashed var(--border-color);
-        }
-
-        /* ============================================
-           LOADING E EMPTY STATE
+           LOADING
            ============================================ */
         .loading-container {
             text-align: center;
@@ -611,39 +540,25 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-
-        .empty-list {
-            text-align: center;
-            padding: 40px;
-            color: var(--text-secondary);
-            background: var(--light-bg);
-            border-radius: var(--radius-md);
-            border: 1px dashed var(--border-color);
-        }
-
-        .empty-list i {
-            font-size: 40px;
-            color: var(--border-color);
-            margin-bottom: 12px;
-        }
     </style>
 </head>
-<body data-page-id="gestor-11-10" data-page-type="READ">
+<body data-page-id="gestor-financeiro" data-page-type="READ">
 
     <!-- ============================================
-         HEADER
+         HEADER PROFISSIONAL
          ============================================ -->
     <header class="page-header">
         <div class="header-content">
             <div class="header-title">
-                <div class="header-icon">
-                    <i class="fas fa-crown"></i>
-                </div>
-                <div class="header-text">
-                    <h1>🏆 GESTOR 11/10</h1>
-                    <p>Inteligência Financeira Completa • Visão 360° • Projeções Inteligentes</p>
-                </div>
+                <h1>Gestor Financeiro</h1>
+                <p>Análise em tempo real • Fluxo de caixa • Inteligência de negócio</p>
             </div>
+            
+            <div class="header-balance" id="headerBalance">
+                <div class="balance-label">BALANÇO PATRIMONIAL</div>
+                <div class="balance-value" id="balanceValue">€ 0</div>
+            </div>
+            
             <div class="last-update" id="lastUpdate">
                 <i class="fas fa-sync-alt"></i>
                 <span>Carregando...</span>
@@ -654,36 +569,81 @@
     <!-- LOADING STATE -->
     <div id="loadingState" class="loading-container">
         <div class="loading-spinner"></div>
-        <h3 style="margin-bottom: 8px;">Processando inteligência financeira...</h3>
-        <p style="color: var(--text-secondary);">Analisando pedidos, despesas e gerando projeções</p>
+        <h3 style="margin-bottom: 8px;">Processando dados financeiros</h3>
+        <p style="color: var(--text-secondary);">Carregando pedidos, despesas e gerando análise</p>
     </div>
 
-    <!-- CONTEÚDO PRINCIPAL (INICIALMENTE OCULTO) -->
+    <!-- CONTEÚDO PRINCIPAL -->
     <div id="mainContent" style="display: none;">
         
-        <!-- TERMÔMETRO DE SAÚDE -->
-        <section class="health-section">
-            <div class="health-card" id="healthCard"></div>
+        <!-- BALANÇO PRINCIPAL (RECEITA VS DESPESA) -->
+        <section class="balance-section">
+            <div class="balance-grid">
+                <div class="balance-card receita">
+                    <div class="card-header">
+                        <h3><i class="fas fa-arrow-down"></i> A RECEBER</h3>
+                        <i class="fas fa-arrow-circle-down"></i>
+                    </div>
+                    <div class="card-value" id="totalReceber">€ 0</div>
+                    <div class="card-sub">
+                        <span><i class="fas fa-clock"></i> <span id="qtdReceber">0</span> pendentes</span>
+                        <span><i class="fas fa-exclamation-triangle"></i> <span id="receberAtrasado">€ 0</span> atrasado</span>
+                    </div>
+                </div>
+                
+                <div class="balance-card despesa">
+                    <div class="card-header">
+                        <h3><i class="fas fa-arrow-up"></i> A PAGAR</h3>
+                        <i class="fas fa-arrow-circle-up"></i>
+                    </div>
+                    <div class="card-value" id="totalPagar">€ 0</div>
+                    <div class="card-sub">
+                        <span><i class="fas fa-clock"></i> <span id="qtdPagar">0</span> pendentes</span>
+                        <span><i class="fas fa-exclamation-triangle"></i> <span id="pagarAtrasado">€ 0</span> atrasado</span>
+                    </div>
+                </div>
+            </div>
         </section>
 
-        <!-- MÉTRICAS PRINCIPAIS -->
-        <section class="metrics-section">
-            <div class="metrics-grid" id="metricsGrid"></div>
+        <!-- GRÁFICO DE LINHA PROFISSIONAL -->
+        <section class="chart-section">
+            <div class="chart-card">
+                <div class="chart-header">
+                    <h2><i class="fas fa-chart-line" style="margin-right: 8px; color: var(--primary-color);"></i> Evolução Financeira - Últimos 6 Meses</h2>
+                    <div class="chart-legend">
+                        <div class="legend-item">
+                            <div class="legend-color receita"></div>
+                            <span>Receitas</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color despesa"></div>
+                            <span>Despesas</span>
+                        </div>
+                        <div class="legend-item">
+                            <div class="legend-color atraso"></div>
+                            <span>A receber atrasado</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="chart-container">
+                    <canvas id="financialChart"></canvas>
+                </div>
+                
+                <div class="insight-card" id="insightCard">
+                    <!-- Preenchido via JS -->
+                </div>
+            </div>
         </section>
 
-        <!-- PROJEÇÕES INTELIGENTES (BASE MÊS ANTERIOR) -->
-        <section class="projection-section">
-            <div class="projection-grid" id="projectionGrid"></div>
-        </section>
-
-        <!-- LISTAS COMPLETAS (TUDO VISÍVEL) -->
+        <!-- LISTAS COMPLETAS -->
         <section class="lists-section">
             <div class="lists-grid">
                 <!-- A RECEBER -->
                 <div class="list-card">
-                    <div class="list-header receber">
-                        <h3><i class="fas fa-arrow-down"></i> A RECEBER (Pendente)</h3>
-                        <span class="list-total receber" id="totalReceberPendente">€ 0</span>
+                    <div class="list-header receita">
+                        <h3><i class="fas fa-arrow-down"></i> A RECEBER • Pendentes</h3>
+                        <span class="list-total receita" id="totalReceberLista">€ 0</span>
                     </div>
                     <div class="list-container" id="listaReceber">
                         <!-- Preenchido via JS -->
@@ -692,9 +652,9 @@
 
                 <!-- A PAGAR -->
                 <div class="list-card">
-                    <div class="list-header pagar">
-                        <h3><i class="fas fa-arrow-up"></i> A PAGAR (Pendente)</h3>
-                        <span class="list-total pagar" id="totalPagarPendente">€ 0</span>
+                    <div class="list-header despesa">
+                        <h3><i class="fas fa-arrow-up"></i> A PAGAR • Pendentes</h3>
+                        <span class="list-total despesa" id="totalPagarLista">€ 0</span>
                     </div>
                     <div class="list-container" id="listaPagar">
                         <!-- Preenchido via JS -->
@@ -703,20 +663,15 @@
             </div>
         </section>
 
-        <!-- RESUMO DE ATRASOS (DESTAQUE) -->
-        <section class="metrics-section">
-            <div class="metrics-grid" id="atrasosGrid"></div>
-        </section>
-
     </div>
 
     <script>
         // ============================================
-        // GESTOR 11/10 - INTELIGÊNCIA FINANCEIRA TOTAL
+        // GESTOR FINANCEIRO PROFISSIONAL
         // ============================================
         
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('🏆 GESTOR 11/10 iniciado');
+            console.log('📊 Gestor Financeiro Profissional iniciado');
             
             // Elementos do DOM
             const loadingState = document.getElementById('loadingState');
@@ -726,29 +681,26 @@
             // Estado da aplicação
             let todosPedidos = [];
             let todasDespesas = [];
-            let despesasFixasMedia = {};
-            let dataAtualizacao = new Date();
+            let grafico = null;
             
             // ============================================
-            // CARREGAR DADOS DO FIREBASE
+            // CARREGAR DADOS
             // ============================================
             
             async function carregarDados() {
                 try {
-                    console.log('🔄 Carregando dados para análise...');
+                    console.log('🔄 Carregando dados...');
                     
-                    // Buscar Pedidos
                     const responsePedidos = await fetch('/api/database/query', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ schema: 'pedido', filters: {} })
                     });
                     
-                    // Buscar Despesas (TODAS, inclusive pagas, para análise histórica)
                     const responseDespesas = await fetch('/api/database/query', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ schema: 'despesa', filters: {} }) // SEM FILTRO DE DELETED
+                        body: JSON.stringify({ schema: 'despesa', filters: {} })
                     });
                     
                     if (!responsePedidos.ok || !responseDespesas.ok) {
@@ -758,33 +710,26 @@
                     const resultPedidos = await responsePedidos.json();
                     const resultDespesas = await responseDespesas.json();
                     
-                    // Processar dados
                     processarPedidos(resultPedidos.events || []);
                     processarDespesas(resultDespesas.events || []);
                     
-                    // Calcular médias de despesas fixas (base mês anterior)
-                    calcularProjecoes();
-                    
-                    // Renderizar tudo
                     renderizarPainel();
                     
-                    // Esconder loading, mostrar conteúdo
                     loadingState.style.display = 'none';
                     mainContent.style.display = 'block';
                     
-                    // Atualizar timestamp
                     dataAtualizacao = new Date();
-                    lastUpdateSpan.textContent = `Última análise: ${dataAtualizacao.toLocaleTimeString('pt-PT')} • Dados em tempo real`;
+                    lastUpdateSpan.textContent = `${dataAtualizacao.toLocaleDateString('pt-PT')} • ${dataAtualizacao.toLocaleTimeString('pt-PT')}`;
                     
                 } catch (error) {
-                    console.error('❌ Erro crítico:', error);
+                    console.error('❌ Erro:', error);
                     loadingState.innerHTML = `
                         <div style="color: var(--danger-color);">
-                            <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px;"></i>
-                            <h3>Erro ao carregar dados</h3>
-                            <p style="margin: 16px 0;">${error.message}</p>
-                            <button onclick="location.reload()" style="background: var(--primary-color); color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer;">
-                                <i class="fas fa-redo"></i> Tentar Novamente
+                            <i class="fas fa-exclamation-triangle" style="font-size: 48px;"></i>
+                            <h3>Erro ao carregar</h3>
+                            <p>${error.message}</p>
+                            <button onclick="location.reload()" style="margin-top: 16px; padding: 12px 24px; background: var(--primary-color); color: white; border: none; border-radius: 8px;">
+                                <i class="fas fa-redo"></i> Tentar novamente
                             </button>
                         </div>
                     `;
@@ -792,11 +737,10 @@
             }
             
             // ============================================
-            // PROCESSADORES DE DADOS
+            // PROCESSADORES
             // ============================================
             
             function processarPedidos(events) {
-                // Agrupar por ID (pegar o mais recente)
                 const pedidosMap = new Map();
                 events
                     .filter(e => e.schema === 'pedido' && !e.deleted)
@@ -812,7 +756,6 @@
                         }
                     });
                 
-                // Converter para objetos úteis
                 todosPedidos = Array.from(pedidosMap.values()).map(event => {
                     let payload = event.payload;
                     if (typeof payload === 'string') {
@@ -820,7 +763,6 @@
                         catch (e) { payload = {}; }
                     }
                     
-                    // Calcular totais de pagamento
                     const pagamentos = Array.isArray(payload.pagamentos) ? payload.pagamentos : [];
                     const totalPago = pagamentos
                         .filter(p => p.status === 'pago')
@@ -829,39 +771,43 @@
                     const totalPedido = parseFloat(payload.total) || 0;
                     const saldoPendente = totalPedido - totalPago;
                     
-                    // Status de pagamento
                     let statusPagamento = 'pendente';
                     if (totalPago === 0) statusPagamento = 'pendente';
                     else if (totalPago > 0 && totalPago < totalPedido) statusPagamento = 'parcial';
                     else if (totalPago >= totalPedido) statusPagamento = 'pago';
                     
-                    // Data de vencimento (priorizar dataEntrega)
                     let dataVencimento = null;
                     if (payload.dataEntrega) {
                         dataVencimento = new Date(payload.dataEntrega);
                         dataVencimento.setHours(0,0,0,0);
                     }
                     
+                    // Data de criação para o gráfico
+                    let dataCriacao = null;
+                    if (event.timestamp) {
+                        dataCriacao = new Date(event.timestamp);
+                    } else if (event.created_at) {
+                        dataCriacao = new Date(event.created_at);
+                    }
+                    
                     return {
                         id: event.id,
-                        tipo: 'pedido',
-                        nome: payload.cliente || 'Cliente não identificado',
+                        nome: payload.cliente || 'Cliente',
                         descricao: payload.empresa || `Pedido ${payload.numero || ''}`,
                         valor: saldoPendente,
                         valorTotal: totalPedido,
-                        statusPagamento: statusPagamento,
+                        status: statusPagamento,
                         dataVencimento: dataVencimento,
-                        dataOriginal: payload.dataEntrega || payload.createdAt,
+                        dataCriacao: dataCriacao,
                         createdAt: event.timestamp || event.created_at
                     };
-                }).filter(p => p.valor > 0); // Só interessam os que têm saldo pendente
+                }).filter(p => p.valor > 0);
             }
             
             function processarDespesas(events) {
-                // Agrupar por ID (pegar o mais recente)
                 const despesasMap = new Map();
                 events
-                    .filter(e => e.schema === 'despesa') // NÃO filtrar deleted para análise histórica
+                    .filter(e => e.schema === 'despesa')
                     .forEach(e => {
                         const id = e.id;
                         if (despesasMap.has(id)) {
@@ -874,7 +820,6 @@
                         }
                     });
                 
-                // Converter para objetos úteis
                 todasDespesas = Array.from(despesasMap.values()).map(event => {
                     let payload = event.payload;
                     if (typeof payload === 'string') {
@@ -887,10 +832,6 @@
                     const valorIVA = comIVA ? valorBruto * 0.23 : 0;
                     const valorTotal = valorBruto + valorIVA;
                     
-                    // 🔥 CORREÇÃO: Status correto (paga, pendente)
-                    const statusPagamento = payload.statusPagamento || 'pendente';
-                    
-                    // Data de vencimento
                     let dataVencimento = null;
                     if (payload.dataVencimento) {
                         dataVencimento = new Date(payload.dataVencimento);
@@ -900,15 +841,21 @@
                         dataVencimento.setHours(0,0,0,0);
                     }
                     
+                    let dataCriacao = null;
+                    if (event.timestamp) {
+                        dataCriacao = new Date(event.timestamp);
+                    } else if (event.created_at) {
+                        dataCriacao = new Date(event.created_at);
+                    }
+                    
                     return {
                         id: event.id,
-                        tipo: 'despesa',
-                        nome: payload.fornecedor || 'Fornecedor não identificado',
+                        nome: payload.fornecedor || 'Fornecedor',
                         descricao: payload.descricao || payload.categoria || 'Despesa',
                         valor: valorTotal,
-                        statusPagamento: statusPagamento, // 🔥 AGORA CORRETO: 'paga' ou 'pendente'
+                        status: payload.statusPagamento || 'pendente',
                         dataVencimento: dataVencimento,
-                        dataPagamento: payload.dataPagamento,
+                        dataCriacao: dataCriacao,
                         categoria: payload.categoria || 'OUTROS',
                         data: payload.data,
                         createdAt: event.timestamp || event.created_at,
@@ -918,82 +865,194 @@
             }
             
             // ============================================
-            // PROJEÇÕES INTELIGENTES (BASE MÊS ANTERIOR)
+            // GRÁFICO DE LINHA
             // ============================================
             
-            function calcularProjecoes() {
+            function gerarDadosGrafico() {
                 const hoje = new Date();
-                const mesAtual = hoje.getMonth();
-                const anoAtual = hoje.getFullYear();
+                const meses = [];
+                const receitasMensais = [];
+                const despesasMensais = [];
+                const atrasadosMensais = [];
                 
-                // Mês anterior
-                let mesAnterior = mesAtual - 1;
-                let anoAnterior = anoAtual;
-                if (mesAnterior < 0) {
-                    mesAnterior = 11;
-                    anoAnterior = anoAtual - 1;
+                // Gerar últimos 6 meses
+                for (let i = 5; i >= 0; i--) {
+                    const data = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+                    const mesAno = data.toLocaleDateString('pt-PT', { month: 'short', year: '2-digit' });
+                    meses.push(mesAno);
+                    
+                    const ano = data.getFullYear();
+                    const mes = data.getMonth();
+                    
+                    // Calcular receitas do mês (pedidos pagos ou criados no mês)
+                    let receitaMes = 0;
+                    todosPedidos.forEach(p => {
+                        if (p.dataCriacao && p.dataCriacao.getMonth() === mes && p.dataCriacao.getFullYear() === ano) {
+                            receitaMes += p.valorTotal;
+                        }
+                    });
+                    receitasMensais.push(receitaMes);
+                    
+                    // Calcular despesas do mês (pagas no mês)
+                    let despesaMes = 0;
+                    todasDespesas.forEach(d => {
+                        if (d.status === 'paga' && d.dataCriacao && d.dataCriacao.getMonth() === mes && d.dataCriacao.getFullYear() === ano) {
+                            despesaMes += d.valor;
+                        }
+                    });
+                    despesasMensais.push(despesaMes);
+                    
+                    // Calcular atrasados do mês
+                    let atrasadoMes = 0;
+                    todosPedidos.forEach(p => {
+                        if (p.status !== 'pago' && p.dataVencimento && 
+                            p.dataVencimento.getMonth() === mes && 
+                            p.dataVencimento.getFullYear() === ano &&
+                            p.dataVencimento < hoje) {
+                            atrasadoMes += p.valor;
+                        }
+                    });
+                    atrasadosMensais.push(atrasadoMes);
                 }
                 
-                // Filtrar despesas do mês anterior (pagas, para análise de fixas)
-                const despesasMesAnterior = todasDespesas.filter(d => {
-                    if (d.statusPagamento !== 'paga') return false; // Só considerar pagas para base histórica
-                    if (!d.data) return false;
-                    
-                    const dataDespesa = new Date(d.data);
-                    return dataDespesa.getMonth() === mesAnterior && dataDespesa.getFullYear() === anoAnterior;
-                });
+                return { meses, receitasMensais, despesasMensais, atrasadosMensais };
+            }
+            
+            function criarGrafico() {
+                const ctx = document.getElementById('financialChart').getContext('2d');
+                const dados = gerarDadosGrafico();
                 
-                // Agrupar por categoria para calcular médias
-                const categorias = {};
-                despesasMesAnterior.forEach(d => {
-                    const cat = d.categoria || 'OUTROS';
-                    if (!categorias[cat]) {
-                        categorias[cat] = {
-                            total: 0,
-                            count: 0,
-                            valores: []
-                        };
+                if (grafico) {
+                    grafico.destroy();
+                }
+                
+                grafico = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: dados.meses,
+                        datasets: [
+                            {
+                                label: 'Receitas',
+                                data: dados.receitasMensais,
+                                borderColor: '#3b82f6',
+                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                                borderWidth: 3,
+                                pointBackgroundColor: '#3b82f6',
+                                pointBorderColor: '#ffffff',
+                                pointBorderWidth: 2,
+                                pointRadius: 4,
+                                pointHoverRadius: 6,
+                                tension: 0.3,
+                                fill: false
+                            },
+                            {
+                                label: 'Despesas',
+                                data: dados.despesasMensais,
+                                borderColor: '#f59e0b',
+                                backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                                borderWidth: 3,
+                                pointBackgroundColor: '#f59e0b',
+                                pointBorderColor: '#ffffff',
+                                pointBorderWidth: 2,
+                                pointRadius: 4,
+                                pointHoverRadius: 6,
+                                tension: 0.3,
+                                fill: false
+                            },
+                            {
+                                label: 'A receber atrasado',
+                                data: dados.atrasadosMensais,
+                                borderColor: '#ef4444',
+                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                borderWidth: 3,
+                                borderDash: [5, 5],
+                                pointBackgroundColor: '#ef4444',
+                                pointBorderColor: '#ffffff',
+                                pointBorderWidth: 2,
+                                pointRadius: 4,
+                                pointHoverRadius: 6,
+                                tension: 0.3,
+                                fill: false
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false,
+                                backgroundColor: '#1e293b',
+                                titleColor: '#ffffff',
+                                bodyColor: '#e2e8f0',
+                                borderColor: '#334155',
+                                borderWidth: 1,
+                                padding: 12,
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            label += new Intl.NumberFormat('pt-PT', {
+                                                style: 'currency',
+                                                currency: 'EUR',
+                                                minimumFractionDigits: 0
+                                            }).format(context.parsed.y);
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                grid: {
+                                    color: '#e2e8f0',
+                                    drawBorder: false
+                                },
+                                ticks: {
+                                    callback: function(value) {
+                                        return '€' + value.toLocaleString('pt-PT');
+                                    }
+                                }
+                            },
+                            x: {
+                                grid: {
+                                    display: false
+                                }
+                            }
+                        }
                     }
-                    categorias[cat].total += d.valor;
-                    categorias[cat].count++;
-                    categorias[cat].valores.push(d.valor);
                 });
                 
-                // Calcular médias (para projeção)
-                despesasFixasMedia = {};
-                Object.keys(categorias).forEach(cat => {
-                    const dados = categorias[cat];
-                    despesasFixasMedia[cat] = {
-                        media: dados.total / dados.count,
-                        total: dados.total,
-                        count: dados.count
-                    };
-                });
-                
-                console.log('📊 Projeções base mês anterior:', despesasFixasMedia);
+                return dados;
             }
             
             // ============================================
-            // RENDERIZAÇÃO PRINCIPAL
+            // RENDERIZAÇÃO
             // ============================================
             
             function renderizarPainel() {
                 const hoje = new Date();
                 hoje.setHours(0, 0, 0, 0);
                 
-                // ---------- 1. FILTRAR DADOS CORRETAMENTE ----------
-                
-                // 🔥 A RECEBER: Pedidos com status pendente ou parcial (NÃO pagos)
+                // Filtrar dados
                 const aReceber = todosPedidos.filter(p => 
-                    p.statusPagamento === 'pendente' || p.statusPagamento === 'parcial'
+                    p.status === 'pendente' || p.status === 'parcial'
                 );
                 
-                // 🔥 A PAGAR: Despesas com status pendente (NÃO pagas) e NÃO deletadas
                 const aPagar = todasDespesas.filter(d => 
-                    d.statusPagamento === 'pendente' && !d.deleted
+                    d.status === 'pendente' && !d.deleted
                 );
                 
-                // Separar atrasados
+                // Atrasados
                 const aReceberAtrasado = aReceber.filter(p => {
                     if (!p.dataVencimento) return false;
                     return p.dataVencimento < hoje;
@@ -1005,192 +1064,108 @@
                 });
                 
                 // Totais
-                const totalAReceber = aReceber.reduce((sum, p) => sum + p.valor, 0);
-                const totalAPagar = aPagar.reduce((sum, d) => sum + d.valor, 0);
-                const totalAReceberAtrasado = aReceberAtrasado.reduce((sum, p) => sum + p.valor, 0);
-                const totalAPagarAtrasado = aPagarAtrasado.reduce((sum, d) => sum + d.valor, 0);
+                const totalReceber = aReceber.reduce((sum, p) => sum + p.valor, 0);
+                const totalPagar = aPagar.reduce((sum, d) => sum + d.valor, 0);
+                const totalReceberAtrasado = aReceberAtrasado.reduce((sum, p) => sum + p.valor, 0);
+                const totalPagarAtrasado = aPagarAtrasado.reduce((sum, d) => sum + d.valor, 0);
                 
-                // Projeções para os próximos 30 dias
-                const trintaDias = new Date(hoje);
-                trintaDias.setDate(trintaDias.getDate() + 30);
+                // BALANÇO PATRIMONIAL (header)
+                const balanco = totalReceber - totalPagar;
+                const balanceElement = document.getElementById('balanceValue');
+                balanceElement.textContent = formatarMoeda(balanco);
+                balanceElement.className = `balance-value ${balanco >= 0 ? 'positive' : 'negative'}`;
                 
-                const aReceberProximo = aReceber.filter(p => {
-                    if (!p.dataVencimento) return false;
-                    return p.dataVencimento >= hoje && p.dataVencimento <= trintaDias;
-                }).reduce((sum, p) => sum + p.valor, 0);
+                // CARDS DE BALANÇO
+                document.getElementById('totalReceber').textContent = formatarMoeda(totalReceber);
+                document.getElementById('qtdReceber').textContent = aReceber.length;
+                document.getElementById('receberAtrasado').textContent = formatarMoeda(totalReceberAtrasado);
                 
-                const aPagarProximo = aPagar.filter(d => {
-                    if (!d.dataVencimento) return false;
-                    return d.dataVencimento >= hoje && d.dataVencimento <= trintaDias;
-                }).reduce((sum, d) => sum + d.valor, 0);
+                document.getElementById('totalPagar').textContent = formatarMoeda(totalPagar);
+                document.getElementById('qtdPagar').textContent = aPagar.length;
+                document.getElementById('pagarAtrasado').textContent = formatarMoeda(totalPagarAtrasado);
                 
-                // Saldo projetado
-                const saldoProjetado = aReceberProximo - aPagarProximo;
+                // GRÁFICO
+                const dadosGrafico = criarGrafico();
                 
-                // ---------- 2. SAÚDE DO NEGÓCIO ----------
-                let saudeStatus = 'critical';
-                let saudeIcon = '💥';
-                let saudeTitulo = '🚨 SITUAÇÃO CRÍTICA';
-                let saudeDescricao = '';
-                let saudeClasse = 'critical';
+                // INSIGHT INTELIGENTE
+                const ultimoMesReceita = dadosGrafico.receitasMensais[dadosGrafico.receitasMensais.length - 1] || 0;
+                const ultimoMesDespesa = dadosGrafico.despesasMensais[dadosGrafico.despesasMensais.length - 1] || 0;
+                const totalAtrasado = totalReceberAtrasado + totalPagarAtrasado;
                 
-                if (totalAReceberAtrasado > 0 || totalAPagarAtrasado > 0) {
-                    saudeStatus = 'critical';
-                    saudeIcon = '🚨';
-                    saudeTitulo = '🚨 ALERTA MÁXIMO';
-                    saudeDescricao = `Atrasos detectados: ${formatarMoeda(totalAReceberAtrasado)} a receber • ${formatarMoeda(totalAPagarAtrasado)} a pagar`;
-                    saudeClasse = 'critical';
-                } else if (saldoProjetado < 0) {
-                    saudeStatus = 'warning';
-                    saudeIcon = '⚠️';
-                    saudeTitulo = '⚠️ ATENÇÃO';
-                    saudeDescricao = `Fluxo negativo nos próximos 30 dias: ${formatarMoeda(saldoProjetado)}`;
-                    saudeClasse = 'warning';
-                } else if (saldoProjetado < 500) {
-                    saudeStatus = 'warning';
-                    saudeIcon = '⚡';
-                    saudeTitulo = '⚡ MARGEM APERTADA';
-                    saudeDescricao = `Saldo positivo mas apertado: ${formatarMoeda(saldoProjetado)} para os próximos 30 dias`;
-                    saudeClasse = 'warning';
+                let insightMensagem = '';
+                let insightValor = '';
+                
+                if (totalAtrasado > 0) {
+                    insightMensagem = 'Para regularizar a situação, você precisa receber:';
+                    insightValor = formatarMoeda(totalAtrasado);
+                } else if (ultimoMesReceita < ultimoMesDespesa) {
+                    const deficit = ultimoMesDespesa - ultimoMesReceita;
+                    insightMensagem = 'No último mês, suas despesas superaram as receitas em:';
+                    insightValor = formatarMoeda(deficit);
+                } else if (ultimoMesReceita > ultimoMesDespesa) {
+                    const superavit = ultimoMesReceita - ultimoMesDespesa;
+                    insightMensagem = 'No último mês, você teve um superávit de:';
+                    insightValor = formatarMoeda(superavit);
                 } else {
-                    saudeStatus = 'healthy';
-                    saudeIcon = '💪';
-                    saudeTitulo = '💪 SAÚDE EXCELENTE';
-                    saudeDescricao = `Fluxo positivo de ${formatarMoeda(saldoProjetado)} para os próximos 30 dias`;
-                    saudeClasse = 'healthy';
+                    insightMensagem = 'Seu fluxo está equilibrado. Meta sugerida para crescer:';
+                    insightValor = formatarMoeda(ultimoMesReceita * 0.2);
                 }
                 
-                document.getElementById('healthCard').innerHTML = `
-                    <div class="health-status">
-                        <div class="health-indicator ${saudeClasse}">
-                            ${saudeIcon}
-                        </div>
-                        <div class="health-text">
-                            <h2>${saudeTitulo}</h2>
-                            <p>${saudeDescricao}</p>
-                        </div>
+                document.getElementById('insightCard').innerHTML = `
+                    <div class="insight-icon">
+                        <i class="fas fa-chart-pie"></i>
                     </div>
-                    <div class="health-score">
-                        <div class="score-value">${formatarMoeda(totalAReceber - totalAPagar)}</div>
-                        <div class="score-label">Saldo Atual (Receber - Pagar)</div>
+                    <div class="insight-content">
+                        <div class="insight-title">${insightMensagem}</div>
+                        <div class="insight-value">${insightValor}</div>
+                    </div>
+                    <div class="insight-action">
+                        <i class="fas fa-arrow-right"></i> Detalhes
                     </div>
                 `;
                 
-                // ---------- 3. MÉTRICAS PRINCIPAIS ----------
-                document.getElementById('metricsGrid').innerHTML = `
-                    <div class="metric-card receber">
-                        <div class="metric-header">
-                            <div class="metric-icon"><i class="fas fa-arrow-down"></i></div>
-                            ${aReceber.length > 0 ? `<span class="metric-badge">${aReceber.length} itens</span>` : ''}
-                        </div>
-                        <div class="metric-value">${formatarMoeda(totalAReceber)}</div>
-                        <div class="metric-label">Total a Receber</div>
-                        <div class="metric-sub">${aReceber.length} cliente(s) pendente(s)</div>
-                    </div>
-                    
-                    <div class="metric-card pagar">
-                        <div class="metric-header">
-                            <div class="metric-icon"><i class="fas fa-arrow-up"></i></div>
-                            ${aPagar.length > 0 ? `<span class="metric-badge">${aPagar.length} itens</span>` : ''}
-                        </div>
-                        <div class="metric-value">${formatarMoeda(totalAPagar)}</div>
-                        <div class="metric-label">Total a Pagar</div>
-                        <div class="metric-sub">${aPagar.length} despesa(s) pendente(s)</div>
-                    </div>
-                    
-                    <div class="metric-card previsao">
-                        <div class="metric-header">
-                            <div class="metric-icon"><i class="fas fa-chart-line"></i></div>
-                        </div>
-                        <div class="metric-value">${formatarMoeda(saldoProjetado)}</div>
-                        <div class="metric-label">Saldo Projetado (30d)</div>
-                        <div class="metric-sub">Baseado em vencimentos</div>
-                    </div>
-                    
-                    <div class="metric-card alerta">
-                        <div class="metric-header">
-                            <div class="metric-icon"><i class="fas fa-exclamation-triangle"></i></div>
-                            ${(totalAReceberAtrasado > 0 || totalAPagarAtrasado > 0) ? '<span class="metric-badge">ATRASO</span>' : ''}
-                        </div>
-                        <div class="metric-value">${formatarMoeda(totalAReceberAtrasado + totalAPagarAtrasado)}</div>
-                        <div class="metric-label">Total em Atraso</div>
-                        <div class="metric-sub">Receber: ${formatarMoeda(totalAReceberAtrasado)} • Pagar: ${formatarMoeda(totalAPagarAtrasado)}</div>
-                    </div>
-                `;
+                // LISTAS
+                document.getElementById('totalReceberLista').textContent = formatarMoeda(totalReceber);
+                document.getElementById('totalPagarLista').textContent = formatarMoeda(totalPagar);
                 
-                // ---------- 4. PROJEÇÕES INTELIGENTES ----------
-                // Estimar despesas fixas para o próximo mês baseado no mês anterior
-                const despesasFixasProjetadas = Object.values(despesasFixasMedia).reduce((sum, cat) => sum + cat.media, 0);
-                
-                document.getElementById('projectionGrid').innerHTML = `
-                    <div class="projection-card">
-                        <div class="projection-title"><i class="fas fa-history" style="color: var(--info-color);"></i> Base Mês Anterior</div>
-                        <div class="projection-value">${Object.keys(despesasFixasMedia).length} categorias</div>
-                        <div class="projection-detail">Média de despesas: ${formatarMoeda(despesasFixasProjetadas)}</div>
-                    </div>
-                    
-                    <div class="projection-card">
-                        <div class="projection-title"><i class="fas fa-calculator" style="color: var(--warning-color);"></i> Projeção Fixas (Próx. Mês)</div>
-                        <div class="projection-value">${formatarMoeda(despesasFixasProjetadas)}</div>
-                        <div class="projection-detail">Baseado no histórico do mês anterior</div>
-                    </div>
-                    
-                    <div class="projection-card">
-                        <div class="projection-title"><i class="fas fa-bullseye" style="color: var(--success-color);"></i> Meta de Recebimento</div>
-                        <div class="projection-value">${formatarMoeda(despesasFixasProjetadas * 1.3)}</div>
-                        <div class="projection-detail">+30% sobre despesas fixas (margem segura)</div>
-                    </div>
-                `;
-                
-                // ---------- 5. LISTAS COMPLETAS (TUDO VISÍVEL) ----------
-                
-                // Lista A RECEBER (ordenada por data, atrasados primeiro)
+                // Lista A RECEBER
                 const receberOrdenados = [...aReceber].sort((a, b) => {
-                    // Atrasados primeiro
                     const aAtrasado = a.dataVencimento && a.dataVencimento < hoje ? 1 : 0;
                     const bAtrasado = b.dataVencimento && b.dataVencimento < hoje ? 1 : 0;
                     if (aAtrasado !== bAtrasado) return bAtrasado - aAtrasado;
                     
-                    // Depois por data
                     if (!a.dataVencimento) return 1;
                     if (!b.dataVencimento) return -1;
                     return a.dataVencimento - b.dataVencimento;
                 });
                 
-                document.getElementById('totalReceberPendente').textContent = formatarMoeda(totalAReceber);
                 document.getElementById('listaReceber').innerHTML = receberOrdenados.length > 0 
                     ? receberOrdenados.map(item => {
                         const atrasado = item.dataVencimento && item.dataVencimento < hoje;
-                        const hojeMesmo = item.dataVencimento && item.dataVencimento.getTime() === hoje.getTime();
-                        
-                        let badgeHtml = '';
-                        if (atrasado) badgeHtml = '<span class="badge atrasado">ATRASADO</span>';
-                        else if (hojeMesmo) badgeHtml = '<span class="badge hoje">HOJE</span>';
-                        
                         const dataStr = item.dataVencimento 
                             ? item.dataVencimento.toLocaleDateString('pt-PT') 
                             : 'Data não definida';
                         
                         return `
-                            <div class="list-item receber ${atrasado ? 'atrasado' : ''}">
+                            <div class="list-item receita ${atrasado ? 'atrasado' : ''}">
                                 <div class="list-icon"><i class="fas fa-user"></i></div>
                                 <div class="list-content">
                                     <div class="list-title">${item.nome}</div>
                                     <div class="list-subtitle">${item.descricao}</div>
                                     <div class="list-meta">
                                         <span><i class="fas fa-calendar"></i> Vence: ${dataStr}</span>
-                                        ${badgeHtml}
+                                        ${atrasado ? '<span class="badge atrasado">ATRASADO</span>' : ''}
                                     </div>
                                 </div>
-                                <div class="list-value receber ${atrasado ? 'atrasado' : ''}">
+                                <div class="list-value receita ${atrasado ? 'atrasado' : ''}">
                                     ${formatarMoeda(item.valor)}
                                 </div>
                             </div>
                         `;
                     }).join('')
-                    : '<div class="empty-list"><i class="fas fa-check-circle"></i><p>Nenhum valor a receber pendente</p><p style="font-size: 12px;">Tudo em dia! 🎉</p></div>';
+                    : '<div style="text-align: center; padding: 40px; color: var(--text-secondary);"><i class="fas fa-check-circle" style="font-size: 32px; margin-bottom: 12px;"></i><p>Nenhum valor a receber pendente</p></div>';
                 
-                // Lista A PAGAR (ordenada por data, atrasados primeiro)
+                // Lista A PAGAR
                 const pagarOrdenados = [...aPagar].sort((a, b) => {
                     const aAtrasado = a.dataVencimento && a.dataVencimento < hoje ? 1 : 0;
                     const bAtrasado = b.dataVencimento && b.dataVencimento < hoje ? 1 : 0;
@@ -1201,89 +1176,33 @@
                     return a.dataVencimento - b.dataVencimento;
                 });
                 
-                document.getElementById('totalPagarPendente').textContent = formatarMoeda(totalAPagar);
                 document.getElementById('listaPagar').innerHTML = pagarOrdenados.length > 0
                     ? pagarOrdenados.map(item => {
                         const atrasado = item.dataVencimento && item.dataVencimento < hoje;
-                        const hojeMesmo = item.dataVencimento && item.dataVencimento.getTime() === hoje.getTime();
-                        
-                        let badgeHtml = '';
-                        if (atrasado) badgeHtml = '<span class="badge atrasado">ATRASADO</span>';
-                        else if (hojeMesmo) badgeHtml = '<span class="badge hoje">HOJE</span>';
-                        
                         const dataStr = item.dataVencimento 
                             ? item.dataVencimento.toLocaleDateString('pt-PT') 
                             : 'Data não definida';
                         
                         return `
-                            <div class="list-item pagar ${atrasado ? 'atrasado' : ''}">
+                            <div class="list-item despesa ${atrasado ? 'atrasado' : ''}">
                                 <div class="list-icon"><i class="fas fa-building"></i></div>
                                 <div class="list-content">
                                     <div class="list-title">${item.nome}</div>
                                     <div class="list-subtitle">${item.descricao}</div>
                                     <div class="list-meta">
                                         <span><i class="fas fa-calendar"></i> Vence: ${dataStr}</span>
-                                        <span><i class="fas fa-tag"></i> ${item.categoria}</span>
-                                        ${badgeHtml}
+                                        ${atrasado ? '<span class="badge atrasado">ATRASADO</span>' : ''}
                                     </div>
                                 </div>
-                                <div class="list-value pagar ${atrasado ? 'atrasado' : ''}">
+                                <div class="list-value despesa ${atrasado ? 'atrasado' : ''}">
                                     ${formatarMoeda(item.valor)}
                                 </div>
                             </div>
                         `;
                     }).join('')
-                    : '<div class="empty-list"><i class="fas fa-check-circle"></i><p>Nenhuma despesa pendente</p><p style="font-size: 12px;">Tudo pago em dia! 🎉</p></div>';
-                
-                // ---------- 6. RESUMO DE ATRASOS ----------
-                document.getElementById('atrasosGrid').innerHTML = `
-                    <div class="metric-card alerta">
-                        <div class="metric-header">
-                            <div class="metric-icon"><i class="fas fa-exclamation-circle"></i></div>
-                            <span class="metric-badge">URGENTE</span>
-                        </div>
-                        <div class="metric-value">${aReceberAtrasado.length}</div>
-                        <div class="metric-label">Clientes em Atraso</div>
-                        <div class="metric-sub">Total: ${formatarMoeda(totalAReceberAtrasado)}</div>
-                    </div>
-                    
-                    <div class="metric-card alerta">
-                        <div class="metric-header">
-                            <div class="metric-icon"><i class="fas fa-exclamation-circle"></i></div>
-                            <span class="metric-badge">URGENTE</span>
-                        </div>
-                        <div class="metric-value">${aPagarAtrasado.length}</div>
-                        <div class="metric-label">Fornecedores em Atraso</div>
-                        <div class="metric-sub">Total: ${formatarMoeda(totalAPagarAtrasado)}</div>
-                    </div>
-                    
-                    <div class="metric-card previsao">
-                        <div class="metric-header">
-                            <div class="metric-icon"><i class="fas fa-calendar-check"></i></div>
-                        </div>
-                        <div class="metric-value">${aReceber.filter(p => {
-                            if (!p.dataVencimento) return false;
-                            return p.dataVencimento >= hoje && p.dataVencimento <= new Date(hoje.getTime() + 7*24*60*60*1000);
-                        }).length}</div>
-                        <div class="metric-label">Vencem em 7 dias (Receber)</div>
-                        <div class="metric-sub">Fique atento aos próximos vencimentos</div>
-                    </div>
-                    
-                    <div class="metric-card previsao">
-                        <div class="metric-header">
-                            <div class="metric-icon"><i class="fas fa-calendar-check"></i></div>
-                        </div>
-                        <div class="metric-value">${aPagar.filter(d => {
-                            if (!d.dataVencimento) return false;
-                            return d.dataVencimento >= hoje && d.dataVencimento <= new Date(hoje.getTime() + 7*24*60*60*1000);
-                        }).length}</div>
-                        <div class="metric-label">Vencem em 7 dias (Pagar)</div>
-                        <div class="metric-sub">Programe-se para não atrasar</div>
-                    </div>
-                `;
+                    : '<div style="text-align: center; padding: 40px; color: var(--text-secondary);"><i class="fas fa-check-circle" style="font-size: 32px; margin-bottom: 12px;"></i><p>Nenhuma despesa pendente</p></div>';
             }
             
-            // Utilitário de formatação de moeda
             function formatarMoeda(valor) {
                 return new Intl.NumberFormat('pt-PT', {
                     style: 'currency',
@@ -1293,18 +1212,14 @@
                 }).format(valor);
             }
             
-            // Auto-refresh a cada 60 segundos
-            setInterval(() => {
-                console.log('🔄 Atualizando painel...');
-                carregarDados();
-            }, 60000);
+            // Auto-refresh
+            setInterval(carregarDados, 60000);
             
             // Iniciar
             carregarDados();
         });
     </script>
 
-    <!-- CONEXÃO COM O CORE ENGINE (OBRIGATÓRIO) -->
     <script src="../core/engine.js"></script>
 </body>
 </html>
