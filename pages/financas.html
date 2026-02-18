@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finanças - Gestão de Dívidas</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', system-ui, sans-serif;
+        }
+
+        body {
+            background: #f1f5f9;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* HEADER */
+        .header {
+            background: linear-gradient(135deg, #1e293b, #0f172a);
+            color: white;
+            padding: 30px;
+            border-radius: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header h1 i {
+            color: #fbbf24;
+        }
+
+        .header .subtitle {
+            color: #cbd5e1;
+            font-size: 16px;
+        }
+
+        /* INDICADORES */
+        .indicadores {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        .card-indicador {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            transition: transform 0.2s;
+            border: 1px solid #e2e8f0;
+        }
+
+        .card-indicador:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+        }
+
+        .indicador-titulo {
+            color: #64748b;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .indicador-valor {
+            font-size: 42px;
+            font-weight: 700;
+            color: #1e293b;
+            line-height: 1.2;
+        }
+
+        .indicador-sub {
+            color: #94a3b8;
+            font-size: 14px;
+            margin-top: 8px;
+        }
+
+        .card-indicador.total i { color: #3b82f6; }
+        .card-indicador.pago i { color: #10b981; }
+        .card-indicador.restante i { color: #ef4444; }
+
+        /* GRID PRINCIPAL */
+        .grid-2colunas {
+            display: grid;
+            grid-template-columns: 1.2fr 0.8fr;
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        /* CARDS */
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            border: 1px solid #e2e8f0;
+        }
+
+        .card-titulo {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1e293b;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f1f5f9;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card-titulo i {
+            color: #3b82f6;
+        }
+
+        /* FORMULÁRIOS */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group.full-width {
+            grid-column: span 2;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #334155;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        input, select, textarea {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1.5px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 14px;
+            transition: all 0.2s;
+            background: white;
+        }
+
+        input:focus, select:focus, textarea:focus {
+            border-color: #3b82f6;
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+        }
+
+        .btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 14px 20px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            width: 100%;
+        }
+
+        .btn:hover {
+            background: #2563eb;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(37,99,235,0.2);
+        }
+
+        .btn-secondary {
+            background: #64748b;
+        }
+
+        .btn-secondary:hover {
+            background: #475569;
+        }
+
+        .btn-success {
+            background: #10b981;
+        }
+
+        .btn-success:hover {
+            background: #059669;
+        }
+
+        /* LISTA DE PAGAMENTOS */
+        .lista-pagamentos {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .pagamento-item {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-left: 4px solid #3b82f6;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .pagamento-item:hover {
+            background: #f1f5f9;
+        }
+
+        .pagamento-info h4 {
+            color: #1e293b;
+            margin-bottom: 5px;
+            font-size: 16px;
+        }
+
+        .pagamento-info p {
+            color: #64748b;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .pagamento-valor {
+            font-weight: 700;
+            font-size: 18px;
+            color: #10b981;
+        }
+
+        .badge {
+            background: #e2e8f0;
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #475569;
+        }
+
+        /* LISTA DE DÍVIDAS */
+        .divida-item {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .divida-item:hover {
+            background: #f1f5f9;
+        }
+
+        .divida-item.selected {
+            border-color: #3b82f6;
+            background: #eff6ff;
+        }
+
+        .divida-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .divida-descricao {
+            font-weight: 600;
+            color: #1e293b;
+        }
+
+        .divida-status {
+            font-size: 11px;
+            padding: 4px 8px;
+            border-radius: 20px;
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .divida-status.quitada {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .divida-valores {
+            display: flex;
+            justify-content: space-between;
+            color: #64748b;
+            font-size: 13px;
+        }
+
+        .progresso {
+            margin-top: 10px;
+            height: 6px;
+            background: #e2e8f0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .progresso-bar {
+            height: 100%;
+            background: #3b82f6;
+            border-radius: 10px;
+            transition: width 0.3s;
+        }
+
+        /* UTILITÁRIOS */
+        .mt-20 { margin-top: 20px; }
+        .text-right { text-align: right; }
+        .text-success { color: #10b981; }
+        .text-danger { color: #ef4444; }
+        .text-warning { color: #f59e0b; }
+
+        /* RESPONSIVO */
+        @media (max-width: 1024px) {
+            .grid-2colunas {
+                grid-template-columns: 1fr;
+            }
+            
+            .indicadores {
+                grid-template-columns: repeat(3, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .indicadores {
+                grid-template-columns: 1fr;
+            }
+            
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .form-group.full-width {
+                grid-column: span 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- HEADER -->
+        <div class="header">
+            <h1>
+                <i>💰</i> 
+                Gestão de Dívidas - Finanças
+            </h1>
+            <div class="subtitle">
+                Controle de dívidas e pagamentos parciais | Sistema Independente
+            </div>
+        </div>
+
+        <!-- INDICADORES -->
+        <div class="indicadores">
+            <div class="card-indicador total">
+                <div class="indicador-titulo">
+                    <i>📊</i> TOTAL DAS DÍVIDAS
+                </div>
+                <div class="indicador-valor" id="totalDividas">€0</div>
+                <div class="indicador-sub">Valor total de todas as dívidas</div>
+            </div>
+            
+            <div class="card-indicador pago">
+                <div class="indicador-titulo">
+                    <i>✅</i> TOTAL PAGO
+                </div>
+                <div class="indicador-valor" id="totalPago">€0</div>
+                <div class="indicador-sub">Soma de todos os pagamentos</div>
+            </div>
+            
+            <div class="card-indicador restante">
+                <div class="indicador-titulo">
+                    <i>⏳</i> RESTANTE A PAGAR
+                </div>
+                <div class="indicador-valor" id="totalRestante">€0</div>
+                <div class="indicador-sub">Saldo devedor total</div>
+            </div>
+        </div>
+
+        <!-- GRID PRINCIPAL -->
+        <div class="grid-2colunas">
+            <!-- COLUNA ESQUERDA: Cadastro de Dívidas -->
+            <div class="card">
+                <h2 class="card-titulo">
+                    <i>➕</i> Cadastrar Nova Dívida
+                </h2>
+                
+                <form id="formDivida">
+                    <div class="form-group">
+                        <label>Descrição da Dívida</label>
+                        <input type="text" id="descricao" placeholder="Ex: IRS 2023 - Finanças" required>
+                    </div>
+                    
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Valor Total (€)</label>
+                            <input type="number" id="valorTotal" step="0.01" min="0" placeholder="0.00" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Data de Negociação</label>
+                            <input type="date" id="dataNegociacao" required>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Observações</label>
+                        <textarea id="observacoesDivida" rows="3" placeholder="Detalhes da dívida..."></textarea>
+                    </div>
+                    
+                    <button type="button" class="btn" onclick="salvarDivida()">
+                        <i>💾</i> REGISTRAR DÍVIDA
+                    </button>
+                </form>
+
+                <div class="mt-20">
+                    <h2 class="card-titulo">
+                        <i>📋</i> Dívidas Ativas
+                    </h2>
+                    <div id="listaDividas" class="lista-pagamentos">
+                        <!-- Lista será preenchida via JavaScript -->
+                        <div style="text-align: center; color: #94a3b8; padding: 30px;">
+                            Carregando dívidas...
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- COLUNA DIREITA: Pagamentos -->
+            <div class="card">
+                <h2 class="card-titulo">
+                    <i>💳</i> Registrar Pagamento
+                </h2>
+                
+                <form id="formPagamento">
+                    <div class="form-group">
+                        <label>Selecionar Dívida</label>
+                        <select id="dividaSelect" required>
+                            <option value="">Selecione uma dívida...</option>
+                            <!-- Opções serão carregadas via JavaScript -->
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Valor do Pagamento (€)</label>
+                        <input type="number" id="valorPago" step="0.01" min="0.01" placeholder="0.00" required>
+                    </div>
+                    
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Data do Pagamento</label>
+                            <input type="date" id="dataPagamento" required>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Forma de Pagamento</label>
+                            <select id="formaPagamento" required>
+                                <option value="MBWay">MBWay</option>
+                                <option value="Transferência">Transferência Bancária</option>
+                                <option value="Dinheiro">Dinheiro</option>
+                                <option value="Cartão">Cartão de Crédito</option>
+                                <option value="Outro">Outro</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Observações do Pagamento</label>
+                        <textarea id="observacoesPagamento" rows="2" placeholder="Observações..."></textarea>
+                    </div>
+                    
+                    <button type="button" class="btn btn-success" onclick="salvarPagamento()">
+                        <i>✅</i> REGISTRAR PAGAMENTO
+                    </button>
+                </form>
+
+                <!-- Histórico de Pagamentos da Dívida Selecionada -->
+                <div class="mt-20">
+                    <h2 class="card-titulo">
+                        <i>📜</i> Histórico de Pagamentos
+                    </h2>
+                    <div id="historicoPagamentos" class="lista-pagamentos">
+                        <!-- Histórico será preenchido via JavaScript -->
+                        <div style="text-align: center; color: #94a3b8; padding: 30px;">
+                            Selecione uma dívida para ver os pagamentos
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================
+        // SISTEMA FINANCEIRO INDEPENDENTE
+        // ============================================
+        
+        // Schemas exclusivos (NÃO USADOS PELO CRM)
+        const SCHEMA_DIVIDA = 'financas_divida';
+        const SCHEMA_PAGAMENTO = 'financas_pagamento';
+
+        // ============================================
+        // FUNÇÕES PRINCIPAIS
+        // ============================================
+
+        // Carregar todas as dívidas
+        async function carregarDividas() {
+            try {
+                const response = await fetch('/api/database/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        schema: SCHEMA_DIVIDA,
+                        filters: {}
+                    })
+                });
+
+                if (!response.ok) throw new Error('Erro ao carregar dívidas');
+                
+                const data = await response.json();
+                const dividas = data.events || [];
+                
+                // Atualizar lista de dívidas
+                atualizarListaDividas(dividas);
+                
+                // Atualizar select de dívidas
+                atualizarSelectDividas(dividas);
+                
+                // Atualizar indicadores
+                await atualizarIndicadores();
+                
+                return dividas;
+            } catch (error) {
+                console.error('Erro:', error);
+                mostrarMensagem('Erro ao carregar dívidas', 'error');
+            }
+        }
+
+        // Carregar todos os pagamentos
+        async function carregarPagamentos(dividaId = null) {
+            try {
+                let url = '/api/database/query';
+                let body = {
+                    schema: SCHEMA_PAGAMENTO,
+                    filters: {}
+                };
+                
+                if (dividaId) {
+                    body.filters.dividaId = dividaId;
+                }
+                
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+
+                if (!response.ok) throw new Error('Erro ao carregar pagamentos');
+                
+                const data = await response.json();
+                return data.events || [];
+            } catch (error) {
+                console.error('Erro:', error);
+                return [];
+            }
+        }
+
+        // Salvar nova dívida
+        async function salvarDivida() {
+            const descricao = document.getElementById('descricao').value;
+            const valorTotal = parseFloat(document.getElementById('valorTotal').value);
+            const dataNegociacao = document.getElementById('dataNegociacao').value;
+            const observacoes = document.getElementById('observacoesDivida').value;
+
+            if (!descricao || !valorTotal || !dataNegociacao) {
+                mostrarMensagem('Preencha todos os campos obrigatórios', 'warning');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/database/commit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        schema: SCHEMA_DIVIDA,
+                        payload: {
+                            descricao: descricao,
+                            valorTotal: valorTotal,
+                            valorPago: 0,
+                            saldoRestante: valorTotal,
+                            dataNegociacao: dataNegociacao,
+                            observacoes: observacoes,
+                            status: 'ativa',
+                            dataCriacao: new Date().toISOString()
+                        }
+                    })
+                });
+
+                if (!response.ok) throw new Error('Erro ao salvar');
+                
+                mostrarMensagem('Dívida registrada com sucesso!', 'success');
+                
+                // Limpar formulário
+                document.getElementById('formDivida').reset();
+                
+                // Definir data atual
+                document.getElementById('dataNegociacao').valueAsDate = new Date();
+                
+                // Recarregar lista
+                await carregarDividas();
+                
+            } catch (error) {
+                console.error('Erro:', error);
+                mostrarMensagem('Erro ao registrar dívida', 'error');
+            }
+        }
+
+        // Salvar novo pagamento
+        async function salvarPagamento() {
+            const dividaId = document.getElementById('dividaSelect').value;
+            const valorPago = parseFloat(document.getElementById('valorPago').value);
+            const dataPagamento = document.getElementById('dataPagamento').value;
+            const formaPagamento = document.getElementById('formaPagamento').value;
+            const observacoes = document.getElementById('observacoesPagamento').value;
+
+            if (!dividaId || !valorPago || !dataPagamento || !formaPagamento) {
+                mostrarMensagem('Preencha todos os campos obrigatórios', 'warning');
+                return;
+            }
+
+            try {
+                // 1. Registrar o pagamento
+                const responsePagamento = await fetch('/api/database/commit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        schema: SCHEMA_PAGAMENTO,
+                        payload: {
+                            dividaId: dividaId,
+                            valorPago: valorPago,
+                            dataPagamento: dataPagamento,
+                            formaPagamento: formaPagamento,
+                            observacoes: observacoes,
+                            dataRegistro: new Date().toISOString()
+                        }
+                    })
+                });
+
+                if (!responsePagamento.ok) throw new Error('Erro ao registrar pagamento');
+
+                // 2. Buscar a dívida para atualizar
+                const responseDivida = await fetch('/api/database/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        schema: SCHEMA_DIVIDA,
+                        filters: { id: dividaId }
+                    })
+                });
+
+                const dataDivida = await responseDivida.json();
+                const divida = dataDivida.events?.[0];
+                
+                if (divida) {
+                    // 3. Buscar todos os pagamentos desta dívida
+                    const pagamentos = await carregarPagamentos(dividaId);
+                    
+                    // 4. Calcular total pago
+                    const totalPago = pagamentos.reduce((sum, p) => sum + (p.payload.valorPago || 0), 0) + valorPago;
+                    const valorTotal = divida.payload.valorTotal;
+                    const saldoRestante = valorTotal - totalPago;
+                    
+                    // 5. Atualizar a dívida
+                    await fetch('/api/database/commit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            schema: SCHEMA_DIVIDA,
+                            id: dividaId,
+                            payload: {
+                                ...divida.payload,
+                                valorPago: totalPago,
+                                saldoRestante: saldoRestante,
+                                status: saldoRestante <= 0 ? 'quitada' : 'ativa'
+                            }
+                        })
+                    });
+                }
+                
+                mostrarMensagem('Pagamento registrado com sucesso!', 'success');
+                
+                // Limpar formulário
+                document.getElementById('formPagamento').reset();
+                document.getElementById('dataPagamento').valueAsDate = new Date();
+                
+                // Recarregar tudo
+                await carregarDividas();
+                
+                // Se tiver uma dívida selecionada, mostrar histórico
+                if (dividaId) {
+                    await mostrarHistoricoPagamentos(dividaId);
+                }
+                
+            } catch (error) {
+                console.error('Erro:', error);
+                mostrarMensagem('Erro ao registrar pagamento', 'error');
+            }
+        }
+
+        // Atualizar lista de dívidas na interface
+        function atualizarListaDividas(dividas) {
+            const container = document.getElementById('listaDividas');
+            
+            if (!dividas || dividas.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; color: #94a3b8; padding: 30px;">
+                        Nenhuma dívida cadastrada
+                    </div>
+                `;
+                return;
+            }
+
+            // Ordenar por data (mais recentes primeiro)
+            dividas.sort((a, b) => new Date(b.payload.dataNegociacao) - new Date(a.payload.dataNegociacao));
+
+            let html = '';
+            dividas.forEach(divida => {
+                const payload = divida.payload;
+                const percentualPago = (payload.valorPago / payload.valorTotal) * 100 || 0;
+                const statusClass = payload.status === 'quitada' ? 'quitada' : '';
+                const statusText = payload.status === 'quitada' ? 'Quitada' : 'Ativa';
+                
+                html += `
+                    <div class="divida-item" onclick="selecionarDivida('${divida.id}', '${payload.descricao}')">
+                        <div class="divida-header">
+                            <span class="divida-descricao">${payload.descricao}</span>
+                            <span class="divida-status ${statusClass}">${statusText}</span>
+                        </div>
+                        <div class="divida-valores">
+                            <span>Total: €${payload.valorTotal.toFixed(2)}</span>
+                            <span>Pago: €${payload.valorPago.toFixed(2)}</span>
+                            <span>Restante: €${payload.saldoRestante.toFixed(2)}</span>
+                        </div>
+                        <div class="progresso">
+                            <div class="progresso-bar" style="width: ${percentualPago}%"></div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        // Atualizar select de dívidas
+        function atualizarSelectDividas(dividas) {
+            const select = document.getElementById('dividaSelect');
+            
+            let options = '<option value="">Selecione uma dívida...</option>';
+            
+            dividas
+                .filter(d => d.payload.status !== 'quitada')
+                .forEach(divida => {
+                    options += `<option value="${divida.id}">${divida.payload.descricao} - €${divida.payload.saldoRestante.toFixed(2)} restante</option>`;
+                });
+            
+            select.innerHTML = options;
+        }
+
+        // Selecionar dívida e mostrar histórico
+        async function selecionarDivida(dividaId, descricao) {
+            await mostrarHistoricoPagamentos(dividaId);
+            
+            // Destacar item selecionado
+            document.querySelectorAll('.divida-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            event.currentTarget.classList.add('selected');
+        }
+
+        // Mostrar histórico de pagamentos de uma dívida
+        async function mostrarHistoricoPagamentos(dividaId) {
+            const pagamentos = await carregarPagamentos(dividaId);
+            const container = document.getElementById('historicoPagamentos');
+            
+            if (!pagamentos || pagamentos.length === 0) {
+                container.innerHTML = `
+                    <div style="text-align: center; color: #94a3b8; padding: 30px;">
+                        Nenhum pagamento registrado para esta dívida
+                    </div>
+                `;
+                return;
+            }
+
+            // Ordenar por data (mais recentes primeiro)
+            pagamentos.sort((a, b) => new Date(b.payload.dataPagamento) - new Date(a.payload.dataPagamento));
+
+            let html = '';
+            pagamentos.forEach(pagamento => {
+                const payload = pagamento.payload;
+                html += `
+                    <div class="pagamento-item">
+                        <div class="pagamento-info">
+                            <h4>${payload.formaPagamento}</h4>
+                            <p>
+                                <span>📅 ${new Date(payload.dataPagamento).toLocaleDateString('pt-PT')}</span>
+                                <span class="badge">${payload.observacoes || 'Sem observações'}</span>
+                            </p>
+                        </div>
+                        <div class="pagamento-valor">€${payload.valorPago.toFixed(2)}</div>
+                    </div>
+                `;
+            });
+            
+            container.innerHTML = html;
+        }
+
+        // Atualizar indicadores (totais)
+        async function atualizarIndicadores() {
+            try {
+                const dividas = await carregarDividas();
+                const pagamentos = await carregarPagamentos();
+                
+                if (!dividas || !pagamentos) return;
+                
+                // Calcular totais
+                const totalDividas = dividas.reduce((sum, d) => sum + (d.payload.valorTotal || 0), 0);
+                const totalPago = pagamentos.reduce((sum, p) => sum + (p.payload.valorPago || 0), 0);
+                const totalRestante = totalDividas - totalPago;
+                
+                // Atualizar interface
+                document.getElementById('totalDividas').textContent = `€${totalDividas.toFixed(2)}`;
+                document.getElementById('totalPago').textContent = `€${totalPago.toFixed(2)}`;
+                document.getElementById('totalRestante').textContent = `€${totalRestante.toFixed(2)}`;
+                
+            } catch (error) {
+                console.error('Erro ao atualizar indicadores:', error);
+            }
+        }
+
+        // Mostrar mensagem
+        function mostrarMensagem(texto, tipo) {
+            // Remover mensagens existentes
+            const existing = document.querySelectorAll('.mensagem-flutuante');
+            existing.forEach(m => m.remove());
+            
+            const mensagem = document.createElement('div');
+            mensagem.className = 'mensagem-flutuante';
+            mensagem.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 15px 25px;
+                border-radius: 12px;
+                color: white;
+                font-weight: 600;
+                z-index: 9999;
+                animation: slideIn 0.3s ease;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            `;
+            
+            if (tipo === 'success') {
+                mensagem.style.background = '#10b981';
+            } else if (tipo === 'error') {
+                mensagem.style.background = '#ef4444';
+            } else if (tipo === 'warning') {
+                mensagem.style.background = '#f59e0b';
+            } else {
+                mensagem.style.background = '#3b82f6';
+            }
+            
+            mensagem.textContent = texto;
+            document.body.appendChild(mensagem);
+            
+            setTimeout(() => {
+                mensagem.remove();
+            }, 3000);
+        }
+
+        // Inicialização
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 Sistema Financeiro Independente Iniciado');
+            
+            // Definir datas padrão
+            const hoje = new Date();
+            document.getElementById('dataNegociacao').valueAsDate = hoje;
+            document.getElementById('dataPagamento').valueAsDate = hoje;
+            
+            // Carregar dados iniciais
+            carregarDividas();
+            
+            // Verificar conexão com API
+            fetch('/api/database/init')
+                .then(() => console.log('✅ Conectado à API'))
+                .catch(err => console.error('❌ Erro de conexão:', err));
+        });
+
+        // Animação CSS
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes slideIn {
+                from { transform: translateX(100%); opacity: 0; }
+                to { transform: translateX(0); opacity: 1; }
+            }
+        `;
+        document.head.appendChild(style);
+    </script>
+</body>
+</html>

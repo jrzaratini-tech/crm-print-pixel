@@ -107,5 +107,15 @@
         pos: 11,
         hidden: false,
         deleted: false
+    },
+
+    {
+        id: "nav_financas",
+        name: "Finanças",
+        file: "pages/financas.html",
+        type: "READ",
+        pos: 12,
+        hidden: false,
+        deleted: false
     }
 ];
