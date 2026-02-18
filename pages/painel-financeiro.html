@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>PrintPixel - Gestor Financeiro Profissional</title>
+    <title>PrintPixel - Gestor Financeiro Predict</title>
     
     <!-- BIBLIOTECAS EXTERNAS -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <style>
         /* ============================================
@@ -33,11 +32,6 @@
             --radius-sm: 8px;
             --radius-md: 12px;
             --radius-lg: 16px;
-            
-            /* Cores do gráfico */
-            --chart-receita: #3b82f6;
-            --chart-despesa: #f59e0b;
-            --chart-atraso: #ef4444;
         }
 
         * {
@@ -130,7 +124,7 @@
         }
 
         /* ============================================
-           BALANÇO PRINCIPAL (RECEITA VS DESPESA)
+           BALANÇO PRINCIPAL
            ============================================ */
         .balance-section {
             margin-bottom: 24px;
@@ -160,16 +154,6 @@
         .balance-card.despesa {
             background: linear-gradient(135deg, #78350f, #b45309);
             color: white;
-        }
-
-        .balance-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: rgba(255, 255, 255, 0.3);
         }
 
         .card-header {
@@ -213,118 +197,250 @@
         }
 
         /* ============================================
-           GRÁFICO PROFISSIONAL
+           META DE FATURAMENTO
            ============================================ */
-        .chart-section {
+        .target-section {
             margin-bottom: 24px;
         }
 
-        .chart-card {
-            background: var(--card-bg);
+        .target-card {
+            background: linear-gradient(135deg, #059669, #10b981);
             border-radius: var(--radius-lg);
-            padding: 24px;
-            box-shadow: var(--shadow-md);
-            border: 1px solid var(--border-color);
+            padding: 28px;
+            box-shadow: var(--shadow-lg);
+            color: white;
+            position: relative;
+            overflow: hidden;
         }
 
-        .chart-header {
+        .target-card::before {
+            content: '🎯';
+            position: absolute;
+            right: 20px;
+            bottom: 20px;
+            font-size: 80px;
+            opacity: 0.1;
+        }
+
+        .target-label {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            opacity: 0.9;
+            margin-bottom: 8px;
+        }
+
+        .target-value {
+            font-size: 56px;
+            font-weight: 800;
+            line-height: 1;
+            margin-bottom: 8px;
+        }
+
+        .target-sub {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .target-progress {
+            margin-top: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .target-progress-bar {
+            height: 100%;
+            background: white;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+
+        /* ============================================
+           COMPARATIVO POR CATEGORIA
+           ============================================ */
+        .comparison-section {
+            margin-bottom: 24px;
+        }
+
+        .comparison-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-            gap: 16px;
+            margin-bottom: 16px;
         }
 
-        .chart-header h2 {
+        .comparison-header h2 {
             font-size: 18px;
             font-weight: 600;
             color: var(--text-primary);
         }
 
-        .chart-legend {
-            display: flex;
-            gap: 20px;
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
         }
 
-        .legend-item {
+        .category-card {
+            background: var(--card-bg);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
+            transition: transform 0.2s;
+        }
+
+        .category-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .category-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid;
+        }
+
+        .category-header.agua { border-bottom-color: #3b82f6; }
+        .category-header.luz { border-bottom-color: #f59e0b; }
+        .category-header.aluguel { border-bottom-color: #8b5cf6; }
+        .category-header.telefone { border-bottom-color: #10b981; }
+        .category-header.combustivel { border-bottom-color: #ef4444; }
+        .category-header.outros { border-bottom-color: #64748b; }
+
+        .category-name {
+            font-size: 16px;
+            font-weight: 600;
             display: flex;
             align-items: center;
             gap: 8px;
-            font-size: 13px;
         }
 
-        .legend-color {
-            width: 12px;
-            height: 12px;
-            border-radius: 4px;
-        }
-
-        .legend-color.receita {
-            background: var(--chart-receita);
-        }
-
-        .legend-color.despesa {
-            background: var(--chart-despesa);
-        }
-
-        .legend-color.atraso {
-            background: var(--chart-atraso);
-        }
-
-        .chart-container {
-            height: 300px;
-            position: relative;
-            margin-bottom: 20px;
-        }
-
-        .insight-card {
-            background: var(--light-bg);
-            border-radius: var(--radius-md);
-            padding: 20px;
-            border: 1px solid var(--border-color);
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            flex-wrap: wrap;
-        }
-
-        .insight-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 12px;
-            background: #e0e7ff;
-            color: var(--primary-color);
+        .category-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 24px;
-        }
-
-        .insight-content {
-            flex: 1;
-        }
-
-        .insight-title {
             font-size: 14px;
-            color: var(--text-secondary);
-            margin-bottom: 4px;
         }
 
-        .insight-value {
-            font-size: 24px;
-            font-weight: 700;
+        .category-icon.agua { background: #dbeafe; color: #1e40af; }
+        .category-icon.luz { background: #fef3c7; color: #92400e; }
+        .category-icon.aluguel { background: #ede9fe; color: #6d28d9; }
+        .category-icon.telefone { background: #d1fae5; color: #065f46; }
+        .category-icon.combustivel { background: #fee2e2; color: #991b1b; }
+        .category-icon.outros { background: #f1f5f9; color: #334155; }
+
+        .category-values {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+
+        .prev-month {
+            text-align: left;
+        }
+
+        .prev-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+
+        .prev-value {
+            font-size: 16px;
+            font-weight: 600;
             color: var(--text-primary);
         }
 
-        .insight-action {
-            font-size: 14px;
-            color: var(--primary-color);
-            font-weight: 500;
-            padding: 8px 16px;
-            background: white;
-            border-radius: 30px;
-            border: 1px solid var(--border-color);
+        .current-month {
+            text-align: right;
+        }
+
+        .current-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+
+        .current-value {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .current-value.paid {
+            color: var(--success-color);
+        }
+
+        .current-value.pending {
+            color: var(--warning-color);
+        }
+
+        .category-progress {
+            margin: 12px 0;
+            height: 6px;
+            background: var(--border-color);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: var(--success-color);
+            border-radius: 3px;
+            transition: width 0.3s ease;
+        }
+
+        .category-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+            padding-top: 12px;
+            border-top: 1px dashed var(--border-color);
+        }
+
+        .remaining {
+            font-weight: 600;
+        }
+
+        .remaining.positive {
+            color: var(--success-color);
+        }
+
+        .remaining.negative {
+            color: var(--danger-color);
+        }
+
+        .status-badge {
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .status-badge.ok {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-badge.warning {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-badge.urgent {
+            background: #fee2e2;
+            color: #991b1b;
         }
 
         /* ============================================
@@ -376,10 +492,6 @@
             display: flex;
             align-items: center;
             gap: 8px;
-        }
-
-        .list-header h3 i {
-            font-size: 18px;
         }
 
         .list-header.receita h3 {
@@ -510,11 +622,6 @@
             color: var(--danger-color);
         }
 
-        .badge.hoje {
-            background: #fef3c7;
-            color: #92400e;
-        }
-
         /* ============================================
            LOADING
            ============================================ */
@@ -542,7 +649,7 @@
         }
     </style>
 </head>
-<body data-page-id="gestor-financeiro" data-page-type="READ">
+<body data-page-id="gestor-financeiro-predict" data-page-type="READ">
 
     <!-- ============================================
          HEADER PROFISSIONAL
@@ -550,8 +657,8 @@
     <header class="page-header">
         <div class="header-content">
             <div class="header-title">
-                <h1>Gestor Financeiro</h1>
-                <p>Análise em tempo real • Fluxo de caixa • Inteligência de negócio</p>
+                <h1>Gestor Financeiro Predict</h1>
+                <p>Análise preditiva • Comparativo mês a mês • Inteligência de despesas fixas</p>
             </div>
             
             <div class="header-balance" id="headerBalance">
@@ -569,14 +676,14 @@
     <!-- LOADING STATE -->
     <div id="loadingState" class="loading-container">
         <div class="loading-spinner"></div>
-        <h3 style="margin-bottom: 8px;">Processando dados financeiros</h3>
-        <p style="color: var(--text-secondary);">Carregando pedidos, despesas e gerando análise</p>
+        <h3 style="margin-bottom: 8px;">Processando dados preditivos</h3>
+        <p style="color: var(--text-secondary);">Analisando despesas do mês anterior e calculando projeções</p>
     </div>
 
     <!-- CONTEÚDO PRINCIPAL -->
     <div id="mainContent" style="display: none;">
         
-        <!-- BALANÇO PRINCIPAL (RECEITA VS DESPESA) -->
+        <!-- BALANÇO PRINCIPAL -->
         <section class="balance-section">
             <div class="balance-grid">
                 <div class="balance-card receita">
@@ -605,34 +712,28 @@
             </div>
         </section>
 
-        <!-- GRÁFICO DE LINHA PROFISSIONAL -->
-        <section class="chart-section">
-            <div class="chart-card">
-                <div class="chart-header">
-                    <h2><i class="fas fa-chart-line" style="margin-right: 8px; color: var(--primary-color);"></i> Evolução Financeira - Últimos 6 Meses</h2>
-                    <div class="chart-legend">
-                        <div class="legend-item">
-                            <div class="legend-color receita"></div>
-                            <span>Receitas</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color despesa"></div>
-                            <span>Despesas</span>
-                        </div>
-                        <div class="legend-item">
-                            <div class="legend-color atraso"></div>
-                            <span>A receber atrasado</span>
-                        </div>
-                    </div>
+        <!-- META DE FATURAMENTO BASEADA NO MÊS ANTERIOR -->
+        <section class="target-section">
+            <div class="target-card" id="targetCard">
+                <div class="target-label">🎯 META DE FATURAMENTO DO MÊS</div>
+                <div class="target-value" id="targetValue">€ 0</div>
+                <div class="target-sub" id="targetSub">Baseado nas despesas do mês anterior</div>
+                <div class="target-progress">
+                    <div class="target-progress-bar" id="targetProgress" style="width: 0%;"></div>
                 </div>
-                
-                <div class="chart-container">
-                    <canvas id="financialChart"></canvas>
-                </div>
-                
-                <div class="insight-card" id="insightCard">
-                    <!-- Preenchido via JS -->
-                </div>
+                <div style="margin-top: 12px; font-size: 14px; opacity: 0.9;" id="targetDetail"></div>
+            </div>
+        </section>
+
+        <!-- COMPARATIVO POR CATEGORIA (MÊS ANTERIOR VS ATUAL) -->
+        <section class="comparison-section">
+            <div class="comparison-header">
+                <h2><i class="fas fa-chart-bar" style="margin-right: 8px; color: var(--primary-color);"></i> Comparativo de Despesas Fixas por Categoria</h2>
+                <span style="font-size: 13px; color: var(--text-secondary);">Mês anterior vs Mês atual</span>
+            </div>
+            
+            <div class="comparison-grid" id="categoryComparison">
+                <!-- Preenchido via JS -->
             </div>
         </section>
 
@@ -667,11 +768,11 @@
 
     <script>
         // ============================================
-        // GESTOR FINANCEIRO PROFISSIONAL
+        // GESTOR FINANCEIRO PREDICT
         // ============================================
         
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('📊 Gestor Financeiro Profissional iniciado');
+            console.log('📊 Gestor Financeiro Predict iniciado');
             
             // Elementos do DOM
             const loadingState = document.getElementById('loadingState');
@@ -681,7 +782,8 @@
             // Estado da aplicação
             let todosPedidos = [];
             let todasDespesas = [];
-            let grafico = null;
+            let despesasMesAnterior = {};
+            let despesasMesAtual = {};
             
             // ============================================
             // CARREGAR DADOS
@@ -713,12 +815,15 @@
                     processarPedidos(resultPedidos.events || []);
                     processarDespesas(resultDespesas.events || []);
                     
+                    // Análise preditiva
+                    analisarDespesasPorMes();
+                    
                     renderizarPainel();
                     
                     loadingState.style.display = 'none';
                     mainContent.style.display = 'block';
                     
-                    dataAtualizacao = new Date();
+                    const dataAtualizacao = new Date();
                     lastUpdateSpan.textContent = `${dataAtualizacao.toLocaleDateString('pt-PT')} • ${dataAtualizacao.toLocaleTimeString('pt-PT')}`;
                     
                 } catch (error) {
@@ -782,14 +887,6 @@
                         dataVencimento.setHours(0,0,0,0);
                     }
                     
-                    // Data de criação para o gráfico
-                    let dataCriacao = null;
-                    if (event.timestamp) {
-                        dataCriacao = new Date(event.timestamp);
-                    } else if (event.created_at) {
-                        dataCriacao = new Date(event.created_at);
-                    }
-                    
                     return {
                         id: event.id,
                         nome: payload.cliente || 'Cliente',
@@ -798,7 +895,6 @@
                         valorTotal: totalPedido,
                         status: statusPagamento,
                         dataVencimento: dataVencimento,
-                        dataCriacao: dataCriacao,
                         createdAt: event.timestamp || event.created_at
                     };
                 }).filter(p => p.valor > 0);
@@ -832,20 +928,16 @@
                     const valorIVA = comIVA ? valorBruto * 0.23 : 0;
                     const valorTotal = valorBruto + valorIVA;
                     
+                    let dataDespesa = null;
+                    if (payload.data) {
+                        dataDespesa = new Date(payload.data);
+                        dataDespesa.setHours(0,0,0,0);
+                    }
+                    
                     let dataVencimento = null;
                     if (payload.dataVencimento) {
                         dataVencimento = new Date(payload.dataVencimento);
                         dataVencimento.setHours(0,0,0,0);
-                    } else if (payload.data) {
-                        dataVencimento = new Date(payload.data);
-                        dataVencimento.setHours(0,0,0,0);
-                    }
-                    
-                    let dataCriacao = null;
-                    if (event.timestamp) {
-                        dataCriacao = new Date(event.timestamp);
-                    } else if (event.created_at) {
-                        dataCriacao = new Date(event.created_at);
                     }
                     
                     return {
@@ -854,10 +946,10 @@
                         descricao: payload.descricao || payload.categoria || 'Despesa',
                         valor: valorTotal,
                         status: payload.statusPagamento || 'pendente',
-                        dataVencimento: dataVencimento,
-                        dataCriacao: dataCriacao,
                         categoria: payload.categoria || 'OUTROS',
-                        data: payload.data,
+                        data: dataDespesa,
+                        dataVencimento: dataVencimento,
+                        dataPagamento: payload.dataPagamento,
                         createdAt: event.timestamp || event.created_at,
                         deleted: event.deleted || false
                     };
@@ -865,174 +957,78 @@
             }
             
             // ============================================
-            // GRÁFICO DE LINHA
+            // ANÁLISE PREDITIVA (MÊS ANTERIOR VS ATUAL)
             // ============================================
             
-            function gerarDadosGrafico() {
+            function analisarDespesasPorMes() {
                 const hoje = new Date();
-                const meses = [];
-                const receitasMensais = [];
-                const despesasMensais = [];
-                const atrasadosMensais = [];
+                const mesAtual = hoje.getMonth();
+                const anoAtual = hoje.getFullYear();
                 
-                // Gerar últimos 6 meses
-                for (let i = 5; i >= 0; i--) {
-                    const data = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
-                    const mesAno = data.toLocaleDateString('pt-PT', { month: 'short', year: '2-digit' });
-                    meses.push(mesAno);
-                    
-                    const ano = data.getFullYear();
-                    const mes = data.getMonth();
-                    
-                    // Calcular receitas do mês (pedidos pagos ou criados no mês)
-                    let receitaMes = 0;
-                    todosPedidos.forEach(p => {
-                        if (p.dataCriacao && p.dataCriacao.getMonth() === mes && p.dataCriacao.getFullYear() === ano) {
-                            receitaMes += p.valorTotal;
-                        }
-                    });
-                    receitasMensais.push(receitaMes);
-                    
-                    // Calcular despesas do mês (pagas no mês)
-                    let despesaMes = 0;
-                    todasDespesas.forEach(d => {
-                        if (d.status === 'paga' && d.dataCriacao && d.dataCriacao.getMonth() === mes && d.dataCriacao.getFullYear() === ano) {
-                            despesaMes += d.valor;
-                        }
-                    });
-                    despesasMensais.push(despesaMes);
-                    
-                    // Calcular atrasados do mês
-                    let atrasadoMes = 0;
-                    todosPedidos.forEach(p => {
-                        if (p.status !== 'pago' && p.dataVencimento && 
-                            p.dataVencimento.getMonth() === mes && 
-                            p.dataVencimento.getFullYear() === ano &&
-                            p.dataVencimento < hoje) {
-                            atrasadoMes += p.valor;
-                        }
-                    });
-                    atrasadosMensais.push(atrasadoMes);
+                // Mês anterior
+                let mesAnterior = mesAtual - 1;
+                let anoAnterior = anoAtual;
+                if (mesAnterior < 0) {
+                    mesAnterior = 11;
+                    anoAnterior = anoAtual - 1;
                 }
                 
-                return { meses, receitasMensais, despesasMensais, atrasadosMensais };
-            }
-            
-            function criarGrafico() {
-                const ctx = document.getElementById('financialChart').getContext('2d');
-                const dados = gerarDadosGrafico();
+                // Inicializar objetos de categorias
+                const categorias = [
+                    'ÁGUA', 'LUZ', 'ALUGUEL', 'TELEFONE', 'WHATSAPP', 
+                    'COMBUSTIVEL', 'CAFÉ', 'ESCRITORIO', 'COMUNICAÇÃO', 
+                    'FINANÇAS', 'INTERNET', 'SALÁRIOS', 'OUTROS'
+                ];
                 
-                if (grafico) {
-                    grafico.destroy();
-                }
+                despesasMesAnterior = {};
+                despesasMesAtual = {};
                 
-                grafico = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: dados.meses,
-                        datasets: [
-                            {
-                                label: 'Receitas',
-                                data: dados.receitasMensais,
-                                borderColor: '#3b82f6',
-                                backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                                borderWidth: 3,
-                                pointBackgroundColor: '#3b82f6',
-                                pointBorderColor: '#ffffff',
-                                pointBorderWidth: 2,
-                                pointRadius: 4,
-                                pointHoverRadius: 6,
-                                tension: 0.3,
-                                fill: false
-                            },
-                            {
-                                label: 'Despesas',
-                                data: dados.despesasMensais,
-                                borderColor: '#f59e0b',
-                                backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                                borderWidth: 3,
-                                pointBackgroundColor: '#f59e0b',
-                                pointBorderColor: '#ffffff',
-                                pointBorderWidth: 2,
-                                pointRadius: 4,
-                                pointHoverRadius: 6,
-                                tension: 0.3,
-                                fill: false
-                            },
-                            {
-                                label: 'A receber atrasado',
-                                data: dados.atrasadosMensais,
-                                borderColor: '#ef4444',
-                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                                borderWidth: 3,
-                                borderDash: [5, 5],
-                                pointBackgroundColor: '#ef4444',
-                                pointBorderColor: '#ffffff',
-                                pointBorderWidth: 2,
-                                pointRadius: 4,
-                                pointHoverRadius: 6,
-                                tension: 0.3,
-                                fill: false
-                            }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                            legend: {
-                                display: false
-                            },
-                            tooltip: {
-                                mode: 'index',
-                                intersect: false,
-                                backgroundColor: '#1e293b',
-                                titleColor: '#ffffff',
-                                bodyColor: '#e2e8f0',
-                                borderColor: '#334155',
-                                borderWidth: 1,
-                                padding: 12,
-                                callbacks: {
-                                    label: function(context) {
-                                        let label = context.dataset.label || '';
-                                        if (label) {
-                                            label += ': ';
-                                        }
-                                        if (context.parsed.y !== null) {
-                                            label += new Intl.NumberFormat('pt-PT', {
-                                                style: 'currency',
-                                                currency: 'EUR',
-                                                minimumFractionDigits: 0
-                                            }).format(context.parsed.y);
-                                        }
-                                        return label;
-                                    }
-                                }
-                            }
-                        },
-                        scales: {
-                            y: {
-                                beginAtZero: true,
-                                grid: {
-                                    color: '#e2e8f0',
-                                    drawBorder: false
-                                },
-                                ticks: {
-                                    callback: function(value) {
-                                        return '€' + value.toLocaleString('pt-PT');
-                                    }
-                                }
-                            },
-                            x: {
-                                grid: {
-                                    display: false
-                                }
-                            }
+                categorias.forEach(cat => {
+                    despesasMesAnterior[cat] = {
+                        total: 0,
+                        pagas: 0,
+                        pendentes: 0
+                    };
+                    despesasMesAtual[cat] = {
+                        total: 0,
+                        pagas: 0,
+                        pendentes: 0
+                    };
+                });
+                
+                // Processar cada despesa
+                todasDespesas.forEach(d => {
+                    if (!d.data) return;
+                    
+                    const dataDespesa = new Date(d.data);
+                    const mes = dataDespesa.getMonth();
+                    const ano = dataDespesa.getFullYear();
+                    
+                    const categoria = d.categoria || 'OUTROS';
+                    
+                    // Mês anterior
+                    if (mes === mesAnterior && ano === anoAnterior) {
+                        despesasMesAnterior[categoria].total += d.valor;
+                        if (d.status === 'paga') {
+                            despesasMesAnterior[categoria].pagas += d.valor;
+                        } else {
+                            despesasMesAnterior[categoria].pendentes += d.valor;
+                        }
+                    }
+                    
+                    // Mês atual
+                    if (mes === mesAtual && ano === anoAtual) {
+                        despesasMesAtual[categoria].total += d.valor;
+                        if (d.status === 'paga') {
+                            despesasMesAtual[categoria].pagas += d.valor;
+                        } else {
+                            despesasMesAtual[categoria].pendentes += d.valor;
                         }
                     }
                 });
                 
-                return dados;
+                console.log('📊 Despesas mês anterior:', despesasMesAnterior);
+                console.log('📊 Despesas mês atual:', despesasMesAtual);
             }
             
             // ============================================
@@ -1069,7 +1065,7 @@
                 const totalReceberAtrasado = aReceberAtrasado.reduce((sum, p) => sum + p.valor, 0);
                 const totalPagarAtrasado = aPagarAtrasado.reduce((sum, d) => sum + d.valor, 0);
                 
-                // BALANÇO PATRIMONIAL (header)
+                // BALANÇO PATRIMONIAL
                 const balanco = totalReceber - totalPagar;
                 const balanceElement = document.getElementById('balanceValue');
                 balanceElement.textContent = formatarMoeda(balanco);
@@ -1084,47 +1080,167 @@
                 document.getElementById('qtdPagar').textContent = aPagar.length;
                 document.getElementById('pagarAtrasado').textContent = formatarMoeda(totalPagarAtrasado);
                 
-                // GRÁFICO
-                const dadosGrafico = criarGrafico();
+                // ============================================
+                // META DE FATURAMENTO BASEADA NO MÊS ANTERIOR
+                // ============================================
                 
-                // INSIGHT INTELIGENTE
-                const ultimoMesReceita = dadosGrafico.receitasMensais[dadosGrafico.receitasMensais.length - 1] || 0;
-                const ultimoMesDespesa = dadosGrafico.despesasMensais[dadosGrafico.despesasMensais.length - 1] || 0;
-                const totalAtrasado = totalReceberAtrasado + totalPagarAtrasado;
+                // Calcular total de despesas do mês anterior (pagas)
+                let totalDespesasMesAnterior = 0;
+                Object.values(despesasMesAnterior).forEach(cat => {
+                    totalDespesasMesAnterior += cat.pagas; // Só considerar pagas para base real
+                });
                 
-                let insightMensagem = '';
-                let insightValor = '';
+                // Calcular total de despesas do mês atual (pagas até agora)
+                let totalDespesasMesAtualPagas = 0;
+                let totalDespesasMesAtualPendentes = 0;
+                Object.values(despesasMesAtual).forEach(cat => {
+                    totalDespesasMesAtualPagas += cat.pagas;
+                    totalDespesasMesAtualPendentes += cat.pendentes;
+                });
                 
-                if (totalAtrasado > 0) {
-                    insightMensagem = 'Para regularizar a situação, você precisa receber:';
-                    insightValor = formatarMoeda(totalAtrasado);
-                } else if (ultimoMesReceita < ultimoMesDespesa) {
-                    const deficit = ultimoMesDespesa - ultimoMesReceita;
-                    insightMensagem = 'No último mês, suas despesas superaram as receitas em:';
-                    insightValor = formatarMoeda(deficit);
-                } else if (ultimoMesReceita > ultimoMesDespesa) {
-                    const superavit = ultimoMesReceita - ultimoMesDespesa;
-                    insightMensagem = 'No último mês, você teve um superávit de:';
-                    insightValor = formatarMoeda(superavit);
+                // Meta: igual ao total do mês anterior (ou um pouco maior para segurança)
+                const metaFaturamento = Math.max(totalDespesasMesAnterior, 100); // Mínimo €100
+                
+                // Quanto já faturou (recebimentos do mês atual)
+                // Isso é uma estimativa - idealmente você teria um campo de data de recebimento
+                const faturadoAteAgora = totalReceber; // Simplificação
+                
+                const percentualMeta = Math.min(100, Math.round((faturadoAteAgora / metaFaturamento) * 100));
+                
+                document.getElementById('targetValue').textContent = formatarMoeda(metaFaturamento);
+                document.getElementById('targetSub').textContent = `Baseado nas despesas pagas do mês anterior: ${formatarMoeda(totalDespesasMesAnterior)}`;
+                document.getElementById('targetProgress').style.width = `${percentualMeta}%`;
+                
+                if (faturadoAteAgora >= metaFaturamento) {
+                    document.getElementById('targetDetail').innerHTML = `✅ Meta atingida! Faturado ${formatarMoeda(faturadoAteAgora)} de ${formatarMoeda(metaFaturamento)}`;
                 } else {
-                    insightMensagem = 'Seu fluxo está equilibrado. Meta sugerida para crescer:';
-                    insightValor = formatarMoeda(ultimoMesReceita * 0.2);
+                    const falta = metaFaturamento - faturadoAteAgora;
+                    document.getElementById('targetDetail').innerHTML = `📉 Faltam ${formatarMoeda(falta)} para atingir a meta do mês`;
                 }
                 
-                document.getElementById('insightCard').innerHTML = `
-                    <div class="insight-icon">
-                        <i class="fas fa-chart-pie"></i>
-                    </div>
-                    <div class="insight-content">
-                        <div class="insight-title">${insightMensagem}</div>
-                        <div class="insight-value">${insightValor}</div>
-                    </div>
-                    <div class="insight-action">
-                        <i class="fas fa-arrow-right"></i> Detalhes
-                    </div>
-                `;
+                // ============================================
+                // COMPARATIVO POR CATEGORIA
+                // ============================================
                 
+                const categoriasOrdenadas = [
+                    'ÁGUA', 'LUZ', 'ALUGUEL', 'TELEFONE', 'WHATSAPP', 
+                    'INTERNET', 'SALÁRIOS', 'COMBUSTIVEL', 'CAFÉ', 
+                    'ESCRITORIO', 'COMUNICAÇÃO', 'FINANÇAS', 'OUTROS'
+                ];
+                
+                let categoryHtml = '';
+                
+                categoriasOrdenadas.forEach(cat => {
+                    const anterior = despesasMesAnterior[cat] || { pagas: 0, pendentes: 0, total: 0 };
+                    const atual = despesasMesAtual[cat] || { pagas: 0, pendentes: 0, total: 0 };
+                    
+                    // Se não tem nada em nenhum dos meses, não mostrar
+                    if (anterior.pagas === 0 && atual.pagas === 0 && atual.pendentes === 0) {
+                        return;
+                    }
+                    
+                    const totalAnterior = anterior.pagas; // Só considerar pagas para base real
+                    const totalAtualPago = atual.pagas;
+                    const totalAtualPendente = atual.pendentes;
+                    const totalAtual = totalAtualPago + totalAtualPendente;
+                    
+                    // Determinar status
+                    let statusClass = 'ok';
+                    let statusText = 'OK';
+                    let remainingClass = 'positive';
+                    
+                    if (totalAtualPendente > 0) {
+                        if (totalAtualPendente > totalAnterior * 0.5) {
+                            statusClass = 'urgent';
+                            statusText = 'URGENTE';
+                        } else {
+                            statusClass = 'warning';
+                            statusText = 'PENDENTE';
+                        }
+                    }
+                    
+                    const percentualPago = totalAnterior > 0 ? Math.min(100, Math.round((totalAtualPago / totalAnterior) * 100)) : 0;
+                    const faltaPagar = Math.max(0, totalAnterior - totalAtualPago);
+                    
+                    // Ícone baseado na categoria
+                    let icon = 'fa-question';
+                    let bgClass = 'outros';
+                    
+                    switch(cat) {
+                        case 'ÁGUA': icon = 'fa-water'; bgClass = 'agua'; break;
+                        case 'LUZ': icon = 'fa-bolt'; bgClass = 'luz'; break;
+                        case 'ALUGUEL': icon = 'fa-building'; bgClass = 'aluguel'; break;
+                        case 'TELEFONE': icon = 'fa-phone'; bgClass = 'telefone'; break;
+                        case 'WHATSAPP': icon = 'fa-whatsapp'; bgClass = 'telefone'; break;
+                        case 'INTERNET': icon = 'fa-wifi'; bgClass = 'telefone'; break;
+                        case 'SALÁRIOS': icon = 'fa-users'; bgClass = 'aluguel'; break;
+                        case 'COMBUSTIVEL': icon = 'fa-gas-pump'; bgClass = 'combustivel'; break;
+                        case 'CAFÉ': icon = 'fa-mug-hot'; bgClass = 'outros'; break;
+                        case 'ESCRITORIO': icon = 'fa-pen'; bgClass = 'outros'; break;
+                        case 'COMUNICAÇÃO': icon = 'fa-bullhorn'; bgClass = 'telefone'; break;
+                        case 'FINANÇAS': icon = 'fa-coins'; bgClass = 'outros'; break;
+                        default: icon = 'fa-box'; bgClass = 'outros';
+                    }
+                    
+                    categoryHtml += `
+                        <div class="category-card">
+                            <div class="category-header ${bgClass}">
+                                <div class="category-name">
+                                    <div class="category-icon ${bgClass}">
+                                        <i class="fas ${icon}"></i>
+                                    </div>
+                                    ${cat}
+                                </div>
+                                <span class="status-badge ${statusClass}">${statusText}</span>
+                            </div>
+                            
+                            <div class="category-values">
+                                <div class="prev-month">
+                                    <div class="prev-label">MÊS ANTERIOR</div>
+                                    <div class="prev-value">${formatarMoeda(totalAnterior)}</div>
+                                </div>
+                                <div class="current-month">
+                                    <div class="prev-label">MÊS ATUAL</div>
+                                    <div class="current-value ${totalAtualPendente > 0 ? 'pending' : 'paid'}">
+                                        ${formatarMoeda(totalAtual)}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="category-progress">
+                                <div class="progress-bar" style="width: ${percentualPago}%;"></div>
+                            </div>
+                            
+                            <div class="category-footer">
+                                <div>
+                                    <i class="fas fa-check-circle" style="color: var(--success-color);"></i>
+                                    Pago: ${formatarMoeda(totalAtualPago)}
+                                </div>
+                                <div class="remaining ${faltaPagar > 0 ? 'negative' : 'positive'}">
+                                    ${faltaPagar > 0 ? `Falta: ${formatarMoeda(faltaPagar)}` : 'OK'}
+                                </div>
+                            </div>
+                            
+                            ${totalAtualPendente > 0 ? `
+                                <div style="margin-top: 8px; font-size: 12px; color: var(--warning-color);">
+                                    <i class="fas fa-clock"></i> Pendente: ${formatarMoeda(totalAtualPendente)}
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                });
+                
+                // Se não houver categorias, mostrar mensagem
+                if (!categoryHtml) {
+                    categoryHtml = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-secondary);"><i class="fas fa-chart-pie" style="font-size: 48px; margin-bottom: 16px;"></i><p>Nenhuma despesa encontrada nos últimos meses</p></div>';
+                }
+                
+                document.getElementById('categoryComparison').innerHTML = categoryHtml;
+                
+                // ============================================
                 // LISTAS
+                // ============================================
+                
                 document.getElementById('totalReceberLista').textContent = formatarMoeda(totalReceber);
                 document.getElementById('totalPagarLista').textContent = formatarMoeda(totalPagar);
                 
@@ -1191,6 +1307,7 @@
                                     <div class="list-subtitle">${item.descricao}</div>
                                     <div class="list-meta">
                                         <span><i class="fas fa-calendar"></i> Vence: ${dataStr}</span>
+                                        <span><i class="fas fa-tag"></i> ${item.categoria}</span>
                                         ${atrasado ? '<span class="badge atrasado">ATRASADO</span>' : ''}
                                     </div>
                                 </div>
