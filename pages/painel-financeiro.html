@@ -1,0 +1,1303 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>PrintPixel - Painel de Comando Financeiro</title>
+    
+    <!-- BIBLIOTECAS EXTERNAS -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        /* ============================================
+           VARIÁVEIS E RESET (Baseado no seu sistema)
+           ============================================ */
+        :root {
+            --primary-color: #1a237e;
+            --secondary-color: #283593;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --info-color: #3b82f6;
+            --light-bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --border-color: #e2e8f0;
+            --hover-bg: #f1f5f9;
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            
+            /* Cores de Saúde */
+            --health-critical: #fee2e2;
+            --health-critical-text: #991b1b;
+            --health-warning: #fef3c7;
+            --health-warning-text: #92400e;
+            --health-healthy: #dcfce7;
+            --health-healthy-text: #166534;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--light-bg);
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        /* ============================================
+           HEADER
+           ============================================ */
+        .page-header {
+            background: var(--card-bg);
+            padding: 24px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-md);
+            margin-bottom: 24px;
+            border: 1px solid var(--border-color);
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .header-title {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--primary-color) 0%, #5e35b1 100%);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            color: white;
+        }
+
+        .header-text h1 {
+            font-size: 24px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: var(--primary-color);
+        }
+
+        .header-text p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            font-weight: 400;
+        }
+
+        .last-update {
+            background: var(--hover-bg);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* ============================================
+           CARD DE SAÚDE DO NEGÓCIO (TERMÔMETRO)
+           ============================================ */
+        .health-section {
+            margin-bottom: 24px;
+        }
+
+        .health-card {
+            background: var(--card-bg);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .health-status {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .health-indicator {
+            width: 60px;
+            height: 60px;
+            border-radius: 30px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            background: #f1f5f9;
+        }
+
+        .health-indicator.critical {
+            background: var(--health-critical);
+            color: var(--health-critical-text);
+        }
+
+        .health-indicator.warning {
+            background: var(--health-warning);
+            color: var(--health-warning-text);
+        }
+
+        .health-indicator.healthy {
+            background: var(--health-healthy);
+            color: var(--health-healthy-text);
+        }
+
+        .health-text h2 {
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .health-text p {
+            color: var(--text-secondary);
+            font-size: 14px;
+            max-width: 400px;
+        }
+
+        .health-score {
+            text-align: right;
+        }
+
+        .score-value {
+            font-size: 42px;
+            font-weight: 800;
+            line-height: 1;
+            color: var(--primary-color);
+        }
+
+        .score-label {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* ============================================
+           CONTADORES INTELIGENTES
+           ============================================ */
+        .counters-section {
+            margin-bottom: 24px;
+        }
+
+        .counters-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+
+        @media (max-width: 768px) {
+            .counters-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 480px) {
+            .counters-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .counter-card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
+            transition: transform 0.2s;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .counter-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .counter-card.receber {
+            border-top: 4px solid var(--info-color);
+        }
+
+        .counter-card.pagar {
+            border-top: 4px solid var(--warning-color);
+        }
+
+        .counter-card.atraso-receber {
+            border-top: 4px solid var(--danger-color);
+            background: #fff5f5;
+        }
+
+        .counter-card.atraso-pagar {
+            border-top: 4px solid var(--danger-color);
+            background: #fff5f5;
+        }
+
+        .counter-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            margin-bottom: 12px;
+        }
+
+        .counter-card.receber .counter-icon {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .counter-card.pagar .counter-icon {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .counter-card.atraso-receber .counter-icon,
+        .counter-card.atraso-pagar .counter-icon {
+            background: #fee2e2;
+            color: var(--danger-color);
+        }
+
+        .counter-value {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .counter-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .counter-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: var(--danger-color);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        /* ============================================
+           PLANO DE AÇÃO INTELIGENTE
+           ============================================ */
+        .action-section {
+            margin-bottom: 24px;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .section-title i {
+            color: var(--primary-color);
+        }
+
+        .action-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
+        }
+
+        .action-card {
+            background: var(--card-bg);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            box-shadow: var(--shadow-sm);
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            transition: all 0.2s;
+            border-left: 4px solid transparent;
+        }
+
+        .action-card.urgent {
+            border-left-color: var(--danger-color);
+            background: #fff5f5;
+        }
+
+        .action-card.warning {
+            border-left-color: var(--warning-color);
+            background: #fffbeb;
+        }
+
+        .action-card.info {
+            border-left-color: var(--info-color);
+            background: #eff6ff;
+        }
+
+        .action-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .action-card.urgent .action-icon {
+            background: #fee2e2;
+            color: var(--danger-color);
+        }
+
+        .action-card.warning .action-icon {
+            background: #fef3c7;
+            color: var(--warning-color);
+        }
+
+        .action-card.info .action-icon {
+            background: #dbeafe;
+            color: var(--info-color);
+        }
+
+        .action-content {
+            flex: 1;
+        }
+
+        .action-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: var(--text-primary);
+        }
+
+        .action-desc {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 4px;
+        }
+
+        .action-meta {
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+        }
+
+        .action-meta i {
+            font-size: 11px;
+        }
+
+        .action-btn {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .action-btn:hover {
+            background: var(--hover-bg);
+            border-color: var(--primary-color);
+            color: var(--primary-color);
+        }
+
+        /* ============================================
+           CRONOGRAMA (TIMELINE)
+           ============================================ */
+        .timeline-section {
+            margin-bottom: 32px;
+        }
+
+        .timeline-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .timeline-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .timeline-card {
+            background: var(--card-bg);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
+        }
+
+        .timeline-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .timeline-header h3 {
+            font-size: 16px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .timeline-header h3 i {
+            color: var(--info-color);
+        }
+
+        .timeline-header.pagar h3 i {
+            color: var(--warning-color);
+        }
+
+        .timeline-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding-right: 8px;
+        }
+
+        .timeline-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: var(--light-bg);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+            transition: transform 0.2s;
+        }
+
+        .timeline-item:hover {
+            transform: translateX(4px);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .timeline-item.atrasado {
+            border-left: 4px solid var(--danger-color);
+        }
+
+        .timeline-date {
+            min-width: 45px;
+            text-align: center;
+        }
+
+        .timeline-day {
+            font-size: 18px;
+            font-weight: 700;
+            line-height: 1.2;
+            color: var(--text-primary);
+        }
+
+        .timeline-month {
+            font-size: 10px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        .timeline-info {
+            flex: 1;
+        }
+
+        .timeline-title {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 2px;
+        }
+
+        .timeline-subtitle {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .timeline-value {
+            font-weight: 700;
+            font-size: 15px;
+            color: var(--text-primary);
+            white-space: nowrap;
+        }
+
+        .timeline-value.receber {
+            color: var(--info-color);
+        }
+
+        .timeline-value.pagar {
+            color: var(--warning-color);
+        }
+
+        .timeline-value.atrasado {
+            color: var(--danger-color);
+        }
+
+        .badge {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .badge.atrasado {
+            background: #fee2e2;
+            color: var(--danger-color);
+        }
+
+        .badge.hoje {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .badge.amanha {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        /* ============================================
+           LOADING E EMPTY STATE
+           ============================================ */
+        .loading-container {
+            text-align: center;
+            padding: 60px;
+        }
+
+        .loading-spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border-color);
+            border-top: 3px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+            background: var(--card-bg);
+            border-radius: var(--radius-md);
+            border: 1px solid var(--border-color);
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            color: var(--border-color);
+        }
+    </style>
+</head>
+<body data-page-id="painel-financeiro" data-page-type="READ">
+
+    <!-- ============================================
+         HEADER
+         ============================================ -->
+    <header class="page-header">
+        <div class="header-content">
+            <div class="header-title">
+                <div class="header-icon">
+                    <i class="fas fa-chart-pie"></i>
+                </div>
+                <div class="header-text">
+                    <h1>Painel de Comando Financeiro</h1>
+                    <p>Inteligência de Fluxo de Caixa e Plano de Ação Diário</p>
+                </div>
+            </div>
+            <div class="last-update" id="lastUpdate">
+                <i class="fas fa-sync-alt"></i>
+                <span>Atualizando...</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- ============================================
+         TERMÔMETRO DE SAÚDE
+         ============================================ -->
+    <section class="health-section">
+        <div class="health-card" id="healthCard">
+            <!-- Preenchido via JS -->
+        </div>
+    </section>
+
+    <!-- ============================================
+         CONTADORES INTELIGENTES
+         ============================================ -->
+    <section class="counters-section">
+        <div class="counters-grid" id="countersGrid">
+            <!-- Preenchido via JS -->
+        </div>
+    </section>
+
+    <!-- ============================================
+         PLANO DE AÇÃO INTELIGENTE
+         ============================================ -->
+    <section class="action-section">
+        <div class="section-title">
+            <i class="fas fa-bolt"></i>
+            <span>📋 Plano de Ação Inteligente</span>
+        </div>
+        <div class="action-grid" id="actionGrid">
+            <!-- Preenchido via JS -->
+        </div>
+    </section>
+
+    <!-- ============================================
+         CRONOGRAMA (A RECEBER vs A PAGAR)
+         ============================================ -->
+    <section class="timeline-section">
+        <div class="timeline-grid">
+            <!-- Coluna: A Receber -->
+            <div class="timeline-card">
+                <div class="timeline-header">
+                    <h3><i class="fas fa-arrow-down"></i> A Receber (Próximos 15 dias)</h3>
+                    <span class="badge info" id="totalReceberProximos">€ 0,00</span>
+                </div>
+                <div class="timeline-list" id="receberTimeline">
+                    <!-- Preenchido via JS -->
+                </div>
+            </div>
+
+            <!-- Coluna: A Pagar -->
+            <div class="timeline-card">
+                <div class="timeline-header pagar">
+                    <h3><i class="fas fa-arrow-up"></i> A Pagar (Próximos 15 dias)</h3>
+                    <span class="badge warning" id="totalPagarProximos">€ 0,00</span>
+                </div>
+                <div class="timeline-list" id="pagarTimeline">
+                    <!-- Preenchido via JS -->
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- LOADING STATE -->
+    <div id="loadingState" class="loading-container">
+        <div class="loading-spinner"></div>
+        <p>Carregando inteligência financeira...</p>
+    </div>
+
+    <!-- CONTEÚDO PRINCIPAL (será mostrado após carregar) -->
+    <div id="mainContent" style="display: none;">
+        <!-- O conteúdo já está estruturado acima, mas o JS vai preencher -->
+    </div>
+
+    <script>
+        // ============================================
+        // PAINEL DE COMANDO FINANCEIRO v1.0
+        // ============================================
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Painel de Comando Financeiro iniciado');
+            
+            // Elementos do DOM
+            const loadingState = document.getElementById('loadingState');
+            const mainContent = document.getElementById('mainContent');
+            const lastUpdateSpan = document.getElementById('lastUpdate').querySelector('span');
+            
+            // Estado da aplicação
+            let todosPedidos = [];
+            let todasDespesas = [];
+            let dataAtualizacao = new Date();
+            
+            // ============================================
+            // CARREGAR DADOS DO FIREBASE
+            // ============================================
+            
+            async function carregarDados() {
+                try {
+                    console.log('🔄 Carregando dados para análise...');
+                    
+                    // Buscar Pedidos (para contas a receber)
+                    const responsePedidos = await fetch('/api/database/query', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ schema: 'pedido', filters: {} })
+                    });
+                    
+                    // Buscar Despesas (para contas a pagar)
+                    const responseDespesas = await fetch('/api/database/query', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ schema: 'despesa', filters: { deleted: false } })
+                    });
+                    
+                    if (!responsePedidos.ok || !responseDespesas.ok) {
+                        throw new Error('Erro ao carregar dados');
+                    }
+                    
+                    const resultPedidos = await responsePedidos.json();
+                    const resultDespesas = await responseDespesas.json();
+                    
+                    // Processar dados
+                    processarPedidos(resultPedidos.events || []);
+                    processarDespesas(resultDespesas.events || []);
+                    
+                    // Atualizar interface
+                    renderizarPainel();
+                    
+                    // Esconder loading, mostrar conteúdo
+                    loadingState.style.display = 'none';
+                    mainContent.style.display = 'block';
+                    
+                    // Atualizar timestamp
+                    dataAtualizacao = new Date();
+                    lastUpdateSpan.textContent = `Última atualização: ${dataAtualizacao.toLocaleTimeString('pt-PT')}`;
+                    
+                } catch (error) {
+                    console.error('❌ Erro crítico:', error);
+                    loadingState.innerHTML = `
+                        <div style="color: var(--danger-color);">
+                            <i class="fas fa-exclamation-triangle" style="font-size: 48px;"></i>
+                            <h3>Erro ao carregar dados</h3>
+                            <p>${error.message}</p>
+                            <button onclick="location.reload()" class="btn-new" style="margin-top: 16px;">
+                                <i class="fas fa-redo"></i> Tentar Novamente
+                            </button>
+                        </div>
+                    `;
+                }
+            }
+            
+            // ============================================
+            // PROCESSADORES DE DADOS (Baseado nos seus schemas)
+            // ============================================
+            
+            function processarPedidos(events) {
+                // Agrupar por ID (pegar o mais recente)
+                const pedidosMap = new Map();
+                events
+                    .filter(e => e.schema === 'pedido' && !e.deleted)
+                    .forEach(e => {
+                        const id = e.id;
+                        if (pedidosMap.has(id)) {
+                            const existing = pedidosMap.get(id);
+                            const existingTime = new Date(existing.timestamp || 0).getTime();
+                            const newTime = new Date(e.timestamp || 0).getTime();
+                            if (newTime > existingTime) pedidosMap.set(id, e);
+                        } else {
+                            pedidosMap.set(id, e);
+                        }
+                    });
+                
+                // Converter para objetos úteis
+                todosPedidos = Array.from(pedidosMap.values()).map(event => {
+                    let payload = event.payload;
+                    if (typeof payload === 'string') payload = JSON.parse(payload);
+                    
+                    // Calcular totais de pagamento
+                    const pagamentos = Array.isArray(payload.pagamentos) ? payload.pagamentos : [];
+                    const totalPago = pagamentos
+                        .filter(p => p.status === 'pago')
+                        .reduce((sum, p) => sum + (parseFloat(p.valor) || 0), 0);
+                    
+                    const totalPedido = parseFloat(payload.total) || 0;
+                    const saldoPendente = totalPedido - totalPago;
+                    
+                    // Status de pagamento
+                    let statusPagamento = 'pendente';
+                    if (totalPago === 0) statusPagamento = 'pendente';
+                    else if (totalPago > 0 && totalPago < totalPedido) statusPagamento = 'parcial';
+                    else if (totalPago >= totalPedido) statusPagamento = 'pago';
+                    
+                    return {
+                        id: event.id,
+                        tipo: 'pedido',
+                        cliente: payload.cliente || 'Cliente',
+                        empresa: payload.empresa || '',
+                        numero: payload.numero || `PED-${event.id.substring(0,6)}`,
+                        total: totalPedido,
+                        saldoPendente: saldoPendente,
+                        statusPagamento: statusPagamento,
+                        dataEntrega: payload.dataEntrega || '',
+                        dataFechamento: payload.dataFechamento || '',
+                        pagamentos: pagamentos,
+                        createdAt: event.timestamp || event.created_at
+                    };
+                });
+            }
+            
+            function processarDespesas(events) {
+                // Agrupar por ID (pegar o mais recente)
+                const despesasMap = new Map();
+                events
+                    .filter(e => e.schema === 'despesa' && !e.deleted)
+                    .forEach(e => {
+                        const id = e.id;
+                        if (despesasMap.has(id)) {
+                            const existing = despesasMap.get(id);
+                            const existingTime = new Date(existing.timestamp || 0).getTime();
+                            const newTime = new Date(e.timestamp || 0).getTime();
+                            if (newTime > existingTime) despesasMap.set(id, e);
+                        } else {
+                            despesasMap.set(id, e);
+                        }
+                    });
+                
+                // Converter para objetos úteis
+                todasDespesas = Array.from(despesasMap.values()).map(event => {
+                    let payload = event.payload;
+                    if (typeof payload === 'string') payload = JSON.parse(payload);
+                    
+                    const valorBruto = parseFloat(payload.valorBruto) || 0;
+                    const comIVA = payload.comIVA === 'sim';
+                    const valorIVA = comIVA ? valorBruto * 0.23 : 0;
+                    const valorTotal = valorBruto + valorIVA;
+                    
+                    return {
+                        id: event.id,
+                        tipo: 'despesa',
+                        fornecedor: payload.fornecedor || 'Fornecedor',
+                        descricao: payload.descricao || '',
+                        valorTotal: valorTotal,
+                        statusPagamento: payload.statusPagamento || 'pendente',
+                        data: payload.data || '',
+                        dataVencimento: payload.dataVencimento || '',
+                        dataPagamento: payload.dataPagamento || '',
+                        categoria: payload.categoria || 'OUTROS',
+                        createdAt: event.timestamp || event.created_at
+                    };
+                });
+            }
+            
+            // ============================================
+            // LÓGICA DE INTELIGÊNCIA E RENDERIZAÇÃO
+            // ============================================
+            
+            function renderizarPainel() {
+                const hoje = new Date();
+                hoje.setHours(0, 0, 0, 0);
+                
+                // ---------- 1. Calcular Métricas ----------
+                let totalAReceber = 0;
+                let totalAReceberAtrasado = 0;
+                let totalAReceberProximos15 = 0;
+                
+                let totalAPagar = 0;
+                let totalAPagarAtrasado = 0;
+                let totalAPagarProximos15 = 0;
+                
+                // Listas para timeline
+                const receberProximos = [];
+                const pagarProximos = [];
+                
+                // Análise de Pedidos (A Receber)
+                todosPedidos.forEach(pedido => {
+                    if (pedido.statusPagamento === 'pago') return; // Já pago, ignorar
+                    
+                    const saldo = pedido.saldoPendente;
+                    totalAReceber += saldo;
+                    
+                    // Tentar encontrar data de vencimento (priorizar dataEntrega ou dataFechamento)
+                    let dataVencimento = null;
+                    if (pedido.dataEntrega) {
+                        dataVencimento = new Date(pedido.dataEntrega);
+                        dataVencimento.setHours(0,0,0,0);
+                    }
+                    
+                    // Se não tem data, usar data de criação + 30 dias (estimativa)
+                    if (!dataVencimento || isNaN(dataVencimento)) {
+                        dataVencimento = new Date(pedido.createdAt);
+                        dataVencimento.setDate(dataVencimento.getDate() + 30);
+                        dataVencimento.setHours(0,0,0,0);
+                    }
+                    
+                    const diffDias = Math.ceil((dataVencimento - hoje) / (1000 * 60 * 60 * 24));
+                    
+                    // Verificar atraso
+                    if (dataVencimento < hoje && saldo > 0) {
+                        totalAReceberAtrasado += saldo;
+                    }
+                    
+                    // Verificar próximos 15 dias
+                    if (diffDias >= 0 && diffDias <= 15 && saldo > 0) {
+                        totalAReceberProximos15 += saldo;
+                        receberProximos.push({
+                            id: pedido.id,
+                            titulo: pedido.cliente,
+                            subtitulo: pedido.empresa || `Pedido ${pedido.numero}`,
+                            valor: saldo,
+                            data: dataVencimento,
+                            diffDias: diffDias,
+                            tipo: 'receber',
+                            atrasado: dataVencimento < hoje
+                        });
+                    }
+                });
+                
+                // Análise de Despesas (A Pagar)
+                todasDespesas.forEach(despesa => {
+                    if (despesa.statusPagamento === 'paga') return; // Já paga, ignorar
+                    
+                    const valor = despesa.valorTotal;
+                    totalAPagar += valor;
+                    
+                    // Data de vencimento (priorizar dataVencimento, senão usar data da despesa)
+                    let dataVencimento = null;
+                    if (despesa.dataVencimento) {
+                        dataVencimento = new Date(despesa.dataVencimento);
+                        dataVencimento.setHours(0,0,0,0);
+                    } else if (despesa.data) {
+                        dataVencimento = new Date(despesa.data);
+                        dataVencimento.setHours(0,0,0,0);
+                    }
+                    
+                    if (!dataVencimento || isNaN(dataVencimento)) {
+                        dataVencimento = new Date(despesa.createdAt);
+                        dataVencimento.setDate(dataVencimento.getDate() + 15); // Despesas geralmente vencem mais rápido
+                        dataVencimento.setHours(0,0,0,0);
+                    }
+                    
+                    const diffDias = Math.ceil((dataVencimento - hoje) / (1000 * 60 * 60 * 24));
+                    
+                    // Verificar atraso
+                    if (dataVencimento < hoje && valor > 0) {
+                        totalAPagarAtrasado += valor;
+                    }
+                    
+                    // Verificar próximos 15 dias
+                    if (diffDias >= 0 && diffDias <= 15 && valor > 0) {
+                        totalAPagarProximos15 += valor;
+                        pagarProximos.push({
+                            id: despesa.id,
+                            titulo: despesa.fornecedor,
+                            subtitulo: despesa.descricao || despesa.categoria,
+                            valor: valor,
+                            data: dataVencimento,
+                            diffDias: diffDias,
+                            tipo: 'pagar',
+                            atrasado: dataVencimento < hoje
+                        });
+                    }
+                });
+                
+                // Ordenar por data
+                receberProximos.sort((a, b) => a.data - b.data);
+                pagarProximos.sort((a, b) => a.data - b.data);
+                
+                // ---------- 2. Calcular Saúde do Negócio ----------
+                const saldoProjetado = totalAReceberProximos15 - totalAPagarProximos15;
+                const temAtraso = (totalAReceberAtrasado > 0 || totalAPagarAtrasado > 0);
+                
+                let saudeStatus = 'critical';
+                let saudeIcon = '💥';
+                let saudeTitulo = 'Situação Crítica';
+                let saudeDescricao = 'Ações imediatas necessárias!';
+                let saudeClasse = 'critical';
+                
+                if (saldoProjetado > 500 && !temAtraso) {
+                    saudeStatus = 'healthy';
+                    saudeIcon = '💪';
+                    saudeTitulo = 'Saúde Financeira Excelente';
+                    saudeDescricao = 'Fluxo positivo e sem atrasos. Continue assim!';
+                    saudeClasse = 'healthy';
+                } else if (saldoProjetado > 0 && !temAtraso) {
+                    saudeStatus = 'healthy';
+                    saudeIcon = '👍';
+                    saudeTitulo = 'Situação Estável';
+                    saudeDescricao = 'Fluxo positivo, mas fique atento aos próximos vencimentos.';
+                    saudeClasse = 'healthy';
+                } else if (saldoProjetado > -500 && !temAtraso) {
+                    saudeStatus = 'warning';
+                    saudeIcon = '⚠️';
+                    saudeTitulo = 'Atenção Necessária';
+                    saudeDescricao = 'Fluxo apertado nos próximos 15 dias. Priorize recebimentos.';
+                    saudeClasse = 'warning';
+                } else {
+                    saudeStatus = 'critical';
+                    saudeIcon = '🚨';
+                    saudeTitulo = 'Alerta Vermelho';
+                    saudeDescricao = 'Atrasos detectados e/ou fluxo negativo. Aja agora!';
+                    saudeClasse = 'critical';
+                }
+                
+                // ---------- 3. Renderizar Card de Saúde ----------
+                document.getElementById('healthCard').innerHTML = `
+                    <div class="health-status">
+                        <div class="health-indicator ${saudeClasse}">
+                            ${saudeIcon}
+                        </div>
+                        <div class="health-text">
+                            <h2>${saudeTitulo}</h2>
+                            <p>${saudeDescricao}</p>
+                        </div>
+                    </div>
+                    <div class="health-score">
+                        <div class="score-value">${formatarMoeda(saldoProjetado)}</div>
+                        <div class="score-label">Saldo Projetado (15d)</div>
+                    </div>
+                `;
+                
+                // ---------- 4. Renderizar Contadores ----------
+                document.getElementById('countersGrid').innerHTML = `
+                    <div class="counter-card receber">
+                        <div class="counter-icon"><i class="fas fa-arrow-down"></i></div>
+                        <div class="counter-value">${formatarMoeda(totalAReceber)}</div>
+                        <div class="counter-label">Total a Receber</div>
+                    </div>
+                    <div class="counter-card pagar">
+                        <div class="counter-icon"><i class="fas fa-arrow-up"></i></div>
+                        <div class="counter-value">${formatarMoeda(totalAPagar)}</div>
+                        <div class="counter-label">Total a Pagar</div>
+                    </div>
+                    <div class="counter-card atraso-receber">
+                        ${totalAReceberAtrasado > 0 ? '<div class="counter-badge">ATRASADO</div>' : ''}
+                        <div class="counter-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                        <div class="counter-value">${formatarMoeda(totalAReceberAtrasado)}</div>
+                        <div class="counter-label">A Receber Atrasado</div>
+                    </div>
+                    <div class="counter-card atraso-pagar">
+                        ${totalAPagarAtrasado > 0 ? '<div class="counter-badge">ATRASADO</div>' : ''}
+                        <div class="counter-icon"><i class="fas fa-exclamation-triangle"></i></div>
+                        <div class="counter-value">${formatarMoeda(totalAPagarAtrasado)}</div>
+                        <div class="counter-label">A Pagar Atrasado</div>
+                    </div>
+                `;
+                
+                document.getElementById('totalReceberProximos').textContent = formatarMoeda(totalAReceberProximos15);
+                document.getElementById('totalPagarProximos').textContent = formatarMoeda(totalAPagarProximos15);
+                
+                // ---------- 5. Gerar Plano de Ação Inteligente ----------
+                const acoes = [];
+                
+                // Ação 1: Atraso em recebimentos
+                if (totalAReceberAtrasado > 0) {
+                    acoes.push({
+                        urgencia: 'urgent',
+                        icone: 'fa-exclamation-triangle',
+                        titulo: `💰 Recebimentos Atrasados`,
+                        descricao: `Total de ${formatarMoeda(totalAReceberAtrasado)} em atraso. Priorize a cobrança.`,
+                        meta: `${Math.ceil(totalAReceberAtrasado / 200)} clientes`,
+                        acao: 'Ver Pedidos',
+                        link: 'pedidos.html?filter=pendente'
+                    });
+                }
+                
+                // Ação 2: Atraso em pagamentos
+                if (totalAPagarAtrasado > 0) {
+                    acoes.push({
+                        urgencia: 'urgent',
+                        icone: 'fa-exclamation-triangle',
+                        titulo: `⚠️ Pagamentos em Atraso`,
+                        descricao: `Total de ${formatarMoeda(totalAPagarAtrasado)} em despesas vencidas. Regularize urgentemente.`,
+                        meta: `${Math.ceil(totalAPagarAtrasado / 100)} fornecedores`,
+                        acao: 'Ver Despesas',
+                        link: 'despesas.html?filter=pendente'
+                    });
+                }
+                
+                // Ação 3: Vencimentos hoje
+                const hojeItens = [...receberProximos, ...pagarProximos].filter(item => item.diffDias === 0);
+                if (hojeItens.length > 0) {
+                    const aReceberHoje = hojeItens.filter(i => i.tipo === 'receber').reduce((sum, i) => sum + i.valor, 0);
+                    const aPagarHoje = hojeItens.filter(i => i.tipo === 'pagar').reduce((sum, i) => sum + i.valor, 0);
+                    
+                    if (aReceberHoje > 0) {
+                        acoes.push({
+                            urgencia: 'warning',
+                            icone: 'fa-calendar-day',
+                            titulo: `📅 Recebimentos HOJE`,
+                            descricao: `${hojeItens.filter(i => i.tipo === 'receber').length} cliente(s) devem pagar hoje.`,
+                            meta: formatarMoeda(aReceberHoje),
+                            acao: 'Ver Detalhes',
+                            link: '#receber'
+                        });
+                    }
+                    
+                    if (aPagarHoje > 0) {
+                        acoes.push({
+                            urgencia: 'warning',
+                            icone: 'fa-calendar-day',
+                            titulo: `📅 Pagamentos HOJE`,
+                            descricao: `${hojeItens.filter(i => i.tipo === 'pagar').length} despesa(s) vencem hoje.`,
+                            meta: formatarMoeda(aPagarHoje),
+                            acao: 'Ver Detalhes',
+                            link: '#pagar'
+                        });
+                    }
+                }
+                
+                // Ação 4: Fluxo apertado
+                if (saldoProjetado < 200 && saldoProjetado > -200) {
+                    acoes.push({
+                        urgencia: 'warning',
+                        icone: 'fa-chart-line',
+                        titulo: `📉 Fluxo de Caixa Apertado`,
+                        descricao: `Saldo projetado de ${formatarMoeda(saldoProjetado)} para os próximos 15 dias.`,
+                        meta: 'Priorize recebimentos',
+                        acao: 'Analisar',
+                        link: '#'
+                    });
+                }
+                
+                // Ação 5: Oportunidade (se sobra dinheiro)
+                if (saldoProjetado > 1000) {
+                    acoes.push({
+                        urgencia: 'info',
+                        icone: 'fa-lightbulb',
+                        titulo: `💡 Folga Financeira`,
+                        descricao: `Saldo positivo de ${formatarMoeda(saldoProjetado)}. Considere investir ou quitar dívidas.`,
+                        meta: 'Planejar uso',
+                        acao: 'Ver Oportunidades',
+                        link: '#'
+                    });
+                }
+                
+                // Se não há ações, mostrar mensagem de tudo certo
+                if (acoes.length === 0) {
+                    acoes.push({
+                        urgencia: 'info',
+                        icone: 'fa-check-circle',
+                        titulo: `🎯 Tudo em Dia!`,
+                        descricao: `Nenhum atraso ou vencimento crítico detectado.`,
+                        meta: 'Parabéns!',
+                        acao: 'Continuar assim',
+                        link: '#'
+                    });
+                }
+                
+                // Renderizar ações
+                document.getElementById('actionGrid').innerHTML = acoes.map(acao => `
+                    <div class="action-card ${acao.urgencia}">
+                        <div class="action-icon"><i class="fas ${acao.icone}"></i></div>
+                        <div class="action-content">
+                            <div class="action-title">${acao.titulo}</div>
+                            <div class="action-desc">${acao.descricao}</div>
+                            <div class="action-meta">
+                                <i class="fas fa-tag"></i> ${acao.meta}
+                            </div>
+                        </div>
+                        <button class="action-btn" onclick="window.location.href='${acao.link}'">
+                            ${acao.acao} <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
+                `).join('');
+                
+                // ---------- 6. Renderizar Timeline ----------
+                const formatarDataItem = (data) => {
+                    const d = new Date(data);
+                    return {
+                        dia: d.getDate().toString().padStart(2, '0'),
+                        mes: d.toLocaleDateString('pt-PT', { month: 'short' }).replace('.', '')
+                    };
+                };
+                
+                document.getElementById('receberTimeline').innerHTML = receberProximos.slice(0, 8).map(item => {
+                    const dataF = formatarDataItem(item.data);
+                    const badgeClass = item.diffDias === 0 ? 'hoje' : (item.diffDias === 1 ? 'amanha' : '');
+                    const badgeText = item.diffDias === 0 ? 'HOJE' : (item.diffDias === 1 ? 'AMANHÃ' : '');
+                    
+                    return `
+                        <div class="timeline-item ${item.atrasado ? 'atrasado' : ''}">
+                            <div class="timeline-date">
+                                <div class="timeline-day">${dataF.dia}</div>
+                                <div class="timeline-month">${dataF.mes}</div>
+                            </div>
+                            <div class="timeline-info">
+                                <div class="timeline-title">${item.titulo}</div>
+                                <div class="timeline-subtitle">${item.subtitulo}</div>
+                            </div>
+                            <div class="timeline-value receber ${item.atrasado ? 'atrasado' : ''}">
+                                ${formatarMoeda(item.valor)}
+                                ${badgeClass ? `<span class="badge ${badgeClass}">${badgeText}</span>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('') || '<div class="empty-state"><i class="fas fa-check-circle"></i><p>Nenhum recebimento previsto</p></div>';
+                
+                document.getElementById('pagarTimeline').innerHTML = pagarProximos.slice(0, 8).map(item => {
+                    const dataF = formatarDataItem(item.data);
+                    const badgeClass = item.diffDias === 0 ? 'hoje' : (item.diffDias === 1 ? 'amanha' : '');
+                    const badgeText = item.diffDias === 0 ? 'HOJE' : (item.diffDias === 1 ? 'AMANHÃ' : '');
+                    
+                    return `
+                        <div class="timeline-item ${item.atrasado ? 'atrasado' : ''}">
+                            <div class="timeline-date">
+                                <div class="timeline-day">${dataF.dia}</div>
+                                <div class="timeline-month">${dataF.mes}</div>
+                            </div>
+                            <div class="timeline-info">
+                                <div class="timeline-title">${item.titulo}</div>
+                                <div class="timeline-subtitle">${item.subtitulo}</div>
+                            </div>
+                            <div class="timeline-value pagar ${item.atrasado ? 'atrasado' : ''}">
+                                ${formatarMoeda(item.valor)}
+                                ${badgeClass ? `<span class="badge ${badgeClass}">${badgeText}</span>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('') || '<div class="empty-state"><i class="fas fa-check-circle"></i><p>Nenhum pagamento previsto</p></div>';
+            }
+            
+            // Utilitário de formatação de moeda
+            function formatarMoeda(valor) {
+                return new Intl.NumberFormat('pt-PT', {
+                    style: 'currency',
+                    currency: 'EUR',
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                }).format(valor);
+            }
+            
+            // Auto-refresh a cada 60 segundos
+            setInterval(() => {
+                console.log('🔄 Atualizando painel...');
+                carregarDados();
+            }, 60000);
+            
+            // Iniciar
+            carregarDados();
+        });
+    </script>
+
+    <!-- CONEXÃO COM O CORE ENGINE (OBRIGATÓRIO) -->
+    <script src="../core/engine.js"></script>
+</body>
+</html>

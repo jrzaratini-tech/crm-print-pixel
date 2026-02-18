@@ -97,5 +97,15 @@
         pos: 10,
         hidden: false,
         deleted: false
+    },
+
+    {
+        id: "nav_gestao",
+        name: "Gestão",
+        file: "pages/painel-financeiro.html",
+        type: "READ",
+        pos: 11,
+        hidden: false,
+        deleted: false
     }
 ];
