@@ -2,10 +2,11 @@
 <html lang="pt">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
-    <title>PrintPixel - Gestor Financeiro Predict</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PrintPixel - Gestão Financeira Profissional</title>
     
     <!-- BIBLIOTECAS EXTERNAS -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
@@ -20,18 +21,19 @@
             --warning-color: #f59e0b;
             --danger-color: #ef4444;
             --info-color: #3b82f6;
+            --expense-color: #9C27B0;
             --light-bg: #f8fafc;
             --card-bg: #ffffff;
             --text-primary: #1e293b;
             --text-secondary: #64748b;
             --border-color: #e2e8f0;
             --hover-bg: #f1f5f9;
-            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.1);
-            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+            --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+            --shadow-md: 0 4px 20px rgba(0, 0, 0, 0.07);
+            --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.12);
             --radius-sm: 8px;
-            --radius-md: 12px;
-            --radius-lg: 16px;
+            --radius-md: 16px;
+            --radius-lg: 24px;
         }
 
         * {
@@ -44,419 +46,407 @@
         body {
             background-color: var(--light-bg);
             color: var(--text-primary);
-            line-height: 1.5;
             min-height: 100vh;
-            padding: 20px;
+            overflow-x: hidden;
         }
 
         /* ============================================
-           HEADER PROFISSIONAL
+           HEADER PROFISSIONAL (IGUAL AO DASHBOARD)
            ============================================ */
-        .page-header {
-            background: linear-gradient(135deg, #0f172a, #1e293b);
-            padding: 24px 32px;
-            border-radius: var(--radius-lg);
-            box-shadow: var(--shadow-lg);
-            margin-bottom: 24px;
+        .dashboard-header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
             color: white;
-        }
-
-        .header-content {
+            padding: 25px 40px;
             display: flex;
             justify-content: space-between;
             align-items: center;
+            box-shadow: 0 6px 20px rgba(26, 35, 126, 0.15);
+            position: relative;
             flex-wrap: wrap;
             gap: 20px;
         }
 
-        .header-title h1 {
-            font-size: 24px;
-            font-weight: 600;
-            letter-spacing: -0.3px;
-            margin-bottom: 4px;
-            opacity: 0.95;
-        }
-
-        .header-title p {
-            font-size: 14px;
-            opacity: 0.7;
-        }
-
-        .header-balance {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 16px 28px;
-            border-radius: 100px;
-            backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            text-align: center;
-        }
-
-        .balance-label {
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            opacity: 0.7;
-            margin-bottom: 4px;
-        }
-
-        .balance-value {
-            font-size: 32px;
-            font-weight: 700;
-            line-height: 1;
-        }
-
-        .balance-value.positive {
-            color: #4ade80;
-        }
-
-        .balance-value.negative {
-            color: #f87171;
-        }
-
-        .last-update {
-            background: rgba(255, 255, 255, 0.08);
-            padding: 8px 16px;
-            border-radius: 30px;
-            font-size: 13px;
+        .header-left {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 22px;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .logo-icon {
+            font-size: 32px;
+            color: #ffffff;
+            background: rgba(255, 255, 255, 0.12);
+            width: 56px;
+            height: 56px;
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-text h1 {
+            font-size: 26px;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        .logo-text span {
+            font-size: 14px;
+            opacity: 0.85;
+            font-weight: 400;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .date-info {
+            background-color: rgba(255, 255, 255, 0.12);
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 500;
+            font-size: 15px;
+        }
+
+        .period-filter {
+            background: rgba(255, 255, 255, 0.12);
+            padding: 8px 16px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .period-filter select {
+            background: rgba(255, 255, 255, 0.2);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            outline: none;
+            min-width: 150px;
+        }
+
+        .period-filter select option {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .privacy-toggle {
+            background: rgba(255, 255, 255, 0.12);
+            border: none;
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            transition: all 0.3s;
+        }
+
+        .privacy-toggle:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.05);
+        }
+
+        .privacy-toggle.active {
+            background: rgba(255, 255, 255, 0.25);
+            box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2);
         }
 
         /* ============================================
-           BALANÇO PRINCIPAL
+           MAIN CONTENT
            ============================================ */
-        .balance-section {
-            margin-bottom: 24px;
+        .main-content {
+            padding: 35px 40px;
+            max-width: 1600px;
+            margin: 0 auto;
         }
 
-        .balance-grid {
+        /* ============================================
+           MÉTRICAS PRINCIPAIS
+           ============================================ */
+        .metrics-grid {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
         }
 
-        .balance-card {
+        @media (max-width: 1200px) {
+            .metrics-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 768px) {
+            .metrics-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .metric-card {
             background: var(--card-bg);
-            border-radius: var(--radius-lg);
+            border-radius: var(--radius-md);
             padding: 24px;
             box-shadow: var(--shadow-md);
-            border: 1px solid var(--border-color);
+            border-left: 5px solid;
+            transition: all 0.3s;
             position: relative;
             overflow: hidden;
         }
 
-        .balance-card.receita {
-            background: linear-gradient(135deg, #1e3a8a, #2563eb);
-            color: white;
+        .metric-card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-lg);
         }
 
-        .balance-card.despesa {
-            background: linear-gradient(135deg, #78350f, #b45309);
-            color: white;
+        .metric-card.balanco {
+            border-left-color: var(--primary-color);
+        }
+        .metric-card.receber {
+            border-left-color: var(--success-color);
+        }
+        .metric-card.pagar {
+            border-left-color: var(--danger-color);
         }
 
-        .card-header {
+        .metric-header {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
+            align-items: flex-start;
+            margin-bottom: 15px;
         }
 
-        .card-header h3 {
-            font-size: 16px;
-            font-weight: 500;
-            opacity: 0.9;
+        .metric-title {
+            font-size: 14px;
+            color: var(--text-secondary);
+            font-weight: 600;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
-        .card-header i {
-            font-size: 24px;
-            opacity: 0.8;
-        }
-
-        .card-value {
-            font-size: 42px;
-            font-weight: 700;
-            margin-bottom: 8px;
-            line-height: 1;
-        }
-
-        .card-sub {
-            display: flex;
-            gap: 16px;
-            font-size: 14px;
-            opacity: 0.8;
-        }
-
-        .card-sub span {
+        .metric-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
             display: flex;
             align-items: center;
-            gap: 4px;
+            justify-content: center;
+            font-size: 22px;
+            color: white;
+        }
+
+        .metric-icon.balanco {
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        }
+        .metric-icon.receber {
+            background: linear-gradient(135deg, var(--success-color), #34d399);
+        }
+        .metric-icon.pagar {
+            background: linear-gradient(135deg, var(--danger-color), #f87171);
+        }
+
+        .metric-value {
+            font-size: 36px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            transition: all 0.3s;
+        }
+
+        .metric-value.hidden {
+            filter: blur(8px);
+            user-select: none;
+        }
+
+        .metric-sub {
+            display: flex;
+            gap: 20px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .metric-sub span {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .metric-sub .danger {
+            color: var(--danger-color);
+        }
+
+        .metric-sub .warning {
+            color: var(--warning-color);
         }
 
         /* ============================================
-           META DE FATURAMENTO
+           META SECTION (INSPIRADO NO EQUILIBRIUM CARD)
            ============================================ */
         .target-section {
-            margin-bottom: 24px;
+            margin-bottom: 40px;
         }
 
         .target-card {
-            background: linear-gradient(135deg, #059669, #10b981);
-            border-radius: var(--radius-lg);
-            padding: 28px;
-            box-shadow: var(--shadow-lg);
-            color: white;
-            position: relative;
-            overflow: hidden;
+            background: var(--card-bg);
+            border-radius: var(--radius-md);
+            padding: 30px;
+            box-shadow: var(--shadow-md);
+            border-top: 4px solid var(--info-color);
         }
 
-        .target-card::before {
-            content: '🎯';
-            position: absolute;
-            right: 20px;
-            bottom: 20px;
-            font-size: 80px;
-            opacity: 0.1;
+        .target-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
+            gap: 20px;
         }
 
-        .target-label {
-            font-size: 14px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            opacity: 0.9;
-            margin-bottom: 8px;
+        .target-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
 
-        .target-value {
-            font-size: 56px;
+        .target-stats {
+            display: flex;
+            gap: 40px;
+            flex-wrap: wrap;
+        }
+
+        .target-stat {
+            text-align: center;
+        }
+
+        .target-stat-value {
+            font-size: 32px;
             font-weight: 800;
-            line-height: 1;
-            margin-bottom: 8px;
+            color: var(--primary-color);
+            margin-bottom: 5px;
         }
 
-        .target-sub {
-            font-size: 16px;
-            opacity: 0.9;
+        .target-stat-value.hidden {
+            filter: blur(8px);
+            user-select: none;
         }
 
-        .target-progress {
+        .target-stat-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .target-progress-container {
             margin-top: 20px;
-            background: rgba(255, 255, 255, 0.2);
-            height: 8px;
-            border-radius: 4px;
-            overflow: hidden;
         }
 
-        .target-progress-bar {
+        .progress-bar {
+            height: 20px;
+            background: #e0e0e0;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 10px;
+        }
+
+        .progress-fill {
             height: 100%;
-            background: white;
-            border-radius: 4px;
-            transition: width 0.3s ease;
+            background: linear-gradient(90deg, var(--info-color), var(--secondary-color));
+            border-radius: 10px;
+            transition: width 1s ease-in-out;
+        }
+
+        .progress-labels {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            color: var(--text-secondary);
         }
 
         /* ============================================
-           COMPARATIVO POR CATEGORIA
+           CHARTS SECTION
            ============================================ */
-        .comparison-section {
-            margin-bottom: 24px;
+        .charts-section {
+            margin-bottom: 40px;
         }
 
-        .comparison-header {
+        .section-title {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 30px;
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            margin-bottom: 16px;
+            gap: 12px;
         }
 
-        .comparison-header h2 {
-            font-size: 18px;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .comparison-grid {
+        .charts-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 16px;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 25px;
         }
 
-        .category-card {
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .chart-card {
             background: var(--card-bg);
-            border-radius: var(--radius-lg);
-            padding: 20px;
+            border-radius: var(--radius-md);
+            padding: 25px;
             box-shadow: var(--shadow-md);
-            border: 1px solid var(--border-color);
-            transition: transform 0.2s;
         }
 
-        .category-card:hover {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-lg);
+        .chart-header {
+            margin-bottom: 20px;
         }
 
-        .category-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-            padding-bottom: 12px;
-            border-bottom: 2px solid;
-        }
-
-        .category-header.agua { border-bottom-color: #3b82f6; }
-        .category-header.luz { border-bottom-color: #f59e0b; }
-        .category-header.aluguel { border-bottom-color: #8b5cf6; }
-        .category-header.telefone { border-bottom-color: #10b981; }
-        .category-header.combustivel { border-bottom-color: #ef4444; }
-        .category-header.outros { border-bottom-color: #64748b; }
-
-        .category-name {
+        .chart-title {
             font-size: 16px;
             font-weight: 600;
+            color: var(--primary-color);
             display: flex;
             align-items: center;
             gap: 8px;
         }
 
-        .category-icon {
-            width: 32px;
-            height: 32px;
-            border-radius: 8px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 14px;
-        }
-
-        .category-icon.agua { background: #dbeafe; color: #1e40af; }
-        .category-icon.luz { background: #fef3c7; color: #92400e; }
-        .category-icon.aluguel { background: #ede9fe; color: #6d28d9; }
-        .category-icon.telefone { background: #d1fae5; color: #065f46; }
-        .category-icon.combustivel { background: #fee2e2; color: #991b1b; }
-        .category-icon.outros { background: #f1f5f9; color: #334155; }
-
-        .category-values {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 12px;
-        }
-
-        .prev-month {
-            text-align: left;
-        }
-
-        .prev-label {
-            font-size: 11px;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            margin-bottom: 2px;
-        }
-
-        .prev-value {
-            font-size: 16px;
-            font-weight: 600;
-            color: var(--text-primary);
-        }
-
-        .current-month {
-            text-align: right;
-        }
-
-        .current-label {
-            font-size: 11px;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            margin-bottom: 2px;
-        }
-
-        .current-value {
-            font-size: 16px;
-            font-weight: 600;
-        }
-
-        .current-value.paid {
-            color: var(--success-color);
-        }
-
-        .current-value.pending {
-            color: var(--warning-color);
-        }
-
-        .category-progress {
-            margin: 12px 0;
-            height: 6px;
-            background: var(--border-color);
-            border-radius: 3px;
-            overflow: hidden;
-        }
-
-        .progress-bar {
-            height: 100%;
-            background: var(--success-color);
-            border-radius: 3px;
-            transition: width 0.3s ease;
-        }
-
-        .category-footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 13px;
-            padding-top: 12px;
-            border-top: 1px dashed var(--border-color);
-        }
-
-        .remaining {
-            font-weight: 600;
-        }
-
-        .remaining.positive {
-            color: var(--success-color);
-        }
-
-        .remaining.negative {
-            color: var(--danger-color);
-        }
-
-        .status-badge {
-            padding: 4px 8px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 600;
-        }
-
-        .status-badge.ok {
-            background: #d1fae5;
-            color: #065f46;
-        }
-
-        .status-badge.warning {
-            background: #fef3c7;
-            color: #92400e;
-        }
-
-        .status-badge.urgent {
-            background: #fee2e2;
-            color: #991b1b;
+        .chart-wrapper {
+            height: 300px;
+            position: relative;
         }
 
         /* ============================================
-           LISTAS PROFISSIONAIS
+           LISTS SECTION (MANTIDA A SUA LISTA, MAS MELHORADA)
            ============================================ */
         .lists-section {
-            margin-bottom: 24px;
+            margin-bottom: 40px;
         }
 
         .lists-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 20px;
+            gap: 25px;
         }
 
-        @media (max-width: 768px) {
+        @media (max-width: 1000px) {
             .lists-grid {
                 grid-template-columns: 1fr;
             }
@@ -464,26 +454,27 @@
 
         .list-card {
             background: var(--card-bg);
-            border-radius: var(--radius-lg);
+            border-radius: var(--radius-md);
             box-shadow: var(--shadow-md);
-            border: 1px solid var(--border-color);
             overflow: hidden;
         }
 
         .list-header {
             padding: 20px;
-            border-bottom: 1px solid var(--border-color);
             display: flex;
             justify-content: space-between;
             align-items: center;
+            border-bottom: 2px solid;
         }
 
-        .list-header.receita {
-            background: linear-gradient(135deg, #1e3a8a15, #2563eb15);
+        .list-header.receber {
+            background: linear-gradient(135deg, #10b98110, #34d39910);
+            border-bottom-color: var(--success-color);
         }
 
-        .list-header.despesa {
-            background: linear-gradient(135deg, #78350f15, #b4530915);
+        .list-header.pagar {
+            background: linear-gradient(135deg, #ef444410, #f8717110);
+            border-bottom-color: var(--danger-color);
         }
 
         .list-header h3 {
@@ -491,15 +482,15 @@
             font-weight: 600;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
         }
 
-        .list-header.receita h3 {
-            color: #1e3a8a;
+        .list-header.receber h3 {
+            color: var(--success-color);
         }
 
-        .list-header.despesa h3 {
-            color: #b45309;
+        .list-header.pagar h3 {
+            color: var(--danger-color);
         }
 
         .list-total {
@@ -507,61 +498,61 @@
             font-weight: 700;
         }
 
-        .list-total.receita {
-            color: #2563eb;
+        .list-total.receber {
+            color: var(--success-color);
         }
 
-        .list-total.despesa {
-            color: #b45309;
+        .list-total.pagar {
+            color: var(--danger-color);
         }
 
         .list-container {
             max-height: 400px;
             overflow-y: auto;
-            padding: 16px;
+            padding: 15px;
         }
 
         .list-item {
             display: flex;
             align-items: center;
-            gap: 12px;
-            padding: 16px;
+            gap: 15px;
+            padding: 15px;
             background: var(--light-bg);
-            border-radius: var(--radius-md);
-            margin-bottom: 8px;
+            border-radius: var(--radius-sm);
+            margin-bottom: 10px;
             border: 1px solid var(--border-color);
             transition: all 0.2s;
         }
 
         .list-item:hover {
-            transform: translateX(4px);
+            transform: translateX(5px);
             box-shadow: var(--shadow-md);
         }
 
         .list-item.atrasado {
             border-left: 4px solid var(--danger-color);
-            background: #fee2e2;
+            background: #fef2f2;
         }
 
         .list-icon {
-            width: 40px;
-            height: 40px;
+            width: 45px;
+            height: 45px;
             border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 16px;
+            font-size: 18px;
             flex-shrink: 0;
         }
 
-        .list-item.receita .list-icon {
-            background: #dbeafe;
-            color: #1e3a8a;
+        .list-item.receber .list-icon {
+            background: #d1fae5;
+            color: var(--success-color);
         }
 
-        .list-item.despesa .list-icon {
-            background: #fef3c7;
-            color: #b45309;
+        .list-item.pagar .list-icon {
+            background: #fee2e2;
+            color: var(--danger-color);
         }
 
         .list-content {
@@ -598,15 +589,11 @@
             white-space: nowrap;
         }
 
-        .list-value.receita {
-            color: #2563eb;
+        .list-value.receber {
+            color: var(--success-color);
         }
 
-        .list-value.despesa {
-            color: #b45309;
-        }
-
-        .list-value.atrasado {
+        .list-value.pagar {
             color: var(--danger-color);
         }
 
@@ -622,6 +609,22 @@
             color: var(--danger-color);
         }
 
+        .badge.hoje {
+            background: #fef3c7;
+            color: var(--warning-color);
+        }
+
+        /* ============================================
+           FOOTER
+           ============================================ */
+        .dashboard-footer {
+            text-align: center;
+            padding: 25px;
+            color: var(--text-secondary);
+            font-size: 14px;
+            border-top: 1px solid var(--border-color);
+        }
+
         /* ============================================
            LOADING
            ============================================ */
@@ -631,6 +634,7 @@
             background: var(--card-bg);
             border-radius: var(--radius-lg);
             box-shadow: var(--shadow-md);
+            margin: 40px;
         }
 
         .loading-spinner {
@@ -647,104 +651,220 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        /* ============================================
+           ANIMAÇÕES
+           ============================================ */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .metric-card, .target-card, .chart-card, .list-card {
+            animation: fadeIn 0.6s ease-out;
+        }
     </style>
 </head>
-<body data-page-id="gestor-financeiro-predict" data-page-type="READ">
+<body data-page-id="gestao-financeira" data-page-type="READ">
 
     <!-- ============================================
          HEADER PROFISSIONAL
          ============================================ -->
-    <header class="page-header">
-        <div class="header-content">
-            <div class="header-title">
-                <h1>Gestor Financeiro Predict</h1>
-                <p>Análise preditiva • Comparativo mês a mês • Inteligência de despesas fixas</p>
-            </div>
-            
-            <div class="header-balance" id="headerBalance">
-                <div class="balance-label">BALANÇO PATRIMONIAL</div>
-                <div class="balance-value" id="balanceValue">€ 0</div>
-            </div>
-            
-            <div class="last-update" id="lastUpdate">
-                <i class="fas fa-sync-alt"></i>
-                <span>Carregando...</span>
+    <div class="dashboard-header">
+        <div class="header-left">
+            <div class="logo">
+                <div class="logo-icon">
+                    <i class="fas fa-chart-line"></i>
+                </div>
+                <div class="logo-text">
+                    <h1>Gestão Financeira</h1>
+                    <span>Controle e Projeções Inteligentes</span>
+                </div>
             </div>
         </div>
-    </header>
+        
+        <div class="header-right">
+            <div class="period-filter">
+                <span>Período:</span>
+                <select id="periodFilter">
+                    <option value="mes_atual">Mês Atual</option>
+                    <option value="mes_anterior">Mês Anterior</option>
+                    <option value="trimestre">Último Trimestre</option>
+                    <option value="ano_atual">Ano Atual</option>
+                </select>
+            </div>
+            
+            <button class="privacy-toggle" id="privacyToggle" title="Ocultar/Mostrar Valores">
+                <i class="fas fa-eye"></i>
+            </button>
+            
+            <div class="date-info" id="currentDate">Carregando...</div>
+        </div>
+    </div>
 
     <!-- LOADING STATE -->
     <div id="loadingState" class="loading-container">
         <div class="loading-spinner"></div>
-        <h3 style="margin-bottom: 8px;">Processando dados preditivos</h3>
-        <p style="color: var(--text-secondary);">Analisando despesas do mês anterior e calculando projeções</p>
+        <h3 style="margin-bottom: 8px;">Carregando dados financeiros</h3>
+        <p style="color: var(--text-secondary);">Analisando receitas, despesas e calculando projeções</p>
     </div>
 
     <!-- CONTEÚDO PRINCIPAL -->
-    <div id="mainContent" style="display: none;">
+    <div id="mainContent" class="main-content" style="display: none;">
         
-        <!-- BALANÇO PRINCIPAL -->
-        <section class="balance-section">
-            <div class="balance-grid">
-                <div class="balance-card receita">
-                    <div class="card-header">
-                        <h3><i class="fas fa-arrow-down"></i> A RECEBER</h3>
-                        <i class="fas fa-arrow-circle-down"></i>
+        <!-- MÉTRICAS PRINCIPAIS -->
+        <div class="metrics-grid">
+            <div class="metric-card balanco">
+                <div class="metric-header">
+                    <div class="metric-title">Balanço Patrimonial</div>
+                    <div class="metric-icon balanco">
+                        <i class="fas fa-scale-balanced"></i>
                     </div>
-                    <div class="card-value" id="totalReceber">€ 0</div>
-                    <div class="card-sub">
-                        <span><i class="fas fa-clock"></i> <span id="qtdReceber">0</span> pendentes</span>
-                        <span><i class="fas fa-exclamation-triangle"></i> <span id="receberAtrasado">€ 0</span> atrasado</span>
+                </div>
+                <div class="metric-value" id="balanceValue">€0</div>
+                <div class="metric-sub">
+                    <span><i class="fas fa-arrow-down text-success"></i> A Receber</span>
+                    <span><i class="fas fa-arrow-up text-danger"></i> A Pagar</span>
+                </div>
+            </div>
+            
+            <div class="metric-card receber">
+                <div class="metric-header">
+                    <div class="metric-title">A Receber</div>
+                    <div class="metric-icon receber">
+                        <i class="fas fa-arrow-down"></i>
+                    </div>
+                </div>
+                <div class="metric-value" id="totalReceber">€0</div>
+                <div class="metric-sub">
+                    <span><i class="fas fa-clock"></i> <span id="qtdReceber">0</span> pendentes</span>
+                    <span class="danger"><i class="fas fa-exclamation-triangle"></i> <span id="receberAtrasado">€0</span></span>
+                </div>
+            </div>
+            
+            <div class="metric-card pagar">
+                <div class="metric-header">
+                    <div class="metric-title">A Pagar</div>
+                    <div class="metric-icon pagar">
+                        <i class="fas fa-arrow-up"></i>
+                    </div>
+                </div>
+                <div class="metric-value" id="totalPagar">€0</div>
+                <div class="metric-sub">
+                    <span><i class="fas fa-clock"></i> <span id="qtdPagar">0</span> pendentes</span>
+                    <span class="danger"><i class="fas fa-exclamation-triangle"></i> <span id="pagarAtrasado">€0</span></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- META DE FATURAMENTO (BASEADA NO MÊS ANTERIOR) -->
+        <div class="target-section">
+            <div class="target-card">
+                <div class="target-header">
+                    <div class="target-title">
+                        <i class="fas fa-bullseye" style="color: var(--info-color);"></i>
+                        Meta de Faturamento do Mês
+                    </div>
+                    <div class="target-stats">
+                        <div class="target-stat">
+                            <div class="target-stat-value" id="metaFaturamento">€0</div>
+                            <div class="target-stat-label">Meta (base mês anterior)</div>
+                        </div>
+                        <div class="target-stat">
+                            <div class="target-stat-value" id="faturadoAteAgora">€0</div>
+                            <div class="target-stat-label">Faturado até agora</div>
+                        </div>
+                        <div class="target-stat">
+                            <div class="target-stat-value" id="percentualMeta">0%</div>
+                            <div class="target-stat-label">Atingido</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="target-progress-container">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="targetProgress" style="width: 0%"></div>
+                    </div>
+                    <div class="progress-labels">
+                        <span id="progressStart">€0</span>
+                        <span id="progressEnd">Meta: €0</span>
+                    </div>
+                </div>
+                <div style="margin-top: 15px; font-size: 14px; color: var(--text-secondary);" id="targetDetail">
+                    Baseado nas despesas do mês anterior
+                </div>
+            </div>
+        </div>
+
+        <!-- GRÁFICOS -->
+        <div class="charts-section">
+            <div class="section-title">
+                <i class="fas fa-chart-pie"></i>
+                Análise Financeira
+            </div>
+            
+            <div class="charts-grid">
+                <!-- Distribuição por Categoria (Receitas) -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div class="chart-title">
+                            <i class="fas fa-chart-pie" style="color: var(--success-color);"></i>
+                            Receitas por Categoria
+                        </div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="receitasPorCategoriaChart"></canvas>
                     </div>
                 </div>
                 
-                <div class="balance-card despesa">
-                    <div class="card-header">
-                        <h3><i class="fas fa-arrow-up"></i> A PAGAR</h3>
-                        <i class="fas fa-arrow-circle-up"></i>
+                <!-- Distribuição por Categoria (Despesas) -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div class="chart-title">
+                            <i class="fas fa-chart-pie" style="color: var(--danger-color);"></i>
+                            Despesas por Categoria
+                        </div>
                     </div>
-                    <div class="card-value" id="totalPagar">€ 0</div>
-                    <div class="card-sub">
-                        <span><i class="fas fa-clock"></i> <span id="qtdPagar">0</span> pendentes</span>
-                        <span><i class="fas fa-exclamation-triangle"></i> <span id="pagarAtrasado">€ 0</span> atrasado</span>
+                    <div class="chart-wrapper">
+                        <canvas id="despesasPorCategoriaChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Evolução Mensal -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div class="chart-title">
+                            <i class="fas fa-chart-line" style="color: var(--info-color);"></i>
+                            Evolução Receitas vs Despesas
+                        </div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="evolucaoMensalChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Projeção vs Realizado -->
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <div class="chart-title">
+                            <i class="fas fa-chart-bar" style="color: var(--warning-color);"></i>
+                            Projeção vs Realizado
+                        </div>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="projecaoChart"></canvas>
                     </div>
                 </div>
             </div>
-        </section>
+        </div>
 
-        <!-- META DE FATURAMENTO BASEADA NO MÊS ANTERIOR -->
-        <section class="target-section">
-            <div class="target-card" id="targetCard">
-                <div class="target-label">🎯 META DE FATURAMENTO DO MÊS</div>
-                <div class="target-value" id="targetValue">€ 0</div>
-                <div class="target-sub" id="targetSub">Baseado nas despesas do mês anterior</div>
-                <div class="target-progress">
-                    <div class="target-progress-bar" id="targetProgress" style="width: 0%;"></div>
-                </div>
-                <div style="margin-top: 12px; font-size: 14px; opacity: 0.9;" id="targetDetail"></div>
-            </div>
-        </section>
-
-        <!-- COMPARATIVO POR CATEGORIA (MÊS ANTERIOR VS ATUAL) -->
-        <section class="comparison-section">
-            <div class="comparison-header">
-                <h2><i class="fas fa-chart-bar" style="margin-right: 8px; color: var(--primary-color);"></i> Comparativo de Despesas Fixas por Categoria</h2>
-                <span style="font-size: 13px; color: var(--text-secondary);">Mês anterior vs Mês atual</span>
-            </div>
-            
-            <div class="comparison-grid" id="categoryComparison">
-                <!-- Preenchido via JS -->
-            </div>
-        </section>
-
-        <!-- LISTAS COMPLETAS -->
-        <section class="lists-section">
+        <!-- LISTAS (MANTIDAS E MELHORADAS) -->
+        <div class="lists-section">
             <div class="lists-grid">
                 <!-- A RECEBER -->
                 <div class="list-card">
-                    <div class="list-header receita">
-                        <h3><i class="fas fa-arrow-down"></i> A RECEBER • Pendentes</h3>
-                        <span class="list-total receita" id="totalReceberLista">€ 0</span>
+                    <div class="list-header receber">
+                        <h3><i class="fas fa-arrow-down"></i> A Receber • Pendentes</h3>
+                        <span class="list-total receber" id="totalReceberLista">€0</span>
                     </div>
                     <div class="list-container" id="listaReceber">
                         <!-- Preenchido via JS -->
@@ -753,52 +873,108 @@
 
                 <!-- A PAGAR -->
                 <div class="list-card">
-                    <div class="list-header despesa">
-                        <h3><i class="fas fa-arrow-up"></i> A PAGAR • Pendentes</h3>
-                        <span class="list-total despesa" id="totalPagarLista">€ 0</span>
+                    <div class="list-header pagar">
+                        <h3><i class="fas fa-arrow-up"></i> A Pagar • Pendentes</h3>
+                        <span class="list-total pagar" id="totalPagarLista">€0</span>
                     </div>
                     <div class="list-container" id="listaPagar">
                         <!-- Preenchido via JS -->
                     </div>
                 </div>
             </div>
-        </section>
+        </div>
 
+        <!-- FOOTER -->
+        <div class="dashboard-footer">
+            <p>PrintPixel Gestão Financeira &copy; 2026 - Análise preditiva baseada em dados reais</p>
+        </div>
     </div>
 
     <script>
         // ============================================
-        // GESTOR FINANCEIRO PREDICT
+        // GESTÃO FINANCEIRA PROFISSIONAL
         // ============================================
         
         document.addEventListener('DOMContentLoaded', function() {
-            console.log('📊 Gestor Financeiro Predict iniciado');
+            console.log('📊 Gestão Financeira iniciada');
             
             // Elementos do DOM
             const loadingState = document.getElementById('loadingState');
             const mainContent = document.getElementById('mainContent');
-            const lastUpdateSpan = document.getElementById('lastUpdate').querySelector('span');
+            const privacyToggle = document.getElementById('privacyToggle');
+            const periodFilter = document.getElementById('periodFilter');
+            const currentDate = document.getElementById('currentDate');
             
-            // Estado da aplicação
+            // Estado
+            let isPrivate = false;
+            let charts = {};
             let todosPedidos = [];
             let todasDespesas = [];
-            let despesasMesAnterior = {};
-            let despesasMesAtual = {};
             
+            // ============================================
+            // FUNÇÕES AUXILIARES
+            // ============================================
+            
+            function formatarMoeda(valor) {
+                return new Intl.NumberFormat('pt-PT', {
+                    style: 'currency',
+                    currency: 'EUR',
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0
+                }).format(valor || 0);
+            }
+
+            function formatarData(data) {
+                return data.toLocaleDateString('pt-PT', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric'
+                });
+            }
+
+            function atualizarDataAtual() {
+                const now = new Date();
+                currentDate.textContent = formatarData(now);
+            }
+
+            function alternarPrivacidade() {
+                isPrivate = !isPrivate;
+                const elementos = document.querySelectorAll('.metric-value, .target-stat-value');
+                
+                elementos.forEach(elemento => {
+                    if (isPrivate) {
+                        elemento.classList.add('hidden');
+                    } else {
+                        elemento.classList.remove('hidden');
+                    }
+                });
+                
+                const icon = privacyToggle.querySelector('i');
+                if (isPrivate) {
+                    icon.className = 'fas fa-eye-slash';
+                    privacyToggle.classList.add('active');
+                } else {
+                    icon.className = 'fas fa-eye';
+                    privacyToggle.classList.remove('active');
+                }
+            }
+
             // ============================================
             // CARREGAR DADOS
             // ============================================
             
             async function carregarDados() {
                 try {
-                    console.log('🔄 Carregando dados...');
+                    console.log('🔄 Carregando dados financeiros...');
                     
+                    // Buscar pedidos (receitas)
                     const responsePedidos = await fetch('/api/database/query', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ schema: 'pedido', filters: {} })
                     });
                     
+                    // Buscar despesas
                     const responseDespesas = await fetch('/api/database/query', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -815,25 +991,23 @@
                     processarPedidos(resultPedidos.events || []);
                     processarDespesas(resultDespesas.events || []);
                     
-                    // Análise preditiva
-                    analisarDespesasPorMes();
+                    // Inicializar gráficos
+                    criarGraficos();
                     
+                    // Renderizar tudo
                     renderizarPainel();
                     
                     loadingState.style.display = 'none';
                     mainContent.style.display = 'block';
                     
-                    const dataAtualizacao = new Date();
-                    lastUpdateSpan.textContent = `${dataAtualizacao.toLocaleDateString('pt-PT')} • ${dataAtualizacao.toLocaleTimeString('pt-PT')}`;
-                    
                 } catch (error) {
                     console.error('❌ Erro:', error);
                     loadingState.innerHTML = `
                         <div style="color: var(--danger-color);">
-                            <i class="fas fa-exclamation-triangle" style="font-size: 48px;"></i>
-                            <h3>Erro ao carregar</h3>
-                            <p>${error.message}</p>
-                            <button onclick="location.reload()" style="margin-top: 16px; padding: 12px 24px; background: var(--primary-color); color: white; border: none; border-radius: 8px;">
+                            <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px;"></i>
+                            <h3>Erro ao carregar dados</h3>
+                            <p style="margin: 16px 0;">${error.message}</p>
+                            <button onclick="location.reload()" style="padding: 12px 24px; background: var(--primary-color); color: white; border: none; border-radius: 8px; cursor: pointer;">
                                 <i class="fas fa-redo"></i> Tentar novamente
                             </button>
                         </div>
@@ -841,12 +1015,9 @@
                 }
             }
             
-            // ============================================
-            // PROCESSADORES
-            // ============================================
-            
             function processarPedidos(events) {
                 const pedidosMap = new Map();
+                
                 events
                     .filter(e => e.schema === 'pedido' && !e.deleted)
                     .forEach(e => {
@@ -868,23 +1039,31 @@
                         catch (e) { payload = {}; }
                     }
                     
+                    const totalPedido = parseFloat(payload.total) || 0;
                     const pagamentos = Array.isArray(payload.pagamentos) ? payload.pagamentos : [];
                     const totalPago = pagamentos
                         .filter(p => p.status === 'pago')
                         .reduce((sum, p) => sum + (parseFloat(p.valor) || 0), 0);
                     
-                    const totalPedido = parseFloat(payload.total) || 0;
-                    const saldoPendente = totalPedido - totalPago;
+                    const saldoPendente = Math.max(0, totalPedido - totalPago);
                     
-                    let statusPagamento = 'pendente';
-                    if (totalPago === 0) statusPagamento = 'pendente';
-                    else if (totalPago > 0 && totalPago < totalPedido) statusPagamento = 'parcial';
-                    else if (totalPago >= totalPedido) statusPagamento = 'pago';
+                    let status = 'pendente';
+                    if (totalPago === 0) status = 'pendente';
+                    else if (totalPago > 0 && totalPago < totalPedido) status = 'parcial';
+                    else if (totalPago >= totalPedido) status = 'pago';
+                    
+                    let dataEvento = null;
+                    if (payload.dataPedido) {
+                        dataEvento = new Date(payload.dataPedido);
+                    } else if (event.created_at) {
+                        dataEvento = new Date(event.created_at);
+                    } else if (event.timestamp) {
+                        dataEvento = new Date(event.timestamp);
+                    }
                     
                     let dataVencimento = null;
                     if (payload.dataEntrega) {
                         dataVencimento = new Date(payload.dataEntrega);
-                        dataVencimento.setHours(0,0,0,0);
                     }
                     
                     return {
@@ -893,15 +1072,18 @@
                         descricao: payload.empresa || `Pedido ${payload.numero || ''}`,
                         valor: saldoPendente,
                         valorTotal: totalPedido,
-                        status: statusPagamento,
+                        categoria: payload.categoria || 'Vendas',
+                        status: status,
+                        data: dataEvento,
                         dataVencimento: dataVencimento,
-                        createdAt: event.timestamp || event.created_at
+                        createdAt: event.created_at || event.timestamp
                     };
-                }).filter(p => p.valor > 0);
+                }).filter(p => p.valor > 0 && p.status !== 'pago');
             }
             
             function processarDespesas(events) {
                 const despesasMap = new Map();
+                
                 events
                     .filter(e => e.schema === 'despesa')
                     .forEach(e => {
@@ -923,112 +1105,382 @@
                         catch (e) { payload = {}; }
                     }
                     
-                    const valorBruto = parseFloat(payload.valorBruto) || 0;
-                    const comIVA = payload.comIVA === 'sim';
-                    const valorIVA = comIVA ? valorBruto * 0.23 : 0;
-                    const valorTotal = valorBruto + valorIVA;
+                    let valor = 0;
+                    if (payload.valorTotal) valor = parseFloat(payload.valorTotal);
+                    else if (payload.total) valor = parseFloat(payload.total);
+                    else if (payload.valor) valor = parseFloat(payload.valor);
                     
-                    let dataDespesa = null;
+                    let dataEvento = null;
                     if (payload.data) {
-                        dataDespesa = new Date(payload.data);
-                        dataDespesa.setHours(0,0,0,0);
+                        dataEvento = new Date(payload.data);
+                    } else if (event.created_at) {
+                        dataEvento = new Date(event.created_at);
+                    } else if (event.timestamp) {
+                        dataEvento = new Date(event.timestamp);
                     }
                     
                     let dataVencimento = null;
                     if (payload.dataVencimento) {
                         dataVencimento = new Date(payload.dataVencimento);
-                        dataVencimento.setHours(0,0,0,0);
                     }
                     
                     return {
                         id: event.id,
                         nome: payload.fornecedor || 'Fornecedor',
                         descricao: payload.descricao || payload.categoria || 'Despesa',
-                        valor: valorTotal,
-                        status: payload.statusPagamento || 'pendente',
+                        valor: valor,
                         categoria: payload.categoria || 'OUTROS',
-                        data: dataDespesa,
+                        status: payload.statusPagamento || 'pendente',
+                        data: dataEvento,
                         dataVencimento: dataVencimento,
-                        dataPagamento: payload.dataPagamento,
-                        createdAt: event.timestamp || event.created_at,
-                        deleted: event.deleted || false
+                        createdAt: event.created_at || event.timestamp
                     };
-                });
+                }).filter(d => d.status !== 'pago' && d.status !== 'paga');
             }
             
             // ============================================
-            // ANÁLISE PREDITIVA (MÊS ANTERIOR VS ATUAL)
+            // ANÁLISE E CÁLCULOS
             // ============================================
             
-            function analisarDespesasPorMes() {
+            function calcularMetricas(periodo = 'mes_atual') {
+                const hoje = new Date();
+                hoje.setHours(0, 0, 0, 0);
+                
+                // Determinar período
+                let dataInicio, dataFim;
+                const mesAtual = hoje.getMonth();
+                const anoAtual = hoje.getFullYear();
+                
+                switch(periodo) {
+                    case 'mes_anterior':
+                        const mesAnt = mesAtual === 0 ? 11 : mesAtual - 1;
+                        const anoAnt = mesAtual === 0 ? anoAtual - 1 : anoAtual;
+                        dataInicio = new Date(anoAnt, mesAnt, 1);
+                        dataFim = new Date(anoAnt, mesAnt + 1, 0, 23, 59, 59);
+                        break;
+                    case 'trimestre':
+                        dataInicio = new Date(anoAtual, mesAtual - 3, 1);
+                        dataFim = new Date(anoAtual, mesAtual, 0, 23, 59, 59);
+                        break;
+                    case 'ano_atual':
+                        dataInicio = new Date(anoAtual, 0, 1);
+                        dataFim = hoje;
+                        break;
+                    case 'mes_atual':
+                    default:
+                        dataInicio = new Date(anoAtual, mesAtual, 1);
+                        dataFim = hoje;
+                        break;
+                }
+                
+                // Filtrar dados do período
+                const receitasPeriodo = todosPedidos.filter(p => {
+                    if (!p.data) return false;
+                    return p.data >= dataInicio && p.data <= dataFim;
+                });
+                
+                const despesasPeriodo = todasDespesas.filter(d => {
+                    if (!d.data) return false;
+                    return d.data >= dataInicio && d.data <= dataFim;
+                });
+                
+                // Totais
+                const totalReceber = receitasPeriodo.reduce((sum, p) => sum + p.valor, 0);
+                const totalPagar = despesasPeriodo.reduce((sum, d) => sum + d.valor, 0);
+                
+                // Atrasados
+                const receberAtrasado = receitasPeriodo
+                    .filter(p => p.dataVencimento && p.dataVencimento < hoje)
+                    .reduce((sum, p) => sum + p.valor, 0);
+                
+                const pagarAtrasado = despesasPeriodo
+                    .filter(d => d.dataVencimento && d.dataVencimento < hoje)
+                    .reduce((sum, d) => sum + d.valor, 0);
+                
+                // Categorias para gráficos
+                const receitasPorCategoria = {};
+                const despesasPorCategoria = {};
+                
+                receitasPeriodo.forEach(p => {
+                    const cat = p.categoria || 'Vendas';
+                    receitasPorCategoria[cat] = (receitasPorCategoria[cat] || 0) + p.valor;
+                });
+                
+                despesasPeriodo.forEach(d => {
+                    const cat = d.categoria || 'OUTROS';
+                    despesasPorCategoria[cat] = (despesasPorCategoria[cat] || 0) + d.valor;
+                });
+                
+                return {
+                    totalReceber,
+                    totalPagar,
+                    qtdReceber: receitasPeriodo.length,
+                    qtdPagar: despesasPeriodo.length,
+                    receberAtrasado,
+                    pagarAtrasado,
+                    balanco: totalReceber - totalPagar,
+                    receitasPorCategoria,
+                    despesasPorCategoria,
+                    receitasPeriodo,
+                    despesasPeriodo
+                };
+            }
+            
+            function calcularMetaFaturamento() {
                 const hoje = new Date();
                 const mesAtual = hoje.getMonth();
                 const anoAtual = hoje.getFullYear();
                 
                 // Mês anterior
-                let mesAnterior = mesAtual - 1;
-                let anoAnterior = anoAtual;
-                if (mesAnterior < 0) {
-                    mesAnterior = 11;
-                    anoAnterior = anoAtual - 1;
+                const mesAnterior = mesAtual === 0 ? 11 : mesAtual - 1;
+                const anoAnterior = mesAtual === 0 ? anoAtual - 1 : anoAtual;
+                
+                // Buscar despesas do mês anterior (pagas)
+                const despesasMesAnterior = todasDespesas.filter(d => {
+                    if (!d.data) return false;
+                    return d.data.getMonth() === mesAnterior && 
+                           d.data.getFullYear() === anoAnterior;
+                });
+                
+                // Total de despesas do mês anterior
+                const totalDespesasMesAnterior = despesasMesAnterior.reduce((sum, d) => sum + d.valor, 0);
+                
+                // Meta: despesas do mês anterior + 20% de margem de segurança
+                const meta = Math.max(totalDespesasMesAnterior * 1.2, 1000); // Mínimo €1000
+                
+                // Faturamento do mês atual (até agora)
+                const faturamentoAtual = todosPedidos
+                    .filter(p => {
+                        if (!p.data) return false;
+                        return p.data.getMonth() === mesAtual && 
+                               p.data.getFullYear() === anoAtual;
+                    })
+                    .reduce((sum, p) => sum + p.valor, 0);
+                
+                const percentual = Math.min(100, (faturamentoAtual / meta) * 100);
+                
+                return {
+                    meta,
+                    faturado: faturamentoAtual,
+                    percentual,
+                    baseMesAnterior: totalDespesasMesAnterior
+                };
+            }
+            
+            function calcularEvolucaoMensal() {
+                const hoje = new Date();
+                const meses = [];
+                const labels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+                
+                // Últimos 6 meses
+                for (let i = 5; i >= 0; i--) {
+                    const data = new Date(hoje.getFullYear(), hoje.getMonth() - i, 1);
+                    const mes = data.getMonth();
+                    const ano = data.getFullYear();
+                    
+                    const receitas = todosPedidos
+                        .filter(p => p.data && p.data.getMonth() === mes && p.data.getFullYear() === ano)
+                        .reduce((sum, p) => sum + p.valor, 0);
+                    
+                    const despesas = todasDespesas
+                        .filter(d => d.data && d.data.getMonth() === mes && d.data.getFullYear() === ano)
+                        .reduce((sum, d) => sum + d.valor, 0);
+                    
+                    meses.push({
+                        mes: labels[mes],
+                        receitas,
+                        despesas
+                    });
                 }
                 
-                // Inicializar objetos de categorias
-                const categorias = [
-                    'ÁGUA', 'LUZ', 'ALUGUEL', 'TELEFONE', 'WHATSAPP', 
-                    'COMBUSTIVEL', 'CAFÉ', 'ESCRITORIO', 'COMUNICAÇÃO', 
-                    'FINANÇAS', 'INTERNET', 'SALÁRIOS', 'OUTROS'
+                return meses;
+            }
+            
+            // ============================================
+            // GRÁFICOS
+            // ============================================
+            
+            function criarGraficos() {
+                // Receitas por Categoria
+                const receitasCtx = document.getElementById('receitasPorCategoriaChart');
+                charts.receitas = new Chart(receitasCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            data: [],
+                            backgroundColor: [
+                                '#10b981', '#34d399', '#6ee7b7', '#a7f3d0',
+                                '#059669', '#047857', '#065f46', '#064e3b'
+                            ],
+                            borderWidth: 0,
+                            hoverOffset: 15
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: { font: { size: 12 } }
+                            }
+                        }
+                    }
+                });
+
+                // Despesas por Categoria
+                const despesasCtx = document.getElementById('despesasPorCategoriaChart');
+                charts.despesas = new Chart(despesasCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            data: [],
+                            backgroundColor: [
+                                '#ef4444', '#f87171', '#fca5a5', '#fecaca',
+                                '#dc2626', '#b91c1c', '#991b1b', '#7f1d1d'
+                            ],
+                            borderWidth: 0,
+                            hoverOffset: 15
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: { font: { size: 12 } }
+                            }
+                        }
+                    }
+                });
+
+                // Evolução Mensal
+                const evolucaoCtx = document.getElementById('evolucaoMensalChart');
+                charts.evolucao = new Chart(evolucaoCtx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [
+                            {
+                                label: 'Receitas',
+                                data: [],
+                                borderColor: '#10b981',
+                                backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                                borderWidth: 3,
+                                fill: true,
+                                tension: 0.4
+                            },
+                            {
+                                label: 'Despesas',
+                                data: [],
+                                borderColor: '#ef4444',
+                                backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                borderWidth: 3,
+                                fill: true,
+                                tension: 0.4
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            tooltip: {
+                                callbacks: {
+                                    label: (context) => `${context.dataset.label}: ${formatarMoeda(context.raw)}`
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: (value) => formatarMoeda(value)
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // Projeção vs Realizado
+                const projecaoCtx = document.getElementById('projecaoChart');
+                charts.projecao = new Chart(projecaoCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['Meta', 'Realizado', 'Projetado'],
+                        datasets: [{
+                            data: [0, 0, 0],
+                            backgroundColor: [
+                                'rgba(59, 130, 246, 0.7)',
+                                'rgba(16, 185, 129, 0.7)',
+                                'rgba(245, 158, 11, 0.7)'
+                            ],
+                            borderColor: [
+                                '#3b82f6',
+                                '#10b981',
+                                '#f59e0b'
+                            ],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            tooltip: {
+                                callbacks: {
+                                    label: (context) => formatarMoeda(context.raw)
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: {
+                                    callback: (value) => formatarMoeda(value)
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+            
+            function atualizarGraficos(metricas, meta) {
+                // Receitas por Categoria
+                const receitasData = Object.entries(metricas.receitasPorCategoria)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 6);
+                
+                charts.receitas.data.labels = receitasData.map(([cat]) => cat);
+                charts.receitas.data.datasets[0].data = receitasData.map(([, valor]) => valor);
+                charts.receitas.update();
+                
+                // Despesas por Categoria
+                const despesasData = Object.entries(metricas.despesasPorCategoria)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 6);
+                
+                charts.despesas.data.labels = despesasData.map(([cat]) => cat);
+                charts.despesas.data.datasets[0].data = despesasData.map(([, valor]) => valor);
+                charts.despesas.update();
+                
+                // Evolução Mensal
+                const evolucao = calcularEvolucaoMensal();
+                charts.evolucao.data.labels = evolucao.map(e => e.mes);
+                charts.evolucao.data.datasets[0].data = evolucao.map(e => e.receitas);
+                charts.evolucao.data.datasets[1].data = evolucao.map(e => e.despesas);
+                charts.evolucao.update();
+                
+                // Projeção vs Realizado
+                charts.projecao.data.datasets[0].data = [
+                    meta.meta,
+                    meta.faturado,
+                    meta.baseMesAnterior * 1.3 // Projeção para próximo mês
                 ];
-                
-                despesasMesAnterior = {};
-                despesasMesAtual = {};
-                
-                categorias.forEach(cat => {
-                    despesasMesAnterior[cat] = {
-                        total: 0,
-                        pagas: 0,
-                        pendentes: 0
-                    };
-                    despesasMesAtual[cat] = {
-                        total: 0,
-                        pagas: 0,
-                        pendentes: 0
-                    };
-                });
-                
-                // Processar cada despesa
-                todasDespesas.forEach(d => {
-                    if (!d.data) return;
-                    
-                    const dataDespesa = new Date(d.data);
-                    const mes = dataDespesa.getMonth();
-                    const ano = dataDespesa.getFullYear();
-                    
-                    const categoria = d.categoria || 'OUTROS';
-                    
-                    // Mês anterior
-                    if (mes === mesAnterior && ano === anoAnterior) {
-                        despesasMesAnterior[categoria].total += d.valor;
-                        if (d.status === 'paga') {
-                            despesasMesAnterior[categoria].pagas += d.valor;
-                        } else {
-                            despesasMesAnterior[categoria].pendentes += d.valor;
-                        }
-                    }
-                    
-                    // Mês atual
-                    if (mes === mesAtual && ano === anoAtual) {
-                        despesasMesAtual[categoria].total += d.valor;
-                        if (d.status === 'paga') {
-                            despesasMesAtual[categoria].pagas += d.valor;
-                        } else {
-                            despesasMesAtual[categoria].pendentes += d.valor;
-                        }
-                    }
-                });
-                
-                console.log('📊 Despesas mês anterior:', despesasMesAnterior);
-                console.log('📊 Despesas mês atual:', despesasMesAtual);
+                charts.projecao.update();
             }
             
             // ============================================
@@ -1036,216 +1488,57 @@
             // ============================================
             
             function renderizarPainel() {
+                const periodo = periodFilter.value;
+                const metricas = calcularMetricas(periodo);
+                const meta = calcularMetaFaturamento();
+                
+                // Atualizar métricas principais
+                document.getElementById('balanceValue').textContent = formatarMoeda(metricas.balanco);
+                document.getElementById('totalReceber').textContent = formatarMoeda(metricas.totalReceber);
+                document.getElementById('totalPagar').textContent = formatarMoeda(metricas.totalPagar);
+                document.getElementById('qtdReceber').textContent = metricas.qtdReceber;
+                document.getElementById('qtdPagar').textContent = metricas.qtdPagar;
+                document.getElementById('receberAtrasado').textContent = formatarMoeda(metricas.receberAtrasado);
+                document.getElementById('pagarAtrasado').textContent = formatarMoeda(metricas.pagarAtrasado);
+                
+                // Atualizar meta
+                document.getElementById('metaFaturamento').textContent = formatarMoeda(meta.meta);
+                document.getElementById('faturadoAteAgora').textContent = formatarMoeda(meta.faturado);
+                document.getElementById('percentualMeta').textContent = meta.percentual.toFixed(1) + '%';
+                document.getElementById('targetProgress').style.width = meta.percentual + '%';
+                document.getElementById('progressStart').textContent = '€0';
+                document.getElementById('progressEnd').textContent = `Meta: ${formatarMoeda(meta.meta)}`;
+                
+                const targetDetail = document.getElementById('targetDetail');
+                if (meta.faturado >= meta.meta) {
+                    targetDetail.innerHTML = `✅ Meta atingida! Base: ${formatarMoeda(meta.baseMesAnterior)} (mês anterior)`;
+                } else {
+                    const falta = meta.meta - meta.faturado;
+                    targetDetail.innerHTML = `📉 Faltam ${formatarMoeda(falta)} para atingir a meta • Base: ${formatarMoeda(meta.baseMesAnterior)} (mês anterior)`;
+                }
+                
+                // Atualizar gráficos
+                atualizarGraficos(metricas, meta);
+                
+                // Listas
+                renderizarListas(metricas);
+                
+                // Aplicar privacidade se necessário
+                if (isPrivate) {
+                    alternarPrivacidade();
+                }
+            }
+            
+            function renderizarListas(metricas) {
                 const hoje = new Date();
                 hoje.setHours(0, 0, 0, 0);
                 
-                // Filtrar dados
-                const aReceber = todosPedidos.filter(p => 
-                    p.status === 'pendente' || p.status === 'parcial'
-                );
-                
-                const aPagar = todasDespesas.filter(d => 
-                    d.status === 'pendente' && !d.deleted
-                );
-                
-                // Atrasados
-                const aReceberAtrasado = aReceber.filter(p => {
-                    if (!p.dataVencimento) return false;
-                    return p.dataVencimento < hoje;
-                });
-                
-                const aPagarAtrasado = aPagar.filter(d => {
-                    if (!d.dataVencimento) return false;
-                    return d.dataVencimento < hoje;
-                });
-                
-                // Totais
-                const totalReceber = aReceber.reduce((sum, p) => sum + p.valor, 0);
-                const totalPagar = aPagar.reduce((sum, d) => sum + d.valor, 0);
-                const totalReceberAtrasado = aReceberAtrasado.reduce((sum, p) => sum + p.valor, 0);
-                const totalPagarAtrasado = aPagarAtrasado.reduce((sum, d) => sum + d.valor, 0);
-                
-                // BALANÇO PATRIMONIAL
-                const balanco = totalReceber - totalPagar;
-                const balanceElement = document.getElementById('balanceValue');
-                balanceElement.textContent = formatarMoeda(balanco);
-                balanceElement.className = `balance-value ${balanco >= 0 ? 'positive' : 'negative'}`;
-                
-                // CARDS DE BALANÇO
-                document.getElementById('totalReceber').textContent = formatarMoeda(totalReceber);
-                document.getElementById('qtdReceber').textContent = aReceber.length;
-                document.getElementById('receberAtrasado').textContent = formatarMoeda(totalReceberAtrasado);
-                
-                document.getElementById('totalPagar').textContent = formatarMoeda(totalPagar);
-                document.getElementById('qtdPagar').textContent = aPagar.length;
-                document.getElementById('pagarAtrasado').textContent = formatarMoeda(totalPagarAtrasado);
-                
-                // ============================================
-                // META DE FATURAMENTO BASEADA NO MÊS ANTERIOR
-                // ============================================
-                
-                // Calcular total de despesas do mês anterior (pagas)
-                let totalDespesasMesAnterior = 0;
-                Object.values(despesasMesAnterior).forEach(cat => {
-                    totalDespesasMesAnterior += cat.pagas; // Só considerar pagas para base real
-                });
-                
-                // Calcular total de despesas do mês atual (pagas até agora)
-                let totalDespesasMesAtualPagas = 0;
-                let totalDespesasMesAtualPendentes = 0;
-                Object.values(despesasMesAtual).forEach(cat => {
-                    totalDespesasMesAtualPagas += cat.pagas;
-                    totalDespesasMesAtualPendentes += cat.pendentes;
-                });
-                
-                // Meta: igual ao total do mês anterior (ou um pouco maior para segurança)
-                const metaFaturamento = Math.max(totalDespesasMesAnterior, 100); // Mínimo €100
-                
-                // Quanto já faturou (recebimentos do mês atual)
-                // Isso é uma estimativa - idealmente você teria um campo de data de recebimento
-                const faturadoAteAgora = totalReceber; // Simplificação
-                
-                const percentualMeta = Math.min(100, Math.round((faturadoAteAgora / metaFaturamento) * 100));
-                
-                document.getElementById('targetValue').textContent = formatarMoeda(metaFaturamento);
-                document.getElementById('targetSub').textContent = `Baseado nas despesas pagas do mês anterior: ${formatarMoeda(totalDespesasMesAnterior)}`;
-                document.getElementById('targetProgress').style.width = `${percentualMeta}%`;
-                
-                if (faturadoAteAgora >= metaFaturamento) {
-                    document.getElementById('targetDetail').innerHTML = `✅ Meta atingida! Faturado ${formatarMoeda(faturadoAteAgora)} de ${formatarMoeda(metaFaturamento)}`;
-                } else {
-                    const falta = metaFaturamento - faturadoAteAgora;
-                    document.getElementById('targetDetail').innerHTML = `📉 Faltam ${formatarMoeda(falta)} para atingir a meta do mês`;
-                }
-                
-                // ============================================
-                // COMPARATIVO POR CATEGORIA
-                // ============================================
-                
-                const categoriasOrdenadas = [
-                    'ÁGUA', 'LUZ', 'ALUGUEL', 'TELEFONE', 'WHATSAPP', 
-                    'INTERNET', 'SALÁRIOS', 'COMBUSTIVEL', 'CAFÉ', 
-                    'ESCRITORIO', 'COMUNICAÇÃO', 'FINANÇAS', 'OUTROS'
-                ];
-                
-                let categoryHtml = '';
-                
-                categoriasOrdenadas.forEach(cat => {
-                    const anterior = despesasMesAnterior[cat] || { pagas: 0, pendentes: 0, total: 0 };
-                    const atual = despesasMesAtual[cat] || { pagas: 0, pendentes: 0, total: 0 };
-                    
-                    // Se não tem nada em nenhum dos meses, não mostrar
-                    if (anterior.pagas === 0 && atual.pagas === 0 && atual.pendentes === 0) {
-                        return;
-                    }
-                    
-                    const totalAnterior = anterior.pagas; // Só considerar pagas para base real
-                    const totalAtualPago = atual.pagas;
-                    const totalAtualPendente = atual.pendentes;
-                    const totalAtual = totalAtualPago + totalAtualPendente;
-                    
-                    // Determinar status
-                    let statusClass = 'ok';
-                    let statusText = 'OK';
-                    let remainingClass = 'positive';
-                    
-                    if (totalAtualPendente > 0) {
-                        if (totalAtualPendente > totalAnterior * 0.5) {
-                            statusClass = 'urgent';
-                            statusText = 'URGENTE';
-                        } else {
-                            statusClass = 'warning';
-                            statusText = 'PENDENTE';
-                        }
-                    }
-                    
-                    const percentualPago = totalAnterior > 0 ? Math.min(100, Math.round((totalAtualPago / totalAnterior) * 100)) : 0;
-                    const faltaPagar = Math.max(0, totalAnterior - totalAtualPago);
-                    
-                    // Ícone baseado na categoria
-                    let icon = 'fa-question';
-                    let bgClass = 'outros';
-                    
-                    switch(cat) {
-                        case 'ÁGUA': icon = 'fa-water'; bgClass = 'agua'; break;
-                        case 'LUZ': icon = 'fa-bolt'; bgClass = 'luz'; break;
-                        case 'ALUGUEL': icon = 'fa-building'; bgClass = 'aluguel'; break;
-                        case 'TELEFONE': icon = 'fa-phone'; bgClass = 'telefone'; break;
-                        case 'WHATSAPP': icon = 'fa-whatsapp'; bgClass = 'telefone'; break;
-                        case 'INTERNET': icon = 'fa-wifi'; bgClass = 'telefone'; break;
-                        case 'SALÁRIOS': icon = 'fa-users'; bgClass = 'aluguel'; break;
-                        case 'COMBUSTIVEL': icon = 'fa-gas-pump'; bgClass = 'combustivel'; break;
-                        case 'CAFÉ': icon = 'fa-mug-hot'; bgClass = 'outros'; break;
-                        case 'ESCRITORIO': icon = 'fa-pen'; bgClass = 'outros'; break;
-                        case 'COMUNICAÇÃO': icon = 'fa-bullhorn'; bgClass = 'telefone'; break;
-                        case 'FINANÇAS': icon = 'fa-coins'; bgClass = 'outros'; break;
-                        default: icon = 'fa-box'; bgClass = 'outros';
-                    }
-                    
-                    categoryHtml += `
-                        <div class="category-card">
-                            <div class="category-header ${bgClass}">
-                                <div class="category-name">
-                                    <div class="category-icon ${bgClass}">
-                                        <i class="fas ${icon}"></i>
-                                    </div>
-                                    ${cat}
-                                </div>
-                                <span class="status-badge ${statusClass}">${statusText}</span>
-                            </div>
-                            
-                            <div class="category-values">
-                                <div class="prev-month">
-                                    <div class="prev-label">MÊS ANTERIOR</div>
-                                    <div class="prev-value">${formatarMoeda(totalAnterior)}</div>
-                                </div>
-                                <div class="current-month">
-                                    <div class="prev-label">MÊS ATUAL</div>
-                                    <div class="current-value ${totalAtualPendente > 0 ? 'pending' : 'paid'}">
-                                        ${formatarMoeda(totalAtual)}
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div class="category-progress">
-                                <div class="progress-bar" style="width: ${percentualPago}%;"></div>
-                            </div>
-                            
-                            <div class="category-footer">
-                                <div>
-                                    <i class="fas fa-check-circle" style="color: var(--success-color);"></i>
-                                    Pago: ${formatarMoeda(totalAtualPago)}
-                                </div>
-                                <div class="remaining ${faltaPagar > 0 ? 'negative' : 'positive'}">
-                                    ${faltaPagar > 0 ? `Falta: ${formatarMoeda(faltaPagar)}` : 'OK'}
-                                </div>
-                            </div>
-                            
-                            ${totalAtualPendente > 0 ? `
-                                <div style="margin-top: 8px; font-size: 12px; color: var(--warning-color);">
-                                    <i class="fas fa-clock"></i> Pendente: ${formatarMoeda(totalAtualPendente)}
-                                </div>
-                            ` : ''}
-                        </div>
-                    `;
-                });
-                
-                // Se não houver categorias, mostrar mensagem
-                if (!categoryHtml) {
-                    categoryHtml = '<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-secondary);"><i class="fas fa-chart-pie" style="font-size: 48px; margin-bottom: 16px;"></i><p>Nenhuma despesa encontrada nos últimos meses</p></div>';
-                }
-                
-                document.getElementById('categoryComparison').innerHTML = categoryHtml;
-                
-                // ============================================
-                // LISTAS
-                // ============================================
-                
-                document.getElementById('totalReceberLista').textContent = formatarMoeda(totalReceber);
-                document.getElementById('totalPagarLista').textContent = formatarMoeda(totalPagar);
+                // Totais das listas
+                document.getElementById('totalReceberLista').textContent = formatarMoeda(metricas.totalReceber);
+                document.getElementById('totalPagarLista').textContent = formatarMoeda(metricas.totalPagar);
                 
                 // Lista A RECEBER
-                const receberOrdenados = [...aReceber].sort((a, b) => {
+                const receberOrdenados = [...metricas.receitasPeriodo].sort((a, b) => {
                     const aAtrasado = a.dataVencimento && a.dataVencimento < hoje ? 1 : 0;
                     const bAtrasado = b.dataVencimento && b.dataVencimento < hoje ? 1 : 0;
                     if (aAtrasado !== bAtrasado) return bAtrasado - aAtrasado;
@@ -1258,31 +1551,40 @@
                 document.getElementById('listaReceber').innerHTML = receberOrdenados.length > 0 
                     ? receberOrdenados.map(item => {
                         const atrasado = item.dataVencimento && item.dataVencimento < hoje;
-                        const dataStr = item.dataVencimento 
-                            ? item.dataVencimento.toLocaleDateString('pt-PT') 
-                            : 'Data não definida';
+                        const venceHoje = item.dataVencimento && 
+                            item.dataVencimento.toDateString() === hoje.toDateString();
+                        
+                        let dataStr = 'Data não definida';
+                        let badge = '';
+                        
+                        if (item.dataVencimento) {
+                            dataStr = formatarData(item.dataVencimento);
+                            if (atrasado) {
+                                badge = '<span class="badge atrasado">ATRASADO</span>';
+                            } else if (venceHoje) {
+                                badge = '<span class="badge hoje">VENCE HOJE</span>';
+                            }
+                        }
                         
                         return `
-                            <div class="list-item receita ${atrasado ? 'atrasado' : ''}">
+                            <div class="list-item receber ${atrasado ? 'atrasado' : ''}">
                                 <div class="list-icon"><i class="fas fa-user"></i></div>
                                 <div class="list-content">
                                     <div class="list-title">${item.nome}</div>
                                     <div class="list-subtitle">${item.descricao}</div>
                                     <div class="list-meta">
                                         <span><i class="fas fa-calendar"></i> Vence: ${dataStr}</span>
-                                        ${atrasado ? '<span class="badge atrasado">ATRASADO</span>' : ''}
+                                        ${badge}
                                     </div>
                                 </div>
-                                <div class="list-value receita ${atrasado ? 'atrasado' : ''}">
-                                    ${formatarMoeda(item.valor)}
-                                </div>
+                                <div class="list-value receber">${formatarMoeda(item.valor)}</div>
                             </div>
                         `;
                     }).join('')
                     : '<div style="text-align: center; padding: 40px; color: var(--text-secondary);"><i class="fas fa-check-circle" style="font-size: 32px; margin-bottom: 12px;"></i><p>Nenhum valor a receber pendente</p></div>';
                 
                 // Lista A PAGAR
-                const pagarOrdenados = [...aPagar].sort((a, b) => {
+                const pagarOrdenados = [...metricas.despesasPeriodo].sort((a, b) => {
                     const aAtrasado = a.dataVencimento && a.dataVencimento < hoje ? 1 : 0;
                     const bAtrasado = b.dataVencimento && b.dataVencimento < hoje ? 1 : 0;
                     if (aAtrasado !== bAtrasado) return bAtrasado - aAtrasado;
@@ -1295,12 +1597,23 @@
                 document.getElementById('listaPagar').innerHTML = pagarOrdenados.length > 0
                     ? pagarOrdenados.map(item => {
                         const atrasado = item.dataVencimento && item.dataVencimento < hoje;
-                        const dataStr = item.dataVencimento 
-                            ? item.dataVencimento.toLocaleDateString('pt-PT') 
-                            : 'Data não definida';
+                        const venceHoje = item.dataVencimento && 
+                            item.dataVencimento.toDateString() === hoje.toDateString();
+                        
+                        let dataStr = 'Data não definida';
+                        let badge = '';
+                        
+                        if (item.dataVencimento) {
+                            dataStr = formatarData(item.dataVencimento);
+                            if (atrasado) {
+                                badge = '<span class="badge atrasado">ATRASADO</span>';
+                            } else if (venceHoje) {
+                                badge = '<span class="badge hoje">VENCE HOJE</span>';
+                            }
+                        }
                         
                         return `
-                            <div class="list-item despesa ${atrasado ? 'atrasado' : ''}">
+                            <div class="list-item pagar ${atrasado ? 'atrasado' : ''}">
                                 <div class="list-icon"><i class="fas fa-building"></i></div>
                                 <div class="list-content">
                                     <div class="list-title">${item.nome}</div>
@@ -1308,31 +1621,33 @@
                                     <div class="list-meta">
                                         <span><i class="fas fa-calendar"></i> Vence: ${dataStr}</span>
                                         <span><i class="fas fa-tag"></i> ${item.categoria}</span>
-                                        ${atrasado ? '<span class="badge atrasado">ATRASADO</span>' : ''}
+                                        ${badge}
                                     </div>
                                 </div>
-                                <div class="list-value despesa ${atrasado ? 'atrasado' : ''}">
-                                    ${formatarMoeda(item.valor)}
-                                </div>
+                                <div class="list-value pagar">${formatarMoeda(item.valor)}</div>
                             </div>
                         `;
                     }).join('')
                     : '<div style="text-align: center; padding: 40px; color: var(--text-secondary);"><i class="fas fa-check-circle" style="font-size: 32px; margin-bottom: 12px;"></i><p>Nenhuma despesa pendente</p></div>';
             }
             
-            function formatarMoeda(valor) {
-                return new Intl.NumberFormat('pt-PT', {
-                    style: 'currency',
-                    currency: 'EUR',
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 0
-                }).format(valor);
-            }
+            // ============================================
+            // EVENT LISTENERS
+            // ============================================
             
-            // Auto-refresh
-            setInterval(carregarDados, 60000);
+            privacyToggle.addEventListener('click', alternarPrivacidade);
             
-            // Iniciar
+            periodFilter.addEventListener('change', function() {
+                renderizarPainel();
+            });
+            
+            // Auto-refresh a cada 30 segundos
+            setInterval(() => {
+                carregarDados();
+            }, 30000);
+            
+            // Inicializar
+            atualizarDataAtual();
             carregarDados();
         });
     </script>
