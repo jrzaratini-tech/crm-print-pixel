@@ -239,6 +239,7 @@
             transition: all 0.2s;
             position: relative;
             box-shadow: 0 2px 8px rgba(0,0,0,0.02);
+            cursor: pointer;
         }
 
         .item-divida:hover {
@@ -481,19 +482,19 @@
             border-radius: 16px;
             padding: 16px;
             margin-bottom: 10px;
-            border-left: 4px solid;
             display: flex;
             justify-content: space-between;
             align-items: center;
             border: 1px solid #f1f5f9;
+            position: relative;
         }
 
         .pagamento-item.financas {
-            border-left-color: #3b82f6;
+            border-left: 4px solid #3b82f6;
         }
 
         .pagamento-item.escritorio {
-            border-left-color: #10b981;
+            border-left: 4px solid #10b981;
         }
 
         .pagamento-info h4 {
@@ -992,7 +993,7 @@
             
             try {
                 if (tipoExclusao === 'divida') {
-                    // Primeiro buscar todos pagamentos da dívida
+                    // Buscar todos pagamentos da dívida
                     const pagamentos = await carregarPagamentos(itemParaExcluir);
                     
                     // Excluir todos os pagamentos
@@ -1003,6 +1004,7 @@
                             body: JSON.stringify({
                                 schema: SCHEMAS[categoriaSelecionada].pagamento,
                                 id: pagamento.id,
+                                payload: null,  // Importante: para exclusão, payload null indica remoção
                                 delete: true
                             })
                         });
@@ -1015,6 +1017,7 @@
                         body: JSON.stringify({
                             schema: SCHEMAS[categoriaSelecionada].divida,
                             id: itemParaExcluir,
+                            payload: null,  // Importante: para exclusão, payload null indica remoção
                             delete: true
                         })
                     });
@@ -1056,6 +1059,7 @@
                         body: JSON.stringify({
                             schema: SCHEMAS[categoriaSelecionada].pagamento,
                             id: itemParaExcluir,
+                            payload: null,  // Importante: para exclusão, payload null indica remoção
                             delete: true
                         })
                     });
@@ -1107,8 +1111,8 @@
                 await atualizarMegaIndicadores();
                 
             } catch (error) {
-                console.error('Erro:', error);
-                mostrarMensagem('Erro ao excluir', 'error');
+                console.error('Erro ao excluir:', error);
+                mostrarMensagem('Erro ao excluir: ' + error.message, 'error');
                 fecharModal();
             }
         }
@@ -1203,7 +1207,7 @@
                 }
                 
                 html += `
-                    <div class="item-divida ${statusClass} ${selectedClass}" onclick="selecionarDivida('${divida.id}')">
+                    <div class="item-divida ${statusClass} ${selectedClass}" onclick="selecionarDivida('${divida.id}', event)">
                         <div class="divida-header">
                             <div style="display: flex; align-items: center; gap: 8px;">
                                 <span class="divida-titulo">${p.descricao}${statusText}</span>
@@ -1254,7 +1258,7 @@
             let options = '<option value="">Selecione uma dívida...</option>';
             
             dividas
-                .filter(d => (d.payload.saldoRestante || d.payload.valorTotal) > 0)
+                .filter(d => (d.payload.saldoRestante || d.payload.valorTotal - (d.payload.valorPago || 0)) > 0)
                 .forEach(divida => {
                     const restante = divida.payload.saldoRestante || (divida.payload.valorTotal - (divida.payload.valorPago || 0));
                     options += `<option value="${divida.id}">${divida.payload.descricao} - ${formatarMoeda(restante)} restante</option>`;
@@ -1266,7 +1270,7 @@
         // ============================================
         // SELECIONAR DÍVIDA
         // ============================================
-        async function selecionarDivida(dividaId) {
+        async function selecionarDivida(dividaId, event) {
             dividaSelecionadaId = dividaId;
             
             document.getElementById('formPagamentoContainer').classList.remove('hidden');
