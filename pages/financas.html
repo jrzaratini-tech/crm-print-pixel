@@ -785,7 +785,7 @@
 
     <script>
         // ============================================
-        // SISTEMA DE GESTÃO DE DÍVIDAS - SEM EXCLUSÃO
+        // SISTEMA DE GESTÃO DE DÍVIDAS - CORRIGIDO
         // ============================================
         
         const SCHEMAS = {
@@ -984,7 +984,7 @@
         }
 
         // ============================================
-        // SALVAR EDIÇÃO DE PAGAMENTO
+        // SALVAR EDIÇÃO DE PAGAMENTO - CORRIGIDO
         // ============================================
         async function salvarEdicaoPagamento() {
             if (!pagamentoEmEdicao) return;
@@ -1001,7 +1001,7 @@
             
             try {
                 // Atualizar o pagamento
-                await fetch('/api/database/commit', {
+                const responseUpdate = await fetch('/api/database/commit', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -1016,10 +1016,27 @@
                         }
                     })
                 });
+
+                if (!responseUpdate.ok) {
+                    throw new Error('Erro ao atualizar pagamento');
+                }
                 
-                // Recalcular total pago da dívida
-                const pagamentos = await carregarPagamentos(pagamentoEmEdicao.payload.dividaId);
-                const totalPago = pagamentos.reduce((sum, p) => sum + p.payload.valorPago, 0);
+                // Buscar todos os pagamentos atualizados da dívida
+                const responsePagamentos = await fetch('/api/database/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        schema: SCHEMAS[categoriaSelecionada].pagamento,
+                        filters: {}
+                    })
+                });
+                
+                const dataPagamentos = await responsePagamentos.json();
+                const todosPagamentos = dataPagamentos.events || [];
+                const pagamentosDivida = todosPagamentos.filter(p => p.payload.dividaId === pagamentoEmEdicao.payload.dividaId);
+                
+                // Recalcular total pago
+                const totalPago = pagamentosDivida.reduce((sum, p) => sum + p.payload.valorPago, 0);
                 
                 // Buscar a dívida
                 const responseDivida = await fetch('/api/database/query', {
@@ -1037,6 +1054,7 @@
                 if (divida) {
                     const saldoRestante = divida.payload.valorTotal - totalPago;
                     
+                    // Atualizar a dívida
                     await fetch('/api/database/commit', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -1055,16 +1073,38 @@
                 
                 mostrarMensagem('Pagamento atualizado com sucesso!', 'success');
                 
-                cancelarEdicaoPagamento();
+                // Importante: limpar o pagamento em edição e fechar o formulário
+                const dividaId = pagamentoEmEdicao.payload.dividaId;
+                pagamentoEmEdicao = null;
                 
+                document.getElementById('formEditarPagamentoContainer').classList.add('hidden');
+                document.getElementById('formPagamentoContainer').classList.remove('hidden');
+                
+                // Recarregar todos os dados
                 await carregarDividas();
                 await atualizarIndicadores();
                 await atualizarMegaIndicadores();
-                await mostrarHistoricoPagamentos(pagamentoEmEdicao.payload.dividaId);
+                
+                // Garantir que a dívida continue selecionada e o histórico atualizado
+                if (dividaSelecionadaId === dividaId) {
+                    await mostrarHistoricoPagamentos(dividaId);
+                } else {
+                    dividaSelecionadaId = dividaId;
+                    await mostrarHistoricoPagamentos(dividaId);
+                    
+                    // Atualizar a seleção visual
+                    document.querySelectorAll('.item-divida').forEach(item => {
+                        item.classList.remove('selected');
+                    });
+                    const dividaElement = document.querySelector(`[onclick*="'${dividaId}'"]`);
+                    if (dividaElement) {
+                        dividaElement.classList.add('selected');
+                    }
+                }
                 
             } catch (error) {
                 console.error('Erro ao atualizar pagamento:', error);
-                mostrarMensagem('Erro ao atualizar pagamento', 'error');
+                mostrarMensagem('Erro ao atualizar pagamento: ' + error.message, 'error');
             }
         }
 
