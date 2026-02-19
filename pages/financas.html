@@ -743,7 +743,6 @@
                 <!-- LISTA DE DÍVIDAS -->
                 <div id="listaDividas" class="lista-dividas">
                     <div style="text-align: center; color: #94a3b8; padding: 40px;">
-                        Carregando dívidas...
                     </div>
                 </div>
             </div>
@@ -929,20 +928,22 @@
         // ============================================
         // EDITAR DÍVIDA
         // ============================================
-        function editarDivida(dividaId, event) {
+        async function editarDivida(dividaId, event) {
             event.stopPropagation();
             
-            fetch('/api/database/query', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    schema: SCHEMAS[categoriaSelecionada].divida,
-                    filters: {}
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
+            try {
+                const response = await fetch('/api/database/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        schema: SCHEMAS[categoriaSelecionada].divida,
+                        filters: {}
+                    })
+                });
+                
+                const data = await response.json();
                 const divida = (data.events || []).find(d => d.id === dividaId);
+                
                 if (!divida) return;
                 
                 dividaEmEdicao = divida;
@@ -957,7 +958,10 @@
                 document.getElementById('observacoesDivida').value = divida.payload.observacoes || '';
                 
                 document.getElementById('formNovaDividaContainer').classList.remove('hidden');
-            });
+            } catch (error) {
+                console.error('Erro ao carregar dívida para edição:', error);
+                mostrarMensagem('Erro ao carregar dívida', 'error');
+            }
         }
 
         // ============================================
@@ -988,42 +992,63 @@
             itemParaExcluir = null;
         }
 
+        // ============================================
+        // CONFIRMAR EXCLUSÃO - CORRIGIDO
+        // ============================================
         async function confirmarExclusao() {
             if (!itemParaExcluir) return;
             
             try {
                 if (tipoExclusao === 'divida') {
-                    // Buscar todos pagamentos da dívida
-                    const pagamentos = await carregarPagamentos(itemParaExcluir);
+                    // Primeiro, buscar todos os pagamentos desta dívida
+                    const responsePagamentos = await fetch('/api/database/query', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            schema: SCHEMAS[categoriaSelecionada].pagamento,
+                            filters: {}
+                        })
+                    });
                     
-                    // Excluir todos os pagamentos
-                    for (const pagamento of pagamentos) {
+                    const dataPagamentos = await responsePagamentos.json();
+                    const todosPagamentos = dataPagamentos.events || [];
+                    
+                    // Filtrar pagamentos da dívida específica
+                    const pagamentosDivida = todosPagamentos.filter(p => p.payload.dividaId === itemParaExcluir);
+                    
+                    // Excluir cada pagamento individualmente
+                    for (const pagamento of pagamentosDivida) {
                         await fetch('/api/database/commit', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 schema: SCHEMAS[categoriaSelecionada].pagamento,
                                 id: pagamento.id,
-                                payload: null,  // Importante: para exclusão, payload null indica remoção
+                                payload: null,
                                 delete: true
                             })
                         });
                     }
                     
-                    // Excluir a dívida
-                    await fetch('/api/database/commit', {
+                    // Agora excluir a dívida
+                    const responseDivida = await fetch('/api/database/commit', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             schema: SCHEMAS[categoriaSelecionada].divida,
                             id: itemParaExcluir,
-                            payload: null,  // Importante: para exclusão, payload null indica remoção
+                            payload: null,
                             delete: true
                         })
                     });
                     
+                    if (!responseDivida.ok) {
+                        throw new Error('Erro ao excluir dívida');
+                    }
+                    
                     mostrarMensagem('Dívida excluída com sucesso!', 'success');
                     
+                    // Se a dívida excluída era a selecionada, limpar seleção
                     if (dividaSelecionadaId === itemParaExcluir) {
                         dividaSelecionadaId = null;
                         document.getElementById('formPagamentoContainer').classList.add('hidden');
@@ -1035,8 +1060,8 @@
                     }
                     
                 } else if (tipoExclusao === 'pagamento') {
-                    // Buscar o pagamento para saber a qual dívida pertence
-                    const response = await fetch('/api/database/query', {
+                    // Primeiro, buscar o pagamento para saber a qual dívida pertence
+                    const responsePagamento = await fetch('/api/database/query', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -1045,30 +1070,48 @@
                         })
                     });
                     
-                    const data = await response.json();
-                    const pagamento = (data.events || []).find(p => p.id === itemParaExcluir);
+                    const dataPagamento = await responsePagamento.json();
+                    const pagamento = (dataPagamento.events || []).find(p => p.id === itemParaExcluir);
                     
-                    if (!pagamento) return;
+                    if (!pagamento) {
+                        throw new Error('Pagamento não encontrado');
+                    }
                     
                     const dividaId = pagamento.payload.dividaId;
                     
                     // Excluir o pagamento
-                    await fetch('/api/database/commit', {
+                    const responseDelete = await fetch('/api/database/commit', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             schema: SCHEMAS[categoriaSelecionada].pagamento,
                             id: itemParaExcluir,
-                            payload: null,  // Importante: para exclusão, payload null indica remoção
+                            payload: null,
                             delete: true
                         })
                     });
                     
-                    // Recalcular o total pago da dívida
-                    const pagamentosRestantes = await carregarPagamentos(dividaId);
+                    if (!responseDelete.ok) {
+                        throw new Error('Erro ao excluir pagamento');
+                    }
+                    
+                    // Buscar todos os pagamentos restantes da dívida
+                    const responsePagamentosRestantes = await fetch('/api/database/query', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            schema: SCHEMAS[categoriaSelecionada].pagamento,
+                            filters: {}
+                        })
+                    });
+                    
+                    const dataPagamentosRestantes = await responsePagamentosRestantes.json();
+                    const pagamentosRestantes = (dataPagamentosRestantes.events || []).filter(p => p.payload.dividaId === dividaId);
+                    
+                    // Calcular total pago atualizado
                     const totalPago = pagamentosRestantes.reduce((sum, p) => sum + p.payload.valorPago, 0);
                     
-                    // Buscar a dívida
+                    // Buscar a dívida para atualizar
                     const responseDivida = await fetch('/api/database/query', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -1082,6 +1125,9 @@
                     const divida = (dataDivida.events || []).find(d => d.id === dividaId);
                     
                     if (divida) {
+                        const saldoRestante = divida.payload.valorTotal - totalPago;
+                        
+                        // Atualizar a dívida
                         await fetch('/api/database/commit', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
@@ -1091,8 +1137,8 @@
                                 payload: {
                                     ...divida.payload,
                                     valorPago: totalPago,
-                                    saldoRestante: divida.payload.valorTotal - totalPago,
-                                    status: totalPago >= divida.payload.valorTotal ? 'quitada' : 'ativa'
+                                    saldoRestante: saldoRestante,
+                                    status: saldoRestante <= 0 ? 'quitada' : 'ativa'
                                 }
                             })
                         });
@@ -1100,6 +1146,7 @@
                     
                     mostrarMensagem('Pagamento excluído com sucesso!', 'success');
                     
+                    // Atualizar histórico se a dívida ainda estiver selecionada
                     if (dividaSelecionadaId === dividaId) {
                         await mostrarHistoricoPagamentos(dividaId);
                     }
@@ -1157,14 +1204,20 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         schema: SCHEMAS[categoriaSelecionada].pagamento,
-                        filters: dividaId ? { dividaId } : {}
+                        filters: {}
                     })
                 });
 
                 if (!response.ok) throw new Error('Erro ao carregar pagamentos');
                 
                 const data = await response.json();
-                return data.events || [];
+                const pagamentos = data.events || [];
+                
+                if (dividaId) {
+                    return pagamentos.filter(p => p.payload.dividaId === dividaId);
+                }
+                
+                return pagamentos;
             } catch (error) {
                 console.error('Erro:', error);
                 return [];
@@ -1285,7 +1338,10 @@
             document.querySelectorAll('.item-divida').forEach(item => {
                 item.classList.remove('selected');
             });
-            event.currentTarget.classList.add('selected');
+            
+            if (event && event.currentTarget) {
+                event.currentTarget.classList.add('selected');
+            }
             
             await mostrarHistoricoPagamentos(dividaId);
         }
@@ -1425,6 +1481,7 @@
             }
 
             try {
+                // Buscar a dívida atual
                 const responseDividas = await fetch('/api/database/query', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1442,6 +1499,7 @@
                     return;
                 }
 
+                // Registrar o pagamento
                 const responsePagamento = await fetch('/api/database/commit', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1460,10 +1518,12 @@
 
                 if (!responsePagamento.ok) throw new Error('Erro ao registrar pagamento');
 
+                // Buscar todos os pagamentos atualizados
                 const pagamentos = await carregarPagamentos(dividaId);
-                const totalPago = pagamentos.reduce((sum, p) => sum + p.payload.valorPago, 0) + valorPago;
+                const totalPago = pagamentos.reduce((sum, p) => sum + p.payload.valorPago, 0);
                 const saldoRestante = divida.payload.valorTotal - totalPago;
 
+                // Atualizar a dívida
                 await fetch('/api/database/commit', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1500,6 +1560,7 @@
         // ============================================
         async function atualizarIndicadores() {
             try {
+                // Finanças
                 const respF = await fetch('/api/database/query', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1523,6 +1584,7 @@
                 document.getElementById('totalPagoFinancas').textContent = formatarMoeda(pagoF);
                 document.getElementById('totalRestanteFinancas').textContent = formatarMoeda(totalF - pagoF);
                 
+                // Escritório
                 const respE = await fetch('/api/database/query', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1556,6 +1618,7 @@
         // ============================================
         async function atualizarMegaIndicadores() {
             try {
+                // Finanças
                 const respF = await fetch('/api/database/query', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1575,6 +1638,7 @@
                 const totalF = dividasF.reduce((s, d) => s + (d.payload.valorTotal || 0), 0);
                 const pagoF = pagamentosF.reduce((s, p) => s + (p.payload.valorPago || 0), 0);
                 
+                // Escritório
                 const respE = await fetch('/api/database/query', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
