@@ -236,21 +236,33 @@
             border-radius: 20px;
             padding: 20px;
             margin-bottom: 12px;
-            cursor: pointer;
             transition: all 0.2s;
             position: relative;
             box-shadow: 0 2px 8px rgba(0,0,0,0.02);
         }
 
         .item-divida:hover {
-            border-color: #3b82f6;
-            box-shadow: 0 8px 20px -12px #3b82f6;
             transform: translateY(-1px);
+            box-shadow: 0 8px 20px -12px rgba(0,0,0,0.2);
         }
 
         .item-divida.selected {
             border: 2px solid #3b82f6;
             background: #f0f9ff;
+        }
+
+        .item-divida.status-ativo {
+            border-left: 6px solid #3b82f6;
+        }
+
+        .item-divida.status-quitada {
+            border-left: 6px solid #10b981;
+            opacity: 0.8;
+        }
+
+        .item-divida.status-atrasado {
+            border-left: 6px solid #ef4444;
+            background: #fef2f2;
         }
 
         .divida-header {
@@ -283,6 +295,36 @@
             color: #065f46;
         }
 
+        .divida-actions {
+            display: flex;
+            gap: 8px;
+            margin-left: 12px;
+        }
+
+        .btn-action {
+            background: transparent;
+            border: none;
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 16px;
+        }
+
+        .btn-action.edit:hover {
+            background: #dbeafe;
+            color: #3b82f6;
+        }
+
+        .btn-action.delete:hover {
+            background: #fee2e2;
+            color: #ef4444;
+        }
+
         .divida-valores-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -305,8 +347,12 @@
         .valor-numero {
             font-weight: 700;
             font-size: 16px;
-            color: #0f172a;
         }
+
+        .valor-numero.total { color: #0f172a; }
+        .valor-numero.pago { color: #10b981; }
+        .valor-numero.restante { color: #3b82f6; }
+        .valor-numero.atrasado { color: #ef4444; }
 
         .progresso-bar {
             height: 6px;
@@ -321,6 +367,10 @@
             background: linear-gradient(90deg, #3b82f6, #8b5cf6);
             border-radius: 10px;
             transition: width 0.3s;
+        }
+
+        .progresso-fill.quitada {
+            background: linear-gradient(90deg, #10b981, #34d399);
         }
 
         /* FORMULÁRIO COMPACTO */
@@ -399,6 +449,27 @@
             background: linear-gradient(135deg, #10b981, #059669);
         }
 
+        .btn-secondary {
+            background: #f1f5f9;
+            color: #475569;
+            border: 1px solid #e2e8f0;
+            padding: 14px 24px;
+            border-radius: 16px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .btn-secondary:hover {
+            background: #e2e8f0;
+        }
+
         /* HISTÓRICO DE PAGAMENTOS */
         .historico-pagamentos {
             max-height: 300px;
@@ -466,6 +537,71 @@
             to { transform: translateX(0); opacity: 1; }
         }
 
+        /* MODAL */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: white;
+            border-radius: 32px;
+            padding: 32px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25);
+        }
+
+        .modal-content h3 {
+            font-size: 24px;
+            margin-bottom: 20px;
+            color: #0f172a;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        .btn-modal {
+            flex: 1;
+            padding: 14px;
+            border-radius: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
+        }
+
+        .btn-modal.confirm {
+            background: #ef4444;
+            color: white;
+        }
+
+        .btn-modal.cancel {
+            background: #f1f5f9;
+            color: #475569;
+        }
+
+        .btn-modal.confirm:hover {
+            background: #dc2626;
+            transform: translateY(-2px);
+        }
+
+        .btn-modal.cancel:hover {
+            background: #e2e8f0;
+        }
+
         /* UTILS */
         .hidden {
             display: none !important;
@@ -510,11 +646,11 @@
                 </div>
                 <div class="mega-item">
                     <div class="mega-label">Pago Geral</div>
-                    <div class="mega-valor total" id="megaPagoGeral">€0,00</div>
+                    <div class="mega-valor total" style="color: #10b981;" id="megaPagoGeral">€0,00</div>
                 </div>
                 <div class="mega-item">
                     <div class="mega-label">Restante Geral</div>
-                    <div class="mega-valor total" id="megaRestanteGeral">€0,00</div>
+                    <div class="mega-valor total" style="color: #ef4444;" id="megaRestanteGeral">€0,00</div>
                 </div>
             </div>
         </div>
@@ -537,11 +673,11 @@
             </div>
             <div class="mega-item">
                 <div class="mega-label">Pago Finanças</div>
-                <div class="mega-valor financas" id="totalPagoFinancas">€0,00</div>
+                <div class="mega-valor financas" style="color: #10b981;" id="totalPagoFinancas">€0,00</div>
             </div>
             <div class="mega-item">
                 <div class="mega-label">Restante Finanças</div>
-                <div class="mega-valor financas" id="totalRestanteFinancas">€0,00</div>
+                <div class="mega-valor financas" style="color: #ef4444;" id="totalRestanteFinancas">€0,00</div>
             </div>
         </div>
 
@@ -552,11 +688,11 @@
             </div>
             <div class="mega-item">
                 <div class="mega-label">Pago Escritório</div>
-                <div class="mega-valor escritorio" id="totalPagoEscritorio">€0,00</div>
+                <div class="mega-valor escritorio" style="color: #10b981;" id="totalPagoEscritorio">€0,00</div>
             </div>
             <div class="mega-item">
                 <div class="mega-label">Restante Escritório</div>
-                <div class="mega-valor escritorio" id="totalRestanteEscritorio">€0,00</div>
+                <div class="mega-valor escritorio" style="color: #ef4444;" id="totalRestanteEscritorio">€0,00</div>
             </div>
         </div>
 
@@ -576,7 +712,7 @@
 
                 <!-- FORM NOVA DÍVIDA (OCULTO INICIALMENTE) -->
                 <div id="formNovaDividaContainer" class="form-compacto hidden">
-                    <h3 style="margin-bottom: 20px; font-size: 16px;">➕ Nova Dívida</h3>
+                    <h3 style="margin-bottom: 20px; font-size: 16px;" id="tituloFormDivida">➕ Nova Dívida</h3>
                     <div class="form-group">
                         <label>Descrição</label>
                         <input type="text" id="descricao" class="form-control" placeholder="Ex: IRS 2023">
@@ -597,6 +733,9 @@
                     </div>
                     <button class="btn-primary" id="btnSalvarDivida" onclick="salvarDivida()">
                         <i>💾</i> REGISTRAR DÍVIDA
+                    </button>
+                    <button class="btn-secondary hidden" id="btnCancelarEdicao" onclick="cancelarEdicao()">
+                        <i>✖️</i> Cancelar Edição
                     </button>
                 </div>
 
@@ -669,6 +808,18 @@
         </div>
     </div>
 
+    <!-- MODAL DE CONFIRMAÇÃO -->
+    <div id="modalConfirmacao" class="modal hidden" onclick="if(event.target === this) fecharModal()">
+        <div class="modal-content">
+            <h3 id="modalTitulo">Confirmar exclusão</h3>
+            <p id="modalMensagem">Tem certeza que deseja excluir este item?</p>
+            <div class="modal-actions">
+                <button class="btn-modal cancel" onclick="fecharModal()">Cancelar</button>
+                <button class="btn-modal confirm" id="modalConfirmBtn">Excluir</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // ============================================
         // SISTEMA DE GESTÃO DE DÍVIDAS - CORRIGIDO
@@ -687,6 +838,9 @@
 
         let categoriaSelecionada = 'financas';
         let dividaSelecionadaId = null;
+        let dividaEmEdicao = null;
+        let itemParaExcluir = null;
+        let tipoExclusao = 'divida';
 
         // ============================================
         // UTILS
@@ -712,6 +866,12 @@
             return `€${(valor || 0).toFixed(2)}`;
         }
 
+        function verificarAtraso(dataNegociacao) {
+            const data = new Date(dataNegociacao);
+            const hoje = new Date();
+            return data < hoje;
+        }
+
         // ============================================
         // MUDAR CATEGORIA
         // ============================================
@@ -722,26 +882,21 @@
             document.getElementById('tabEscritorio').classList.remove('active');
             document.getElementById(`tab${categoria.charAt(0).toUpperCase() + categoria.slice(1)}`).classList.add('active');
             
-            // Mostrar/esconder indicadores
             document.getElementById('indicadoresFinancas').style.display = categoria === 'financas' ? 'flex' : 'none';
             document.getElementById('indicadoresEscritorio').style.display = categoria === 'escritorio' ? 'flex' : 'none';
             
-            // Atualizar títulos
             document.getElementById('tituloLista').textContent = `Dívidas Ativas - ${categoria === 'financas' ? 'Finanças' : 'Escritório'}`;
             document.getElementById('tituloPagamento').textContent = `Registrar Pagamento - ${categoria === 'financas' ? 'Finanças' : 'Escritório'}`;
             
-            // Atualizar cor do botão
             const btnDivida = document.getElementById('btnSalvarDivida');
             const btnPagamento = document.getElementById('btnSalvarPagamento');
             
             btnDivida.className = `btn-primary ${categoria}`;
             btnPagamento.className = `btn-primary ${categoria}`;
             
-            // Limpar seleção
             dividaSelecionadaId = null;
             document.getElementById('formPagamentoContainer').classList.add('hidden');
             
-            // Recarregar
             carregarDividas();
             atualizarIndicadores();
             atualizarMegaIndicadores();
@@ -751,12 +906,210 @@
         // MOSTRAR FORM NOVA DÍVIDA
         // ============================================
         function mostrarFormNovaDivida() {
+            dividaEmEdicao = null;
+            document.getElementById('tituloFormDivida').textContent = '➕ Nova Dívida';
+            document.getElementById('btnSalvarDivida').innerHTML = '<i>💾</i> REGISTRAR DÍVIDA';
+            document.getElementById('btnCancelarEdicao').classList.add('hidden');
+            
+            document.getElementById('descricao').value = '';
+            document.getElementById('valorTotal').value = '';
+            document.getElementById('observacoesDivida').value = '';
+            document.getElementById('dataNegociacao').valueAsDate = new Date();
+            
             const container = document.getElementById('formNovaDividaContainer');
             container.classList.toggle('hidden');
+        }
+
+        function cancelarEdicao() {
+            dividaEmEdicao = null;
+            document.getElementById('formNovaDividaContainer').classList.add('hidden');
+        }
+
+        // ============================================
+        // EDITAR DÍVIDA
+        // ============================================
+        function editarDivida(dividaId, event) {
+            event.stopPropagation();
             
-            // Setar data padrão
-            if (!document.getElementById('dataNegociacao').value) {
-                document.getElementById('dataNegociacao').valueAsDate = new Date();
+            fetch('/api/database/query', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    schema: SCHEMAS[categoriaSelecionada].divida,
+                    filters: {}
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                const divida = (data.events || []).find(d => d.id === dividaId);
+                if (!divida) return;
+                
+                dividaEmEdicao = divida;
+                
+                document.getElementById('tituloFormDivida').textContent = '✏️ Editar Dívida';
+                document.getElementById('btnSalvarDivida').innerHTML = '<i>💾</i> ATUALIZAR DÍVIDA';
+                document.getElementById('btnCancelarEdicao').classList.remove('hidden');
+                
+                document.getElementById('descricao').value = divida.payload.descricao;
+                document.getElementById('valorTotal').value = divida.payload.valorTotal;
+                document.getElementById('dataNegociacao').value = divida.payload.dataNegociacao;
+                document.getElementById('observacoesDivida').value = divida.payload.observacoes || '';
+                
+                document.getElementById('formNovaDividaContainer').classList.remove('hidden');
+            });
+        }
+
+        // ============================================
+        // EXCLUIR DÍVIDA
+        // ============================================
+        function excluirDivida(dividaId, event) {
+            event.stopPropagation();
+            itemParaExcluir = dividaId;
+            tipoExclusao = 'divida';
+            document.getElementById('modalTitulo').textContent = 'Confirmar exclusão';
+            document.getElementById('modalMensagem').textContent = 'Tem certeza que deseja excluir esta dívida? Todos os pagamentos associados também serão excluídos.';
+            document.getElementById('modalConfirmBtn').onclick = confirmarExclusao;
+            document.getElementById('modalConfirmacao').classList.remove('hidden');
+        }
+
+        function excluirPagamento(pagamentoId, event) {
+            event.stopPropagation();
+            itemParaExcluir = pagamentoId;
+            tipoExclusao = 'pagamento';
+            document.getElementById('modalTitulo').textContent = 'Confirmar exclusão';
+            document.getElementById('modalMensagem').textContent = 'Tem certeza que deseja excluir este pagamento?';
+            document.getElementById('modalConfirmBtn').onclick = confirmarExclusao;
+            document.getElementById('modalConfirmacao').classList.remove('hidden');
+        }
+
+        function fecharModal() {
+            document.getElementById('modalConfirmacao').classList.add('hidden');
+            itemParaExcluir = null;
+        }
+
+        async function confirmarExclusao() {
+            if (!itemParaExcluir) return;
+            
+            try {
+                if (tipoExclusao === 'divida') {
+                    // Primeiro buscar todos pagamentos da dívida
+                    const pagamentos = await carregarPagamentos(itemParaExcluir);
+                    
+                    // Excluir todos os pagamentos
+                    for (const pagamento of pagamentos) {
+                        await fetch('/api/database/commit', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                schema: SCHEMAS[categoriaSelecionada].pagamento,
+                                id: pagamento.id,
+                                delete: true
+                            })
+                        });
+                    }
+                    
+                    // Excluir a dívida
+                    await fetch('/api/database/commit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            schema: SCHEMAS[categoriaSelecionada].divida,
+                            id: itemParaExcluir,
+                            delete: true
+                        })
+                    });
+                    
+                    mostrarMensagem('Dívida excluída com sucesso!', 'success');
+                    
+                    if (dividaSelecionadaId === itemParaExcluir) {
+                        dividaSelecionadaId = null;
+                        document.getElementById('formPagamentoContainer').classList.add('hidden');
+                        document.getElementById('historicoPagamentos').innerHTML = `
+                            <div style="text-align: center; color: #94a3b8; padding: 30px;">
+                                Selecione uma dívida para ver os pagamentos
+                            </div>
+                        `;
+                    }
+                    
+                } else if (tipoExclusao === 'pagamento') {
+                    // Buscar o pagamento para saber a qual dívida pertence
+                    const response = await fetch('/api/database/query', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            schema: SCHEMAS[categoriaSelecionada].pagamento,
+                            filters: {}
+                        })
+                    });
+                    
+                    const data = await response.json();
+                    const pagamento = (data.events || []).find(p => p.id === itemParaExcluir);
+                    
+                    if (!pagamento) return;
+                    
+                    const dividaId = pagamento.payload.dividaId;
+                    
+                    // Excluir o pagamento
+                    await fetch('/api/database/commit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            schema: SCHEMAS[categoriaSelecionada].pagamento,
+                            id: itemParaExcluir,
+                            delete: true
+                        })
+                    });
+                    
+                    // Recalcular o total pago da dívida
+                    const pagamentosRestantes = await carregarPagamentos(dividaId);
+                    const totalPago = pagamentosRestantes.reduce((sum, p) => sum + p.payload.valorPago, 0);
+                    
+                    // Buscar a dívida
+                    const responseDivida = await fetch('/api/database/query', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            schema: SCHEMAS[categoriaSelecionada].divida,
+                            filters: {}
+                        })
+                    });
+                    
+                    const dataDivida = await responseDivida.json();
+                    const divida = (dataDivida.events || []).find(d => d.id === dividaId);
+                    
+                    if (divida) {
+                        await fetch('/api/database/commit', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                schema: SCHEMAS[categoriaSelecionada].divida,
+                                id: dividaId,
+                                payload: {
+                                    ...divida.payload,
+                                    valorPago: totalPago,
+                                    saldoRestante: divida.payload.valorTotal - totalPago,
+                                    status: totalPago >= divida.payload.valorTotal ? 'quitada' : 'ativa'
+                                }
+                            })
+                        });
+                    }
+                    
+                    mostrarMensagem('Pagamento excluído com sucesso!', 'success');
+                    
+                    if (dividaSelecionadaId === dividaId) {
+                        await mostrarHistoricoPagamentos(dividaId);
+                    }
+                }
+                
+                fecharModal();
+                await carregarDividas();
+                await atualizarIndicadores();
+                await atualizarMegaIndicadores();
+                
+            } catch (error) {
+                console.error('Erro:', error);
+                mostrarMensagem('Erro ao excluir', 'error');
+                fecharModal();
             }
         }
 
@@ -837,30 +1190,54 @@
                 const percentual = p.valorTotal > 0 ? ((p.valorPago || 0) / p.valorTotal) * 100 : 0;
                 const selectedClass = dividaSelecionadaId === divida.id ? 'selected' : '';
                 
+                // Determinar status
+                let statusClass = 'status-ativo';
+                let statusText = '';
+                
+                if (p.valorPago >= p.valorTotal) {
+                    statusClass = 'status-quitada';
+                    statusText = ' (Quitada)';
+                } else if (verificarAtraso(p.dataNegociacao) && p.valorPago < p.valorTotal) {
+                    statusClass = 'status-atrasado';
+                    statusText = ' (Em atraso)';
+                }
+                
                 html += `
-                    <div class="item-divida ${selectedClass}" onclick="selecionarDivida('${divida.id}')">
+                    <div class="item-divida ${statusClass} ${selectedClass}" onclick="selecionarDivida('${divida.id}')">
                         <div class="divida-header">
-                            <span class="divida-titulo">${p.descricao}</span>
-                            <span class="categoria-badge ${categoriaSelecionada}">
-                                ${categoriaSelecionada === 'financas' ? 'Finanças' : 'Escritório'}
-                            </span>
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <span class="divida-titulo">${p.descricao}${statusText}</span>
+                                <span class="categoria-badge ${categoriaSelecionada}">
+                                    ${categoriaSelecionada === 'financas' ? 'Finanças' : 'Escritório'}
+                                </span>
+                            </div>
+                            <div class="divida-actions">
+                                <button class="btn-action edit" onclick="editarDivida('${divida.id}', event)" title="Editar">
+                                    ✏️
+                                </button>
+                                <button class="btn-action delete" onclick="excluirDivida('${divida.id}', event)" title="Excluir">
+                                    🗑️
+                                </button>
+                            </div>
                         </div>
                         <div class="divida-valores-grid">
                             <div class="valor-box">
                                 <div class="valor-label">Total</div>
-                                <div class="valor-numero">${formatarMoeda(p.valorTotal)}</div>
+                                <div class="valor-numero total">${formatarMoeda(p.valorTotal)}</div>
                             </div>
                             <div class="valor-box">
                                 <div class="valor-label">Pago</div>
-                                <div class="valor-numero">${formatarMoeda(p.valorPago || 0)}</div>
+                                <div class="valor-numero pago">${formatarMoeda(p.valorPago || 0)}</div>
                             </div>
                             <div class="valor-box">
                                 <div class="valor-label">Restante</div>
-                                <div class="valor-numero">${formatarMoeda(p.saldoRestante || p.valorTotal)}</div>
+                                <div class="valor-numero ${p.valorPago >= p.valorTotal ? 'pago' : (verificarAtraso(p.dataNegociacao) ? 'atrasado' : 'restante')}">
+                                    ${formatarMoeda(p.saldoRestante || (p.valorTotal - (p.valorPago || 0)))}
+                                </div>
                             </div>
                         </div>
                         <div class="progresso-bar">
-                            <div class="progresso-fill" style="width: ${percentual}%"></div>
+                            <div class="progresso-fill ${p.valorPago >= p.valorTotal ? 'quitada' : ''}" style="width: ${percentual}%"></div>
                         </div>
                     </div>
                 `;
@@ -879,7 +1256,7 @@
             dividas
                 .filter(d => (d.payload.saldoRestante || d.payload.valorTotal) > 0)
                 .forEach(divida => {
-                    const restante = divida.payload.saldoRestante || divida.payload.valorTotal;
+                    const restante = divida.payload.saldoRestante || (divida.payload.valorTotal - (divida.payload.valorPago || 0));
                     options += `<option value="${divida.id}">${divida.payload.descricao} - ${formatarMoeda(restante)} restante</option>`;
                 });
             
@@ -892,25 +1269,20 @@
         async function selecionarDivida(dividaId) {
             dividaSelecionadaId = dividaId;
             
-            // Mostrar formulário de pagamento
             document.getElementById('formPagamentoContainer').classList.remove('hidden');
             
-            // Setar data padrão
             if (!document.getElementById('dataPagamento').value) {
                 document.getElementById('dataPagamento').valueAsDate = new Date();
             }
             
-            // Selecionar no dropdown
             const select = document.getElementById('dividaSelect');
             select.value = dividaId;
             
-            // Destacar item
             document.querySelectorAll('.item-divida').forEach(item => {
                 item.classList.remove('selected');
             });
             event.currentTarget.classList.add('selected');
             
-            // Mostrar histórico
             await mostrarHistoricoPagamentos(dividaId);
         }
 
@@ -936,7 +1308,7 @@
             pagamentos.forEach(pagamento => {
                 const p = pagamento.payload;
                 html += `
-                    <div class="pagamento-item ${categoriaSelecionada}">
+                    <div class="pagamento-item ${categoriaSelecionada}" style="position: relative;">
                         <div class="pagamento-info">
                             <h4>${p.formaPagamento}</h4>
                             <div class="pagamento-meta">
@@ -944,7 +1316,12 @@
                                 <span>📝 ${p.observacoes || 'Sem obs'}</span>
                             </div>
                         </div>
-                        <div class="pagamento-valor">${formatarMoeda(p.valorPago)}</div>
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div class="pagamento-valor">${formatarMoeda(p.valorPago)}</div>
+                            <button class="btn-action delete" onclick="excluirPagamento('${pagamento.id}', event)" title="Excluir pagamento">
+                                🗑️
+                            </button>
+                        </div>
                     </div>
                 `;
             });
@@ -967,43 +1344,64 @@
             }
 
             try {
-                const response = await fetch('/api/database/commit', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        schema: SCHEMAS[categoriaSelecionada].divida,
-                        payload: {
-                            descricao,
-                            valorTotal,
-                            valorPago: 0,
-                            saldoRestante: valorTotal,
-                            dataNegociacao,
-                            observacoes,
-                            status: 'ativa',
-                            categoria: categoriaSelecionada,
-                            dataCriacao: new Date().toISOString()
-                        }
-                    })
-                });
-
-                if (!response.ok) throw new Error('Erro ao salvar');
+                if (dividaEmEdicao) {
+                    // Atualizar dívida existente
+                    await fetch('/api/database/commit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            schema: SCHEMAS[categoriaSelecionada].divida,
+                            id: dividaEmEdicao.id,
+                            payload: {
+                                ...dividaEmEdicao.payload,
+                                descricao,
+                                valorTotal,
+                                dataNegociacao,
+                                observacoes
+                            }
+                        })
+                    });
+                    
+                    mostrarMensagem('Dívida atualizada com sucesso!', 'success');
+                    dividaEmEdicao = null;
+                    document.getElementById('btnCancelarEdicao').classList.add('hidden');
+                    
+                } else {
+                    // Nova dívida
+                    await fetch('/api/database/commit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            schema: SCHEMAS[categoriaSelecionada].divida,
+                            payload: {
+                                descricao,
+                                valorTotal,
+                                valorPago: 0,
+                                saldoRestante: valorTotal,
+                                dataNegociacao,
+                                observacoes,
+                                status: 'ativa',
+                                categoria: categoriaSelecionada,
+                                dataCriacao: new Date().toISOString()
+                            }
+                        })
+                    });
+                    
+                    mostrarMensagem('Dívida registrada com sucesso!', 'success');
+                }
                 
-                mostrarMensagem('Dívida registrada com sucesso!', 'success');
-                
-                // Limpar e esconder form
                 document.getElementById('descricao').value = '';
                 document.getElementById('valorTotal').value = '';
                 document.getElementById('observacoesDivida').value = '';
                 document.getElementById('formNovaDividaContainer').classList.add('hidden');
                 
-                // Recarregar
                 await carregarDividas();
                 await atualizarIndicadores();
                 await atualizarMegaIndicadores();
                 
             } catch (error) {
                 console.error('Erro:', error);
-                mostrarMensagem('Erro ao registrar dívida', 'error');
+                mostrarMensagem('Erro ao salvar dívida', 'error');
             }
         }
 
@@ -1023,7 +1421,6 @@
             }
 
             try {
-                // 1. Buscar dívida atual
                 const responseDividas = await fetch('/api/database/query', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1041,7 +1438,6 @@
                     return;
                 }
 
-                // 2. Registrar pagamento
                 const responsePagamento = await fetch('/api/database/commit', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1060,12 +1456,10 @@
 
                 if (!responsePagamento.ok) throw new Error('Erro ao registrar pagamento');
 
-                // 3. Buscar todos pagamentos da dívida
                 const pagamentos = await carregarPagamentos(dividaId);
                 const totalPago = pagamentos.reduce((sum, p) => sum + p.payload.valorPago, 0) + valorPago;
                 const saldoRestante = divida.payload.valorTotal - totalPago;
 
-                // 4. Atualizar dívida
                 await fetch('/api/database/commit', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1083,11 +1477,9 @@
                 
                 mostrarMensagem('Pagamento registrado com sucesso!', 'success');
                 
-                // Limpar campos
                 document.getElementById('valorPago').value = '';
                 document.getElementById('observacoesPagamento').value = '';
                 
-                // Recarregar
                 await carregarDividas();
                 await atualizarIndicadores();
                 await atualizarMegaIndicadores();
@@ -1104,7 +1496,6 @@
         // ============================================
         async function atualizarIndicadores() {
             try {
-                // Finanças
                 const respF = await fetch('/api/database/query', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1128,7 +1519,6 @@
                 document.getElementById('totalPagoFinancas').textContent = formatarMoeda(pagoF);
                 document.getElementById('totalRestanteFinancas').textContent = formatarMoeda(totalF - pagoF);
                 
-                // Escritório
                 const respE = await fetch('/api/database/query', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1162,7 +1552,6 @@
         // ============================================
         async function atualizarMegaIndicadores() {
             try {
-                // Finanças
                 const respF = await fetch('/api/database/query', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1182,7 +1571,6 @@
                 const totalF = dividasF.reduce((s, d) => s + (d.payload.valorTotal || 0), 0);
                 const pagoF = pagamentosF.reduce((s, p) => s + (p.payload.valorPago || 0), 0);
                 
-                // Escritório
                 const respE = await fetch('/api/database/query', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -1202,7 +1590,6 @@
                 const totalE = dividasE.reduce((s, d) => s + (d.payload.valorTotal || 0), 0);
                 const pagoE = pagamentosE.reduce((s, p) => s + (p.payload.valorPago || 0), 0);
                 
-                // Totais gerais
                 const totalGeral = totalF + totalE;
                 const pagoGeral = pagoF + pagoE;
                 
@@ -1221,17 +1608,14 @@
         document.addEventListener('DOMContentLoaded', async () => {
             console.log('🚀 Sistema Iniciado');
             
-            // Setar datas padrão
             const hoje = new Date().toISOString().split('T')[0];
             document.getElementById('dataNegociacao').value = hoje;
             document.getElementById('dataPagamento').value = hoje;
             
-            // Carregar dados
             await carregarDividas();
             await atualizarIndicadores();
             await atualizarMegaIndicadores();
             
-            // Verificar conexão
             try {
                 await fetch('/api/database/init');
                 console.log('✅ Conectado à API');
