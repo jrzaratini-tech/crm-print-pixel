@@ -336,6 +336,10 @@
             background: var(--accent-green);
         }
         
+        .action-btn.print:hover {
+            background: #7c3aed;
+        }
+        
         .action-btn.delay:hover {
             background: var(--accent-red);
         }
@@ -845,6 +849,256 @@
             let todasOrdens = [];
             let filtroAtual = 'all';
             let contadorRefresh = 30;
+            const camposConhecidosPayload = new Set([
+                'cliente', 'empresa', 'nif', 'morada', 'telemovel', 'numero', 'numeroFatura',
+                'produtos', 'pagamentos', 'total', 'subtotal', 'iva', 'instalacao', 'entrada',
+                'dataEntrada', 'totalPago', 'saldoPendente', 'statusPagamento', 'status',
+                'dataEntrega', 'dataFechamento', 'atendente', 'observacoes', 'comIVA'
+            ]);
+            
+            function escapeHtml(valor) {
+                return String(valor ?? '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#39;');
+            }
+            
+            function formatarDataPadrao(dataStr, incluirHora = false) {
+                if (!dataStr) return 'NÃ£o informado';
+                try {
+                    const data = new Date(dataStr);
+                    if (Number.isNaN(data.getTime())) return dataStr;
+                    if (incluirHora) {
+                        return data.toLocaleDateString('pt-PT') + ' ' + data.toLocaleTimeString('pt-PT', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                        });
+                    }
+                    return data.toLocaleDateString('pt-PT');
+                } catch (e) {
+                    return dataStr;
+                }
+            }
+            
+            function formatarMoedaPadrao(valor, casasDecimais = 2) {
+                return new Intl.NumberFormat('pt-PT', {
+                    style: 'currency',
+                    currency: 'EUR',
+                    minimumFractionDigits: casasDecimais,
+                    maximumFractionDigits: casasDecimais
+                }).format(parseFloat(valor) || 0);
+            }
+            
+            function formatarTempoPadrao(minutos) {
+                if (minutos < 60) return `${minutos}min`;
+                const horas = Math.floor(minutos / 60);
+                const mins = minutos % 60;
+                return `${horas}h${mins > 0 ? ` ${mins}min` : ''}`;
+            }
+            
+            function getStatusInfoPadrao(status) {
+                switch(status) {
+                    case 'pendente': return { texto: 'PENDENTE', classe: 'status-pendente' };
+                    case 'processamento': return { texto: 'EM PRODUÃ‡ÃƒO', classe: 'status-processamento' };
+                    case 'atrasado': return { texto: 'ATRASADO', classe: 'status-atrasado' };
+                    case 'concluido': return { texto: 'CONCLUÃDO', classe: 'status-concluido' };
+                    default: return { texto: status || 'N/A', classe: '' };
+                }
+            }
+            
+            function getStatusPagamentoInfo(status) {
+                switch(status) {
+                    case 'pago': return { texto: 'Pago', classe: 'status-concluido' };
+                    case 'parcial': return { texto: 'Parcial', classe: 'status-pendente' };
+                    case 'pendente': return { texto: 'Pendente', classe: 'status-atrasado' };
+                    default: return { texto: status || 'NÃ£o informado', classe: '' };
+                }
+            }
+            
+            function formatarChaveCampo(chave) {
+                return String(chave || '')
+                    .replace(/([a-z])([A-Z])/g, '$1 $2')
+                    .replace(/[_-]+/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim()
+                    .replace(/^./, letra => letra.toUpperCase());
+            }
+            
+            function formatarValorExtra(valor) {
+                if (valor === null || valor === undefined || valor === '') return 'NÃ£o informado';
+                if (Array.isArray(valor) || typeof valor === 'object') {
+                    return JSON.stringify(valor, null, 2);
+                }
+                return String(valor);
+            }
+            
+            function obterCamposExtras(ordem) {
+                const payload = ordem.originalPayload || {};
+                return Object.entries(payload).filter(([chave]) => !camposConhecidosPayload.has(chave));
+            }
+            
+            function gerarHtmlImpressao(ordem) {
+                const produtos = Array.isArray(ordem.produtos) ? ordem.produtos : [];
+                const pagamentos = Array.isArray(ordem.pagamentos) ? ordem.pagamentos : [];
+                const extras = obterCamposExtras(ordem);
+                const statusInfo = getStatusInfoPadrao(ordem.status);
+                const statusPagamentoInfo = getStatusPagamentoInfo(ordem.statusPagamento);
+                const subtotal = parseFloat(ordem.subtotal) || ((parseFloat(ordem.total) || 0) - (parseFloat(ordem.iva) || 0));
+                const totalPago = parseFloat(ordem.totalPago) || 0;
+                const saldoPendente = parseFloat(ordem.saldoPendente) || ((parseFloat(ordem.total) || 0) - totalPago);
+                
+                return `
+                    <!DOCTYPE html>
+                    <html lang="pt">
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>ImpressÃ£o Ordem ${escapeHtml(ordem.numero)}</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; color: #0f172a; margin: 24px; }
+                            .header { display: flex; justify-content: space-between; gap: 24px; margin-bottom: 24px; border-bottom: 2px solid #cbd5e1; padding-bottom: 16px; }
+                            .title h1 { margin: 0 0 6px; font-size: 28px; }
+                            .title p { margin: 0; color: #475569; }
+                            .badge { display: inline-block; padding: 6px 12px; border-radius: 999px; background: #e2e8f0; font-size: 12px; font-weight: 700; }
+                            .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 20px; }
+                            .card { border: 1px solid #cbd5e1; border-radius: 10px; padding: 16px; break-inside: avoid; }
+                            .card h2 { margin: 0 0 12px; font-size: 16px; }
+                            .row { display: flex; justify-content: space-between; gap: 16px; padding: 6px 0; border-bottom: 1px solid #e2e8f0; }
+                            .row:last-child { border-bottom: none; }
+                            .label { color: #475569; font-weight: 700; }
+                            .value { text-align: right; white-space: pre-wrap; word-break: break-word; }
+                            table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+                            th, td { border: 1px solid #cbd5e1; padding: 10px; text-align: left; vertical-align: top; }
+                            th { background: #f8fafc; }
+                            .section { margin-bottom: 20px; }
+                            .section h2 { margin-bottom: 10px; font-size: 18px; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="header">
+                            <div class="title">
+                                <h1>Ordem de ProduÃ§Ã£o</h1>
+                                <p>ServiÃ§o ${escapeHtml(ordem.numero)} - PrintPixel</p>
+                            </div>
+                            <div class="badge">${escapeHtml(statusInfo.texto)}</div>
+                        </div>
+                        <div class="grid">
+                            <div class="card">
+                                <h2>InformaÃ§Ãµes do Pedido</h2>
+                                <div class="row"><span class="label">NÃºmero</span><span class="value">${escapeHtml(ordem.numero)}</span></div>
+                                <div class="row"><span class="label">Status</span><span class="value">${escapeHtml(statusInfo.texto)}</span></div>
+                                <div class="row"><span class="label">Status Pagamento</span><span class="value">${escapeHtml(statusPagamentoInfo.texto)}</span></div>
+                                <div class="row"><span class="label">Entrega</span><span class="value">${escapeHtml(formatarDataPadrao(ordem.dataEntrega, true))}</span></div>
+                                <div class="row"><span class="label">Fechamento</span><span class="value">${escapeHtml(formatarDataPadrao(ordem.dataFechamento, true))}</span></div>
+                                <div class="row"><span class="label">Criado em</span><span class="value">${escapeHtml(formatarDataPadrao(ordem.createdAt, true))}</span></div>
+                                <div class="row"><span class="label">Atendente</span><span class="value">${escapeHtml(ordem.atendente || 'NÃ£o informado')}</span></div>
+                                <div class="row"><span class="label">NÂº Fatura</span><span class="value">${escapeHtml(ordem.numeroFatura || 'NÃ£o informado')}</span></div>
+                            </div>
+                            <div class="card">
+                                <h2>Cliente</h2>
+                                <div class="row"><span class="label">Cliente</span><span class="value">${escapeHtml(ordem.cliente)}</span></div>
+                                <div class="row"><span class="label">Empresa</span><span class="value">${escapeHtml(ordem.empresa)}</span></div>
+                                <div class="row"><span class="label">NIF</span><span class="value">${escapeHtml(ordem.nif || 'NÃ£o informado')}</span></div>
+                                <div class="row"><span class="label">Morada</span><span class="value">${escapeHtml(ordem.morada || 'NÃ£o informada')}</span></div>
+                                <div class="row"><span class="label">TelemÃ³vel</span><span class="value">${escapeHtml(ordem.telemovel || 'NÃ£o informado')}</span></div>
+                            </div>
+                        </div>
+                        <div class="section">
+                            <h2>Produtos (${produtos.length})</h2>
+                            <table>
+                                <thead>
+                                    <tr><th>Produto</th><th>Tamanho</th><th>Qtd</th><th>Valor Unit.</th><th>Total</th><th>ObservaÃ§Ãµes</th></tr>
+                                </thead>
+                                <tbody>
+                                    ${produtos.length ? produtos.map(prod => `
+                                        <tr>
+                                            <td>${escapeHtml(prod.nome || 'Produto')}</td>
+                                            <td>${escapeHtml(prod.tamanho || 'N/A')}</td>
+                                            <td>${escapeHtml(prod.quantidade || 1)}</td>
+                                            <td>${escapeHtml(formatarMoedaPadrao(prod.valor || 0))}</td>
+                                            <td>${escapeHtml(formatarMoedaPadrao((parseFloat(prod.valor) || 0) * (parseFloat(prod.quantidade) || 1)))}</td>
+                                            <td>${escapeHtml(prod.observacoes || '')}</td>
+                                        </tr>
+                                    `).join('') : '<tr><td colspan="6">Nenhum produto informado.</td></tr>'}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="section">
+                            <h2>Pagamentos (${pagamentos.length})</h2>
+                            <table>
+                                <thead>
+                                    <tr><th>Tipo</th><th>Data</th><th>Valor</th><th>Forma</th><th>Status</th><th>ReferÃªncia</th><th>ObservaÃ§Ãµes</th></tr>
+                                </thead>
+                                <tbody>
+                                    ${pagamentos.length ? pagamentos.map(pag => `
+                                        <tr>
+                                            <td>${escapeHtml(pag.tipo || 'N/A')}</td>
+                                            <td>${escapeHtml(formatarDataPadrao(pag.data, true))}</td>
+                                            <td>${escapeHtml(formatarMoedaPadrao(pag.valor || 0))}</td>
+                                            <td>${escapeHtml(pag.formaPagamento || 'N/A')}</td>
+                                            <td>${escapeHtml(pag.status || 'N/A')}</td>
+                                            <td>${escapeHtml(pag.referencia || 'N/A')}</td>
+                                            <td>${escapeHtml(pag.observacoes || '')}</td>
+                                        </tr>
+                                    `).join('') : '<tr><td colspan="7">Nenhum pagamento informado.</td></tr>'}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="grid">
+                            <div class="card">
+                                <h2>Resumo Financeiro</h2>
+                                <div class="row"><span class="label">Subtotal</span><span class="value">${escapeHtml(formatarMoedaPadrao(subtotal))}</span></div>
+                                <div class="row"><span class="label">IVA</span><span class="value">${escapeHtml(formatarMoedaPadrao(ordem.iva || 0))}</span></div>
+                                <div class="row"><span class="label">InstalaÃ§Ã£o</span><span class="value">${escapeHtml(formatarMoedaPadrao(ordem.instalacao || 0))}</span></div>
+                                <div class="row"><span class="label">Entrada</span><span class="value">${escapeHtml(formatarMoedaPadrao(ordem.entrada || 0))}</span></div>
+                                <div class="row"><span class="label">Data Entrada</span><span class="value">${escapeHtml(formatarDataPadrao(ordem.dataEntrada, true))}</span></div>
+                                <div class="row"><span class="label">Total Pago</span><span class="value">${escapeHtml(formatarMoedaPadrao(totalPago))}</span></div>
+                                <div class="row"><span class="label">Saldo Pendente</span><span class="value">${escapeHtml(formatarMoedaPadrao(saldoPendente))}</span></div>
+                                <div class="row"><span class="label">Total</span><span class="value">${escapeHtml(formatarMoedaPadrao(ordem.total || 0))}</span></div>
+                            </div>
+                            <div class="card">
+                                <h2>ObservaÃ§Ãµes e Metadados</h2>
+                                <div class="row"><span class="label">ObservaÃ§Ãµes</span><span class="value">${escapeHtml(ordem.observacoes || 'Sem observaÃ§Ãµes')}</span></div>
+                                <div class="row"><span class="label">ID do ServiÃ§o</span><span class="value">${escapeHtml(ordem.id || '')}</span></div>
+                                <div class="row"><span class="label">Origem</span><span class="value">${escapeHtml(ordem.pageId || '')}</span></div>
+                                <div class="row"><span class="label">Tempo decorrido</span><span class="value">${escapeHtml(formatarTempoPadrao(ordem.tempoDecorrido || 0))}</span></div>
+                            </div>
+                        </div>
+                        ${extras.length ? `
+                            <div class="section">
+                                <h2>Campos Extras do Banco de Dados</h2>
+                                <table>
+                                    <thead><tr><th>Campo</th><th>Valor</th></tr></thead>
+                                    <tbody>
+                                        ${extras.map(([chave, valor]) => `
+                                            <tr>
+                                                <td>${escapeHtml(formatarChaveCampo(chave))}</td>
+                                                <td>${escapeHtml(formatarValorExtra(valor))}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ` : ''}
+                    </body>
+                    </html>
+                `;
+            }
+            
+            function imprimirOrdem(ordem) {
+                const janela = window.open('', '_blank', 'width=1100,height=900');
+                if (!janela) {
+                    alert('NÃ£o foi possÃ­vel abrir a janela de impressÃ£o. Verifique se o navegador bloqueou o pop-up.');
+                    return;
+                }
+                
+                janela.document.open();
+                janela.document.write(gerarHtmlImpressao(ordem));
+                janela.document.close();
+                janela.focus();
+                janela.onload = () => janela.print();
+            }
             
             // ============================================
             // FUNÇÕES PRINCIPAIS - SIGA PROTOCOLO CORE
@@ -932,11 +1186,20 @@
                             morada: payload.morada || '',
                             telemovel: payload.telemovel || '',
                             numero: payload.numero || `PED-${event.id.substring(0, 8)}`,
+                            numeroFatura: payload.numeroFatura || '',
                             produtos: Array.isArray(payload.produtos) ? payload.produtos : [],
+                            pagamentos: Array.isArray(payload.pagamentos) ? payload.pagamentos : [],
+                            subtotal: parseFloat(payload.subtotal) || 0,
+                            iva: parseFloat(payload.iva) || 0,
                             total: parseFloat(payload.total) || 0,
                             status: status,
+                            statusPagamento: payload.statusPagamento || 'pendente',
+                            totalPago: parseFloat(payload.totalPago) || 0,
+                            saldoPendente: parseFloat(payload.saldoPendente) || 0,
                             dataEntrega: payload.dataEntrega || '',
+                            dataFechamento: payload.dataFechamento || '',
                             observacoes: payload.observacoes || '',
+                            comIVA: payload.comIVA || 'sim',
                             
                             // Campos adicionais
                             atendente: payload.atendente || '',
@@ -947,7 +1210,8 @@
                             // Metadados
                             createdAt: event.timestamp || event.created_at || new Date().toISOString(),
                             pageId: event.pageId || 'novo_pedido',
-                            tempoDecorrido: tempoDecorrido
+                            tempoDecorrido: tempoDecorrido,
+                            originalPayload: payload
                         };
                         
                         return ordemFormatada;
@@ -1126,11 +1390,14 @@
                             <button class="action-btn complete" title="Marcar como concluído" data-id="${ordem.id}">
                                 <i class="fas fa-check"></i>
                             </button>
-                            <button class="action-btn" title="Ver detalhes" data-id="${ordem.id}">
+                            <button class="action-btn view" title="Ver detalhes" data-id="${ordem.id}">
                                 <i class="fas fa-eye"></i>
                             </button>
+                            <button class="action-btn print" title="Imprimir serviÃ§o" data-id="${ordem.id}">
+                                <i class="fas fa-print"></i>
+                            </button>
                             ${ordem.status === 'pendente' ? `
-                                <button class="action-btn" title="Iniciar produção" data-id="${ordem.id}">
+                                <button class="action-btn start" title="Iniciar produção" data-id="${ordem.id}">
                                     <i class="fas fa-play"></i>
                                 </button>
                             ` : ''}
@@ -1144,12 +1411,14 @@
                 `;
                 
                 // Adicionar event listeners
-                const viewBtn = card.querySelector('.order-actions .action-btn:nth-child(2)');
+                const viewBtn = card.querySelector('.action-btn.view');
+                const printBtn = card.querySelector('.action-btn.print');
                 const completeBtn = card.querySelector('.action-btn.complete');
-                const startBtn = card.querySelector('.action-btn:nth-child(3)');
+                const startBtn = card.querySelector('.action-btn.start');
                 const problemBtn = card.querySelector('.action-btn.delay');
                 
-                viewBtn.addEventListener('click', () => abrirModalDetalhes(ordem));
+                viewBtn.addEventListener('click', () => abrirModalDetalhesCompleto(ordem));
+                if (printBtn) printBtn.addEventListener('click', () => imprimirOrdem(ordem));
                 if (completeBtn) completeBtn.addEventListener('click', () => atualizarStatusOrdem(ordem.id, 'concluido'));
                 if (startBtn) startBtn.addEventListener('click', () => atualizarStatusOrdem(ordem.id, 'processamento'));
                 if (problemBtn) problemBtn.addEventListener('click', () => reportarProblema(ordem.id));
@@ -1289,6 +1558,164 @@
                     ` : ''}
                     
                     <div style="display: flex; gap: 15px; margin-top: 30px;">
+                        <button class="refresh-btn" style="flex: 1;" onclick="atualizarStatusOrdem('${ordem.id}', 'concluido'); fecharModal();">
+                            <i class="fas fa-check"></i>
+                            Marcar como Concluído
+                        </button>
+                        <button class="filter-btn" style="flex: 1;" onclick="fecharModal();">
+                            <i class="fas fa-times"></i>
+                            Fechar
+                        </button>
+                    </div>
+                `;
+                
+                modalOverlay.classList.add('active');
+            }
+            
+            function abrirModalDetalhesCompleto(ordem) {
+                const produtos = ordem.produtos || [];
+                const pagamentos = ordem.pagamentos || [];
+                const total = ordem.total || 0;
+                const iva = ordem.iva || 0;
+                const subtotal = ordem.subtotal || total - iva;
+                const totalPago = ordem.totalPago || pagamentos
+                    .filter(pag => pag.status === 'pago')
+                    .reduce((soma, pag) => soma + (parseFloat(pag.valor) || 0), 0);
+                const saldoPendente = ordem.saldoPendente || (total - totalPago);
+                const statusInfo = getStatusInfoPadrao(ordem.status);
+                const statusPagamentoInfo = getStatusPagamentoInfo(ordem.statusPagamento);
+                const extras = obterCamposExtras(ordem);
+                
+                modalContent.innerHTML = `
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px;">
+                        <div>
+                            <h3 style="color: var(--accent-blue); margin-bottom: 15px; font-size: 16px;">INFORMAÇÕES DO PEDIDO</h3>
+                            <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 8px;">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                    <div><div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Número</div><div style="font-weight: 700; font-size: 18px;">${ordem.numero}</div></div>
+                                    <div><div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Status</div><div class="order-status ${statusInfo.classe}" style="display: inline-block;">${statusInfo.texto}</div></div>
+                                    <div><div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Data de Entrega</div><div style="font-weight: 600;">${formatarDataPadrao(ordem.dataEntrega, true)}</div></div>
+                                    <div><div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Atendente</div><div style="font-weight: 600;">${ordem.atendente || 'Não informado'}</div></div>
+                                    <div><div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Nº Fatura</div><div style="font-weight: 600;">${ordem.numeroFatura || 'Não informado'}</div></div>
+                                    <div><div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Pagamento</div><div class="order-status ${statusPagamentoInfo.classe}" style="display: inline-block;">${statusPagamentoInfo.texto}</div></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 style="color: var(--accent-blue); margin-bottom: 15px; font-size: 16px;">CLIENTE</h3>
+                            <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 8px;">
+                                <div style="margin-bottom: 10px;"><div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Cliente</div><div style="font-weight: 700; font-size: 18px;">${ordem.cliente}</div></div>
+                                <div style="margin-bottom: 10px;"><div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Empresa</div><div style="font-weight: 600;">${ordem.empresa}</div></div>
+                                <div style="margin-bottom: 10px;"><div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Telemóvel</div><div style="font-weight: 600;">${ordem.telemovel || 'Não informado'}</div></div>
+                                <div style="margin-bottom: 10px;"><div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">NIF</div><div style="font-weight: 600;">${ordem.nif || 'Não informado'}</div></div>
+                                <div><div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 5px;">Morada</div><div style="font-weight: 600;">${ordem.morada || 'Não informada'}</div></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 30px;">
+                        <h3 style="color: var(--accent-blue); margin-bottom: 15px; font-size: 16px;">PRODUTOS (${produtos.length})</h3>
+                        <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 8px;">
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <thead>
+                                    <tr style="border-bottom: 1px solid var(--border-color);">
+                                        <th style="text-align: left; padding: 12px; font-size: 12px; color: var(--text-secondary);">Produto</th>
+                                        <th style="text-align: left; padding: 12px; font-size: 12px; color: var(--text-secondary);">Tamanho</th>
+                                        <th style="text-align: left; padding: 12px; font-size: 12px; color: var(--text-secondary);">Qtd</th>
+                                        <th style="text-align: left; padding: 12px; font-size: 12px; color: var(--text-secondary);">Valor Unit.</th>
+                                        <th style="text-align: left; padding: 12px; font-size: 12px; color: var(--text-secondary);">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${produtos.map(prod => `
+                                        <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                                            <td style="padding: 12px;"><div style="font-weight: 600;">${prod.nome || 'Produto'}</div>${prod.observacoes ? `<div style="font-size: 11px; color: var(--text-secondary); margin-top: 3px;">${prod.observacoes}</div>` : ''}</td>
+                                            <td style="padding: 12px;">${prod.tamanho || 'N/A'}</td>
+                                            <td style="padding: 12px;">${prod.quantidade || 1}</td>
+                                            <td style="padding: 12px;">${formatarMoedaPadrao(prod.valor || 0)}</td>
+                                            <td style="padding: 12px; font-weight: 600;">${formatarMoedaPadrao((prod.valor || 0) * (prod.quantidade || 1))}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    ${pagamentos.length ? `
+                        <div style="margin-bottom: 30px;">
+                            <h3 style="color: var(--accent-blue); margin-bottom: 15px; font-size: 16px;">PAGAMENTOS (${pagamentos.length})</h3>
+                            <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 8px;">
+                                <table style="width: 100%; border-collapse: collapse;">
+                                    <thead>
+                                        <tr style="border-bottom: 1px solid var(--border-color);">
+                                            <th style="text-align: left; padding: 12px; font-size: 12px; color: var(--text-secondary);">Tipo</th>
+                                            <th style="text-align: left; padding: 12px; font-size: 12px; color: var(--text-secondary);">Data</th>
+                                            <th style="text-align: left; padding: 12px; font-size: 12px; color: var(--text-secondary);">Valor</th>
+                                            <th style="text-align: left; padding: 12px; font-size: 12px; color: var(--text-secondary);">Forma</th>
+                                            <th style="text-align: left; padding: 12px; font-size: 12px; color: var(--text-secondary);">Status</th>
+                                            <th style="text-align: left; padding: 12px; font-size: 12px; color: var(--text-secondary);">Observações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${pagamentos.map(pag => `
+                                            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                                                <td style="padding: 12px;">${pag.tipo || 'N/A'}</td>
+                                                <td style="padding: 12px;">${formatarDataPadrao(pag.data, true)}</td>
+                                                <td style="padding: 12px;">${formatarMoedaPadrao(pag.valor || 0)}</td>
+                                                <td style="padding: 12px;">${pag.formaPagamento || 'N/A'}</td>
+                                                <td style="padding: 12px;">${pag.status || 'N/A'}</td>
+                                                <td style="padding: 12px;">${pag.observacoes || ''}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    <div style="display: flex; justify-content: flex-end;">
+                        <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 8px; width: 340px;">
+                            <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-color);"><span>Subtotal:</span><span>${formatarMoedaPadrao(subtotal)}</span></div>
+                            <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-color);"><span>Instalação:</span><span>${formatarMoedaPadrao(ordem.instalacao || 0)}</span></div>
+                            <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-color);"><span>Entrada:</span><span>${formatarMoedaPadrao(ordem.entrada || 0)}</span></div>
+                            <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-color);"><span>Total Pago:</span><span>${formatarMoedaPadrao(totalPago)}</span></div>
+                            <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-color);"><span>Saldo Pendente:</span><span>${formatarMoedaPadrao(saldoPendente)}</span></div>
+                            <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-color);"><span>IVA:</span><span>${formatarMoedaPadrao(iva)}</span></div>
+                            <div style="display: flex; justify-content: space-between; padding: 8px 0; font-weight: 700; font-size: 18px;"><span>TOTAL:</span><span style="color: var(--accent-green);">${formatarMoedaPadrao(total)}</span></div>
+                        </div>
+                    </div>
+
+                    ${ordem.observacoes ? `<div style="margin-top: 30px;"><h3 style="color: var(--accent-blue); margin-bottom: 15px; font-size: 16px;">OBSERVAÇÕES</h3><div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 8px;">${ordem.observacoes}</div></div>` : ''}
+
+                    ${extras.length ? `
+                        <div style="margin-top: 30px;">
+                            <h3 style="color: var(--accent-blue); margin-bottom: 15px; font-size: 16px;">CAMPOS EXTRAS DO BANCO</h3>
+                            <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 8px;">
+                                <table style="width: 100%; border-collapse: collapse;">
+                                    <thead>
+                                        <tr style="border-bottom: 1px solid var(--border-color);">
+                                            <th style="text-align: left; padding: 12px; font-size: 12px; color: var(--text-secondary);">Campo</th>
+                                            <th style="text-align: left; padding: 12px; font-size: 12px; color: var(--text-secondary);">Valor</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${extras.map(([chave, valor]) => `
+                                            <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                                                <td style="padding: 12px;">${formatarChaveCampo(chave)}</td>
+                                                <td style="padding: 12px; white-space: pre-wrap; word-break: break-word;">${formatarValorExtra(valor)}</td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    <div style="display: flex; gap: 15px; margin-top: 30px;">
+                        <button class="refresh-btn" style="flex: 1; background: linear-gradient(135deg, #7c3aed, #5b21b6);" onclick="imprimirOrdemGlobal('${ordem.id}')">
+                            <i class="fas fa-print"></i>
+                            Imprimir
+                        </button>
                         <button class="refresh-btn" style="flex: 1;" onclick="atualizarStatusOrdem('${ordem.id}', 'concluido'); fecharModal();">
                             <i class="fas fa-check"></i>
                             Marcar como Concluído
@@ -1484,6 +1911,14 @@
             // Expor funções para uso global (se necessário)
             window.fecharModal = fecharModal;
             window.atualizarStatusOrdem = atualizarStatusOrdem;
+            window.imprimirOrdemGlobal = function(ordemId) {
+                const ordem = todasOrdens.find(item => item.id === ordemId);
+                if (!ordem) {
+                    alert('ServiÃ§o nÃ£o encontrado para impressÃ£o.');
+                    return;
+                }
+                imprimirOrdem(ordem);
+            };
         });
     </script>
     
