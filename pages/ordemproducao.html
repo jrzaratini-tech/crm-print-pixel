@@ -975,6 +975,16 @@
                             .produto-nome { font-weight: 800; font-size: 21px; }
                             .produto-obs { margin-top: 6px; color: #475569; font-size: 17px; }
                             .obs-box { border: 1px solid #cbd5e1; border-radius: 14px; padding: 20px; min-height: 90px; font-size: 20px; background: #fff; white-space: pre-wrap; }
+                            .processo-ficha { width: 200mm; height: 60mm; max-width: 100%; border: 1px solid #cbd5e1; padding: 8mm; box-sizing: border-box; margin: 0 auto; background: #fff; page-break-inside: avoid; break-inside: avoid; }
+                            .processo-head { display: grid; grid-template-columns: 38mm 18mm 1fr; gap: 10px; align-items: end; margin-bottom: 3mm; font-size: 15px; font-weight: 800; text-transform: uppercase; color: #1f2937; }
+                            .processo-linha-topo { border-bottom: 1px solid #9ca3af; margin-bottom: 3mm; }
+                            .processo-corpo { display: grid; grid-template-columns: 38mm 18mm 1fr; gap: 10px; height: calc(100% - 14mm); }
+                            .processo-coluna { display: flex; flex-direction: column; justify-content: space-between; }
+                            .processo-item { height: 4.1mm; display: flex; align-items: center; font-size: 14px; }
+                            .check-box { width: 4.2mm; height: 4.2mm; border: 1px solid #6b7280; display: inline-block; flex: 0 0 auto; }
+                            .processo-texto { padding-left: 4mm; white-space: nowrap; }
+                            .obs-linhas { display: flex; flex-direction: column; justify-content: space-between; }
+                            .obs-linha { height: 4.1mm; border-bottom: 1px solid #9ca3af; }
                             @media print { body { margin: 18px; } }
                         </style>
                     </head>
@@ -1045,6 +1055,63 @@
                         <div class="section">
                             <h2>ObservaÃ§Ãµes</h2>
                             <div class="obs-box">${escapeHtml(ordem.observacoes || 'Sem observaÃ§Ãµes.')}</div>
+                        </div>
+                        <div class="section">
+                            <div class="processo-ficha">
+                                <div class="processo-head">
+                                    <div>Processo</div>
+                                    <div>OK</div>
+                                    <div>ObservaÃƒÂ§ÃƒÂµes</div>
+                                </div>
+                                <div class="processo-linha-topo"></div>
+                                <div class="processo-corpo">
+                                    <div class="processo-coluna">
+                                        <div class="processo-item"><span class="check-box"></span><span class="processo-texto">Arte / projeto</span></div>
+                                        <div class="processo-item"><span class="check-box"></span><span class="processo-texto">Modelagem</span></div>
+                                        <div class="processo-item"><span class="check-box"></span><span class="processo-texto">Usinagem CNC</span></div>
+                                        <div class="processo-item"><span class="check-box"></span><span class="processo-texto">ImpressÃƒÂ£o 3D</span></div>
+                                        <div class="processo-item"><span class="check-box"></span><span class="processo-texto">Montagem da estrutura</span></div>
+                                        <div class="processo-item"><span class="check-box"></span><span class="processo-texto">Pintura interna</span></div>
+                                        <div class="processo-item"><span class="check-box"></span><span class="processo-texto">LED / solda</span></div>
+                                        <div class="processo-item"><span class="check-box"></span><span class="processo-texto">Cola quente</span></div>
+                                        <div class="processo-item"><span class="check-box"></span><span class="processo-texto">Corte laser opalino</span></div>
+                                        <div class="processo-item"><span class="check-box"></span><span class="processo-texto">Pintura externa</span></div>
+                                        <div class="processo-item"><span class="check-box"></span><span class="processo-texto">Acabamento</span></div>
+                                        <div class="processo-item"><span class="check-box"></span><span class="processo-texto">Molde de instalaÃƒÂ§ÃƒÂ£o</span></div>
+                                        <div class="processo-item"><span class="check-box"></span><span class="processo-texto">Embalagem</span></div>
+                                    </div>
+                                    <div class="processo-coluna">
+                                        <div class="processo-item"><span class="check-box"></span></div>
+                                        <div class="processo-item"><span class="check-box"></span></div>
+                                        <div class="processo-item"><span class="check-box"></span></div>
+                                        <div class="processo-item"><span class="check-box"></span></div>
+                                        <div class="processo-item"><span class="check-box"></span></div>
+                                        <div class="processo-item"><span class="check-box"></span></div>
+                                        <div class="processo-item"><span class="check-box"></span></div>
+                                        <div class="processo-item"><span class="check-box"></span></div>
+                                        <div class="processo-item"><span class="check-box"></span></div>
+                                        <div class="processo-item"><span class="check-box"></span></div>
+                                        <div class="processo-item"><span class="check-box"></span></div>
+                                        <div class="processo-item"><span class="check-box"></span></div>
+                                        <div class="processo-item"><span class="check-box"></span></div>
+                                    </div>
+                                    <div class="obs-linhas">
+                                        <div class="obs-linha"></div>
+                                        <div class="obs-linha"></div>
+                                        <div class="obs-linha"></div>
+                                        <div class="obs-linha"></div>
+                                        <div class="obs-linha"></div>
+                                        <div class="obs-linha"></div>
+                                        <div class="obs-linha"></div>
+                                        <div class="obs-linha"></div>
+                                        <div class="obs-linha"></div>
+                                        <div class="obs-linha"></div>
+                                        <div class="obs-linha"></div>
+                                        <div class="obs-linha"></div>
+                                        <div class="obs-linha"></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </body>
                     </html>
