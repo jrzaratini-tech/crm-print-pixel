@@ -1118,6 +1118,185 @@
                 `;
             }
             
+            function gerarHtmlImpressaoAjustada(ordem) {
+                const produtos = Array.isArray(ordem.produtos) ? ordem.produtos : [];
+                const statusInfo = getStatusInfoPadrao(ordem.status);
+                const precisaInstalacao = parseFloat(ordem.instalacao) > 0;
+
+                return `
+                    <!DOCTYPE html>
+                    <html lang="pt">
+                    <head>
+                        <meta charset="UTF-8">
+                        <title>Impress&atilde;o Ordem ${escapeHtml(ordem.numero)}</title>
+                        <style>
+                            body { font-family: Arial, sans-serif; color: #0f172a; margin: 6px; font-size: 12px; line-height: 1.2; }
+                            .header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; margin-bottom: 8px; border-bottom: 2px solid #cbd5e1; padding-bottom: 6px; }
+                            .heading { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+                            .numero { font-size: 30px; font-weight: 800; letter-spacing: 1px; color: #0f172a; }
+                            .titulo { font-size: 18px; font-weight: 800; text-transform: uppercase; }
+                            .subtitulo { margin: 2px 0 0; color: #475569; font-size: 10px; }
+                            .badge { display: inline-block; padding: 4px 8px; border-radius: 999px; background: #e2e8f0; font-size: 9px; font-weight: 800; }
+                            .alerta-instalacao { margin: 0 0 8px; padding: 6px 10px; border: 2px solid #0f766e; background: #ecfeff; color: #134e4a; border-radius: 8px; font-size: 13px; font-weight: 800; text-transform: uppercase; }
+                            .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
+                            .card { border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px; background: #fff; }
+                            .card h2 { margin: 0 0 4px; font-size: 13px; text-transform: uppercase; }
+                            .row { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px solid #e2e8f0; }
+                            .row:last-child { border-bottom: none; }
+                            .label { color: #475569; font-weight: 800; font-size: 9px; text-transform: uppercase; }
+                            .value { text-align: right; white-space: pre-wrap; word-break: break-word; font-size: 11px; font-weight: 600; }
+                            table { width: 100%; border-collapse: collapse; margin-top: 3px; }
+                            th, td { border: 1px solid #cbd5e1; padding: 4px; text-align: left; vertical-align: top; }
+                            th { background: #f8fafc; font-size: 9px; text-transform: uppercase; }
+                            td { font-size: 10px; }
+                            .section { margin-bottom: 8px; }
+                            .section h2 { margin-bottom: 4px; font-size: 13px; text-transform: uppercase; }
+                            .produto-nome { font-weight: 800; font-size: 11px; }
+                            .produto-obs { margin-top: 2px; color: #475569; font-size: 9px; }
+                            .obs-box { border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px; min-height: 28px; font-size: 11px; background: #fff; white-space: pre-wrap; }
+                            .processo-ficha { width: 200mm; height: 50mm; max-width: 100%; border: 1px solid #cbd5e1; padding: 4mm; box-sizing: border-box; margin: 0 auto; background: #fff; }
+                            .processo-head { display: grid; grid-template-columns: 38mm 13mm 1fr; gap: 6px; align-items: end; margin-bottom: 1.3mm; font-size: 8px; font-weight: 800; text-transform: uppercase; color: #1f2937; }
+                            .processo-linha-topo { border-bottom: 1px solid #9ca3af; margin-bottom: 1.3mm; }
+                            .processo-corpo { display: grid; grid-template-columns: 38mm 13mm 1fr; gap: 6px; height: calc(100% - 7mm); }
+                            .processo-coluna { display: flex; flex-direction: column; justify-content: space-between; }
+                            .processo-item { height: 2.45mm; display: flex; align-items: center; font-size: 7.8px; }
+                            .check-box { width: 2.6mm; height: 2.6mm; border: 1px solid #6b7280; display: inline-block; flex: 0 0 auto; }
+                            .processo-texto { padding-left: 2mm; white-space: nowrap; }
+                            .obs-linhas { display: flex; flex-direction: column; justify-content: space-between; }
+                            .obs-linha { height: 2.45mm; border-bottom: 1px solid #9ca3af; }
+                            @media print { body { margin: 5px; } }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="header">
+                            <div>
+                                <div class="heading">
+                                    <div class="numero">${escapeHtml(ordem.numero)}</div>
+                                    <div class="titulo">Ordem de Produ&ccedil;&atilde;o</div>
+                                </div>
+                                <p class="subtitulo">Ficha de produ&ccedil;&atilde;o PrintPixel</p>
+                            </div>
+                            <div class="badge">${escapeHtml(statusInfo.texto)}</div>
+                        </div>
+                        ${precisaInstalacao ? `<div class="alerta-instalacao">Este servi&ccedil;o ser&aacute; instalado</div>` : ''}
+                        <div class="grid">
+                            <div class="card">
+                                <h2>Informa&ccedil;&otilde;es do Pedido</h2>
+                                <div class="row"><span class="label">N&uacute;mero</span><span class="value">${escapeHtml(ordem.numero)}</span></div>
+                                <div class="row"><span class="label">Status</span><span class="value">${escapeHtml(statusInfo.texto)}</span></div>
+                                <div class="row"><span class="label">Entrega</span><span class="value">${escapeHtml(formatarDataPadrao(ordem.dataEntrega, true))}</span></div>
+                                <div class="row"><span class="label">Fechamento</span><span class="value">${escapeHtml(formatarDataPadrao(ordem.dataFechamento, true))}</span></div>
+                                <div class="row"><span class="label">Criado em</span><span class="value">${escapeHtml(formatarDataPadrao(ordem.createdAt, true))}</span></div>
+                                <div class="row"><span class="label">Atendente</span><span class="value">${ordem.atendente ? escapeHtml(ordem.atendente) : 'N&atilde;o informado'}</span></div>
+                                <div class="row"><span class="label">N&ordm; Fatura</span><span class="value">${ordem.numeroFatura ? escapeHtml(ordem.numeroFatura) : 'N&atilde;o informado'}</span></div>
+                            </div>
+                            <div class="card">
+                                <h2>Cliente</h2>
+                                <div class="row"><span class="label">Cliente</span><span class="value">${escapeHtml(ordem.cliente)}</span></div>
+                                <div class="row"><span class="label">Empresa</span><span class="value">${escapeHtml(ordem.empresa)}</span></div>
+                                <div class="row"><span class="label">NIF</span><span class="value">${ordem.nif ? escapeHtml(ordem.nif) : 'N&atilde;o informado'}</span></div>
+                                <div class="row"><span class="label">Morada</span><span class="value">${ordem.morada ? escapeHtml(ordem.morada) : 'N&atilde;o informada'}</span></div>
+                                <div class="row"><span class="label">Telem&oacute;vel</span><span class="value">${ordem.telemovel ? escapeHtml(ordem.telemovel) : 'N&atilde;o informado'}</span></div>
+                            </div>
+                        </div>
+                        <div class="section">
+                            <h2>Produtos (${produtos.length})</h2>
+                            <table>
+                                <thead>
+                                    <tr><th>Produto</th><th>Tamanho</th><th>Qtd</th><th>Observa&ccedil;&otilde;es</th></tr>
+                                </thead>
+                                <tbody>
+                                    ${produtos.length ? produtos.map(prod => `
+                                        <tr>
+                                            <td><div class="produto-nome">${escapeHtml(prod.nome || 'Produto')}</div></td>
+                                            <td>${escapeHtml(prod.tamanho || 'N/A')}</td>
+                                            <td>${escapeHtml(prod.quantidade || 1)}</td>
+                                            <td>${prod.observacoes ? `<div class="produto-obs">${escapeHtml(prod.observacoes)}</div>` : ''}</td>
+                                        </tr>
+                                    `).join('') : '<tr><td colspan="4">Nenhum produto informado.</td></tr>'}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="grid">
+                            <div class="card">
+                                <h2>Detalhes de Produ&ccedil;&atilde;o</h2>
+                                <div class="row"><span class="label">Instala&ccedil;&atilde;o</span><span class="value">${precisaInstalacao ? 'Sim' : 'N&atilde;o'}</span></div>
+                                <div class="row"><span class="label">Data Entrada</span><span class="value">${escapeHtml(formatarDataPadrao(ordem.dataEntrada, true))}</span></div>
+                                <div class="row"><span class="label">Empresa</span><span class="value">${ordem.empresa ? escapeHtml(ordem.empresa) : 'N&atilde;o informada'}</span></div>
+                            </div>
+                            <div class="card">
+                                <h2>Contato do Cliente</h2>
+                                <div class="row"><span class="label">Cliente</span><span class="value">${ordem.cliente ? escapeHtml(ordem.cliente) : 'N&atilde;o informado'}</span></div>
+                                <div class="row"><span class="label">Telem&oacute;vel</span><span class="value">${ordem.telemovel ? escapeHtml(ordem.telemovel) : 'N&atilde;o informado'}</span></div>
+                                <div class="row"><span class="label">Morada</span><span class="value">${ordem.morada ? escapeHtml(ordem.morada) : 'N&atilde;o informada'}</span></div>
+                            </div>
+                        </div>
+                        <div class="section">
+                            <h2>Observa&ccedil;&otilde;es</h2>
+                            <div class="obs-box">${ordem.observacoes ? escapeHtml(ordem.observacoes) : 'Sem observa&ccedil;&otilde;es.'}</div>
+                        </div>
+                        <div class="section">
+                            <div class="processo-ficha">
+                                <div class="processo-head">
+                                    <div>Processo</div>
+                                    <div>OK</div>
+                                    <div>Observa&ccedil;&otilde;es</div>
+                                </div>
+                                <div class="processo-linha-topo"></div>
+                                <div class="processo-corpo">
+                                    <div class="processo-coluna">
+                                        <div class="processo-item"><span class="check-box"></span><span class="processo-texto">Arte / projeto</span></div>
+                                        <div class="processo-item"><span class="check-box"></span><span class="processo-texto">Modelagem</span></div>
+                                        <div class="processo-item"><span class="check-box"></span><span class="processo-texto">Usinagem CNC</span></div>
+                                        <div class="processo-item"><span class="check-box"></span><span class="processo-texto">Impress&atilde;o 3D</span></div>
+                                        <div class="processo-item"><span class="check-box"></span><span class="processo-texto">Montagem da estrutura</span></div>
+                                        <div class="processo-item"><span class="check-box"></span><span class="processo-texto">Pintura interna</span></div>
+                                        <div class="processo-item"><span class="check-box"></span><span class="processo-texto">LED / solda</span></div>
+                                        <div class="processo-item"><span class="check-box"></span><span class="processo-texto">Cola quente</span></div>
+                                        <div class="processo-item"><span class="check-box"></span><span class="processo-texto">Corte laser opalino</span></div>
+                                        <div class="processo-item"><span class="check-box"></span><span class="processo-texto">Pintura externa</span></div>
+                                        <div class="processo-item"><span class="check-box"></span><span class="processo-texto">Acabamento</span></div>
+                                        <div class="processo-item"><span class="check-box"></span><span class="processo-texto">Molde de instala&ccedil;&atilde;o</span></div>
+                                        <div class="processo-item"><span class="check-box"></span><span class="processo-texto">Embalagem</span></div>
+                                    </div>
+                                    <div class="processo-coluna">
+                                        <div class="processo-item"><span class="check-box"></span></div>
+                                        <div class="processo-item"><span class="check-box"></span></div>
+                                        <div class="processo-item"><span class="check-box"></span></div>
+                                        <div class="processo-item"><span class="check-box"></span></div>
+                                        <div class="processo-item"><span class="check-box"></span></div>
+                                        <div class="processo-item"><span class="check-box"></span></div>
+                                        <div class="processo-item"><span class="check-box"></span></div>
+                                        <div class="processo-item"><span class="check-box"></span></div>
+                                        <div class="processo-item"><span class="check-box"></span></div>
+                                        <div class="processo-item"><span class="check-box"></span></div>
+                                        <div class="processo-item"><span class="check-box"></span></div>
+                                        <div class="processo-item"><span class="check-box"></span></div>
+                                        <div class="processo-item"><span class="check-box"></span></div>
+                                    </div>
+                                    <div class="obs-linhas">
+                                        <div class="obs-linha"></div>
+                                        <div class="obs-linha"></div>
+                                        <div class="obs-linha"></div>
+                                        <div class="obs-linha"></div>
+                                        <div class="obs-linha"></div>
+                                        <div class="obs-linha"></div>
+                                        <div class="obs-linha"></div>
+                                        <div class="obs-linha"></div>
+                                        <div class="obs-linha"></div>
+                                        <div class="obs-linha"></div>
+                                        <div class="obs-linha"></div>
+                                        <div class="obs-linha"></div>
+                                        <div class="obs-linha"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </body>
+                    </html>
+                `;
+            }
+
             function imprimirOrdem(ordem) {
                 const janela = window.open('', '_blank', 'width=1100,height=900');
                 if (!janela) {
@@ -1126,7 +1305,7 @@
                 }
                 
                 janela.document.open();
-                janela.document.write(gerarHtmlImpressao(ordem));
+                janela.document.write(gerarHtmlImpressaoAjustada(ordem));
                 janela.document.close();
                 janela.focus();
                 janela.onload = () => janela.print();
