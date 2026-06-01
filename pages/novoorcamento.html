@@ -3,6 +3,7 @@
 <head>
     <script src="../core/security.js"></script>
     <script src="../core/custeio.js"></script>
+    <script src="../core/materiais-padrao.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Novo Orçamento - PrintPixel</title>
@@ -286,6 +287,8 @@
         .technical-table th, .technical-table td { padding: 9px; border-bottom: 1px solid #e2e8f0; font-size: 12px; }
         .technical-table th { color: #475569; background: #f8fafc; }
         .technical-table input, .technical-table select { width: 100%; padding: 8px; }
+        .technical-table .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; min-width: 190px; }
+        .technical-table label { font-size: 11px; margin: 0; }
         .technical-total { display: flex; justify-content: flex-end; gap: 15px; align-items: center; margin-top: 16px; font-weight: 700; }
         
         .iva-option-section {
@@ -704,7 +707,7 @@
             </div>
             <div class="technical-table-wrap">
                 <table class="technical-table">
-                    <thead><tr><th>Material</th><th>Regra</th><th>Largura cm</th><th>Altura cm</th><th>Comp. m</th><th>Qtd.</th><th>Perda %</th><th>Consumo</th><th>Custo</th><th></th></tr></thead>
+                    <thead><tr><th>O que será usado?</th><th>Características</th><th>Medidas para cálculo</th><th>Qtd.</th><th>Perda %</th><th>Consumo</th><th>Custo</th><th></th></tr></thead>
                     <tbody id="technicalBody"></tbody>
                 </table>
             </div>
@@ -1077,15 +1080,31 @@
         }
 
         function materialOptions(selectedId = '') {
-            return '<option value="">Selecione</option>' + catalogoMateriais.map(material =>
-                `<option value="${material.id}" ${selectedId === material.id ? 'selected' : ''}>${material.nome}</option>`
-            ).join('');
+            const cadastrados = catalogoMateriais.map(material => `<option value="${material.id}" ${selectedId === material.id ? 'selected' : ''}>${material.nome}</option>`).join('');
+            const padroes = MATERIAIS_PADRAO.materiais.map(material => `<option value="preset:${material.key}" ${selectedId === 'preset:' + material.key ? 'selected' : ''}>${material.nome}${material.key === 'outro' ? ' / cadastrar exceção' : ''}</option>`).join('');
+            return `<option value="">Selecione</option><optgroup label="Materiais cadastrados">${cadastrados || '<option disabled>Nenhum preço cadastrado</option>'}</optgroup><optgroup label="Lista padrão">${padroes}</optgroup>`;
         }
 
-        function formulaOptions(selected = '') {
-            return Object.entries(CUSTEIO.formulas).map(([value, label]) =>
-                `<option value="${value}" ${selected === value ? 'selected' : ''}>${label}</option>`
-            ).join('');
+        function resolveMaterial(materialId) {
+            if (materialId.startsWith('preset:')) return { id: materialId, ...MATERIAIS_PADRAO.get(materialId.replace('preset:', '')) };
+            return catalogoMateriais.find(entry => entry.id === materialId) || {};
+        }
+
+        function variantInputs(item, material) {
+            const preset = MATERIAIS_PADRAO.get(material.presetKey || String(material.id || '').replace('preset:', ''));
+            return preset.questions.map(question => {
+                const value = item.variantes && item.variantes[question.key] || question.fixed || '';
+                if (question.fixed) return `<label>${question.label}<input data-variant="${question.key}" value="${question.fixed}" readonly></label>`;
+                if (question.options.length) return `<label>${question.label}<select data-variant="${question.key}"><option value="">Selecione</option>${question.options.map(option => `<option ${option === value ? 'selected' : ''}>${option}</option>`).join('')}</select></label>`;
+                return `<label>${question.label}<input data-variant="${question.key}" value="${value}"></label>`;
+            }).join('');
+        }
+
+        function measureInputs(item, material) {
+            const formula = item.formula || material.formulaPadrao || 'unidade';
+            if (['area', 'placa', 'perimetro', 'densidade_area'].includes(formula)) return `<label>Largura (cm)<input class="tech-largura" type="number" min="0" step="0.1" value="${item.larguraCm || 0}"></label><label>Altura (cm)<input class="tech-altura" type="number" min="0" step="0.1" value="${item.alturaCm || 0}"></label>`;
+            if (['linear', 'barra'].includes(formula)) return `<label>Comprimento (m)<input class="tech-comprimento" type="number" min="0" step="0.01" value="${item.comprimentoM || 0}"></label>`;
+            return '<span style="color:#64748b;">Cálculo por unidade</span>';
         }
 
         function abrirFichaTecnica(row) {
@@ -1108,7 +1127,8 @@
                 alturaCm: item.alturaCm || 0,
                 comprimentoM: item.comprimentoM || 0,
                 quantidade: item.quantidade || 1,
-                perdaPercentual: item.perdaPercentual ?? ''
+                perdaPercentual: item.perdaPercentual ?? '',
+                variantes: item.variantes || {}
             });
             renderTechnicalRows();
         }
@@ -1118,21 +1138,19 @@
             const body = document.getElementById('technicalBody');
             const items = technicalProductRow._materiais || [];
             body.innerHTML = items.length ? items.map((item, index) => {
-                const material = catalogoMateriais.find(entry => entry.id === item.materialId) || {};
+                const material = resolveMaterial(item.materialId);
                 const calculo = CUSTEIO.calcular(item, material);
                 return `<tr data-index="${index}">
                     <td><select class="tech-material">${materialOptions(item.materialId)}</select></td>
-                    <td><select class="tech-formula">${formulaOptions(item.formula || material.formulaPadrao)}</select></td>
-                    <td><input class="tech-largura" type="number" min="0" step="0.1" value="${item.larguraCm || 0}"></td>
-                    <td><input class="tech-altura" type="number" min="0" step="0.1" value="${item.alturaCm || 0}"></td>
-                    <td><input class="tech-comprimento" type="number" min="0" step="0.01" value="${item.comprimentoM || 0}"></td>
+                    <td><div class="grid">${variantInputs(item, material)}</div></td>
+                    <td><div class="grid">${measureInputs(item, material)}</div></td>
                     <td><input class="tech-quantidade" type="number" min="0" step="0.01" value="${item.quantidade || 1}"></td>
                     <td><input class="tech-perda" type="number" min="0" step="0.1" placeholder="${material.perdaPercentual || 0}" value="${item.perdaPercentual ?? ''}"></td>
                     <td>${calculo.consumo.toFixed(2)} ${calculo.unidade}</td>
                     <td>${formatarMoeda(calculo.custo)}</td>
                     <td><button type="button" class="remove-btn tech-remove">X</button></td>
                 </tr>`;
-            }).join('') : '<tr><td colspan="10" style="text-align:center; color:#64748b;">Adicione os materiais usados neste produto.</td></tr>';
+            }).join('') : '<tr><td colspan="8" style="text-align:center; color:#64748b;">Adicione os materiais usados neste produto.</td></tr>';
 
             body.querySelectorAll('tr[data-index]').forEach(row => {
                 const index = Number(row.dataset.index);
@@ -1148,27 +1166,34 @@
         function updateTechnicalItem(index, row) {
             const item = technicalProductRow._materiais[index];
             const materialId = row.querySelector('.tech-material').value;
-            const material = catalogoMateriais.find(entry => entry.id === materialId) || {};
+            const previousMaterialId = item.materialId;
+            const material = resolveMaterial(materialId);
             item.materialId = materialId;
-            item.formula = row.querySelector('.tech-formula').value || material.formulaPadrao || 'unidade';
-            item.larguraCm = parseFloat(row.querySelector('.tech-largura').value) || 0;
-            item.alturaCm = parseFloat(row.querySelector('.tech-altura').value) || 0;
-            item.comprimentoM = parseFloat(row.querySelector('.tech-comprimento').value) || 0;
+            item.formula = material.formulaPadrao || 'unidade';
+            item.larguraCm = parseFloat(row.querySelector('.tech-largura')?.value) || 0;
+            item.alturaCm = parseFloat(row.querySelector('.tech-altura')?.value) || 0;
+            item.comprimentoM = parseFloat(row.querySelector('.tech-comprimento')?.value) || 0;
             item.quantidade = parseFloat(row.querySelector('.tech-quantidade').value) || 1;
             item.perdaPercentual = row.querySelector('.tech-perda').value;
-            if (row.querySelector('.tech-material') === document.activeElement && material.formulaPadrao) item.formula = material.formulaPadrao;
+            item.variantes = Object.fromEntries(Array.from(row.querySelectorAll('[data-variant]')).map(element => [element.dataset.variant, element.value]));
+            if (previousMaterialId !== materialId) item.variantes = {};
             renderTechnicalRows();
         }
 
         function atualizarTotalFicha() {
             if (!technicalProductRow) return;
-            const ficha = CUSTEIO.calcularFicha(technicalProductRow._materiais, catalogoMateriais);
+            const ficha = calcularFichaOrcamento(technicalProductRow._materiais);
             document.getElementById('technicalTotal').textContent = formatarMoeda(ficha.custoTotal);
+        }
+
+        function calcularFichaOrcamento(itens) {
+            const detalhes = itens.map(item => ({ ...item, calculo: CUSTEIO.calcular(item, resolveMaterial(item.materialId)) }));
+            return { detalhes, custoTotal: detalhes.reduce((total, detalhe) => total + detalhe.calculo.custo, 0) };
         }
 
         function aplicarFichaTecnica() {
             if (!technicalProductRow) return;
-            const ficha = CUSTEIO.calcularFicha(technicalProductRow._materiais, catalogoMateriais);
+            const ficha = calcularFichaOrcamento(technicalProductRow._materiais);
             technicalProductRow.querySelector('.custo-input').value = ficha.custoTotal.toFixed(2);
             technicalProductRow.querySelector('.materials-summary').textContent = `${technicalProductRow._materiais.length} itens | ${formatarMoeda(ficha.custoTotal)}`;
             calculateTotals();

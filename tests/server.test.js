@@ -42,10 +42,13 @@ test('não publica arquivos internos', async () => {
 
 test('publica modulo de custeio e pagina de materiais', async () => {
   const moduleResult = await request('/core/custeio.js');
+  const presetsResult = await request('/core/materiais-padrao.js');
   const pageResult = await request('/pages/materiais.html');
   assert.equal(moduleResult.response.status, 200);
+  assert.equal(presetsResult.response.status, 200);
   assert.equal(pageResult.response.status, 200);
   assert.match(moduleResult.body, /calcularFicha/);
+  assert.match(presetsResult.body, /Fonte de alimentação/);
   assert.match(pageResult.body, /Cadastro de Materiais/);
 });
 

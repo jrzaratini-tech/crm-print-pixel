@@ -50,7 +50,8 @@
             <h2 id="formTitle">Novo material</h2>
             <input type="hidden" id="materialId">
             <div class="grid">
-                <label>Nome do material<input id="nome" placeholder="Ex.: Acrílico cristal 3 mm"></label>
+                <label>Material padrão<select id="presetKey"></select></label>
+                <label id="customNameGroup" style="display:none;">Novo nome<input id="nome" placeholder="Informe o nome do material"></label>
                 <label>Categoria<select id="categoria">
                     <option>Placa</option><option>Adesivo</option><option>Iluminação</option><option>Perfil</option>
                     <option>Fonte</option><option>Estrutura</option><option>Acabamento</option><option>Outros</option>
@@ -75,6 +76,7 @@
                 <label>Comprimento da barra (m)<input id="comprimentoM" type="number" min="0" step="0.01" value="0"></label>
                 <label>Densidade de módulos (un./m²)<input id="densidadePorM2" type="number" min="0" step="0.1" value="0"></label>
             </div>
+            <div class="grid" id="variantFields" style="margin-top:14px;"></div>
             <label style="margin-top:14px;">Observações<textarea id="observacoes" placeholder="Fornecedor, espessura, cor, aplicação ou critérios de cálculo."></textarea></label>
             <p class="hint">Placas usam dimensões comerciais e arredondamento por aproveitamento. Barras usam comprimento comercial. Fita LED e neon podem usar comprimento informado ou perímetro. Módulos LED usam densidade configurável por m².</p>
             <div class="actions">
@@ -95,11 +97,36 @@
     </main>
 
     <script src="../core/custeio.js"></script>
+    <script src="../core/materiais-padrao.js"></script>
     <script>
         const ids = ['nome', 'categoria', 'formulaPadrao', 'unidade', 'precoCusto', 'perdaPercentual', 'larguraCm', 'alturaCm', 'comprimentoM', 'densidadePorM2', 'observacoes'];
         let materiais = [];
         const money = value => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(Number(value) || 0);
         const number = id => Number.parseFloat(document.getElementById(id).value) || 0;
+        const presetSelect = document.getElementById('presetKey');
+
+        function renderPresetOptions() {
+            presetSelect.innerHTML = MATERIAIS_PADRAO.materiais.map(material => `<option value="${material.key}">${material.nome}</option>`).join('');
+        }
+
+        function renderVariantFields(variantes = {}) {
+            const preset = MATERIAIS_PADRAO.get(presetSelect.value);
+            document.getElementById('customNameGroup').style.display = preset.key === 'outro' ? 'block' : 'none';
+            document.getElementById('variantFields').innerHTML = preset.questions.map(item => {
+                const value = variantes[item.key] ?? item.fixed ?? '';
+                if (item.fixed) return `<label>${item.label}<input data-variant="${item.key}" value="${item.fixed}" readonly></label>`;
+                if (item.options.length) return `<label>${item.label}<select data-variant="${item.key}"><option value="">Selecione</option>${item.options.map(option => `<option ${option === value ? 'selected' : ''}>${option}</option>`).join('')}</select></label>`;
+                return `<label>${item.label}<input data-variant="${item.key}" value="${value}"></label>`;
+            }).join('');
+            document.getElementById('categoria').value = preset.categoria;
+            document.getElementById('formulaPadrao').value = preset.formulaPadrao;
+            document.getElementById('unidade').value = preset.unidade;
+            if (preset.comprimentoM) document.getElementById('comprimentoM').value = preset.comprimentoM;
+        }
+
+        function variantesFromForm() {
+            return Object.fromEntries(Array.from(document.querySelectorAll('[data-variant]')).map(element => [element.dataset.variant, element.value]));
+        }
 
         function showMessage(text, type = 'success') {
             const message = document.getElementById('message');
@@ -117,11 +144,17 @@
             document.getElementById('categoria').value = 'Placa';
             document.getElementById('formulaPadrao').value = 'area';
             document.getElementById('unidade').value = 'm²';
+            presetSelect.value = 'fonte';
+            renderVariantFields();
         }
 
         function formData() {
+            const preset = MATERIAIS_PADRAO.get(presetSelect.value);
+            const variantes = variantesFromForm();
             return {
-                nome: document.getElementById('nome').value.trim(),
+                presetKey: preset.key,
+                nome: preset.key === 'outro' ? document.getElementById('nome').value.trim() : `${preset.nome}${MATERIAIS_PADRAO.labelVariantes(variantes) ? ' - ' + MATERIAIS_PADRAO.labelVariantes(variantes) : ''}`,
+                variantes,
                 categoria: document.getElementById('categoria').value,
                 formulaPadrao: document.getElementById('formulaPadrao').value,
                 unidade: document.getElementById('unidade').value,
@@ -171,6 +204,8 @@
             document.getElementById('materialId').value = id;
             document.getElementById('formTitle').textContent = 'Editar material';
             ids.forEach(field => { document.getElementById(field).value = material[field] ?? ''; });
+            presetSelect.value = material.presetKey || 'outro';
+            renderVariantFields(material.variantes || {});
             window.scrollTo({ top: 0, behavior: 'smooth' });
         };
 
@@ -182,6 +217,7 @@
         };
 
         document.getElementById('novoBtn').addEventListener('click', resetForm);
+        presetSelect.addEventListener('change', () => renderVariantFields());
         document.getElementById('salvarBtn').addEventListener('click', async () => {
             const payload = formData();
             if (!payload.nome) return showMessage('Informe o nome do material.', 'error');
@@ -195,6 +231,8 @@
             await load();
         });
 
+        renderPresetOptions();
+        resetForm();
         load().catch(error => {
             console.error('Erro ao carregar materiais:', error);
             showMessage('Não foi possível carregar os materiais.', 'error');
