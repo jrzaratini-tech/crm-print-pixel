@@ -40,6 +40,15 @@ test('não publica arquivos internos', async () => {
   }
 });
 
+test('publica modulo de custeio e pagina de materiais', async () => {
+  const moduleResult = await request('/core/custeio.js');
+  const pageResult = await request('/pages/materiais.html');
+  assert.equal(moduleResult.response.status, 200);
+  assert.equal(pageResult.response.status, 200);
+  assert.match(moduleResult.body, /calcularFicha/);
+  assert.match(pageResult.body, /Cadastro de Materiais/);
+});
+
 test('salva, consulta com filtro por id e exclui registro', async () => {
   const saved = await post('/api/database/commit', { schema: 'pedido', payload: { cliente: 'Teste', total: 123 }, pageId: 'test' });
   assert.equal(saved.response.status, 200);

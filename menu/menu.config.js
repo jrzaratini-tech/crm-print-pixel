@@ -127,5 +127,15 @@
         pos: 13,
         hidden: false,
         deleted: false
+    },
+
+    {
+        id: "nav_materiais",
+        name: "Materiais",
+        file: "pages/materiais.html",
+        type: "WRITE",
+        pos: 14,
+        hidden: false,
+        deleted: false
     }
 ];

@@ -311,6 +311,7 @@ app.use('/pages', express.static(path.join(__dirname, 'pages'), { index: false, 
 app.get('/core/engine.js', (req, res) => res.sendFile(path.join(__dirname, 'core', 'engine.js')));
 app.get('/core/config.js', (req, res) => res.sendFile(path.join(__dirname, 'core', 'config.js')));
 app.get('/core/security.js', (req, res) => res.sendFile(path.join(__dirname, 'core', 'security.js')));
+app.get('/core/custeio.js', (req, res) => res.sendFile(path.join(__dirname, 'core', 'custeio.js')));
 app.get('/menu/menu.config.js', (req, res) => res.sendFile(path.join(__dirname, 'menu', 'menu.config.js')));
 
 if (require.main === module) {

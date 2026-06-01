@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <script src="../core/security.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Materiais - PrintPixel</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { margin: 0; background: #f8fafc; color: #1e293b; padding: 24px; }
+        .container { max-width: 1500px; margin: auto; }
+        .header { display: flex; justify-content: space-between; gap: 20px; align-items: center; margin-bottom: 24px; }
+        h1 { margin: 0; color: #1a237e; }
+        .subtitle { color: #64748b; margin: 6px 0 0; }
+        .btn { border: 0; border-radius: 7px; padding: 12px 18px; color: white; cursor: pointer; font-weight: 700; }
+        .btn-primary { background: #2563eb; }
+        .btn-success { background: #059669; }
+        .btn-danger { background: #dc2626; }
+        .panel { background: white; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; box-shadow: 0 3px 16px rgba(15,23,42,.05); margin-bottom: 22px; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); gap: 14px; }
+        label { display: block; color: #475569; font-size: 13px; font-weight: 700; }
+        input, select, textarea { width: 100%; margin-top: 6px; border: 1px solid #cbd5e1; border-radius: 6px; padding: 10px; background: white; }
+        textarea { min-height: 70px; resize: vertical; }
+        .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; }
+        table { width: 100%; border-collapse: collapse; min-width: 1050px; }
+        th, td { text-align: left; padding: 12px 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; }
+        th { background: #f8fafc; color: #475569; text-transform: uppercase; }
+        .table-wrap { overflow-x: auto; }
+        .tag { display: inline-block; border-radius: 999px; padding: 4px 8px; color: #1d4ed8; background: #dbeafe; font-size: 12px; }
+        .hint { color: #64748b; font-size: 12px; line-height: 1.45; margin: 12px 0 0; }
+        .row-actions { display: flex; gap: 7px; }
+        .row-actions .btn { padding: 7px 9px; font-size: 12px; }
+        .empty { padding: 28px; color: #64748b; text-align: center; }
+        .message { margin-top: 12px; font-weight: 700; }
+        .success { color: #059669; } .error { color: #dc2626; }
+        @media (max-width: 700px) { body { padding: 14px; } .header { display: block; } .header .btn { margin-top: 14px; width: 100%; } }
+    </style>
+</head>
+<body data-page-id="materiais" data-page-type="WRITE">
+    <main class="container">
+        <div class="header">
+            <div>
+                <h1>Cadastro de Materiais</h1>
+                <p class="subtitle">Base técnica para formar preços por consumo real de matéria-prima.</p>
+            </div>
+            <button class="btn btn-primary" id="novoBtn">+ NOVO MATERIAL</button>
+        </div>
+
+        <section class="panel">
+            <h2 id="formTitle">Novo material</h2>
+            <input type="hidden" id="materialId">
+            <div class="grid">
+                <label>Nome do material<input id="nome" placeholder="Ex.: Acrílico cristal 3 mm"></label>
+                <label>Categoria<select id="categoria">
+                    <option>Placa</option><option>Adesivo</option><option>Iluminação</option><option>Perfil</option>
+                    <option>Fonte</option><option>Estrutura</option><option>Acabamento</option><option>Outros</option>
+                </select></label>
+                <label>Regra padrão<select id="formulaPadrao">
+                    <option value="area">Área aplicada (m²)</option>
+                    <option value="placa">Aproveitamento por placa</option>
+                    <option value="linear">Comprimento informado (m)</option>
+                    <option value="perimetro">Contorno / perímetro (m)</option>
+                    <option value="barra">Aproveitamento por barra</option>
+                    <option value="densidade_area">Densidade por área (un./m²)</option>
+                    <option value="unidade">Quantidade informada (un.)</option>
+                </select></label>
+                <label>Unidade comercial<select id="unidade">
+                    <option value="m²">m²</option><option value="m">metro</option><option value="un">unidade</option>
+                    <option value="placa">placa</option><option value="barra">barra</option><option value="rolo">rolo</option>
+                </select></label>
+                <label>Preço de custo (€)<input id="precoCusto" type="number" min="0" step="0.01" value="0"></label>
+                <label>Perda padrão (%)<input id="perdaPercentual" type="number" min="0" step="0.1" value="0"></label>
+                <label>Largura da placa (cm)<input id="larguraCm" type="number" min="0" step="0.1" value="0"></label>
+                <label>Altura da placa (cm)<input id="alturaCm" type="number" min="0" step="0.1" value="0"></label>
+                <label>Comprimento da barra (m)<input id="comprimentoM" type="number" min="0" step="0.01" value="0"></label>
+                <label>Densidade de módulos (un./m²)<input id="densidadePorM2" type="number" min="0" step="0.1" value="0"></label>
+            </div>
+            <label style="margin-top:14px;">Observações<textarea id="observacoes" placeholder="Fornecedor, espessura, cor, aplicação ou critérios de cálculo."></textarea></label>
+            <p class="hint">Placas usam dimensões comerciais e arredondamento por aproveitamento. Barras usam comprimento comercial. Fita LED e neon podem usar comprimento informado ou perímetro. Módulos LED usam densidade configurável por m².</p>
+            <div class="actions">
+                <button class="btn btn-success" id="salvarBtn">SALVAR MATERIAL</button>
+            </div>
+            <div id="message" class="message"></div>
+        </section>
+
+        <section class="panel">
+            <h2>Materiais cadastrados</h2>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Material</th><th>Categoria</th><th>Regra</th><th>Preço</th><th>Perda</th><th>Parâmetros</th><th>Ações</th></tr></thead>
+                    <tbody id="materialsBody"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script src="../core/custeio.js"></script>
+    <script>
+        const ids = ['nome', 'categoria', 'formulaPadrao', 'unidade', 'precoCusto', 'perdaPercentual', 'larguraCm', 'alturaCm', 'comprimentoM', 'densidadePorM2', 'observacoes'];
+        let materiais = [];
+        const money = value => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(Number(value) || 0);
+        const number = id => Number.parseFloat(document.getElementById(id).value) || 0;
+
+        function showMessage(text, type = 'success') {
+            const message = document.getElementById('message');
+            message.textContent = text;
+            message.className = 'message ' + type;
+        }
+
+        function resetForm() {
+            document.getElementById('materialId').value = '';
+            document.getElementById('formTitle').textContent = 'Novo material';
+            ids.forEach(id => {
+                const element = document.getElementById(id);
+                element.value = ['precoCusto', 'perdaPercentual', 'larguraCm', 'alturaCm', 'comprimentoM', 'densidadePorM2'].includes(id) ? '0' : '';
+            });
+            document.getElementById('categoria').value = 'Placa';
+            document.getElementById('formulaPadrao').value = 'area';
+            document.getElementById('unidade').value = 'm²';
+        }
+
+        function formData() {
+            return {
+                nome: document.getElementById('nome').value.trim(),
+                categoria: document.getElementById('categoria').value,
+                formulaPadrao: document.getElementById('formulaPadrao').value,
+                unidade: document.getElementById('unidade').value,
+                precoCusto: number('precoCusto'),
+                perdaPercentual: number('perdaPercentual'),
+                larguraCm: number('larguraCm'),
+                alturaCm: number('alturaCm'),
+                comprimentoM: number('comprimentoM'),
+                densidadePorM2: number('densidadePorM2'),
+                observacoes: document.getElementById('observacoes').value.trim(),
+                ativo: true
+            };
+        }
+
+        function parametros(material) {
+            const values = [];
+            if (material.larguraCm && material.alturaCm) values.push(`${material.larguraCm} x ${material.alturaCm} cm`);
+            if (material.comprimentoM) values.push(`${material.comprimentoM} m`);
+            if (material.densidadePorM2) values.push(`${material.densidadePorM2} un./m²`);
+            return values.join(' | ') || '-';
+        }
+
+        function render() {
+            const body = document.getElementById('materialsBody');
+            body.innerHTML = materiais.length ? materiais.map(material => `
+                <tr>
+                    <td><strong>${material.nome}</strong><br><span style="color:#64748b">${material.unidade}</span></td>
+                    <td><span class="tag">${material.categoria}</span></td>
+                    <td>${CUSTEIO.formulas[material.formulaPadrao] || material.formulaPadrao}</td>
+                    <td>${money(material.precoCusto)}</td>
+                    <td>${material.perdaPercentual || 0}%</td>
+                    <td>${parametros(material)}</td>
+                    <td><div class="row-actions"><button class="btn btn-primary" onclick="editar('${material.id}')">Editar</button><button class="btn btn-danger" onclick="excluir('${material.id}')">Excluir</button></div></td>
+                </tr>`).join('') : '<tr><td colspan="7" class="empty">Cadastre os materiais usados na fabricação para ativar o custeio técnico nos orçamentos.</td></tr>';
+        }
+
+        async function load() {
+            const response = await fetch('/api/database/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ schema: 'material', limit: 500 }) });
+            const result = await response.json();
+            materiais = (result.events || []).map(event => ({ id: event.id, ...event.payload })).filter(material => material.ativo !== false).sort((a, b) => a.nome.localeCompare(b.nome));
+            render();
+        }
+
+        window.editar = id => {
+            const material = materiais.find(item => item.id === id);
+            if (!material) return;
+            document.getElementById('materialId').value = id;
+            document.getElementById('formTitle').textContent = 'Editar material';
+            ids.forEach(field => { document.getElementById(field).value = material[field] ?? ''; });
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        window.excluir = async id => {
+            if (!confirm('Excluir este material do catálogo?')) return;
+            await fetch('/api/database/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+            showMessage('Material excluído.');
+            await load();
+        };
+
+        document.getElementById('novoBtn').addEventListener('click', resetForm);
+        document.getElementById('salvarBtn').addEventListener('click', async () => {
+            const payload = formData();
+            if (!payload.nome) return showMessage('Informe o nome do material.', 'error');
+            const body = { schema: 'material', payload, pageId: 'materiais' };
+            const id = document.getElementById('materialId').value;
+            if (id) body.id = id;
+            const response = await fetch('/api/database/commit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+            if (!response.ok) return showMessage('Não foi possível salvar o material.', 'error');
+            resetForm();
+            showMessage('Material salvo com sucesso.');
+            await load();
+        });
+
+        load().catch(error => {
+            console.error('Erro ao carregar materiais:', error);
+            showMessage('Não foi possível carregar os materiais.', 'error');
+        });
+    </script>
+</body>
+</html>

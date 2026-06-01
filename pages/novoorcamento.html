@@ -2,6 +2,7 @@
 <html lang="pt">
 <head>
     <script src="../core/security.js"></script>
+    <script src="../core/custeio.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Novo Orçamento - PrintPixel</title>
@@ -262,6 +263,30 @@
             font-size: 20px;
             margin-right: 10px;
         }
+
+        .materials-btn {
+            background: #2563eb;
+            color: white;
+            border: 0;
+            border-radius: 5px;
+            padding: 10px 12px;
+            cursor: pointer;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .materials-btn:hover { background: #1d4ed8; }
+        .materials-summary { display: block; margin-top: 5px; color: #64748b; font-size: 11px; }
+        .technical-modal { display: none; position: fixed; inset: 0; z-index: 3000; background: rgba(15, 23, 42, .68); padding: 24px; overflow-y: auto; }
+        .technical-modal.active { display: block; }
+        .technical-card { max-width: 1400px; margin: 20px auto; border-radius: 12px; background: white; padding: 22px; box-shadow: 0 18px 50px rgba(15,23,42,.3); }
+        .technical-header { display: flex; align-items: center; justify-content: space-between; gap: 15px; margin-bottom: 16px; }
+        .technical-table-wrap { overflow-x: auto; }
+        .technical-table { width: 100%; min-width: 1180px; border-collapse: collapse; }
+        .technical-table th, .technical-table td { padding: 9px; border-bottom: 1px solid #e2e8f0; font-size: 12px; }
+        .technical-table th { color: #475569; background: #f8fafc; }
+        .technical-table input, .technical-table select { width: 100%; padding: 8px; }
+        .technical-total { display: flex; justify-content: flex-end; gap: 15px; align-items: center; margin-top: 16px; font-weight: 700; }
         
         .iva-option-section {
             margin-top: 30px;
@@ -581,6 +606,7 @@
                             <th>Custo Unitário (€)</th>
                             <th>Valor Unitário (€)</th>
                             <th>Observações</th>
+                            <th>Ficha técnica</th>
                             <th style="width: 50px;"></th>
                         </tr>
                     </thead>
@@ -667,6 +693,30 @@
         </form>
     </div>
 
+    <div class="technical-modal" id="technicalModal">
+        <div class="technical-card">
+            <div class="technical-header">
+                <div>
+                    <h2>Ficha técnica do produto</h2>
+                    <p style="color:#64748b; margin:4px 0 0;">Informe os materiais e as medidas usadas na fabricação.</p>
+                </div>
+                <button type="button" class="btn btn-secondary" id="closeTechnicalBtn">Fechar</button>
+            </div>
+            <div class="technical-table-wrap">
+                <table class="technical-table">
+                    <thead><tr><th>Material</th><th>Regra</th><th>Largura cm</th><th>Altura cm</th><th>Comp. m</th><th>Qtd.</th><th>Perda %</th><th>Consumo</th><th>Custo</th><th></th></tr></thead>
+                    <tbody id="technicalBody"></tbody>
+                </table>
+            </div>
+            <button type="button" class="add-product-btn" id="addMaterialBtn"><span>+</span> ADICIONAR MATERIAL</button>
+            <div class="technical-total">
+                <span>Custo técnico unitário:</span>
+                <strong id="technicalTotal">0,00 €</strong>
+                <button type="button" class="btn btn-primary" id="applyTechnicalBtn">APLICAR AO PRODUTO</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // ============================================
         // VARIÁVEIS E CONSTANTES
@@ -688,6 +738,8 @@
         let isEditMode = false;
         let currentOrcamentoId = '';
         let margemMinimaOrcamento = 25;
+        let catalogoMateriais = [];
+        let technicalProductRow = null;
         
         // Referências DOM
         const productsTableBody = document.getElementById('productsTableBody');
@@ -695,6 +747,13 @@
         const cancelBtn = document.getElementById('cancelBtn');
         const saveBtn = document.getElementById('saveBtn');
         const codigoInput = document.getElementById('codigo');
+        const closeTechnicalBtn = document.getElementById('closeTechnicalBtn');
+        const addMaterialBtn = document.getElementById('addMaterialBtn');
+        const applyTechnicalBtn = document.getElementById('applyTechnicalBtn');
+
+        closeTechnicalBtn.addEventListener('click', fecharFichaTecnica);
+        addMaterialBtn.addEventListener('click', () => addTechnicalRow());
+        applyTechnicalBtn.addEventListener('click', aplicarFichaTecnica);
         
         // ============================================
         // FUNÇÕES ESPECÍFICAS PARA ORÇAMENTO
@@ -988,6 +1047,10 @@
                               placeholder="Observações do produto..." rows="2">${productData ? (productData.observacoes || '') : ''}</textarea>
                 </td>
                 <td>
+                    <button type="button" class="materials-btn">Materiais</button>
+                    <span class="materials-summary">${productData && productData.materiais && productData.materiais.length ? productData.materiais.length + ' itens' : 'Sem ficha'}</span>
+                </td>
+                <td>
                     <button type="button" class="remove-btn" title="Remover produto">
                         🗑️
                     </button>
@@ -995,19 +1058,121 @@
             `;
             
             productsTableBody.appendChild(row);
+            row._materiais = productData && Array.isArray(productData.materiais) ? productData.materiais : [];
             
             // Adicionar event listeners
             const removeBtn = row.querySelector('.remove-btn');
             const valorInput = row.querySelector('.valor-input');
             const custoInput = row.querySelector('.custo-input');
             const quantidadeInput = row.querySelector('.quantidade-input');
+            const materialsBtn = row.querySelector('.materials-btn');
             
             removeBtn.addEventListener('click', () => removeProductRow(row));
             valorInput.addEventListener('input', calculateTotals);
             custoInput.addEventListener('input', calculateTotals);
             quantidadeInput.addEventListener('input', calculateTotals);
+            materialsBtn.addEventListener('click', () => abrirFichaTecnica(row));
             
             return row;
+        }
+
+        function materialOptions(selectedId = '') {
+            return '<option value="">Selecione</option>' + catalogoMateriais.map(material =>
+                `<option value="${material.id}" ${selectedId === material.id ? 'selected' : ''}>${material.nome}</option>`
+            ).join('');
+        }
+
+        function formulaOptions(selected = '') {
+            return Object.entries(CUSTEIO.formulas).map(([value, label]) =>
+                `<option value="${value}" ${selected === value ? 'selected' : ''}>${label}</option>`
+            ).join('');
+        }
+
+        function abrirFichaTecnica(row) {
+            technicalProductRow = row;
+            renderTechnicalRows();
+            document.getElementById('technicalModal').classList.add('active');
+        }
+
+        function fecharFichaTecnica() {
+            document.getElementById('technicalModal').classList.remove('active');
+            technicalProductRow = null;
+        }
+
+        function addTechnicalRow(item = {}) {
+            if (!technicalProductRow) return;
+            technicalProductRow._materiais.push({
+                materialId: item.materialId || '',
+                formula: item.formula || '',
+                larguraCm: item.larguraCm || 0,
+                alturaCm: item.alturaCm || 0,
+                comprimentoM: item.comprimentoM || 0,
+                quantidade: item.quantidade || 1,
+                perdaPercentual: item.perdaPercentual ?? ''
+            });
+            renderTechnicalRows();
+        }
+
+        function renderTechnicalRows() {
+            if (!technicalProductRow) return;
+            const body = document.getElementById('technicalBody');
+            const items = technicalProductRow._materiais || [];
+            body.innerHTML = items.length ? items.map((item, index) => {
+                const material = catalogoMateriais.find(entry => entry.id === item.materialId) || {};
+                const calculo = CUSTEIO.calcular(item, material);
+                return `<tr data-index="${index}">
+                    <td><select class="tech-material">${materialOptions(item.materialId)}</select></td>
+                    <td><select class="tech-formula">${formulaOptions(item.formula || material.formulaPadrao)}</select></td>
+                    <td><input class="tech-largura" type="number" min="0" step="0.1" value="${item.larguraCm || 0}"></td>
+                    <td><input class="tech-altura" type="number" min="0" step="0.1" value="${item.alturaCm || 0}"></td>
+                    <td><input class="tech-comprimento" type="number" min="0" step="0.01" value="${item.comprimentoM || 0}"></td>
+                    <td><input class="tech-quantidade" type="number" min="0" step="0.01" value="${item.quantidade || 1}"></td>
+                    <td><input class="tech-perda" type="number" min="0" step="0.1" placeholder="${material.perdaPercentual || 0}" value="${item.perdaPercentual ?? ''}"></td>
+                    <td>${calculo.consumo.toFixed(2)} ${calculo.unidade}</td>
+                    <td>${formatarMoeda(calculo.custo)}</td>
+                    <td><button type="button" class="remove-btn tech-remove">X</button></td>
+                </tr>`;
+            }).join('') : '<tr><td colspan="10" style="text-align:center; color:#64748b;">Adicione os materiais usados neste produto.</td></tr>';
+
+            body.querySelectorAll('tr[data-index]').forEach(row => {
+                const index = Number(row.dataset.index);
+                row.querySelectorAll('input, select').forEach(element => element.addEventListener('change', () => updateTechnicalItem(index, row)));
+                row.querySelector('.tech-remove').addEventListener('click', () => {
+                    technicalProductRow._materiais.splice(index, 1);
+                    renderTechnicalRows();
+                });
+            });
+            atualizarTotalFicha();
+        }
+
+        function updateTechnicalItem(index, row) {
+            const item = technicalProductRow._materiais[index];
+            const materialId = row.querySelector('.tech-material').value;
+            const material = catalogoMateriais.find(entry => entry.id === materialId) || {};
+            item.materialId = materialId;
+            item.formula = row.querySelector('.tech-formula').value || material.formulaPadrao || 'unidade';
+            item.larguraCm = parseFloat(row.querySelector('.tech-largura').value) || 0;
+            item.alturaCm = parseFloat(row.querySelector('.tech-altura').value) || 0;
+            item.comprimentoM = parseFloat(row.querySelector('.tech-comprimento').value) || 0;
+            item.quantidade = parseFloat(row.querySelector('.tech-quantidade').value) || 1;
+            item.perdaPercentual = row.querySelector('.tech-perda').value;
+            if (row.querySelector('.tech-material') === document.activeElement && material.formulaPadrao) item.formula = material.formulaPadrao;
+            renderTechnicalRows();
+        }
+
+        function atualizarTotalFicha() {
+            if (!technicalProductRow) return;
+            const ficha = CUSTEIO.calcularFicha(technicalProductRow._materiais, catalogoMateriais);
+            document.getElementById('technicalTotal').textContent = formatarMoeda(ficha.custoTotal);
+        }
+
+        function aplicarFichaTecnica() {
+            if (!technicalProductRow) return;
+            const ficha = CUSTEIO.calcularFicha(technicalProductRow._materiais, catalogoMateriais);
+            technicalProductRow.querySelector('.custo-input').value = ficha.custoTotal.toFixed(2);
+            technicalProductRow.querySelector('.materials-summary').textContent = `${technicalProductRow._materiais.length} itens | ${formatarMoeda(ficha.custoTotal)}`;
+            calculateTotals();
+            fecharFichaTecnica();
         }
         
         function removeProductRow(row) {
@@ -1178,6 +1343,7 @@
                         quantidade: quantidade,
                         valor: valor,
                         custo: custo,
+                        materiais: Array.isArray(row._materiais) ? row._materiais : [],
                         observacoes: observacoes
                     });
                 }
@@ -1191,6 +1357,18 @@
         // ============================================
         
         document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const materialsResponse = await fetch('/api/database/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ schema: 'material', limit: 500 })
+                });
+                const materialsData = await materialsResponse.json();
+                catalogoMateriais = (materialsData.events || []).map(event => ({ id: event.id, ...event.payload })).filter(material => material.ativo !== false);
+            } catch (error) {
+                console.warn('Catálogo de materiais não disponível:', error);
+            }
+
             try {
                 const configResponse = await fetch('/api/database/query', {
                     method: 'POST',
