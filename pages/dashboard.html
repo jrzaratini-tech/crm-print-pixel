@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt">
 <head>
+    <script src="../core/security.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PrintPixel - Dashboard Profissional</title>
@@ -863,6 +864,11 @@
             
             // Estado do dashboard
             let isPrivate = false;
+            let configuracaoEquilibrio = {
+                custosFixos: 5000,
+                margemContribuicao: 50,
+                diasUteis: 22
+            };
             let charts = {};
             let dadosCore = {};
             let todosEventos = [];
@@ -985,20 +991,29 @@
             function solicitarTodosDadosAoCore() {
                 console.log('🔄 Solicitando TODOS os dados da API...');
                 
-                fetch('/api/database/query', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ schema: 'all' })
-                })
-                .then(response => {
-                    if (!response.ok) {
+                Promise.all([
+                    fetch('/api/database/query', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ schema: 'all', limit: 500 })
+                    }),
+                    fetch('/api/database/query', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ schema: 'config_equilibrio', limit: 1 })
+                    })
+                ])
+                .then(([response, configResponse]) => {
+                    if (!response.ok || !configResponse.ok) {
                         throw new Error(`Erro na API: ${response.status}`);
                     }
-                    return response.json();
+                    return Promise.all([response.json(), configResponse.json()]);
                 })
-                .then(result => {
+                .then(([result, configResult]) => {
+                    const configEvent = (configResult.events || [])[0];
+                    if (configEvent && configEvent.payload) {
+                        configuracaoEquilibrio = { ...configuracaoEquilibrio, ...configEvent.payload };
+                    }
                     todosEventos = result.events || [];
                     console.log(`✅ Todos os dados recebidos da API:`, todosEventos.length, 'eventos');
                     
@@ -1458,6 +1473,9 @@
                     });
                 }
                 
+                const margemContribuicao = Math.max(1, parseFloat(configuracaoEquilibrio.margemContribuicao) || 50) / 100;
+                const metaEquilibrio = (parseFloat(configuracaoEquilibrio.custosFixos) || 0) / margemContribuicao;
+
                 return {
                     vendas: {
                         total: totalVendas,
@@ -1474,9 +1492,9 @@
                     },
                     equilibrio: {
                         atingido: totalVendas,
-                        meta: 10000,
-                        percentual: Math.min(100, Math.max(0, (totalVendas / 10000) * 100)).toFixed(1),
-                        metaDiaria: calcularMetaDiariaReal(totalVendas, 10000)
+                        meta: metaEquilibrio,
+                        percentual: metaEquilibrio > 0 ? Math.min(100, Math.max(0, (totalVendas / metaEquilibrio) * 100)).toFixed(1) : '0.0',
+                        metaDiaria: calcularMetaDiariaReal(totalVendas, metaEquilibrio)
                     },
                     contas: {
                         receber: totalAReceber,

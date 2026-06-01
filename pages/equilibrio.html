@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+    <script src="../core/security.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ponto de Equilíbrio - PrintPixel</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --text: #1e293b;
+            --muted: #64748b;
+            --border: #e2e8f0;
+            --bg: #f8fafc;
+        }
+        * { box-sizing: border-box; }
+        body { margin: 0; background: var(--bg); color: var(--text); font-family: Inter, Arial, sans-serif; }
+        .container { max-width: 1400px; margin: 0 auto; padding: 28px; }
+        .header { display: flex; justify-content: space-between; gap: 20px; align-items: center; margin-bottom: 24px; }
+        h1 { margin: 0; font-size: 30px; }
+        .subtitle { margin: 6px 0 0; color: var(--muted); }
+        .btn { border: 0; border-radius: 9px; padding: 12px 18px; font-weight: 700; cursor: pointer; }
+        .btn-primary { background: var(--primary); color: white; }
+        .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 22px; }
+        .metric, .panel { background: white; border: 1px solid var(--border); border-radius: 14px; box-shadow: 0 4px 14px rgba(15, 23, 42, .05); }
+        .metric { padding: 18px; }
+        .metric-label { color: var(--muted); font-size: 13px; font-weight: 700; text-transform: uppercase; }
+        .metric-value { margin-top: 8px; font-size: 25px; font-weight: 800; }
+        .metric-value.success { color: var(--success); }
+        .metric-value.warning { color: var(--warning); }
+        .metric-value.danger { color: var(--danger); }
+        .progress { height: 14px; margin-top: 14px; overflow: hidden; border-radius: 999px; background: #e2e8f0; }
+        .progress-bar { height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, #2563eb, #10b981); transition: width .3s; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+        .panel { padding: 20px; }
+        .panel h2 { margin: 0 0 16px; font-size: 19px; }
+        .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+        label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 13px; font-weight: 700; }
+        input, textarea { width: 100%; border: 1px solid var(--border); border-radius: 8px; padding: 11px; color: var(--text); font: inherit; }
+        textarea { min-height: 92px; resize: vertical; }
+        .note { margin-top: 16px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+        .message { display: none; margin-top: 14px; padding: 12px; border-radius: 8px; font-weight: 700; }
+        .message.success { display: block; background: #ecfdf5; color: #047857; }
+        .message.error { display: block; background: #fef2f2; color: #b91c1c; }
+        @media (max-width: 900px) { .metrics, .grid, .form-grid { grid-template-columns: 1fr; } .container { padding: 16px; } }
+    </style>
+</head>
+<body data-page-id="equilibrio" data-page-type="READ">
+    <main class="container">
+        <div class="header">
+            <div>
+                <h1><i class="fas fa-balance-scale"></i> Ponto de Equilíbrio</h1>
+                <p class="subtitle">Custos fixos, margem de contribuição e parâmetros iniciais de custeio.</p>
+            </div>
+            <button class="btn btn-primary" id="saveBtn"><i class="fas fa-save"></i> SALVAR CONFIGURAÇÃO</button>
+        </div>
+
+        <section class="metrics">
+            <div class="metric"><div class="metric-label">Vendas do mês</div><div class="metric-value success" id="vendasMes">€0,00</div></div>
+            <div class="metric"><div class="metric-label">Faturamento mínimo</div><div class="metric-value" id="pontoEquilibrio">€0,00</div></div>
+            <div class="metric"><div class="metric-label">Falta faturar</div><div class="metric-value warning" id="faltaFaturar">€0,00</div></div>
+            <div class="metric">
+                <div class="metric-label">Meta atingida</div><div class="metric-value" id="percentual">0%</div>
+                <div class="progress"><div class="progress-bar" id="progressBar"></div></div>
+            </div>
+        </section>
+
+        <section class="grid">
+            <div class="panel">
+                <h2>Base gerencial</h2>
+                <div class="form-grid">
+                    <div><label for="custosFixos">Custos fixos mensais (€)</label><input id="custosFixos" type="number" min="0" step="0.01" value="5000"></div>
+                    <div><label for="margemContribuicao">Margem de contribuição média (%)</label><input id="margemContribuicao" type="number" min="1" max="100" step="0.1" value="50"></div>
+                    <div><label for="diasUteis">Dias úteis do mês</label><input id="diasUteis" type="number" min="1" max="31" value="22"></div>
+                    <div><label for="margemMinima">Margem mínima nos orçamentos (%)</label><input id="margemMinima" type="number" min="0" max="100" step="0.1" value="25"></div>
+                </div>
+                <p class="note">Faturamento mínimo = custos fixos / margem de contribuição. Atualize estes valores quando a estrutura mensal mudar.</p>
+            </div>
+
+            <div class="panel">
+                <h2>Centros produtivos</h2>
+                <div class="form-grid">
+                    <div><label for="custoHoraImpressao">Impressão - custo/hora (€)</label><input id="custoHoraImpressao" type="number" min="0" step="0.01" value="35"></div>
+                    <div><label for="custoHoraAcabamento">Acabamento - custo/hora (€)</label><input id="custoHoraAcabamento" type="number" min="0" step="0.01" value="22"></div>
+                    <div><label for="custoHoraInstalacao">Instalação - custo/hora (€)</label><input id="custoHoraInstalacao" type="number" min="0" step="0.01" value="30"></div>
+                    <div><label for="perdaMaterial">Perda padrão de material (%)</label><input id="perdaMaterial" type="number" min="0" max="100" step="0.1" value="10"></div>
+                </div>
+                <p class="note">Estes custos formam a primeira camada do custeio. A ficha técnica detalhada por produto pode ser refinada progressivamente com dados reais.</p>
+            </div>
+
+            <div class="panel">
+                <h2>Indicadores calculados</h2>
+                <div class="form-grid">
+                    <div><label>Meta diária</label><input id="metaDiaria" readonly></div>
+                    <div><label>Margem de segurança</label><input id="margemSeguranca" readonly></div>
+                </div>
+                <p class="note">A margem de segurança mostra quanto as vendas estão acima ou abaixo do ponto de equilíbrio.</p>
+            </div>
+
+            <div class="panel">
+                <h2>Notas de custeio</h2>
+                <textarea id="notas" placeholder="Registre critérios de rateio, custos sazonais ou observações para a equipa."></textarea>
+                <div class="message" id="message"></div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const defaults = {
+            custosFixos: 5000, margemContribuicao: 50, diasUteis: 22, margemMinima: 25,
+            custoHoraImpressao: 35, custoHoraAcabamento: 22, custoHoraInstalacao: 30, perdaMaterial: 10, notas: ''
+        };
+        let configId = '';
+        let vendasMes = 0;
+        const ids = Object.keys(defaults);
+
+        const money = value => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(Number(value) || 0);
+        const numberValue = id => Number(document.getElementById(id).value) || 0;
+
+        function configFromForm() {
+            return {
+                custosFixos: numberValue('custosFixos'), margemContribuicao: numberValue('margemContribuicao'),
+                diasUteis: numberValue('diasUteis'), margemMinima: numberValue('margemMinima'),
+                custoHoraImpressao: numberValue('custoHoraImpressao'), custoHoraAcabamento: numberValue('custoHoraAcabamento'),
+                custoHoraInstalacao: numberValue('custoHoraInstalacao'), perdaMaterial: numberValue('perdaMaterial'),
+                notas: document.getElementById('notas').value
+            };
+        }
+
+        function calculate() {
+            const config = configFromForm();
+            const contribution = Math.max(1, config.margemContribuicao) / 100;
+            const equilibrium = config.custosFixos / contribution;
+            const missing = Math.max(0, equilibrium - vendasMes);
+            const percent = equilibrium > 0 ? (vendasMes / equilibrium) * 100 : 0;
+            document.getElementById('vendasMes').textContent = money(vendasMes);
+            document.getElementById('pontoEquilibrio').textContent = money(equilibrium);
+            document.getElementById('faltaFaturar').textContent = money(missing);
+            document.getElementById('percentual').textContent = percent.toFixed(1) + '%';
+            document.getElementById('progressBar').style.width = Math.min(100, percent) + '%';
+            document.getElementById('metaDiaria').value = money(missing / Math.max(1, config.diasUteis));
+            document.getElementById('margemSeguranca').value = money(vendasMes - equilibrium);
+        }
+
+        function showMessage(text, type) {
+            const element = document.getElementById('message');
+            element.textContent = text;
+            element.className = 'message ' + type;
+        }
+
+        async function load() {
+            try {
+                const [configResponse, ordersResponse] = await Promise.all([
+                    fetch('/api/database/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ schema: 'config_equilibrio', limit: 1 }) }),
+                    fetch('/api/database/query', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ schema: 'pedido', limit: 500 }) })
+                ]);
+                const configData = await configResponse.json();
+                const ordersData = await ordersResponse.json();
+                const event = (configData.events || [])[0];
+                if (event) {
+                    configId = event.id;
+                    ids.forEach(id => { if (event.payload[id] !== undefined) document.getElementById(id).value = event.payload[id]; });
+                }
+                const now = new Date();
+                vendasMes = (ordersData.events || []).reduce((sum, order) => {
+                    const date = new Date(order.timestamp || order.created_at || 0);
+                    return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()
+                        ? sum + (Number(order.payload && order.payload.total) || 0) : sum;
+                }, 0);
+                calculate();
+            } catch (error) {
+                console.error('Erro ao carregar indicadores do ponto de equilibrio:', error);
+                showMessage('Não foi possível carregar os indicadores.', 'error');
+            }
+        }
+
+        document.querySelectorAll('input, textarea').forEach(element => element.addEventListener('input', calculate));
+        document.getElementById('saveBtn').addEventListener('click', async () => {
+            try {
+                const body = { schema: 'config_equilibrio', payload: configFromForm(), pageId: 'equilibrio' };
+                if (configId) body.id = configId;
+                const response = await fetch('/api/database/commit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+                if (!response.ok) throw new Error('Falha ao salvar');
+                const result = await response.json();
+                configId = result.id;
+                showMessage('Configuração salva com sucesso.', 'success');
+                calculate();
+            } catch (error) {
+                console.error('Erro ao salvar configuracao do ponto de equilibrio:', error);
+                showMessage('Não foi possível salvar a configuração.', 'error');
+            }
+        });
+        load();
+    </script>
+</body>
+</html>

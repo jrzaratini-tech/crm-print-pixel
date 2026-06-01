@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt">
 <head>
+    <script src="../core/security.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Novo Orçamento - PrintPixel</title>
@@ -577,6 +578,7 @@
                             <th>Produto</th>
                             <th>Tamanho</th>
                             <th>Quantidade</th>
+                            <th>Custo Unitário (€)</th>
                             <th>Valor Unitário (€)</th>
                             <th>Observações</th>
                             <th style="width: 50px;"></th>
@@ -626,12 +628,36 @@
                         <div class="total-label">TOTAL FINAL</div>
                         <div class="total-value final" id="totalFinal">0,00 €</div>
                     </div>
+
+                    <div class="total-card">
+                        <div class="total-label">Custo Estimado</div>
+                        <div class="total-value" id="custoEstimado">0,00 €</div>
+                    </div>
+
+                    <div class="total-card">
+                        <div class="total-label">Lucro Estimado</div>
+                        <div class="total-value" id="lucroEstimado">0,00 €</div>
+                    </div>
+
+                    <div class="total-card">
+                        <div class="total-label">Margem Estimada</div>
+                        <div class="total-value" id="margemEstimada">0,0%</div>
+                    </div>
+
+                    <div class="total-card">
+                        <div class="total-label">Preço Mínimo Recomendado</div>
+                        <div class="total-value" id="precoMinimo">0,00 €</div>
+                    </div>
                 </div>
                 
                 <!-- Campos ocultos para totais -->
                 <input type="hidden" id="orcamentoSubtotal" data-bind="orcamento.subtotal" value="0">
                 <input type="hidden" id="orcamentoIVA" data-bind="orcamento.iva" value="0">
                 <input type="hidden" id="orcamentoTotal" data-bind="orcamento.total" value="0">
+                <input type="hidden" id="orcamentoCustoEstimado" data-bind="orcamento.custoEstimado" value="0">
+                <input type="hidden" id="orcamentoLucroEstimado" data-bind="orcamento.lucroEstimado" value="0">
+                <input type="hidden" id="orcamentoMargemEstimada" data-bind="orcamento.margemEstimada" value="0">
+                <input type="hidden" id="orcamentoPrecoMinimo" data-bind="orcamento.precoMinimo" value="0">
             </div>
             
             <div class="form-actions">
@@ -661,6 +687,7 @@
         let productIndex = 0;
         let isEditMode = false;
         let currentOrcamentoId = '';
+        let margemMinimaOrcamento = 25;
         
         // Referências DOM
         const productsTableBody = document.getElementById('productsTableBody');
@@ -949,6 +976,10 @@
                            min="1" value="${productData ? (productData.quantidade || 1) : 1}" required>
                 </td>
                 <td>
+                    <input type="number" class="custo-input" data-bind="orcamento.produtos.${index}.custo"
+                           min="0" step="0.01" value="${productData ? (productData.custo || '0.00') : '0.00'}">
+                </td>
+                <td>
                     <input type="number" class="valor-input" data-bind="orcamento.produtos.${index}.valor" 
                            min="0" step="0.01" value="${productData ? (productData.valor || '0.00') : '0.00'}" required>
                 </td>
@@ -968,10 +999,12 @@
             // Adicionar event listeners
             const removeBtn = row.querySelector('.remove-btn');
             const valorInput = row.querySelector('.valor-input');
+            const custoInput = row.querySelector('.custo-input');
             const quantidadeInput = row.querySelector('.quantidade-input');
             
             removeBtn.addEventListener('click', () => removeProductRow(row));
             valorInput.addEventListener('input', calculateTotals);
+            custoInput.addEventListener('input', calculateTotals);
             quantidadeInput.addEventListener('input', calculateTotals);
             
             return row;
@@ -998,12 +1031,14 @@
                 const tamanho = row.querySelector('.tamanho-input');
                 const quantidade = row.querySelector('.quantidade-input');
                 const valor = row.querySelector('.valor-input');
+                const custo = row.querySelector('.custo-input');
                 const obs = row.querySelector('.obs-input');
                 
                 if (select) select.setAttribute('data-bind', `orcamento.produtos.${index}.nome`);
                 if (tamanho) tamanho.setAttribute('data-bind', `orcamento.produtos.${index}.tamanho`);
                 if (quantidade) quantidade.setAttribute('data-bind', `orcamento.produtos.${index}.quantidade`);
                 if (valor) valor.setAttribute('data-bind', `orcamento.produtos.${index}.valor`);
+                if (custo) custo.setAttribute('data-bind', `orcamento.produtos.${index}.custo`);
                 if (obs) obs.setAttribute('data-bind', `orcamento.produtos.${index}.observacoes`);
                 
                 productIndex = index + 1;
@@ -1012,15 +1047,19 @@
         
         function calculateTotals() {
             let subtotalProdutos = 0;
+            let custoEstimado = 0;
             
             document.querySelectorAll('#productsTableBody tr').forEach(row => {
                 const valorInput = row.querySelector('.valor-input');
                 const quantidadeInput = row.querySelector('.quantidade-input');
+                const custoInput = row.querySelector('.custo-input');
                 
                 const valor = parseFloat(valorInput.value) || 0;
                 const quantidade = parseInt(quantidadeInput.value) || 0;
+                const custo = parseFloat(custoInput.value) || 0;
                 
                 subtotalProdutos += valor * quantidade;
+                custoEstimado += custo * quantidade;
             });
             
             const instalacao = 0;
@@ -1032,17 +1071,30 @@
             }
             
             const totalFinal = subtotalGeral + iva;
+            const lucroEstimado = subtotalGeral - custoEstimado;
+            const margemEstimada = subtotalGeral > 0 ? (lucroEstimado / subtotalGeral) * 100 : 0;
+            const margemMinimaDecimal = Math.min(99, Math.max(0, margemMinimaOrcamento)) / 100;
+            const precoMinimo = custoEstimado / Math.max(0.01, 1 - margemMinimaDecimal);
             
             // Atualizar exibição
             document.getElementById('subtotalProdutos').textContent = formatarMoeda(subtotalProdutos);
             document.getElementById('totalInstalacao').textContent = formatarMoeda(instalacao);
             document.getElementById('valorIVA').textContent = formatarMoeda(iva);
             document.getElementById('totalFinal').textContent = formatarMoeda(totalFinal);
+            document.getElementById('custoEstimado').textContent = formatarMoeda(custoEstimado);
+            document.getElementById('lucroEstimado').textContent = formatarMoeda(lucroEstimado);
+            document.getElementById('margemEstimada').textContent = margemEstimada.toFixed(1).replace('.', ',') + '%';
+            document.getElementById('margemEstimada').style.color = margemEstimada < margemMinimaOrcamento ? '#ef4444' : '#10b981';
+            document.getElementById('precoMinimo').textContent = formatarMoeda(precoMinimo);
             
             // Atualizar campos ocultos
             document.getElementById('orcamentoSubtotal').value = subtotalGeral;
             document.getElementById('orcamentoIVA').value = iva;
             document.getElementById('orcamentoTotal').value = totalFinal;
+            document.getElementById('orcamentoCustoEstimado').value = custoEstimado.toFixed(2);
+            document.getElementById('orcamentoLucroEstimado').value = lucroEstimado.toFixed(2);
+            document.getElementById('orcamentoMargemEstimada').value = margemEstimada.toFixed(2);
+            document.getElementById('orcamentoPrecoMinimo').value = precoMinimo.toFixed(2);
         }
         
         function formatarMoeda(value) {
@@ -1116,6 +1168,7 @@
                 const tamanho = row.querySelector('.tamanho-input').value;
                 const quantidade = parseInt(row.querySelector('.quantidade-input').value) || 1;
                 const valor = parseFloat(row.querySelector('.valor-input').value) || 0;
+                const custo = parseFloat(row.querySelector('.custo-input').value) || 0;
                 const observacoes = row.querySelector('.obs-input').value;
                 
                 if (nome) {
@@ -1124,6 +1177,7 @@
                         tamanho: tamanho,
                         quantidade: quantidade,
                         valor: valor,
+                        custo: custo,
                         observacoes: observacoes
                     });
                 }
@@ -1137,6 +1191,19 @@
         // ============================================
         
         document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const configResponse = await fetch('/api/database/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ schema: 'config_equilibrio', limit: 1 })
+                });
+                const configData = await configResponse.json();
+                const configEvent = (configData.events || [])[0];
+                if (configEvent && configEvent.payload) margemMinimaOrcamento = parseFloat(configEvent.payload.margemMinima) || 25;
+            } catch (error) {
+                console.warn('Configuração de margem não disponível; usando padrão de 25%.');
+            }
+
             // Verificar se é modo de edição
             const urlParams = new URLSearchParams(window.location.search);
             const editId = urlParams.get('edit');

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt">
 <head>
+    <script src="../core/security.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PrintPixel - Ordem de Produção</title>
@@ -1417,6 +1418,7 @@
                             entrada: parseFloat(payload.entrada) || 0,
                             dataEntrada: payload.dataEntrada || '',
                             instalacao: parseFloat(payload.instalacao) || 0,
+                            producao: payload.producao || {},
                             
                             // Metadados
                             createdAt: event.timestamp || event.created_at || new Date().toISOString(),
@@ -1796,6 +1798,9 @@
                 const statusInfo = getStatusInfoPadrao(ordem.status);
                 const statusPagamentoInfo = getStatusPagamentoInfo(ordem.statusPagamento);
                 const extras = obterCamposExtras(ordem);
+                const producao = ordem.producao || {};
+                const variacaoHoras = (parseFloat(producao.horasRealizadas) || 0) - (parseFloat(producao.horasPrevistas) || 0);
+                const variacaoCustos = (parseFloat(producao.custoRealizado) || 0) - (parseFloat(producao.custoPrevisto) || 0);
                 
                 modalContent.innerHTML = `
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px;">
@@ -1884,6 +1889,39 @@
                         </div>
                     ` : ''}
 
+                    <div style="margin-bottom: 30px;">
+                        <h3 style="color: var(--accent-blue); margin-bottom: 15px; font-size: 16px;">PRODUÇÃO: PREVISTO X REALIZADO</h3>
+                        <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 8px;">
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 15px;">
+                                <label style="font-size: 12px; color: var(--text-secondary);">Horas previstas
+                                    <input id="producaoHorasPrevistas" type="number" min="0" step="0.25" value="${producao.horasPrevistas || ''}" style="width: 100%; margin-top: 5px; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(255,255,255,.06); color: var(--text-primary);">
+                                </label>
+                                <label style="font-size: 12px; color: var(--text-secondary);">Horas realizadas
+                                    <input id="producaoHorasRealizadas" type="number" min="0" step="0.25" value="${producao.horasRealizadas || ''}" style="width: 100%; margin-top: 5px; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(255,255,255,.06); color: var(--text-primary);">
+                                </label>
+                                <label style="font-size: 12px; color: var(--text-secondary);">Custo previsto
+                                    <input id="producaoCustoPrevisto" type="number" min="0" step="0.01" value="${producao.custoPrevisto || ''}" style="width: 100%; margin-top: 5px; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(255,255,255,.06); color: var(--text-primary);">
+                                </label>
+                                <label style="font-size: 12px; color: var(--text-secondary);">Custo realizado
+                                    <input id="producaoCustoRealizado" type="number" min="0" step="0.01" value="${producao.custoRealizado || ''}" style="width: 100%; margin-top: 5px; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(255,255,255,.06); color: var(--text-primary);">
+                                </label>
+                                <label style="font-size: 12px; color: var(--text-secondary);">Material previsto
+                                    <input id="producaoMaterialPrevisto" type="number" min="0" step="0.01" value="${producao.materialPrevisto || ''}" style="width: 100%; margin-top: 5px; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(255,255,255,.06); color: var(--text-primary);">
+                                </label>
+                                <label style="font-size: 12px; color: var(--text-secondary);">Material realizado
+                                    <input id="producaoMaterialRealizado" type="number" min="0" step="0.01" value="${producao.materialRealizado || ''}" style="width: 100%; margin-top: 5px; padding: 10px; border-radius: 6px; border: 1px solid var(--border-color); background: rgba(255,255,255,.06); color: var(--text-primary);">
+                                </label>
+                            </div>
+                            <div style="display: flex; justify-content: space-between; gap: 15px; flex-wrap: wrap; margin-top: 15px;">
+                                <span style="font-size: 13px; color: var(--text-secondary);">Desvio de horas: <strong>${variacaoHoras.toFixed(2)}h</strong> | Desvio de custos: <strong>${formatarMoedaPadrao(variacaoCustos)}</strong></span>
+                                <button class="refresh-btn" onclick="salvarApontamentoProducao('${ordem.id}')">
+                                    <i class="fas fa-save"></i>
+                                    Salvar apontamento
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <div style="display: flex; justify-content: flex-end;">
                         <div style="background: rgba(255, 255, 255, 0.05); padding: 20px; border-radius: 8px; width: 340px;">
                             <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border-color);"><span>Subtotal:</span><span>${formatarMoedaPadrao(subtotal)}</span></div>
@@ -1942,6 +1980,51 @@
             }
             
             // Atualizar status da ordem via API Core
+            async function salvarApontamentoProducao(ordemId) {
+                try {
+                    const response = await fetch('/api/database/query', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ schema: 'pedido', filters: { id: ordemId } })
+                    });
+                    if (!response.ok) throw new Error('Erro ao buscar ordem');
+
+                    const result = await response.json();
+                    const eventoOriginal = (result.events || [])[0];
+                    if (!eventoOriginal) throw new Error('Ordem não encontrada');
+
+                    const lerNumero = id => parseFloat(document.getElementById(id).value) || 0;
+                    const payloadAtualizado = {
+                        ...eventoOriginal.payload,
+                        producao: {
+                            horasPrevistas: lerNumero('producaoHorasPrevistas'),
+                            horasRealizadas: lerNumero('producaoHorasRealizadas'),
+                            custoPrevisto: lerNumero('producaoCustoPrevisto'),
+                            custoRealizado: lerNumero('producaoCustoRealizado'),
+                            materialPrevisto: lerNumero('producaoMaterialPrevisto'),
+                            materialRealizado: lerNumero('producaoMaterialRealizado'),
+                            updated_at: new Date().toISOString()
+                        },
+                        updated_at: new Date().toISOString()
+                    };
+
+                    const commitResponse = await fetch('/api/database/commit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: ordemId, schema: 'pedido', payload: payloadAtualizado, pageId: 'ordem_producao' })
+                    });
+                    if (!commitResponse.ok) throw new Error('Erro ao salvar apontamento');
+
+                    alert('Apontamento de produção salvo.');
+                    fecharModal();
+                    carregarOrdens();
+                } catch (error) {
+                    console.error('Erro ao salvar apontamento:', error);
+                    alert('Erro ao salvar o apontamento de produção. Tente novamente.');
+                }
+            }
+
+            // Atualizar status da ordem via API Core
             async function atualizarStatusOrdem(ordemId, novoStatus) {
                 try {
                     console.log(`🔄 Atualizando status da ordem ${ordemId} para: ${novoStatus}`);
@@ -1978,6 +2061,7 @@
                     
                     // Criar novo evento de atualização
                     const eventoAtualizacao = {
+                        id: ordemId,
                         schema: 'pedido',
                         payload: payloadAtualizado,
                         pageId: 'ordem_producao',
@@ -2121,6 +2205,7 @@
             
             // Expor funções para uso global (se necessário)
             window.fecharModal = fecharModal;
+            window.salvarApontamentoProducao = salvarApontamentoProducao;
             window.atualizarStatusOrdem = atualizarStatusOrdem;
             window.imprimirOrdemGlobal = function(ordemId) {
                 const ordem = todasOrdens.find(item => item.id === ordemId);

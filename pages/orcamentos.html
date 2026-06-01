@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="pt">
 <head>
+    <script src="../core/security.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Orçamentos - PrintPixel</title>
@@ -1831,20 +1832,12 @@
                     throw new Error('Orçamento não encontrado');
                 }
                 
-                const response = await fetch('/api/database/commit', {
+                const response = await fetch('/api/database/delete', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        schema: 'orcamento',
-                        payload: {
-                            ...orcamento,
-                            deleted: true,
-                            dataExclusao: new Date().toISOString()
-                        },
-                        pageId: 'orcamentos'
-                    })
+                    body: JSON.stringify({ id })
                 });
                 
                 if (!response.ok) {

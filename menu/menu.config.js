@@ -117,5 +117,15 @@
         pos: 12,
         hidden: false,
         deleted: false
+    },
+
+    {
+        id: "nav_equilibrio",
+        name: "Ponto de Equilíbrio",
+        file: "pages/equilibrio.html",
+        type: "READ",
+        pos: 13,
+        hidden: false,
+        deleted: false
     }
 ];
