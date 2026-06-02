@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Links - PrintPixel</title>
   <style>
-    *{box-sizing:border-box;font-family:Segoe UI,system-ui,sans-serif}body{margin:0;padding:24px;background:#f8fafc;color:#1e293b}.container{max-width:1300px;margin:auto}h1{margin:0;color:#1a237e}.subtitle{color:#64748b}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px;margin-top:24px}.card,.panel{display:flex;flex-direction:column;gap:12px;padding:20px;border:1px solid #e2e8f0;border-radius:14px;background:#fff;box-shadow:0 4px 16px #0f172a0d}.icon{display:grid;place-items:center;width:46px;height:46px;border-radius:12px;background:#dbeafe;color:#1d4ed8;font-size:22px;font-weight:800}.tag{width:max-content;padding:4px 8px;border-radius:999px;background:#dcfce7;color:#166534;font-size:12px;font-weight:700}.url{padding:10px;border:1px solid #cbd5e1;border-radius:8px;background:#f8fafc;color:#475569;word-break:break-all;font-size:13px}.actions{display:flex;flex-wrap:wrap;gap:9px}.btn{border:0;border-radius:8px;padding:10px 13px;color:#fff;background:#1a237e;font-weight:700;cursor:pointer;text-decoration:none;font-size:13px}.btn.secondary{background:#475569}.btn.danger{background:#b91c1c}.note{margin-top:22px;padding:16px;border-left:4px solid #2563eb;background:#eff6ff;color:#334155;line-height:1.55}.message{min-height:20px;color:#047857;font-weight:700;font-size:13px}.panel{margin-top:20px}.form-row{display:grid;grid-template-columns:1fr 180px auto;gap:9px}.form-row input,.form-row select{min-width:0;border:1px solid #cbd5e1;border-radius:8px;padding:10px}.worker{display:grid;grid-template-columns:1fr auto;gap:10px;padding:13px;border:1px solid #e2e8f0;border-radius:10px}.worker small{display:block;color:#64748b}.worker .actions{justify-content:flex-end}@media(max-width:700px){body{padding:14px}.form-row,.worker{grid-template-columns:1fr}.worker .actions{justify-content:flex-start}}
+    *{box-sizing:border-box;font-family:Segoe UI,system-ui,sans-serif}body{margin:0;padding:24px;background:#f8fafc;color:#1e293b}.container{max-width:1300px;margin:auto}h1{margin:0;color:#1a237e}.subtitle{color:#64748b}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px;margin-top:24px}.card,.panel{display:flex;flex-direction:column;gap:12px;padding:20px;border:1px solid #e2e8f0;border-radius:14px;background:#fff;box-shadow:0 4px 16px #0f172a0d}.icon{display:grid;place-items:center;width:46px;height:46px;border-radius:12px;background:#dbeafe;color:#1d4ed8;font-size:22px;font-weight:800}.tag{width:max-content;padding:4px 8px;border-radius:999px;background:#dcfce7;color:#166534;font-size:12px;font-weight:700}.url{padding:10px;border:1px solid #cbd5e1;border-radius:8px;background:#f8fafc;color:#475569;word-break:break-all;font-size:13px}.actions{display:flex;flex-wrap:wrap;gap:9px}.btn{border:0;border-radius:8px;padding:10px 13px;color:#fff;background:#1a237e;font-weight:700;cursor:pointer;text-decoration:none;font-size:13px}.btn.secondary{background:#475569}.btn.danger{background:#b91c1c}.note{margin-top:22px;padding:16px;border-left:4px solid #2563eb;background:#eff6ff;color:#334155;line-height:1.55}.message{min-height:20px;color:#047857;font-weight:700;font-size:13px}.panel{margin-top:20px}.form-row{display:grid;grid-template-columns:1.2fr 1fr 1fr 170px auto;gap:9px}.form-row input,.form-row select{min-width:0;border:1px solid #cbd5e1;border-radius:8px;padding:10px}.worker{display:grid;grid-template-columns:1fr auto;gap:10px;padding:13px;border:1px solid #e2e8f0;border-radius:10px}.worker small{display:block;color:#64748b}.worker .actions{justify-content:flex-end}@media(max-width:900px){.form-row{grid-template-columns:1fr 1fr}}@media(max-width:700px){body{padding:14px}.form-row,.worker{grid-template-columns:1fr}.worker .actions{justify-content:flex-start}}
   </style>
 </head>
 <body data-page-id="links" data-page-type="READ">
@@ -28,11 +28,16 @@
       </article>
     </section>
     <section class="panel">
-      <div><h2>Links individuais da produção</h2><p class="subtitle">Cadastre colaboradores e gere links revogáveis para o app de execução. Cada pessoa verá somente as próprias O.S.</p></div>
+      <div><h2>App da produção</h2><p class="subtitle">Use um único link no celular. Cada colaborador entra com o próprio usuário e senha.</p></div>
+      <div class="url" id="productionUrl"></div>
+      <div class="actions"><a class="btn" id="openProduction" target="_blank" rel="noopener">Abrir app</a><button class="btn secondary" id="copyProduction">Copiar link</button></div>
+      <div><h3>Usuários autorizados</h3><p class="subtitle">Comercial e projetista acompanham todas as O.S. Montagem e produção visualizam somente os trabalhos atribuídos.</p></div>
       <form class="form-row" id="workerForm">
         <input id="workerName" required maxlength="100" placeholder="Nome do colaborador">
-        <select id="workerRole"><option value="montagem">Montagem</option><option value="projetista">Projetista</option><option value="producao">Produção</option></select>
-        <button class="btn" type="submit">Cadastrar e gerar link</button>
+        <input id="workerUsername" required maxlength="60" placeholder="Usuário para entrar">
+        <input id="workerPassword" required minlength="8" maxlength="120" type="password" placeholder="Senha inicial">
+        <select id="workerRole"><option value="montagem">Montagem</option><option value="producao">Produção</option><option value="projetista">Projetista</option><option value="comercial">Comercial</option></select>
+        <button class="btn" type="submit">Cadastrar usuário</button>
       </form>
       <div class="message" id="workerMessage"></div>
       <div id="workerList"></div>
@@ -48,19 +53,27 @@
       document.getElementById('copyMessage').textContent = 'Link copiado.';
     });
     const workerMessage = document.getElementById('workerMessage');
+    const productionUrl = `${location.origin}/colaborador/`;
+    document.getElementById('productionUrl').textContent = productionUrl;
+    document.getElementById('openProduction').href = productionUrl;
+    document.getElementById('copyProduction').addEventListener('click', async () => {
+      await navigator.clipboard.writeText(productionUrl);
+      workerMessage.textContent = 'Link permanente do app copiado.';
+    });
     async function api(path, options = {}) {
       const response = await fetch(path, { ...options, headers: { 'Content-Type': 'application/json', ...(options.headers || {}) } });
       const body = await response.json();
       if (!response.ok) throw new Error(body.message || 'Não foi possível concluir a operação.');
       return body;
     }
-    async function copyLink(url) {
-      await navigator.clipboard.writeText(url);
-      workerMessage.textContent = 'Link individual copiado. Envie somente ao colaborador correto.';
-    }
-    async function generateLink(workerId) {
-      const result = await api(`/api/production/workers/${workerId}/link`, { method: 'POST' });
-      await copyLink(result.url);
+    async function resetPassword(worker) {
+      const username = worker.username || prompt('Este cadastro veio da versão anterior. Defina o usuário para entrar:');
+      if (!username) return;
+      const password = prompt('Digite a nova senha com pelo menos 8 caracteres:');
+      if (!password) return;
+      await api(`/api/production/workers/${worker.id}/credentials`, { method: 'POST', body: JSON.stringify({ username, password }) });
+      workerMessage.textContent = 'Senha redefinida. Sessões anteriores foram encerradas.';
+      await loadWorkers();
     }
     async function revoke(workerId) {
       if (!confirm('Revogar o acesso deste colaborador?')) return;
@@ -79,14 +92,16 @@
         const title = document.createElement('strong');
         title.textContent = worker.name;
         const role = document.createElement('small');
-        role.textContent = `Perfil: ${worker.role}`;
-        info.append(title, role);
+        role.textContent = `Usuário: ${worker.username || 'defina uma senha para migrar'} · Perfil: ${worker.role}`;
+        const access = document.createElement('small');
+        access.textContent = ['comercial', 'projetista'].includes(worker.role) ? 'Acesso: todas as O.S.' : 'Acesso: somente O.S. atribuídas';
+        info.append(title, role, access);
         const actions = document.createElement('div');
         actions.className = 'actions';
         const link = document.createElement('button');
         link.className = 'btn';
-        link.textContent = 'Gerar novo link';
-        link.addEventListener('click', () => generateLink(worker.id));
+        link.textContent = 'Redefinir senha';
+        link.addEventListener('click', () => resetPassword(worker));
         const remove = document.createElement('button');
         remove.className = 'btn danger';
         remove.textContent = 'Revogar';
@@ -99,9 +114,11 @@
     document.getElementById('workerForm').addEventListener('submit', async event => {
       event.preventDefault();
       try {
-        const result = await api('/api/production/workers', { method: 'POST', body: JSON.stringify({ name: document.getElementById('workerName').value, role: document.getElementById('workerRole').value }) });
+        const result = await api('/api/production/workers', { method: 'POST', body: JSON.stringify({ name: document.getElementById('workerName').value, username: document.getElementById('workerUsername').value, password: document.getElementById('workerPassword').value, role: document.getElementById('workerRole').value }) });
         document.getElementById('workerName').value = '';
-        await copyLink(result.url);
+        document.getElementById('workerUsername').value = '';
+        document.getElementById('workerPassword').value = '';
+        workerMessage.textContent = 'Usuário cadastrado. Envie o link permanente do app e as credenciais ao colaborador.';
         await loadWorkers();
       } catch (error) { workerMessage.textContent = error.message; }
     });

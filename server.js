@@ -17,6 +17,8 @@ const MAX_QUERY_LIMIT = 500;
 const MAX_UPLOAD_BYTES = 500 * 1024;
 const UPLOAD_TTL_MS = 15 * 60 * 1000;
 const MOBILE_DEVICE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+const PRODUCTION_SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+const PRODUCTION_PRIVILEGED_ROLES = new Set(['comercial', 'projetista']);
 const PRODUCTION_STEPS = [
   'Arte / projeto',
   'Modelagem',
@@ -349,18 +351,20 @@ function normalizeProductionSteps(selected = [], previous = []) {
 
 async function getActiveWorkerByToken(token) {
   if (!token || token.length < 40 || token.length > 200) return null;
-  const workerDoc = await db.collection('production_workers').doc(hash(token)).get();
-  if (!workerDoc.exists) return null;
-  const worker = workerDoc.data();
-  return worker.active === false ? null : worker;
+  const sessionDoc = await db.collection('production_sessions').doc(hash(token)).get();
+  if (!sessionDoc.exists) return null;
+  const session = sessionDoc.data();
+  if (session.revoked || Date.now() > new Date(session.expiresAt || 0).getTime()) return null;
+  const worker = (await productionWorkers()).find(item => item.id === session.workerId);
+  return !worker || worker.active === false ? null : worker;
 }
 
 async function requireWorker(req, res, next) {
   try {
     const [scheme, bearer] = String(req.headers.authorization || '').split(' ');
-    const token = scheme === 'Bearer' ? bearer : String(req.query.token || req.body?.token || '');
+    const token = scheme === 'Bearer' ? bearer : '';
     const worker = await getActiveWorkerByToken(token);
-    if (!worker) return res.status(401).json({ success: false, message: 'Link invalido ou desativado.' });
+    if (!worker) return res.status(401).json({ success: false, message: 'Sessao invalida ou expirada. Entre novamente.' });
     req.productionWorker = worker;
     next();
   } catch (error) {
@@ -401,7 +405,9 @@ async function assignmentForWorker(orderId, workerId) {
   const assignmentDoc = await db.collection('production_assignments').doc(orderId).get();
   if (!assignmentDoc.exists) return null;
   const assignment = assignmentDoc.data();
-  return assignment.workerId === workerId ? { id: orderId, ...assignment } : null;
+  const worker = (await productionWorkers()).find(item => item.id === workerId && item.active !== false);
+  if (!worker || (!PRODUCTION_PRIVILEGED_ROLES.has(worker.role) && assignment.workerId !== workerId)) return null;
+  return { id: orderId, ...assignment };
 }
 
 async function messagesForOrder(orderId) {
@@ -418,12 +424,35 @@ app.get('/scan-fatura.html', (req, res) => res.sendFile(path.join(__dirname, 'sc
 app.use('/mobile', express.static(path.join(__dirname, 'mobile'), { index: 'index.html', fallthrough: false }));
 app.use('/colaborador', express.static(path.join(__dirname, 'colaborador'), { index: 'index.html', fallthrough: false }));
 
+app.post('/api/colaborador/login', requestRateLimit({ windowMs: 15 * 60 * 1000, max: 12 }), async (req, res) => {
+  try {
+    const username = normalizeProductionUsername(req.body?.username);
+    const password = String(req.body?.password || '');
+    const worker = (await productionWorkers()).find(item => item.username === username && item.active !== false);
+    if (password.length < 8 || password.length > 120 || !worker || !verifyProductionPassword(password, worker)) {
+      return res.status(401).json({ success: false, message: 'Usuario ou senha incorretos.' });
+    }
+    const token = crypto.randomBytes(48).toString('hex');
+    const now = Date.now();
+    await db.collection('production_sessions').doc(hash(token)).set({
+      workerId: worker.id,
+      createdAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + PRODUCTION_SESSION_TTL_MS).toISOString(),
+      revoked: false
+    });
+    res.json({ success: true, token });
+  } catch (error) {
+    console.error('Erro ao entrar no app de producao:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel entrar no app.' });
+  }
+});
+
 app.get('/api/colaborador/session', requireWorker, async (req, res) => {
   try {
     const snapshot = await db.collection('production_assignments').get();
     const assignments = await Promise.all(snapshot.docs
       .map(doc => ({ id: doc.id, ...doc.data() }))
-      .filter(item => item.workerId === req.productionWorker.id && item.active !== false)
+      .filter(item => item.active !== false && (PRODUCTION_PRIVILEGED_ROLES.has(req.productionWorker.role) || item.workerId === req.productionWorker.id))
       .map(async assignment => {
         const order = await getOrderEvent(assignment.orderId);
         return order ? { ...assignment, order: safeOrderForWorker(order) } : null;
@@ -606,72 +635,101 @@ app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().
 async function productionWorkers() {
   const snapshot = await db.collection('production_workers').get();
   const workers = new Map();
-  snapshot.docs.map(doc => doc.data()).forEach(worker => {
+  snapshot.docs.forEach(doc => {
+    const data = doc.data();
+    const worker = { ...data, id: data.id || doc.id, storageId: doc.id };
     const current = workers.get(worker.id);
-    const workerVersion = Number(worker.credentialVersion || 0);
-    const currentVersion = Number(current?.credentialVersion || 0);
-    const workerUpdatedAt = new Date(worker.updatedAt || worker.createdAt);
-    const currentUpdatedAt = new Date(current?.updatedAt || current?.createdAt);
-    if (!current || workerVersion > currentVersion || (workerVersion === currentVersion && workerUpdatedAt > currentUpdatedAt)) {
+    if (!current || new Date(worker.updatedAt || worker.createdAt) > new Date(current.updatedAt || current.createdAt)) {
       workers.set(worker.id, worker);
     }
   });
   return Array.from(workers.values());
 }
 
-function collaboratorUrl(req, token) {
-  return `${req.protocol}://${req.get('host')}/colaborador/?token=${encodeURIComponent(token)}`;
+function collaboratorUrl(req) {
+  return `${req.protocol}://${req.get('host')}/colaborador/`;
 }
 
-async function issueWorkerLink(req, worker) {
-  const token = crypto.randomBytes(48).toString('hex');
+function normalizeProductionUsername(value) {
+  return text(value, 60).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+function productionPasswordFields(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  return { passwordSalt: salt, passwordHash: crypto.scryptSync(String(password), salt, 64).toString('hex') };
+}
+
+function verifyProductionPassword(password, worker) {
+  if (!worker.passwordSalt || !worker.passwordHash) return false;
+  return safeEqual(crypto.scryptSync(String(password), worker.passwordSalt, 64).toString('hex'), worker.passwordHash);
+}
+
+function safeProductionWorker(worker) {
+  const { passwordHash, passwordSalt, storageId, ...safeWorker } = worker;
+  return sanitizeForResponse(safeWorker);
+}
+
+async function revokeWorkerSessions(workerId) {
+  const sessions = await db.collection('production_sessions').get();
   const now = new Date().toISOString();
-  const credentials = await db.collection('production_workers').get();
-  await Promise.all(credentials.docs
-    .filter(doc => doc.data().id === worker.id && doc.data().active !== false)
-    .map(doc => db.collection('production_workers').doc(doc.id).set({ ...doc.data(), active: false, updatedAt: now })));
-  const nextWorker = { ...worker, active: true, credentialVersion: Number(worker.credentialVersion || 0) + 1, updatedAt: now };
-  await db.collection('production_workers').doc(hash(token)).set(nextWorker);
-  return { worker: nextWorker, url: collaboratorUrl(req, token) };
+  await Promise.all(sessions.docs
+    .filter(doc => doc.data().workerId === workerId && !doc.data().revoked)
+    .map(doc => db.collection('production_sessions').doc(doc.id).set({ ...doc.data(), revoked: true, revokedAt: now })));
 }
 
 app.get('/api/production/workers', async (req, res) => {
-  const workers = (await productionWorkers()).filter(worker => worker.active !== false).map(sanitizeForResponse);
-  res.json({ success: true, workers, steps: PRODUCTION_STEPS });
+  const workers = (await productionWorkers()).filter(worker => worker.active !== false).map(safeProductionWorker);
+  res.json({ success: true, workers, steps: PRODUCTION_STEPS, appUrl: collaboratorUrl(req) });
 });
 
 app.post('/api/production/workers', async (req, res) => {
   try {
     const name = text(req.body?.name, 100);
-    const role = ['montagem', 'projetista', 'producao'].includes(req.body?.role) ? req.body.role : 'montagem';
+    const username = normalizeProductionUsername(req.body?.username);
+    const password = String(req.body?.password || '');
+    const role = ['comercial', 'projetista', 'montagem', 'producao'].includes(req.body?.role) ? req.body.role : 'montagem';
     if (!name || containsUnsafeMarkup(name)) return res.status(400).json({ success: false, message: 'Nome invalido.' });
-    const worker = { id: crypto.randomBytes(12).toString('hex'), name, role, active: true, createdAt: new Date().toISOString() };
-    const issued = await issueWorkerLink(req, worker);
-    res.json({ success: true, worker: sanitizeForResponse(issued.worker), url: issued.url });
+    if (!/^[a-z0-9._-]{3,60}$/.test(username)) return res.status(400).json({ success: false, message: 'Usuario deve ter ao menos 3 caracteres e usar apenas letras, numeros, ponto, hifen ou sublinhado.' });
+    if (password.length < 8 || password.length > 120) return res.status(400).json({ success: false, message: 'Senha deve possuir entre 8 e 120 caracteres.' });
+    if ((await productionWorkers()).some(worker => worker.username === username)) return res.status(409).json({ success: false, message: 'Este usuario ja esta cadastrado.' });
+    const now = new Date().toISOString();
+    const worker = { name, username, role, active: true, createdAt: now, updatedAt: now, ...productionPasswordFields(password) };
+    const id = crypto.randomBytes(12).toString('hex');
+    await db.collection('production_workers').doc(id).set(worker);
+    res.json({ success: true, worker: safeProductionWorker({ id, ...worker }), appUrl: collaboratorUrl(req) });
   } catch (error) {
     console.error('Erro ao cadastrar colaborador:', error);
     res.status(500).json({ success: false, message: 'Nao foi possivel cadastrar o colaborador.' });
   }
 });
 
-app.post('/api/production/workers/:id/link', async (req, res) => {
+app.post('/api/production/workers/:id/credentials', async (req, res) => {
   try {
     const worker = (await productionWorkers()).find(item => item.id === req.params.id);
     if (!worker) return res.status(404).json({ success: false, message: 'Colaborador nao encontrado.' });
-    const issued = await issueWorkerLink(req, worker);
-    res.json({ success: true, url: issued.url });
+    const username = normalizeProductionUsername(req.body?.username || worker.username);
+    const password = String(req.body?.password || '');
+    if (!/^[a-z0-9._-]{3,60}$/.test(username)) return res.status(400).json({ success: false, message: 'Informe um usuario valido.' });
+    if (password.length < 8 || password.length > 120) return res.status(400).json({ success: false, message: 'Senha deve possuir entre 8 e 120 caracteres.' });
+    if ((await productionWorkers()).some(item => item.id !== worker.id && item.username === username)) return res.status(409).json({ success: false, message: 'Este usuario ja esta cadastrado.' });
+    const updated = { ...worker, username, ...productionPasswordFields(password), active: true, updatedAt: new Date().toISOString() };
+    delete updated.storageId;
+    await revokeWorkerSessions(worker.id);
+    await db.collection('production_workers').doc(worker.id).set(updated);
+    res.json({ success: true, worker: safeProductionWorker(updated), appUrl: collaboratorUrl(req) });
   } catch (error) {
-    console.error('Erro ao gerar link do colaborador:', error);
-    res.status(500).json({ success: false, message: 'Nao foi possivel gerar o link.' });
+    console.error('Erro ao redefinir senha do colaborador:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel redefinir a senha.' });
   }
 });
 
 app.post('/api/production/workers/:id/revoke', async (req, res) => {
   try {
     const now = new Date().toISOString();
-    const credentials = await db.collection('production_workers').get();
-    const matches = credentials.docs.filter(doc => doc.data().id === req.params.id);
+    const workers = await db.collection('production_workers').get();
+    const matches = workers.docs.filter(doc => (doc.data().id || doc.id) === req.params.id);
     if (!matches.length) return res.status(404).json({ success: false, message: 'Colaborador nao encontrado.' });
+    await revokeWorkerSessions(req.params.id);
     await Promise.all(matches.map(doc => db.collection('production_workers').doc(doc.id).set({ ...doc.data(), active: false, updatedAt: now })));
     res.json({ success: true, message: 'Acesso revogado.' });
   } catch (error) {

@@ -10,8 +10,16 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="topbar"><div><strong>PrintPixel</strong><span>Produção profissional</span></div><button id="installBtn" hidden>Instalar app</button></header>
-  <main>
+  <header class="topbar"><div><strong>PrintPixel</strong><span>Produção profissional</span></div><div class="top-actions"><button id="logoutBtn" hidden>Sair</button><button id="installBtn" hidden>Instalar app</button></div></header>
+  <section class="login-shell" id="loginShell">
+    <form class="login-card" id="loginForm">
+      <p class="eyebrow">Acesso à produção</p><h1>Entrar no app</h1><p>Use o usuário e a senha fornecidos pela PrintPixel.</p>
+      <label>Usuário<input id="username" maxlength="60" autocomplete="username" required></label>
+      <label>Senha<input id="password" type="password" maxlength="120" autocomplete="current-password" required></label>
+      <button type="submit">Entrar</button><div class="notice" id="loginNotice" hidden></div>
+    </form>
+  </section>
+  <main id="appShell" hidden>
     <section class="hero"><p class="eyebrow">Painel individual</p><h1 id="workerName">Carregando...</h1><p>Acompanhe apenas os trabalhos direcionados para você.</p></section>
     <section id="notice" class="notice" hidden></section>
     <section class="summary"><div><b id="totalCount">0</b><span>Trabalhos</span></div><div><b id="openCount">0</b><span>Em andamento</span></div><div><b id="doneCount">0</b><span>Concluídos</span></div></section>

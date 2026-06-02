@@ -152,6 +152,50 @@
             border-color: var(--accent-blue);
             box-shadow: 0 15px 30px rgba(0, 0, 0, 0.6);
         }
+
+        .order-card.classified {
+            background: linear-gradient(145deg, rgba(15, 118, 110, 0.18), var(--card-bg) 58%);
+            border-color: rgba(45, 212, 191, 0.72);
+        }
+
+        .assigned-worker {
+            grid-column: 1 / -1;
+            padding: 9px 10px;
+            border: 1px solid rgba(45, 212, 191, 0.45);
+            border-radius: 8px;
+            background: rgba(15, 118, 110, 0.22);
+            color: #99f6e4;
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .production-progress {
+            grid-column: 1 / -1;
+            color: var(--text-secondary);
+            line-height: 1.45;
+        }
+
+        .operational-filters {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(160px, 1fr));
+            gap: 10px;
+            margin-top: 13px;
+            flex-basis: 100%;
+            width: 100%;
+        }
+
+        .operational-filters select {
+            min-width: 0;
+            padding: 10px;
+            border: 1px solid var(--border-color);
+            border-radius: 7px;
+            background: var(--card-bg);
+            color: var(--text-primary);
+        }
+
+        .operational-filters option {
+            color: #0f172a;
+        }
         
         /* Status colors */
         .order-card.pendente {
@@ -697,6 +741,10 @@
             .filter-buttons {
                 justify-content: center;
             }
+
+            .operational-filters {
+                grid-template-columns: 1fr;
+            }
         }
         
         @media (max-width: 480px) {
@@ -824,6 +872,17 @@
             <i class="fas fa-redo"></i>
             Atualizar Agora
         </button>
+        <div class="operational-filters">
+            <select id="workerFilter"><option value="">Todos os colaboradores</option></select>
+            <select id="activityFilter"><option value="">Todas as atividades</option></select>
+            <select id="progressFilter">
+                <option value="">Qualquer progresso</option>
+                <option value="unclassified">Não classificadas</option>
+                <option value="not_started">Ainda não iniciadas</option>
+                <option value="in_progress">Em execução</option>
+                <option value="done">Etapas concluídas</option>
+            </select>
+        </div>
     </section>
     
     <!-- ============================================
@@ -945,6 +1004,9 @@
             const manualRefresh = document.getElementById('manualRefresh');
             const filterButtons = document.querySelectorAll('.filter-btn');
             const refreshTimer = document.getElementById('refreshTimer');
+            const workerFilter = document.getElementById('workerFilter');
+            const activityFilter = document.getElementById('activityFilter');
+            const progressFilter = document.getElementById('progressFilter');
             const classificationOverlay = document.getElementById('classificationOverlay');
             const classificationClose = document.getElementById('classificationClose');
             const classificationTitle = document.getElementById('classificationTitle');
@@ -1441,10 +1503,33 @@
                 productionWorkers = workersResult.workers || [];
                 productionSteps = workersResult.steps || [];
                 productionAssignments = assignmentsResult.assignments || [];
+                atualizarFiltrosOperacionais();
             }
 
             function assignmentOf(orderId) {
                 return productionAssignments.find(item => item.orderId === orderId);
+            }
+
+            function assignmentProgress(assignment) {
+                if (!assignment?.steps?.length) return { key: 'unclassified', done: 0, total: 0, percent: 0, current: 'Aguardando classificação' };
+                const done = assignment.steps.filter(step => step.done).length;
+                const total = assignment.steps.length;
+                const current = assignment.steps.filter(step => !step.done).map(step => step.label).join(', ') || 'Todas as etapas concluídas';
+                return { key: done === 0 ? 'not_started' : done === total ? 'done' : 'in_progress', done, total, percent: Math.round(done * 100 / total), current };
+            }
+
+            function atualizarFiltrosOperacionais() {
+                const currentWorker = workerFilter.value;
+                const currentActivity = activityFilter.value;
+                workerFilter.innerHTML = '<option value="">Todos os colaboradores</option>';
+                productionWorkers.forEach(worker => workerFilter.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(worker.id)}">${escapeHtml(worker.name)}</option>`));
+                activityFilter.innerHTML = '<option value="">Todas as atividades</option>';
+                productionSteps.forEach(label => {
+                    const id = label.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '').toLowerCase();
+                    activityFilter.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(id)}">${escapeHtml(label)}</option>`);
+                });
+                workerFilter.value = currentWorker;
+                activityFilter.value = currentActivity;
             }
 
             function fecharClassificacao() {
@@ -1677,6 +1762,18 @@
                 if (filtroAtual !== 'all') {
                     ordensFiltradas = ordensFiltradas.filter(o => o.status === filtroAtual);
                 }
+
+                if (workerFilter.value) {
+                    ordensFiltradas = ordensFiltradas.filter(ordem => assignmentOf(ordem.id)?.workerId === workerFilter.value);
+                }
+
+                if (activityFilter.value) {
+                    ordensFiltradas = ordensFiltradas.filter(ordem => assignmentOf(ordem.id)?.steps?.some(step => step.id === activityFilter.value && !step.done));
+                }
+
+                if (progressFilter.value) {
+                    ordensFiltradas = ordensFiltradas.filter(ordem => assignmentProgress(assignmentOf(ordem.id)).key === progressFilter.value);
+                }
                 
                 // Remover concluídos do painel principal
                 ordensFiltradas = ordensFiltradas.filter(o => o.status !== 'concluido');
@@ -1715,6 +1812,7 @@
                 const produtos = ordem.produtos || [];
                 const total = ordem.total || 0;
                 const assignment = assignmentOf(ordem.id);
+                const progress = assignmentProgress(assignment);
                 
                 // Formatadores
                 const formatarData = (dataStr) => {
@@ -1757,7 +1855,7 @@
                 const statusInfo = getStatusInfo(ordem.status);
                 
                 const card = document.createElement('div');
-                card.className = `order-card ${ordem.status}`;
+                card.className = `order-card ${ordem.status} ${assignment ? 'classified' : ''}`;
                 card.dataset.id = ordem.id;
                 
                 // Limitar produtos para exibição
@@ -1790,6 +1888,8 @@
                                 <i class="fas fa-hard-hat meta-icon"></i>
                                 <span>Execução: ${escapeHtml(assignment?.workerName || 'não classificada')}</span>
                             </div>
+                            ${assignment ? `<div class="assigned-worker"><i class="fas fa-user-check"></i> Responsável: ${escapeHtml(assignment.workerName)}</div>` : ''}
+                            <div class="production-progress"><strong>Progresso:</strong> ${progress.done}/${progress.total} etapas (${progress.percent}%)<br><strong>Agora:</strong> ${escapeHtml(progress.current)}</div>
                         </div>
                     </div>
                     
@@ -2356,6 +2456,7 @@
                     aplicarFiltro();
                 });
             });
+            [workerFilter, activityFilter, progressFilter].forEach(filter => filter.addEventListener('change', aplicarFiltro));
             
             // Atualizar manualmente
             manualRefresh.addEventListener('click', () => {

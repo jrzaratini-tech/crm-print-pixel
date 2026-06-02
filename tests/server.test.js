@@ -93,12 +93,14 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(mobilePageResult.body, /PrintPixel Fiscal/);
   assert.match(mobilePageResult.body, /vendor\/jsQR\.js/);
   assert.match(workerAppResult.body, /PrintPixel Produ/);
+  assert.match(workerAppResult.body, /Entrar no app/);
   assert.match(linksPageResult.body, /PrintPixel Fiscal Móvel/);
-  assert.match(linksPageResult.body, /Links individuais da produção/);
+  assert.match(linksPageResult.body, /App da produção/);
   assert.match(productionPageResult.body, /classificationOverlay/);
+  assert.match(productionPageResult.body, /workerFilter/);
 });
 
-test('classifica OS para colaborador sem expor precos e permite chat privado', async () => {
+test('classifica OS para colaborador com login sem expor precos e permite chat privado', async () => {
   const order = await post('/api/database/commit', {
     schema: 'pedido',
     pageId: 'test',
@@ -111,9 +113,17 @@ test('classifica OS para colaborador sem expor precos e permite chat privado', a
       produtos: [{ nome: 'Letreiro', tamanho: '100x50', quantidade: 1, valor: 999 }]
     }
   });
-  const created = await post('/api/production/workers', { name: 'Montador Teste', role: 'montagem' });
+  const created = await post('/api/production/workers', { name: 'Montador Teste', username: 'montador.teste', password: 'senha-segura-123', role: 'montagem' });
   assert.equal(created.response.status, 200);
-  const token = new URL(created.body.url).searchParams.get('token');
+  assert.equal('passwordHash' in created.body.worker, false);
+  assert.match(created.body.appUrl, /\/colaborador\/$/);
+  const workers = await request('/api/production/workers');
+  assert.equal('passwordHash' in workers.body.workers[0], false);
+  const deniedLogin = await post('/api/colaborador/login', { username: 'montador.teste', password: 'senha-incorreta' });
+  assert.equal(deniedLogin.response.status, 401);
+  const login = await post('/api/colaborador/login', { username: 'montador.teste', password: 'senha-segura-123' });
+  assert.equal(login.response.status, 200);
+  const token = login.body.token;
   assert.match(token, /^[a-f0-9]{96}$/);
 
   const classified = await post('/api/production/assignments', {
@@ -142,12 +152,13 @@ test('classifica OS para colaborador sem expor precos e permite chat privado', a
   assert.equal(adminChat.response.status, 200);
   assert.equal(adminChat.body.messages.length, 2);
 
-  const rotated = await post(`/api/production/workers/${created.body.worker.id}/link`, {});
+  const rotated = await post(`/api/production/workers/${created.body.worker.id}/credentials`, { password: 'nova-senha-segura-456' });
   assert.equal(rotated.response.status, 200);
-  const rotatedToken = new URL(rotated.body.url).searchParams.get('token');
-  assert.notEqual(rotatedToken, token);
   const expired = await workerRequest('/api/colaborador/session', token);
   assert.equal(expired.response.status, 401);
+  const relogin = await post('/api/colaborador/login', { username: 'montador.teste', password: 'nova-senha-segura-456' });
+  assert.equal(relogin.response.status, 200);
+  const rotatedToken = relogin.body.token;
   const rotatedSession = await workerRequest('/api/colaborador/session', rotatedToken);
   assert.equal(rotatedSession.response.status, 200);
 
@@ -155,6 +166,20 @@ test('classifica OS para colaborador sem expor precos e permite chat privado', a
   assert.equal(revoked.response.status, 200);
   const blocked = await workerRequest('/api/colaborador/session', rotatedToken);
   assert.equal(blocked.response.status, 401);
+});
+
+test('comercial visualiza todas as OS classificadas e montagem somente as atribuidas', async () => {
+  const secondOrder = await post('/api/database/commit', { schema: 'pedido', pageId: 'test', payload: { numero: 'PED-PROD-2', cliente: 'Cliente Dois', produtos: [{ nome: 'Painel' }] } });
+  const mounting = await post('/api/production/workers', { name: 'Montagem Dois', username: 'montagem.dois', password: 'senha-segura-789', role: 'montagem' });
+  const commercial = await post('/api/production/workers', { name: 'Comercial', username: 'comercial', password: 'senha-segura-abc', role: 'comercial' });
+  await post('/api/production/assignments', { orderId: secondOrder.body.id, workerId: mounting.body.worker.id, commission: 50, steps: ['acabamento'] });
+  const mountingLogin = await post('/api/colaborador/login', { username: 'montagem.dois', password: 'senha-segura-789' });
+  const commercialLogin = await post('/api/colaborador/login', { username: 'comercial', password: 'senha-segura-abc' });
+  const mountingSession = await workerRequest('/api/colaborador/session', mountingLogin.body.token);
+  const commercialSession = await workerRequest('/api/colaborador/session', commercialLogin.body.token);
+  assert.equal(mountingSession.body.assignments.length, 1);
+  assert.ok(commercialSession.body.assignments.length >= 1);
+  assert.ok(commercialSession.body.assignments.some(item => item.orderId === secondOrder.body.id));
 });
 
 test('ativa celular e lanca compra manual automaticamente', async () => {

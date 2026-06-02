@@ -1,8 +1,7 @@
 (() => {
   'use strict';
   const TOKEN_KEY = 'printpixel_producao_token';
-  const params = new URLSearchParams(location.search);
-  let token = params.get('token') || localStorage.getItem(TOKEN_KEY) || '';
+  let token = localStorage.getItem(TOKEN_KEY) || '';
   let assignments = [];
   let currentOrderId = '';
   let deferredInstall = null;
@@ -18,6 +17,20 @@
     return body;
   }
   function showNotice(message) { $('notice').textContent = message; $('notice').hidden = false; }
+  function showLogin(message = '') {
+    token = '';
+    localStorage.removeItem(TOKEN_KEY);
+    $('appShell').hidden = true;
+    $('logoutBtn').hidden = true;
+    $('loginShell').hidden = false;
+    $('loginNotice').hidden = !message;
+    $('loginNotice').textContent = message;
+  }
+  function showApp() {
+    $('loginShell').hidden = true;
+    $('appShell').hidden = false;
+    $('logoutBtn').hidden = false;
+  }
   function isDone(assignment) { return assignment.steps.length > 0 && assignment.steps.every(step => step.done); }
   function render() {
     $('totalCount').textContent = assignments.length;
@@ -36,18 +49,17 @@
     });
   }
   async function load() {
-    if (!token) return showNotice('Use o link individual enviado pela PrintPixel.');
+    if (!token) return showLogin();
     try {
       localStorage.setItem(TOKEN_KEY, token);
-      if (params.has('token')) history.replaceState({}, '', `${location.pathname}`);
       const result = await api('/api/colaborador/session');
+      showApp();
       $('workerName').textContent = result.worker.name;
       assignments = result.assignments;
       render();
       if (currentOrderId) openOrder(currentOrderId);
     } catch (error) {
-      localStorage.removeItem(TOKEN_KEY);
-      showNotice(error.message);
+      showLogin(error.message);
     }
   }
   async function loadChat(orderId) {
@@ -83,6 +95,25 @@
     if (!$('orderDialog').open) $('orderDialog').showModal();
   }
   $('closeDialog').addEventListener('click', () => { currentOrderId = ''; $('orderDialog').close(); });
+  $('loginForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    try {
+      const response = await fetch('/api/colaborador/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: $('username').value, password: $('password').value })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.message || 'Não foi possível entrar.');
+      token = result.token;
+      $('password').value = '';
+      await load();
+    } catch (error) {
+      $('loginNotice').hidden = false;
+      $('loginNotice').textContent = error.message;
+    }
+  });
+  $('logoutBtn').addEventListener('click', () => showLogin());
   window.addEventListener('beforeinstallprompt', event => { event.preventDefault(); deferredInstall = event; $('installBtn').hidden = false; });
   $('installBtn').addEventListener('click', async () => { if (!deferredInstall) return; deferredInstall.prompt(); await deferredInstall.userChoice; deferredInstall = null; $('installBtn').hidden = true; });
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
