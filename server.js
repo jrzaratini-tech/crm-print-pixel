@@ -691,7 +691,7 @@ app.post('/api/production/workers', async (req, res) => {
     if (!name || containsUnsafeMarkup(name)) return res.status(400).json({ success: false, message: 'Nome invalido.' });
     if (!/^[a-z0-9._-]{3,60}$/.test(username)) return res.status(400).json({ success: false, message: 'Usuario deve ter ao menos 3 caracteres e usar apenas letras, numeros, ponto, hifen ou sublinhado.' });
     if (password.length < 8 || password.length > 120) return res.status(400).json({ success: false, message: 'Senha deve possuir entre 8 e 120 caracteres.' });
-    if ((await productionWorkers()).some(worker => worker.username === username)) return res.status(409).json({ success: false, message: 'Este usuario ja esta cadastrado.' });
+    if ((await productionWorkers()).some(worker => worker.username === username)) return res.status(409).json({ success: false, message: 'Este usuario ja esta cadastrado. Consulte a lista de usuarios autorizados.' });
     const now = new Date().toISOString();
     const worker = { name, username, role, active: true, createdAt: now, updatedAt: now, ...productionPasswordFields(password) };
     const id = crypto.randomBytes(12).toString('hex');
@@ -735,6 +735,20 @@ app.post('/api/production/workers/:id/revoke', async (req, res) => {
   } catch (error) {
     console.error('Erro ao revogar colaborador:', error);
     res.status(500).json({ success: false, message: 'Nao foi possivel revogar o acesso.' });
+  }
+});
+
+app.post('/api/production/workers/:id/delete', async (req, res) => {
+  try {
+    const workers = await db.collection('production_workers').get();
+    const matches = workers.docs.filter(doc => (doc.data().id || doc.id) === req.params.id);
+    if (!matches.length) return res.status(404).json({ success: false, message: 'Colaborador nao encontrado.' });
+    await revokeWorkerSessions(req.params.id);
+    await Promise.all(matches.map(doc => db.collection('production_workers').doc(doc.id).delete()));
+    res.json({ success: true, message: 'Usuario excluido.' });
+  } catch (error) {
+    console.error('Erro ao excluir colaborador:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel excluir o usuario.' });
   }
 });
 

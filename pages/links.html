@@ -40,9 +40,9 @@
         <button class="btn" type="submit">Cadastrar usuário</button>
       </form>
       <div class="message" id="workerMessage"></div>
+      <strong id="workerListTitle">Usuários cadastrados</strong>
       <div id="workerList"></div>
     </section>
-    <div class="note"><strong>Primeira ativação:</strong> configure <code>CRM_MOBILE_ACCESS_KEY</code> no Render com uma senha longa e exclusiva. No celular, abra o link acima, informe a chave uma vez e use a opção do navegador para adicionar o app à tela inicial.</div>
   </main>
   <script>
     const mobileUrl = `${location.origin}/mobile/`;
@@ -75,16 +75,21 @@
       workerMessage.textContent = 'Senha redefinida. Sessões anteriores foram encerradas.';
       await loadWorkers();
     }
-    async function revoke(workerId) {
-      if (!confirm('Revogar o acesso deste colaborador?')) return;
-      await api(`/api/production/workers/${workerId}/revoke`, { method: 'POST' });
-      workerMessage.textContent = 'Acesso revogado.';
+    async function removeWorker(worker) {
+      if (!confirm(`Excluir definitivamente o usuário ${worker.username || worker.name}?`)) return;
+      await api(`/api/production/workers/${worker.id}/delete`, { method: 'POST' });
+      workerMessage.textContent = 'Usuário excluído.';
       await loadWorkers();
     }
     async function loadWorkers() {
       const result = await api('/api/production/workers');
       const list = document.getElementById('workerList');
       list.replaceChildren();
+      document.getElementById('workerListTitle').textContent = `Usuários cadastrados (${result.workers.length})`;
+      if (!result.workers.length) {
+        list.textContent = 'Nenhum usuário cadastrado.';
+        return;
+      }
       result.workers.forEach(worker => {
         const row = document.createElement('div');
         row.className = 'worker';
@@ -104,8 +109,8 @@
         link.addEventListener('click', () => resetPassword(worker));
         const remove = document.createElement('button');
         remove.className = 'btn danger';
-        remove.textContent = 'Revogar';
-        remove.addEventListener('click', () => revoke(worker.id));
+        remove.textContent = 'Excluir usuário';
+        remove.addEventListener('click', () => removeWorker(worker));
         actions.append(link, remove);
         row.append(info, actions);
         list.append(row);
@@ -120,7 +125,11 @@
         document.getElementById('workerPassword').value = '';
         workerMessage.textContent = 'Usuário cadastrado. Envie o link permanente do app e as credenciais ao colaborador.';
         await loadWorkers();
-      } catch (error) { workerMessage.textContent = error.message; }
+      } catch (error) {
+        workerMessage.textContent = error.message;
+        await loadWorkers().catch(() => {});
+        document.getElementById('workerListTitle').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     });
     loadWorkers().catch(error => { workerMessage.textContent = error.message; });
   </script>

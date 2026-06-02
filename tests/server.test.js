@@ -96,6 +96,8 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(workerAppResult.body, /Entrar no app/);
   assert.match(linksPageResult.body, /PrintPixel Fiscal Móvel/);
   assert.match(linksPageResult.body, /App da produção/);
+  assert.match(linksPageResult.body, /Usuários cadastrados/);
+  assert.doesNotMatch(linksPageResult.body, /CRM_MOBILE_ACCESS_KEY/);
   assert.match(productionPageResult.body, /classificationOverlay/);
   assert.match(productionPageResult.body, /workerFilter/);
 });
@@ -180,6 +182,17 @@ test('comercial visualiza todas as OS classificadas e montagem somente as atribu
   assert.equal(mountingSession.body.assignments.length, 1);
   assert.ok(commercialSession.body.assignments.length >= 1);
   assert.ok(commercialSession.body.assignments.some(item => item.orderId === secondOrder.body.id));
+});
+
+test('exclui usuario de producao e bloqueia novo login', async () => {
+  const created = await post('/api/production/workers', { name: 'Usuario Excluir', username: 'usuario.excluir', password: 'senha-segura-excluir', role: 'montagem' });
+  assert.equal(created.response.status, 200);
+  const removed = await post(`/api/production/workers/${created.body.worker.id}/delete`, {});
+  assert.equal(removed.response.status, 200);
+  const login = await post('/api/colaborador/login', { username: 'usuario.excluir', password: 'senha-segura-excluir' });
+  assert.equal(login.response.status, 401);
+  const workers = await request('/api/production/workers');
+  assert.equal(workers.body.workers.some(worker => worker.username === 'usuario.excluir'), false);
 });
 
 test('ativa celular e lanca compra manual automaticamente', async () => {
