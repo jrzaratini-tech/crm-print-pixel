@@ -176,7 +176,7 @@ test('classifica OS para colaborador com login sem expor precos e permite chat p
   assert.equal(blocked.response.status, 401);
 });
 
-test('comercial visualiza todas as OS classificadas e montagem somente as atribuidas', async () => {
+test('cada colaborador visualiza somente as OS atribuidas a ele independentemente do perfil', async () => {
   const secondOrder = await post('/api/database/commit', { schema: 'pedido', pageId: 'test', payload: { numero: 'PED-PROD-2', cliente: 'Cliente Dois', produtos: [{ nome: 'Painel' }] } });
   const mounting = await post('/api/production/workers', { name: 'Montagem Dois', username: 'montagem.dois', password: 'senha-segura-789', role: 'montagem' });
   const commercial = await post('/api/production/workers', { name: 'Comercial', username: 'comercial', password: 'senha-segura-abc', role: 'comercial' });
@@ -186,8 +186,8 @@ test('comercial visualiza todas as OS classificadas e montagem somente as atribu
   const mountingSession = await workerRequest('/api/colaborador/session', mountingLogin.body.token);
   const commercialSession = await workerRequest('/api/colaborador/session', commercialLogin.body.token);
   assert.equal(mountingSession.body.assignments.length, 1);
-  assert.ok(commercialSession.body.assignments.length >= 1);
-  assert.ok(commercialSession.body.assignments.some(item => item.orderId === secondOrder.body.id));
+  assert.equal(commercialSession.body.assignments.length, 0);
+  assert.equal(commercialSession.body.assignments.some(item => item.orderId === secondOrder.body.id), false);
 });
 
 test('devolve OS para fila e transfere para novo colaborador preservando progresso', async () => {

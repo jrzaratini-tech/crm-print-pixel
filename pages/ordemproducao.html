@@ -162,21 +162,64 @@
             border-color: rgba(45, 212, 191, 0.72);
         }
 
-        .assigned-worker {
-            grid-column: 1 / -1;
-            padding: 9px 10px;
-            border: 1px solid rgba(45, 212, 191, 0.45);
-            border-radius: 8px;
-            background: rgba(15, 118, 110, 0.22);
-            color: #99f6e4;
-            font-size: 13px;
-            font-weight: 800;
-        }
-
         .production-progress {
             grid-column: 1 / -1;
+            margin-top: 3px;
+        }
+
+        .production-progress-track {
+            height: 10px;
+            overflow: hidden;
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            border-radius: 999px;
+            background: rgba(148, 163, 184, 0.14);
+        }
+
+        .production-progress-fill {
+            height: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, var(--accent-blue), var(--accent-green));
+            transition: width 0.3s ease;
+        }
+
+        .production-task-groups {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .production-task-group {
+            padding: 10px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 8px;
+            background: rgba(15, 23, 42, 0.24);
+        }
+
+        .production-task-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding-top: 8px;
             color: var(--text-secondary);
-            line-height: 1.45;
+            font-size: 13px;
+        }
+
+        .production-task-check {
+            display: inline-grid;
+            width: 18px;
+            height: 18px;
+            flex: 0 0 18px;
+            place-items: center;
+            border: 1px solid rgba(148, 163, 184, 0.6);
+            border-radius: 5px;
+            color: #fff;
+            font-size: 10px;
+        }
+
+        .production-task-check.done {
+            border-color: var(--accent-green);
+            background: var(--accent-green);
         }
 
         .operational-filters {
@@ -1892,9 +1935,7 @@
                 const produtos = ordem.produtos || [];
                 const total = ordem.total || 0;
                 const assignments = activeAssignmentsOf(ordem.id);
-                const assignment = assignments[0];
                 const progress = orderProgress(ordem.id);
-                const workerNames = assignments.map(item => item.workerName).filter((name, index, names) => name && names.indexOf(name) === index);
                 
                 // Formatadores
                 const formatarData = (dataStr) => {
@@ -1966,12 +2007,11 @@
                                 <i class="fas fa-user-tie meta-icon"></i>
                                 <span>Atendente: ${ordem.atendente || 'N/A'}</span>
                             </div>
-                            <div class="meta-item">
-                                <i class="fas fa-hard-hat meta-icon"></i>
-                                <span>Execução: ${escapeHtml(workerNames.join(', ') || 'não classificada')}</span>
+                            <div class="production-progress" role="progressbar" aria-label="Progresso da produção" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.percent}" title="Progresso da produção: ${progress.percent}%">
+                                <div class="production-progress-track">
+                                    <div class="production-progress-fill" style="width: ${progress.percent}%"></div>
+                                </div>
                             </div>
-                            ${assignments.length ? `<div class="assigned-worker"><i class="fas fa-user-check"></i> Responsáveis: ${escapeHtml(workerNames.join(', '))}<br><small>${assignments.length} artigo(s) em execução</small></div>` : ''}
-                            <div class="production-progress"><strong>Progresso:</strong> ${progress.done}/${progress.total} etapas (${progress.percent}%)<br><strong>Agora:</strong> ${escapeHtml(progress.current)}</div>
                         </div>
                     </div>
                     
@@ -2207,14 +2247,24 @@
                     const current = assignments.find(item => item.active !== false);
                     const latest = current || assignments[assignments.length - 1];
                     const steps = latest?.steps || [];
+                    const completedSteps = steps.filter(step => step.done);
+                    const pendingSteps = steps.filter(step => !step.done);
                     const history = assignments.flatMap(item => item.history || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
                     return `<div style="padding:14px;margin-top:10px;border:1px solid var(--border-color);border-radius:8px;background:rgba(255,255,255,.04)">
                         <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
                             <strong>${escapeHtml(product.nome || `Produto ${index + 1}`)}</strong>
                             <span style="color:${current ? '#99f6e4' : 'var(--accent-yellow)'}">${current ? `Responsável: ${escapeHtml(current.workerName)}` : 'Na fila sem responsável'}</span>
                         </div>
-                        <div style="margin-top:9px;color:var(--text-secondary)"><strong>Feito:</strong> ${steps.filter(step => step.done).map(step => escapeHtml(step.label)).join(', ') || 'Nenhuma etapa concluída'}</div>
-                        <div style="margin-top:5px;color:var(--text-secondary)"><strong>A fazer:</strong> ${steps.filter(step => !step.done).map(step => escapeHtml(step.label)).join(', ') || 'Aguardando classificação ou concluído'}</div>
+                        <div class="production-task-groups">
+                            <div class="production-task-group">
+                                <strong>TAREFAS CONCLUÍDAS</strong>
+                                ${completedSteps.map(step => `<div class="production-task-row"><span class="production-task-check done"><i class="fas fa-check"></i></span>${escapeHtml(step.label)}</div>`).join('') || '<div class="production-task-row">Nenhuma tarefa concluída.</div>'}
+                            </div>
+                            <div class="production-task-group">
+                                <strong>TAREFAS EM ABERTO</strong>
+                                ${pendingSteps.map(step => `<div class="production-task-row"><span class="production-task-check"></span>${escapeHtml(step.label)}</div>`).join('') || '<div class="production-task-row">Nenhuma tarefa em aberto.</div>'}
+                            </div>
+                        </div>
                         <div style="margin-top:10px">${history.map(item => `<div style="padding:5px 0;border-top:1px solid rgba(255,255,255,.05)"><small>${escapeHtml(formatarDataPadrao(item.createdAt, true))} · ${escapeHtml((assignmentHistoryLabels[item.type] || (entry => entry.type))(item))}</small></div>`).join('') || '<small style="color:var(--text-secondary)">Sem movimentações registradas.</small>'}</div>
                     </div>`;
                 }).join('');

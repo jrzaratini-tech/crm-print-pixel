@@ -18,7 +18,6 @@ const MAX_UPLOAD_BYTES = 500 * 1024;
 const UPLOAD_TTL_MS = 15 * 60 * 1000;
 const MOBILE_DEVICE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 const PRODUCTION_SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000;
-const PRODUCTION_PRIVILEGED_ROLES = new Set(['comercial', 'projetista']);
 const PRODUCTION_STEPS = [
   'Arte / projeto',
   'Modelagem',
@@ -441,7 +440,7 @@ async function assignmentForWorker(orderId, workerId, productId = '') {
   const assignment = assignmentDoc.data();
   if (assignment.active === false) return null;
   const worker = (await productionWorkers()).find(item => item.id === workerId && item.active !== false);
-  if (!worker || (!PRODUCTION_PRIVILEGED_ROLES.has(worker.role) && assignment.workerId !== workerId)) return null;
+  if (!worker || assignment.workerId !== workerId) return null;
   return { id: assignmentId, ...assignment };
 }
 
@@ -453,7 +452,7 @@ async function workerHasOrderAssignment(orderId, workerId) {
     const assignment = doc.data();
     return assignment.orderId === orderId
       && assignment.active !== false
-      && (PRODUCTION_PRIVILEGED_ROLES.has(worker.role) || assignment.workerId === workerId);
+      && assignment.workerId === workerId;
   });
 }
 
@@ -499,13 +498,13 @@ app.get('/api/colaborador/session', requireWorker, async (req, res) => {
     const snapshot = await db.collection('production_assignments').get();
     const assignments = await Promise.all(snapshot.docs
       .map(doc => ({ id: doc.id, ...doc.data() }))
-      .filter(item => item.active !== false && (PRODUCTION_PRIVILEGED_ROLES.has(req.productionWorker.role) || item.workerId === req.productionWorker.id))
+      .filter(item => item.active !== false && item.workerId === req.productionWorker.id)
       .map(async assignment => {
         const order = await getOrderEvent(assignment.orderId);
         return order ? {
           ...assignment,
           product: productForAssignment(order, assignment.productId),
-          order: safeOrderForWorker(order, assignment.productId, PRODUCTION_PRIVILEGED_ROLES.has(req.productionWorker.role))
+          order: safeOrderForWorker(order, assignment.productId)
         } : null;
       }));
     res.json({
