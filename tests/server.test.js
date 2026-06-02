@@ -56,6 +56,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   const pageResult = await request('/pages/materiais.html');
   const scanPageResult = await request('/scan-fatura.html');
   const mobilePageResult = await request('/mobile/');
+  const mobileQrLibraryResult = await request('/mobile/vendor/jsQR.js');
   const linksPageResult = await request('/pages/links.html');
   const inboxPageResult = await request('/pages/importacoes-fiscais.html');
   assert.equal(moduleResult.response.status, 200);
@@ -65,6 +66,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.equal(pageResult.response.status, 200);
   assert.equal(scanPageResult.response.status, 200);
   assert.equal(mobilePageResult.response.status, 200);
+  assert.equal(mobileQrLibraryResult.response.status, 200);
   assert.equal(linksPageResult.response.status, 200);
   assert.equal(inboxPageResult.response.status, 200);
   assert.match(moduleResult.body, /calcularFicha/);
@@ -74,6 +76,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(pageResult.body, /Cadastro de Materiais/);
   assert.match(scanPageResult.body, /Ler QR fiscal/);
   assert.match(mobilePageResult.body, /PrintPixel Fiscal/);
+  assert.match(mobilePageResult.body, /vendor\/jsQR\.js/);
   assert.match(linksPageResult.body, /PrintPixel Fiscal Móvel/);
 });
 

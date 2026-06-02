@@ -35,8 +35,8 @@
     </section>
 
     <section class="screen" id="scanScreen">
-      <div class="screen-title"><button class="back" data-go="home">‹</button><div><h1>Ler QR fiscal</h1><p>Aponte para o QR Code da fatura.</p></div></div>
-      <div class="scanner card"><video id="camera" playsinline muted></video><canvas id="canvas" hidden></canvas><div class="scan-frame"></div></div>
+      <div class="screen-title"><button class="back" data-go="home">‹</button><div><h1>Ler QR fiscal</h1><p>Aponte para o QR Code da fatura.</p></div><button class="link stop" id="stopCamera" hidden>Parar</button></div>
+      <div class="scanner card"><video id="camera" playsinline muted></video><canvas id="canvas" hidden></canvas><div class="scan-frame"></div><div class="scan-hint" id="scanHint">Aguardando abertura da câmera</div></div>
       <button class="primary" id="startCamera">Abrir câmera</button>
       <label class="card paste">Ou cole o texto do QR<textarea id="rawQr" rows="4" placeholder="A:...*B:...*D:FT..."></textarea><button class="secondary" id="useRawQr" type="button">Usar texto</button></label>
     </section>
@@ -75,7 +75,7 @@
     <button data-go="settings">⚙<span>Ajustes</span></button>
   </nav>
   <div class="toast" id="toast"></div>
-  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script src="vendor/jsQR.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

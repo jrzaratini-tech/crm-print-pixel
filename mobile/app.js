@@ -4,6 +4,8 @@
   let token = localStorage.getItem(TOKEN_KEY) || '';
   let companyNif = '';
   let stream = null;
+  let scanTimer = null;
+  let scanRequest = null;
   let deferredInstall = null;
   const $ = id => document.getElementById(id);
   const screens = ['login', 'home', 'scan', 'entry', 'list', 'settings'];
@@ -23,8 +25,14 @@
     return body;
   }
   function stopCamera() {
+    if (scanTimer) clearInterval(scanTimer);
+    if (scanRequest) cancelAnimationFrame(scanRequest);
+    scanTimer = null;
+    scanRequest = null;
     if (stream) stream.getTracks().forEach(track => track.stop());
     stream = null;
+    $('stopCamera').hidden = true;
+    $('scanHint').textContent = 'Aguardando abertura da câmera';
   }
   function show(name) {
     stopCamera();
@@ -98,27 +106,61 @@
   }
   async function startCamera() {
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+      stopCamera();
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
       $('camera').srcObject = stream;
       await $('camera').play();
-      scanFrame();
+      $('stopCamera').hidden = false;
+      $('scanHint').textContent = 'Procurando QR Code...';
+      if ('BarcodeDetector' in window) {
+        try {
+          const detector = new BarcodeDetector({ formats: ['qr_code'] });
+          scanTimer = setInterval(async () => {
+            try {
+              const codes = await detector.detect($('camera'));
+              if (codes.length) fillEntry(parseQr(codes[0].rawValue));
+            } catch {
+              clearInterval(scanTimer);
+              scanTimer = null;
+              startCanvasScanner();
+            }
+          }, 700);
+          return;
+        } catch {
+          // Some browsers expose BarcodeDetector without QR support.
+        }
+      }
+      startCanvasScanner();
     } catch {
       toast('Não foi possível abrir a câmera. Confira a permissão do navegador.');
     }
   }
-  function scanFrame() {
-    if (!stream) return;
-    const video = $('camera');
-    if (video.readyState === video.HAVE_ENOUGH_DATA && window.jsQR) {
-      const canvas = $('canvas');
-      const context = canvas.getContext('2d', { willReadFrequently: true });
+  function startCanvasScanner() {
+    if (typeof jsQR !== 'function') {
+      stopCamera();
+      toast('O leitor QR não carregou. Atualize a página e tente novamente.');
+      return;
+    }
+    const canvas = $('canvas');
+    const context = canvas.getContext('2d', { willReadFrequently: true });
+    const tick = () => {
+      const video = $('camera');
+      if (!stream || video.readyState !== HTMLMediaElement.HAVE_ENOUGH_DATA) {
+        scanRequest = requestAnimationFrame(tick);
+        return;
+      }
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const code = jsQR(context.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
-      if (code?.data) return fillEntry(parseQr(code.data));
-    }
-    requestAnimationFrame(scanFrame);
+      const image = context.getImageData(0, 0, canvas.width, canvas.height);
+      const code = jsQR(image.data, image.width, image.height, { inversionAttempts: 'dontInvert' });
+      if (code?.data) {
+        fillEntry(parseQr(code.data));
+        return;
+      }
+      scanRequest = requestAnimationFrame(tick);
+    };
+    tick();
   }
   async function initialize() {
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
@@ -167,6 +209,7 @@
     if (go) show(go);
   });
   $('startCamera').addEventListener('click', startCamera);
+  $('stopCamera').addEventListener('click', stopCamera);
   $('useRawQr').addEventListener('click', () => fillEntry(parseQr($('rawQr').value)));
   $('logoutBtn').addEventListener('click', () => logout());
   window.addEventListener('beforeinstallprompt', event => {
