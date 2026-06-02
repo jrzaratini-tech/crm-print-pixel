@@ -38,7 +38,8 @@
         const hadController = Boolean(navigator.serviceWorker.controller);
         const legacyRegistrations = registrations.filter(registration => {
             try {
-                return !new URL(registration.scope).pathname.startsWith('/mobile/');
+                const pathname = new URL(registration.scope).pathname;
+                return !pathname.startsWith('/mobile/') && !pathname.startsWith('/colaborador/');
             } catch {
                 return true;
             }

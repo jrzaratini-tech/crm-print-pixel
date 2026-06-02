@@ -41,6 +41,17 @@ async function mobilePost(path, body, token) {
   });
 }
 
+async function workerRequest(path, token, options = {}) {
+  return request(path, {
+    ...options,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...(options.headers || {}) }
+  });
+}
+
+async function workerPost(path, body, token) {
+  return workerRequest(path, token, { method: 'POST', body: JSON.stringify(body) });
+}
+
 test('não publica arquivos internos', async () => {
   for (const path of ['/server.js', '/firebase.js', '/package.json', '/DATA/database/core.db', '/core/database.js']) {
     const { response } = await request(path);
@@ -59,6 +70,8 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   const mobileQrLibraryResult = await request('/mobile/vendor/jsQR.js');
   const linksPageResult = await request('/pages/links.html');
   const inboxPageResult = await request('/pages/importacoes-fiscais.html');
+  const productionPageResult = await request('/pages/ordemproducao.html');
+  const workerAppResult = await request('/colaborador/');
   assert.equal(moduleResult.response.status, 200);
   assert.equal(presetsResult.response.status, 200);
   assert.equal(financialResult.response.status, 200);
@@ -69,6 +82,8 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.equal(mobileQrLibraryResult.response.status, 200);
   assert.equal(linksPageResult.response.status, 200);
   assert.equal(inboxPageResult.response.status, 200);
+  assert.equal(productionPageResult.response.status, 200);
+  assert.equal(workerAppResult.response.status, 200);
   assert.match(moduleResult.body, /calcularFicha/);
   assert.match(presetsResult.body, /Fonte de alimentação/);
   assert.match(financialResult.body, /faturamentoSemIva/);
@@ -77,7 +92,69 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(scanPageResult.body, /Ler QR fiscal/);
   assert.match(mobilePageResult.body, /PrintPixel Fiscal/);
   assert.match(mobilePageResult.body, /vendor\/jsQR\.js/);
+  assert.match(workerAppResult.body, /PrintPixel Produ/);
   assert.match(linksPageResult.body, /PrintPixel Fiscal Móvel/);
+  assert.match(linksPageResult.body, /Links individuais da produção/);
+  assert.match(productionPageResult.body, /classificationOverlay/);
+});
+
+test('classifica OS para colaborador sem expor precos e permite chat privado', async () => {
+  const order = await post('/api/database/commit', {
+    schema: 'pedido',
+    pageId: 'test',
+    payload: {
+      numero: 'PED-PROD-1',
+      cliente: 'Cliente Producao',
+      empresa: 'Empresa Teste',
+      total: 999,
+      subtotal: 800,
+      produtos: [{ nome: 'Letreiro', tamanho: '100x50', quantidade: 1, valor: 999 }]
+    }
+  });
+  const created = await post('/api/production/workers', { name: 'Montador Teste', role: 'montagem' });
+  assert.equal(created.response.status, 200);
+  const token = new URL(created.body.url).searchParams.get('token');
+  assert.match(token, /^[a-f0-9]{96}$/);
+
+  const classified = await post('/api/production/assignments', {
+    orderId: order.body.id,
+    workerId: created.body.worker.id,
+    commission: 75,
+    steps: ['montagem_da_estrutura', 'acabamento']
+  });
+  assert.equal(classified.response.status, 200);
+  assert.equal(classified.body.assignment.commission, 75);
+
+  const session = await workerRequest('/api/colaborador/session', token);
+  assert.equal(session.response.status, 200);
+  assert.equal(session.body.assignments.length, 1);
+  assert.equal(session.body.assignments[0].order.produtos[0].nome, 'Letreiro');
+  assert.equal('valor' in session.body.assignments[0].order.produtos[0], false);
+  assert.equal('total' in session.body.assignments[0].order, false);
+
+  const step = await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas`, { stepId: 'acabamento', done: true }, token);
+  assert.equal(step.response.status, 200);
+  assert.equal(step.body.steps.find(item => item.id === 'acabamento').done, true);
+
+  const workerChat = await workerPost(`/api/colaborador/ordens/${order.body.id}/chat`, { message: 'Preciso confirmar a fixacao.' }, token);
+  assert.equal(workerChat.response.status, 200);
+  const adminChat = await post(`/api/production/assignments/${order.body.id}/chat`, { message: 'Confirmado, use buchas metalicas.' });
+  assert.equal(adminChat.response.status, 200);
+  assert.equal(adminChat.body.messages.length, 2);
+
+  const rotated = await post(`/api/production/workers/${created.body.worker.id}/link`, {});
+  assert.equal(rotated.response.status, 200);
+  const rotatedToken = new URL(rotated.body.url).searchParams.get('token');
+  assert.notEqual(rotatedToken, token);
+  const expired = await workerRequest('/api/colaborador/session', token);
+  assert.equal(expired.response.status, 401);
+  const rotatedSession = await workerRequest('/api/colaborador/session', rotatedToken);
+  assert.equal(rotatedSession.response.status, 200);
+
+  const revoked = await post(`/api/production/workers/${created.body.worker.id}/revoke`, {});
+  assert.equal(revoked.response.status, 200);
+  const blocked = await workerRequest('/api/colaborador/session', rotatedToken);
+  assert.equal(blocked.response.status, 401);
 });
 
 test('ativa celular e lanca compra manual automaticamente', async () => {

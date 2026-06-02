@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0f766e">
+  <title>PrintPixel Produção</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar"><div><strong>PrintPixel</strong><span>Produção profissional</span></div><button id="installBtn" hidden>Instalar app</button></header>
+  <main>
+    <section class="hero"><p class="eyebrow">Painel individual</p><h1 id="workerName">Carregando...</h1><p>Acompanhe apenas os trabalhos direcionados para você.</p></section>
+    <section id="notice" class="notice" hidden></section>
+    <section class="summary"><div><b id="totalCount">0</b><span>Trabalhos</span></div><div><b id="openCount">0</b><span>Em andamento</span></div><div><b id="doneCount">0</b><span>Concluídos</span></div></section>
+    <section class="list" id="orderList"></section>
+  </main>
+  <dialog id="orderDialog"><div id="orderDetail"></div><button class="close" id="closeDialog">Fechar</button></dialog>
+  <script src="app.js"></script>
+</body>
+</html>

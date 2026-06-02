@@ -17,6 +17,22 @@ const MAX_QUERY_LIMIT = 500;
 const MAX_UPLOAD_BYTES = 500 * 1024;
 const UPLOAD_TTL_MS = 15 * 60 * 1000;
 const MOBILE_DEVICE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+const PRODUCTION_STEPS = [
+  'Arte / projeto',
+  'Modelagem',
+  'Usinagem CNC',
+  'Impressao 3D',
+  'Montagem da estrutura',
+  'Pintura interna',
+  'LED / solda',
+  'Cola quente',
+  'Corte laser opalino',
+  'Pintura externa',
+  'Acabamento',
+  'Molde de instalacao',
+  'Embalagem',
+  'Instalacao'
+];
 
 if (IS_PRODUCTION && !AUTH_DISABLED && (!CRM_USERNAME || !CRM_PASSWORD)) {
   throw new Error('Configure CRM_USERNAME e CRM_PASSWORD antes de iniciar o CRM em produção.');
@@ -311,8 +327,161 @@ async function launchLegacyPendingMobileDocuments(documents) {
   }));
 }
 
+function productionStepId(label) {
+  return text(label, 80)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '')
+    .toLowerCase();
+}
+
+function normalizeProductionSteps(selected = [], previous = []) {
+  const selectedIds = new Set((Array.isArray(selected) ? selected : []).map(value => productionStepId(value.id || value)));
+  return PRODUCTION_STEPS
+    .filter(label => selectedIds.has(productionStepId(label)))
+    .map(label => {
+      const id = productionStepId(label);
+      const old = (Array.isArray(previous) ? previous : []).find(step => step.id === id);
+      return old ? { ...old, id, label } : { id, label, done: false, completedAt: null };
+    });
+}
+
+async function getActiveWorkerByToken(token) {
+  if (!token || token.length < 40 || token.length > 200) return null;
+  const workerDoc = await db.collection('production_workers').doc(hash(token)).get();
+  if (!workerDoc.exists) return null;
+  const worker = workerDoc.data();
+  return worker.active === false ? null : worker;
+}
+
+async function requireWorker(req, res, next) {
+  try {
+    const [scheme, bearer] = String(req.headers.authorization || '').split(' ');
+    const token = scheme === 'Bearer' ? bearer : String(req.query.token || req.body?.token || '');
+    const worker = await getActiveWorkerByToken(token);
+    if (!worker) return res.status(401).json({ success: false, message: 'Link invalido ou desativado.' });
+    req.productionWorker = worker;
+    next();
+  } catch (error) {
+    console.error('Erro ao validar colaborador:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel validar o acesso.' });
+  }
+}
+
+async function getOrderEvent(orderId) {
+  if (!isSafeIdentifier(orderId)) return null;
+  const orderDoc = await db.collection('events').doc(orderId).get();
+  if (!orderDoc.exists) return null;
+  const order = orderDoc.data();
+  return !order.deleted && order.schema === 'pedido' ? { id: orderId, ...order } : null;
+}
+
+function safeOrderForWorker(order) {
+  const payload = order?.payload || {};
+  return sanitizeForResponse({
+    id: order?.id,
+    numero: text(payload.numero || `PED-${String(order?.id || '').slice(0, 8)}`, 80),
+    cliente: text(payload.cliente || 'Cliente nao informado', 160),
+    empresa: text(payload.empresa, 160),
+    telemovel: text(payload.telemovel, 40),
+    morada: text(payload.morada, 250),
+    dataEntrega: text(payload.dataEntrega, 30),
+    observacoes: text(payload.observacoes, 800),
+    produtos: (Array.isArray(payload.produtos) ? payload.produtos : []).map(product => ({
+      nome: text(product.nome || 'Produto', 160),
+      tamanho: text(product.tamanho, 120),
+      quantidade: money(product.quantidade || 1),
+      observacoes: text(product.observacoes, 400)
+    }))
+  });
+}
+
+async function assignmentForWorker(orderId, workerId) {
+  const assignmentDoc = await db.collection('production_assignments').doc(orderId).get();
+  if (!assignmentDoc.exists) return null;
+  const assignment = assignmentDoc.data();
+  return assignment.workerId === workerId ? { id: orderId, ...assignment } : null;
+}
+
+async function messagesForOrder(orderId) {
+  const snapshot = await db.collection('production_messages').get();
+  return snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }))
+    .filter(message => message.orderId === orderId)
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
+    .slice(-100)
+    .map(sanitizeForResponse);
+}
+
 app.get('/scan-fatura.html', (req, res) => res.sendFile(path.join(__dirname, 'scan-fatura.html')));
 app.use('/mobile', express.static(path.join(__dirname, 'mobile'), { index: 'index.html', fallthrough: false }));
+app.use('/colaborador', express.static(path.join(__dirname, 'colaborador'), { index: 'index.html', fallthrough: false }));
+
+app.get('/api/colaborador/session', requireWorker, async (req, res) => {
+  try {
+    const snapshot = await db.collection('production_assignments').get();
+    const assignments = await Promise.all(snapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() }))
+      .filter(item => item.workerId === req.productionWorker.id && item.active !== false)
+      .map(async assignment => {
+        const order = await getOrderEvent(assignment.orderId);
+        return order ? { ...assignment, order: safeOrderForWorker(order) } : null;
+      }));
+    res.json({
+      success: true,
+      worker: sanitizeForResponse({ id: req.productionWorker.id, name: req.productionWorker.name, role: req.productionWorker.role }),
+      assignments: assignments.filter(Boolean).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+    });
+  } catch (error) {
+    console.error('Erro ao carregar painel do colaborador:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel carregar suas ordens.' });
+  }
+});
+
+app.post('/api/colaborador/ordens/:id/etapas', requireWorker, async (req, res) => {
+  try {
+    const orderId = String(req.params.id || '');
+    const assignment = await assignmentForWorker(orderId, req.productionWorker.id);
+    if (!assignment) return res.status(404).json({ success: false, message: 'Ordem nao encontrada para este colaborador.' });
+    const stepId = productionStepId(req.body?.stepId);
+    if (!stepId || !assignment.steps.some(step => step.id === stepId)) {
+      return res.status(400).json({ success: false, message: 'Etapa invalida.' });
+    }
+    const now = new Date().toISOString();
+    const steps = assignment.steps.map(step => step.id === stepId
+      ? { ...step, done: Boolean(req.body?.done), completedAt: req.body?.done ? now : null }
+      : step);
+    await db.collection('production_assignments').doc(orderId).set({ ...assignment, steps, updatedAt: now });
+    res.json({ success: true, steps });
+  } catch (error) {
+    console.error('Erro ao atualizar etapa:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel atualizar a etapa.' });
+  }
+});
+
+app.get('/api/colaborador/ordens/:id/chat', requireWorker, async (req, res) => {
+  const orderId = String(req.params.id || '');
+  const assignment = await assignmentForWorker(orderId, req.productionWorker.id);
+  if (!assignment) return res.status(404).json({ success: false, message: 'Conversa nao encontrada.' });
+  res.json({ success: true, messages: await messagesForOrder(orderId) });
+});
+
+app.post('/api/colaborador/ordens/:id/chat', requireWorker, async (req, res) => {
+  try {
+    const orderId = String(req.params.id || '');
+    const assignment = await assignmentForWorker(orderId, req.productionWorker.id);
+    if (!assignment) return res.status(404).json({ success: false, message: 'Conversa nao encontrada.' });
+    const message = text(req.body?.message, 1000);
+    if (!message || containsUnsafeMarkup(message)) return res.status(400).json({ success: false, message: 'Mensagem invalida.' });
+    const now = new Date().toISOString();
+    await db.collection('production_messages').add({ orderId, workerId: req.productionWorker.id, author: req.productionWorker.name, authorType: 'worker', message, createdAt: now });
+    res.json({ success: true, messages: await messagesForOrder(orderId) });
+  } catch (error) {
+    console.error('Erro ao enviar mensagem do colaborador:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel enviar a mensagem.' });
+  }
+});
 
 app.post('/api/mobile/login', requestRateLimit({ windowMs: 15 * 60 * 1000, max: 12 }), async (req, res) => {
   try {
@@ -433,6 +602,143 @@ app.post('/api/importacao-fiscal/receber', async (req, res) => {
 app.use(requireAuth);
 
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+
+async function productionWorkers() {
+  const snapshot = await db.collection('production_workers').get();
+  const workers = new Map();
+  snapshot.docs.map(doc => doc.data()).forEach(worker => {
+    const current = workers.get(worker.id);
+    const workerVersion = Number(worker.credentialVersion || 0);
+    const currentVersion = Number(current?.credentialVersion || 0);
+    const workerUpdatedAt = new Date(worker.updatedAt || worker.createdAt);
+    const currentUpdatedAt = new Date(current?.updatedAt || current?.createdAt);
+    if (!current || workerVersion > currentVersion || (workerVersion === currentVersion && workerUpdatedAt > currentUpdatedAt)) {
+      workers.set(worker.id, worker);
+    }
+  });
+  return Array.from(workers.values());
+}
+
+function collaboratorUrl(req, token) {
+  return `${req.protocol}://${req.get('host')}/colaborador/?token=${encodeURIComponent(token)}`;
+}
+
+async function issueWorkerLink(req, worker) {
+  const token = crypto.randomBytes(48).toString('hex');
+  const now = new Date().toISOString();
+  const credentials = await db.collection('production_workers').get();
+  await Promise.all(credentials.docs
+    .filter(doc => doc.data().id === worker.id && doc.data().active !== false)
+    .map(doc => db.collection('production_workers').doc(doc.id).set({ ...doc.data(), active: false, updatedAt: now })));
+  const nextWorker = { ...worker, active: true, credentialVersion: Number(worker.credentialVersion || 0) + 1, updatedAt: now };
+  await db.collection('production_workers').doc(hash(token)).set(nextWorker);
+  return { worker: nextWorker, url: collaboratorUrl(req, token) };
+}
+
+app.get('/api/production/workers', async (req, res) => {
+  const workers = (await productionWorkers()).filter(worker => worker.active !== false).map(sanitizeForResponse);
+  res.json({ success: true, workers, steps: PRODUCTION_STEPS });
+});
+
+app.post('/api/production/workers', async (req, res) => {
+  try {
+    const name = text(req.body?.name, 100);
+    const role = ['montagem', 'projetista', 'producao'].includes(req.body?.role) ? req.body.role : 'montagem';
+    if (!name || containsUnsafeMarkup(name)) return res.status(400).json({ success: false, message: 'Nome invalido.' });
+    const worker = { id: crypto.randomBytes(12).toString('hex'), name, role, active: true, createdAt: new Date().toISOString() };
+    const issued = await issueWorkerLink(req, worker);
+    res.json({ success: true, worker: sanitizeForResponse(issued.worker), url: issued.url });
+  } catch (error) {
+    console.error('Erro ao cadastrar colaborador:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel cadastrar o colaborador.' });
+  }
+});
+
+app.post('/api/production/workers/:id/link', async (req, res) => {
+  try {
+    const worker = (await productionWorkers()).find(item => item.id === req.params.id);
+    if (!worker) return res.status(404).json({ success: false, message: 'Colaborador nao encontrado.' });
+    const issued = await issueWorkerLink(req, worker);
+    res.json({ success: true, url: issued.url });
+  } catch (error) {
+    console.error('Erro ao gerar link do colaborador:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel gerar o link.' });
+  }
+});
+
+app.post('/api/production/workers/:id/revoke', async (req, res) => {
+  try {
+    const now = new Date().toISOString();
+    const credentials = await db.collection('production_workers').get();
+    const matches = credentials.docs.filter(doc => doc.data().id === req.params.id);
+    if (!matches.length) return res.status(404).json({ success: false, message: 'Colaborador nao encontrado.' });
+    await Promise.all(matches.map(doc => db.collection('production_workers').doc(doc.id).set({ ...doc.data(), active: false, updatedAt: now })));
+    res.json({ success: true, message: 'Acesso revogado.' });
+  } catch (error) {
+    console.error('Erro ao revogar colaborador:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel revogar o acesso.' });
+  }
+});
+
+app.get('/api/production/assignments', async (req, res) => {
+  const snapshot = await db.collection('production_assignments').get();
+  res.json({ success: true, assignments: snapshot.docs.map(doc => sanitizeForResponse({ id: doc.id, ...doc.data() })) });
+});
+
+app.get('/api/production/assignments/:id', async (req, res) => {
+  const assignmentDoc = await db.collection('production_assignments').doc(String(req.params.id || '')).get();
+  res.json({ success: true, assignment: assignmentDoc.exists ? sanitizeForResponse({ id: req.params.id, ...assignmentDoc.data() }) : null });
+});
+
+app.post('/api/production/assignments', async (req, res) => {
+  try {
+    const orderId = String(req.body?.orderId || '');
+    const workerId = String(req.body?.workerId || '');
+    const order = await getOrderEvent(orderId);
+    const worker = (await productionWorkers()).find(item => item.id === workerId && item.active !== false);
+    if (!order) return res.status(404).json({ success: false, message: 'Ordem de producao nao encontrada.' });
+    if (!worker) return res.status(400).json({ success: false, message: 'Selecione um colaborador ativo.' });
+    const oldDoc = await db.collection('production_assignments').doc(orderId).get();
+    const old = oldDoc.exists ? oldDoc.data() : {};
+    const now = new Date().toISOString();
+    const assignment = {
+      orderId,
+      workerId,
+      workerName: worker.name,
+      workerRole: worker.role,
+      commission: money(req.body?.commission),
+      steps: normalizeProductionSteps(req.body?.steps, old.workerId === workerId ? old.steps : []),
+      active: true,
+      createdAt: old.createdAt || now,
+      updatedAt: now
+    };
+    if (!assignment.steps.length) return res.status(400).json({ success: false, message: 'Selecione ao menos uma etapa.' });
+    await db.collection('production_assignments').doc(orderId).set(assignment);
+    res.json({ success: true, assignment: sanitizeForResponse(assignment) });
+  } catch (error) {
+    console.error('Erro ao classificar OS:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel classificar a OS.' });
+  }
+});
+
+app.get('/api/production/assignments/:id/chat', async (req, res) => {
+  res.json({ success: true, messages: await messagesForOrder(String(req.params.id || '')) });
+});
+
+app.post('/api/production/assignments/:id/chat', async (req, res) => {
+  try {
+    const orderId = String(req.params.id || '');
+    const assignmentDoc = await db.collection('production_assignments').doc(orderId).get();
+    if (!assignmentDoc.exists) return res.status(404).json({ success: false, message: 'Classifique a OS antes de iniciar a conversa.' });
+    const message = text(req.body?.message, 1000);
+    if (!message || containsUnsafeMarkup(message)) return res.status(400).json({ success: false, message: 'Mensagem invalida.' });
+    await db.collection('production_messages').add({ orderId, workerId: assignmentDoc.data().workerId, author: 'Equipe interna', authorType: 'admin', message, createdAt: new Date().toISOString() });
+    res.json({ success: true, messages: await messagesForOrder(orderId) });
+  } catch (error) {
+    console.error('Erro ao enviar mensagem interna:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel enviar a mensagem.' });
+  }
+});
 
 app.get('/api/mobile/inbox', async (req, res) => {
   try {

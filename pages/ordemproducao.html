@@ -344,6 +344,78 @@
         .action-btn.delay:hover {
             background: var(--accent-red);
         }
+
+        .action-btn.classify:hover {
+            background: #0f766e;
+        }
+
+        .classification-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+            gap: 14px;
+        }
+
+        .classification-grid label, .classification-box label {
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        .classification-grid select, .classification-grid input, .production-chat input {
+            width: 100%;
+            margin-top: 6px;
+            padding: 11px;
+            border: 1px solid var(--border-color);
+            border-radius: 7px;
+            background: rgba(255,255,255,.08);
+            color: var(--text-primary);
+        }
+
+        .classification-grid option {
+            color: #0f172a;
+        }
+
+        .classification-box {
+            margin-top: 18px;
+            padding: 16px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            background: rgba(255,255,255,.04);
+        }
+
+        .classification-steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 9px;
+            margin-top: 12px;
+        }
+
+        .classification-step {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .production-chat-list {
+            max-height: 210px;
+            overflow: auto;
+            margin: 10px 0;
+        }
+
+        .production-chat-message {
+            padding: 9px 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .production-chat-message small {
+            display: block;
+            color: var(--text-secondary);
+        }
+
+        .production-chat {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 9px;
+        }
         
         /* Timer */
         .order-timer {
@@ -818,6 +890,34 @@
             </div>
         </div>
     </div>
+
+    <div class="modal-overlay" id="classificationOverlay">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 class="modal-title" id="classificationTitle">Classificar O.S.</h2>
+                <button class="modal-close" id="classificationClose"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-content">
+                <div class="classification-grid">
+                    <label>Colaborador responsável<select id="classificationWorker"></select></label>
+                    <label>Comissão pelo trabalho (€)<input id="classificationCommission" type="number" min="0" step="0.01" value="0"></label>
+                </div>
+                <div class="classification-box">
+                    <strong>Etapas direcionadas ao colaborador</strong>
+                    <div class="classification-steps" id="classificationSteps"></div>
+                </div>
+                <div class="classification-box">
+                    <strong>Chat privado da O.S.</strong>
+                    <div class="production-chat-list" id="classificationMessages"></div>
+                    <form class="production-chat" id="classificationChatForm">
+                        <input id="classificationChatInput" maxlength="1000" placeholder="Escreva uma mensagem para o colaborador">
+                        <button class="refresh-btn" type="submit"><i class="fas fa-paper-plane"></i> Enviar</button>
+                    </form>
+                </div>
+                <button class="refresh-btn" id="classificationSave" style="width:100%;margin-top:18px;"><i class="fas fa-save"></i> Salvar classificação</button>
+            </div>
+        </div>
+    </div>
     
     <!-- ============================================
          INDICADOR DE AUTO-REFRESH
@@ -845,11 +945,25 @@
             const manualRefresh = document.getElementById('manualRefresh');
             const filterButtons = document.querySelectorAll('.filter-btn');
             const refreshTimer = document.getElementById('refreshTimer');
+            const classificationOverlay = document.getElementById('classificationOverlay');
+            const classificationClose = document.getElementById('classificationClose');
+            const classificationTitle = document.getElementById('classificationTitle');
+            const classificationWorker = document.getElementById('classificationWorker');
+            const classificationCommission = document.getElementById('classificationCommission');
+            const classificationSteps = document.getElementById('classificationSteps');
+            const classificationMessages = document.getElementById('classificationMessages');
+            const classificationChatForm = document.getElementById('classificationChatForm');
+            const classificationChatInput = document.getElementById('classificationChatInput');
+            const classificationSave = document.getElementById('classificationSave');
             
             // Estado da aplicação
             let todasOrdens = [];
             let filtroAtual = 'all';
             let contadorRefresh = 30;
+            let productionWorkers = [];
+            let productionAssignments = [];
+            let productionSteps = [];
+            let classificationOrder = null;
             const camposConhecidosPayload = new Set([
                 'cliente', 'empresa', 'nif', 'morada', 'telemovel', 'numero', 'numeroFatura',
                 'produtos', 'pagamentos', 'total', 'subtotal', 'iva', 'instalacao', 'entrada',
@@ -1316,6 +1430,92 @@
             // FUNÇÕES PRINCIPAIS - SIGA PROTOCOLO CORE
             // ============================================
             
+            async function carregarMetadadosProducao() {
+                const [workersResponse, assignmentsResponse] = await Promise.all([
+                    fetch('/api/production/workers'),
+                    fetch('/api/production/assignments')
+                ]);
+                if (!workersResponse.ok || !assignmentsResponse.ok) throw new Error('Erro ao carregar classificação da produção');
+                const workersResult = await workersResponse.json();
+                const assignmentsResult = await assignmentsResponse.json();
+                productionWorkers = workersResult.workers || [];
+                productionSteps = workersResult.steps || [];
+                productionAssignments = assignmentsResult.assignments || [];
+            }
+
+            function assignmentOf(orderId) {
+                return productionAssignments.find(item => item.orderId === orderId);
+            }
+
+            function fecharClassificacao() {
+                classificationOrder = null;
+                classificationOverlay.classList.remove('active');
+            }
+
+            function renderClassificationSteps(selected = []) {
+                const selectedIds = new Set(selected.map(step => step.id || step));
+                classificationSteps.innerHTML = productionSteps.map(label => {
+                    const id = label.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '').toLowerCase();
+                    return `<label class="classification-step"><input type="checkbox" value="${escapeHtml(id)}" ${selectedIds.has(id) ? 'checked' : ''}><span>${escapeHtml(label)}</span></label>`;
+                }).join('');
+            }
+
+            async function carregarChatClassificacao(orderId) {
+                const response = await fetch(`/api/production/assignments/${encodeURIComponent(orderId)}/chat`);
+                if (!response.ok) {
+                    classificationMessages.innerHTML = '<p style="color:var(--text-secondary)">Salve a classificação para iniciar a conversa.</p>';
+                    return;
+                }
+                const result = await response.json();
+                classificationMessages.innerHTML = (result.messages || []).map(message => `
+                    <div class="production-chat-message">
+                        <strong>${escapeHtml(message.author)}</strong>
+                        <span>${escapeHtml(message.message)}</span>
+                        <small>${escapeHtml(formatarDataPadrao(message.createdAt, true))}</small>
+                    </div>
+                `).join('') || '<p style="color:var(--text-secondary)">Nenhuma mensagem nesta O.S.</p>';
+                classificationMessages.scrollTop = classificationMessages.scrollHeight;
+            }
+
+            async function abrirClassificacao(ordem) {
+                classificationOrder = ordem;
+                const assignment = assignmentOf(ordem.id);
+                classificationTitle.textContent = `Classificar ${ordem.numero}`;
+                classificationWorker.innerHTML = '<option value="">Selecione um colaborador</option>';
+                productionWorkers.forEach(worker => {
+                    const option = document.createElement('option');
+                    option.value = worker.id;
+                    option.textContent = `${worker.name} · ${worker.role}`;
+                    classificationWorker.append(option);
+                });
+                classificationWorker.value = assignment?.workerId || '';
+                classificationCommission.value = assignment?.commission || 0;
+                renderClassificationSteps(assignment?.steps || []);
+                await carregarChatClassificacao(ordem.id);
+                classificationOverlay.classList.add('active');
+            }
+
+            async function salvarClassificacao() {
+                if (!classificationOrder) return;
+                const steps = Array.from(classificationSteps.querySelectorAll('input:checked')).map(input => input.value);
+                const response = await fetch('/api/production/assignments', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        orderId: classificationOrder.id,
+                        workerId: classificationWorker.value,
+                        commission: classificationCommission.value,
+                        steps
+                    })
+                });
+                const result = await response.json();
+                if (!response.ok) return alert(result.message || 'Não foi possível classificar a O.S.');
+                await carregarMetadadosProducao();
+                fecharClassificacao();
+                aplicarFiltro();
+                alert('O.S. classificada e disponibilizada ao colaborador.');
+            }
+
             // Carregar ordens do Firebase via API Core
             async function carregarOrdens() {
                 try {
@@ -1340,6 +1540,7 @@
                     const result = await response.json();
                     
                     if (result.success && result.events) {
+                        await carregarMetadadosProducao();
                         console.log(`✅ ${result.events.length} pedidos recebidos do Firebase`);
                         processarOrdens(result.events);
                     } else {
@@ -1513,6 +1714,7 @@
             function criarCardOrdem(ordem) {
                 const produtos = ordem.produtos || [];
                 const total = ordem.total || 0;
+                const assignment = assignmentOf(ordem.id);
                 
                 // Formatadores
                 const formatarData = (dataStr) => {
@@ -1584,6 +1786,10 @@
                                 <i class="fas fa-user-tie meta-icon"></i>
                                 <span>Atendente: ${ordem.atendente || 'N/A'}</span>
                             </div>
+                            <div class="meta-item">
+                                <i class="fas fa-hard-hat meta-icon"></i>
+                                <span>Execução: ${escapeHtml(assignment?.workerName || 'não classificada')}</span>
+                            </div>
                         </div>
                     </div>
                     
@@ -1600,6 +1806,9 @@
                     <div class="order-footer">
                         <div class="order-total">${formatarMoeda(total)}</div>
                         <div class="order-actions">
+                            <button class="action-btn classify" title="Classificar O.S." data-id="${ordem.id}">
+                                <i class="fas fa-user-check"></i>
+                            </button>
                             <button class="action-btn complete" title="Marcar como concluído" data-id="${ordem.id}">
                                 <i class="fas fa-check"></i>
                             </button>
@@ -1625,12 +1834,14 @@
                 
                 // Adicionar event listeners
                 const viewBtn = card.querySelector('.action-btn.view');
+                const classifyBtn = card.querySelector('.action-btn.classify');
                 const printBtn = card.querySelector('.action-btn.print');
                 const completeBtn = card.querySelector('.action-btn.complete');
                 const startBtn = card.querySelector('.action-btn.start');
                 const problemBtn = card.querySelector('.action-btn.delay');
                 
                 viewBtn.addEventListener('click', () => abrirModalDetalhesCompleto(ordem));
+                if (classifyBtn) classifyBtn.addEventListener('click', () => abrirClassificacao(ordem));
                 if (printBtn) printBtn.addEventListener('click', () => imprimirOrdem(ordem));
                 if (completeBtn) completeBtn.addEventListener('click', () => atualizarStatusOrdem(ordem.id, 'concluido'));
                 if (startBtn) startBtn.addEventListener('click', () => atualizarStatusOrdem(ordem.id, 'processamento'));
@@ -2192,6 +2403,25 @@
             // INICIALIZAÇÃO
             // ============================================
             
+            classificationClose.addEventListener('click', fecharClassificacao);
+            classificationOverlay.addEventListener('click', event => {
+                if (event.target === classificationOverlay) fecharClassificacao();
+            });
+            classificationSave.addEventListener('click', salvarClassificacao);
+            classificationChatForm.addEventListener('submit', async event => {
+                event.preventDefault();
+                if (!classificationOrder || !classificationChatInput.value.trim()) return;
+                const response = await fetch(`/api/production/assignments/${encodeURIComponent(classificationOrder.id)}/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: classificationChatInput.value })
+                });
+                const result = await response.json();
+                if (!response.ok) return alert(result.message || 'Não foi possível enviar a mensagem.');
+                classificationChatInput.value = '';
+                await carregarChatClassificacao(classificationOrder.id);
+            });
+
             // Iniciar carregamento das ordens
             carregarOrdens();
             
