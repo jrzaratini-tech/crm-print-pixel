@@ -405,6 +405,7 @@ async function assignmentForWorker(orderId, workerId) {
   const assignmentDoc = await db.collection('production_assignments').doc(orderId).get();
   if (!assignmentDoc.exists) return null;
   const assignment = assignmentDoc.data();
+  if (assignment.active === false) return null;
   const worker = (await productionWorkers()).find(item => item.id === workerId && item.active !== false);
   if (!worker || (!PRODUCTION_PRIVILEGED_ROLES.has(worker.role) && assignment.workerId !== workerId)) return null;
   return { id: orderId, ...assignment };
@@ -784,7 +785,18 @@ app.post('/api/production/assignments', async (req, res) => {
       workerName: worker.name,
       workerRole: worker.role,
       commission: money(req.body?.commission),
-      steps: normalizeProductionSteps(req.body?.steps, old.workerId === workerId ? old.steps : []),
+      steps: normalizeProductionSteps(req.body?.steps, old.steps),
+      transitions: [
+        ...(Array.isArray(old.transitions) ? old.transitions : []),
+        ...(old.workerId && old.workerId !== workerId ? [{
+          type: 'transfer',
+          fromWorkerId: old.workerId,
+          fromWorkerName: old.workerName,
+          toWorkerId: workerId,
+          toWorkerName: worker.name,
+          createdAt: now
+        }] : [])
+      ].slice(-50),
       active: true,
       createdAt: old.createdAt || now,
       updatedAt: now
@@ -795,6 +807,32 @@ app.post('/api/production/assignments', async (req, res) => {
   } catch (error) {
     console.error('Erro ao classificar OS:', error);
     res.status(500).json({ success: false, message: 'Nao foi possivel classificar a OS.' });
+  }
+});
+
+app.post('/api/production/assignments/:id/unassign', async (req, res) => {
+  try {
+    const orderId = String(req.params.id || '');
+    const assignmentDoc = await db.collection('production_assignments').doc(orderId).get();
+    if (!assignmentDoc.exists || assignmentDoc.data().active === false) {
+      return res.status(404).json({ success: false, message: 'A O.S. ja esta na fila sem responsavel.' });
+    }
+    const old = assignmentDoc.data();
+    const now = new Date().toISOString();
+    const assignment = {
+      ...old,
+      active: false,
+      transitions: [
+        ...(Array.isArray(old.transitions) ? old.transitions : []),
+        { type: 'unassign', fromWorkerId: old.workerId, fromWorkerName: old.workerName, createdAt: now }
+      ].slice(-50),
+      updatedAt: now
+    };
+    await db.collection('production_assignments').doc(orderId).set(assignment);
+    res.json({ success: true, assignment: sanitizeForResponse(assignment), message: 'O.S. devolvida para a fila de producao.' });
+  } catch (error) {
+    console.error('Erro ao desclassificar OS:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel devolver a O.S. para a fila.' });
   }
 });
 

@@ -103,6 +103,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.doesNotMatch(linksPageResult.body, /CRM_MOBILE_ACCESS_KEY/);
   assert.match(productionPageResult.body, /classificationOverlay/);
   assert.match(productionPageResult.body, /workerFilter/);
+  assert.match(productionPageResult.body, /Desclassificar e devolver à fila/);
 });
 
 test('classifica OS para colaborador com login sem expor precos e permite chat privado', async () => {
@@ -185,6 +186,30 @@ test('comercial visualiza todas as OS classificadas e montagem somente as atribu
   assert.equal(mountingSession.body.assignments.length, 1);
   assert.ok(commercialSession.body.assignments.length >= 1);
   assert.ok(commercialSession.body.assignments.some(item => item.orderId === secondOrder.body.id));
+});
+
+test('devolve OS para fila e transfere para novo colaborador preservando progresso', async () => {
+  const order = await post('/api/database/commit', { schema: 'pedido', pageId: 'test', payload: { numero: 'PED-ESTEIRA-1', cliente: 'Cliente Esteira', produtos: [{ nome: 'Letreiro' }] } });
+  const designer = await post('/api/production/workers', { name: 'Projetista Esteira', username: 'projetista.esteira', password: 'senha-segura-projetista', role: 'projetista' });
+  const mounting = await post('/api/production/workers', { name: 'Montagem Esteira', username: 'montagem.esteira', password: 'senha-segura-montagem', role: 'montagem' });
+  const designerLogin = await post('/api/colaborador/login', { username: 'projetista.esteira', password: 'senha-segura-projetista' });
+  const mountingLogin = await post('/api/colaborador/login', { username: 'montagem.esteira', password: 'senha-segura-montagem' });
+  await post('/api/production/assignments', { orderId: order.body.id, workerId: designer.body.worker.id, commission: 30, steps: ['arte_projeto', 'acabamento'] });
+  const completed = await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas`, { stepId: 'arte_projeto', done: true }, designerLogin.body.token);
+  assert.equal(completed.response.status, 200);
+
+  const unassigned = await post(`/api/production/assignments/${order.body.id}/unassign`, {});
+  assert.equal(unassigned.response.status, 200);
+  assert.equal(unassigned.body.assignment.active, false);
+  const designerChatBlocked = await workerRequest(`/api/colaborador/ordens/${order.body.id}/chat`, designerLogin.body.token);
+  assert.equal(designerChatBlocked.response.status, 404);
+
+  const transferred = await post('/api/production/assignments', { orderId: order.body.id, workerId: mounting.body.worker.id, commission: 70, steps: ['arte_projeto', 'acabamento'] });
+  assert.equal(transferred.response.status, 200);
+  assert.equal(transferred.body.assignment.steps.find(step => step.id === 'arte_projeto').done, true);
+  assert.equal(transferred.body.assignment.transitions.at(-1).type, 'transfer');
+  const mountingSession = await workerRequest('/api/colaborador/session', mountingLogin.body.token);
+  assert.ok(mountingSession.body.assignments.some(item => item.orderId === order.body.id));
 });
 
 test('exclui usuario de producao e bloqueia novo login', async () => {
