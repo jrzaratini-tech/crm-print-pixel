@@ -177,8 +177,8 @@
            MAIN CONTENT
            ============================================ */
         .main-content {
-            padding: 35px 40px;
-            max-width: 1600px;
+            padding: 28px 24px;
+            max-width: 1920px;
             margin: 0 auto;
         }
         
@@ -187,38 +187,21 @@
            ============================================ */
         .dashboard-grid {
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
-            gap: 20px;
-            margin-bottom: 40px;
-        }
-        
-        @media (max-width: 1600px) {
-            .dashboard-grid {
-                grid-template-columns: repeat(3, 1fr);
-            }
-        }
-        
-        @media (max-width: 1200px) {
-            .dashboard-grid {
-                grid-template-columns: repeat(2, 1fr);
-            }
-        }
-        
-        @media (max-width: 768px) {
-            .dashboard-grid {
-                grid-template-columns: 1fr;
-            }
+            grid-template-columns: repeat(6, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 30px;
         }
         
         .metric-card {
             background: var(--card-bg);
             border-radius: var(--radius-md);
-            padding: 28px;
+            padding: 16px;
             box-shadow: var(--shadow-md);
             border-left: 5px solid;
             transition: all 0.4s;
             position: relative;
             overflow: hidden;
+            min-height: 168px;
         }
         
         .metric-card:hover {
@@ -255,11 +238,11 @@
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            margin-bottom: 18px;
+            margin-bottom: 12px;
         }
         
         .metric-title {
-            font-size: 15px;
+            font-size: 12px;
             color: var(--text-secondary);
             font-weight: 600;
             text-transform: uppercase;
@@ -267,13 +250,13 @@
         }
         
         .metric-icon {
-            width: 56px;
-            height: 56px;
-            border-radius: 12px;
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 24px;
+            font-size: 18px;
             color: white;
         }
         
@@ -292,9 +275,12 @@
         .metric-icon.pagar { 
             background: linear-gradient(135deg, #f44336, #e57373);
         }
+        .metric-icon.iva {
+            background: linear-gradient(135deg, #7c3aed, #a78bfa);
+        }
         
         .metric-value {
-            font-size: 42px;
+            font-size: 28px;
             font-weight: 800;
             margin-bottom: 8px;
             transition: all 0.3s;
@@ -305,6 +291,7 @@
         .metric-value.expenses { color: var(--expense-color); }
         .metric-value.receber { color: #4caf50; }
         .metric-value.pagar { color: #f44336; }
+        .metric-value.iva { color: #7c3aed; }
         
         .metric-value.hidden,
         .sensitive-value.hidden {
@@ -313,12 +300,41 @@
         }
         
         .metric-change {
-            font-size: 15px;
+            font-size: 12px;
             color: var(--text-secondary);
             display: flex;
             align-items: center;
             gap: 6px;
             font-weight: 500;
+        }
+
+        .metric-breakdown {
+            display: grid;
+            gap: 4px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .metric-breakdown-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        .metric-breakdown-row strong {
+            color: var(--text-primary);
+            text-align: right;
+        }
+
+        .metric-card.sales .metric-breakdown-row strong {
+            color: var(--success-color);
+            font-size: 18px;
+        }
+
+        .metric-card.iva .metric-change {
+            margin-top: 4px;
+            line-height: 1.25;
         }
         
         .positive { 
@@ -516,7 +532,7 @@
            ============================================ */
         @media (max-width: 1200px) {
             .dashboard-grid {
-                grid-template-columns: repeat(2, 1fr);
+                grid-template-columns: repeat(3, 1fr);
             }
             
             .dashboard-charts-container {
@@ -526,7 +542,7 @@
         
         @media (max-width: 900px) {
             .dashboard-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(2, 1fr);
             }
         }
         
@@ -552,6 +568,10 @@
             .main-content {
                 padding: 25px;
             }
+
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
             
             .dashboard-charts-container {
                 grid-template-columns: 1fr;
@@ -569,7 +589,7 @@
         
         @media (max-width: 480px) {
             .metric-value {
-                font-size: 36px;
+                font-size: 28px;
             }
             
             .dashboard-chart-wrapper {
@@ -668,10 +688,15 @@
                         <i class="fas fa-euro-sign"></i>
                     </div>
                 </div>
-                <div class="metric-value sales" data-bind="vendas.total">€0,00</div>
-                <div class="metric-change">
-                    <i class="fas fa-arrow-up positive"></i>
-                    Líquido: <span class="sensitive-value" data-bind="vendas.liquido">€0,00</span> | Bruto: <span class="sensitive-value" data-bind="vendas.bruto">€0,00</span>
+                <div class="metric-breakdown">
+                    <div class="metric-breakdown-row">
+                        <span>Líquido</span>
+                        <strong class="sensitive-value" data-bind="vendas.liquido">€0,00</strong>
+                    </div>
+                    <div class="metric-breakdown-row">
+                        <span>Bruto</span>
+                        <strong class="sensitive-value" data-bind="vendas.bruto">€0,00</strong>
+                    </div>
                 </div>
             </div>
             
@@ -728,6 +753,25 @@
                     <span>Contas a pagar</span>
                 </div>
             </div>
+
+            <div class="metric-card iva">
+                <div class="metric-header">
+                    <div class="metric-title">Estimativa Trimestral de IVA</div>
+                    <div class="metric-icon iva">
+                        <i class="fas fa-landmark"></i>
+                    </div>
+                </div>
+                <div class="metric-value iva" data-bind="iva.saldo">€0,00</div>
+                <div class="metric-change">
+                    <span data-bind="iva.situacao">Sem saldo estimado</span>
+                </div>
+                <div class="metric-change">
+                    <span class="sensitive-value" data-bind="iva.detalhe">IVA vendas: €0,00 | IVA dedutível: €0,00</span>
+                </div>
+                <div class="metric-change">
+                    <span data-bind="iva.prazo">Declaração: --/--/----</span>
+                </div>
+            </div>
         </div>
 
         <!-- PONTO DE EQUILÍBRIO -->
@@ -766,27 +810,6 @@
                 </div>
             </div>
 
-            <div class="metric-card iva">
-                <div class="metric-header">
-                    <div class="metric-title">Estimativa Trimestral de IVA</div>
-                    <div class="metric-icon">
-                        <i class="fas fa-landmark"></i>
-                    </div>
-                </div>
-                <div class="metric-value" data-bind="iva.saldo">€0,00</div>
-                <div class="metric-change">
-                    <span data-bind="iva.situacao">Sem saldo estimado</span>
-                </div>
-                <div class="metric-change">
-                    <span class="sensitive-value" data-bind="iva.detalhe">IVA vendas: €0,00 | IVA dedutível: €0,00</span>
-                </div>
-                <div class="metric-change">
-                    <span data-bind="iva.prazo">Declaração: --/--/----</span>
-                </div>
-                <div class="metric-change">
-                    <span>Regime normal trimestral estimado. Validar com contabilista.</span>
-                </div>
-            </div>
         </div>
 
         <!-- SEÇÃO DE GRÁFICOS -->
