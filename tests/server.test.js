@@ -104,6 +104,8 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(productionPageResult.body, /classificationOverlay/);
   assert.match(productionPageResult.body, /workerFilter/);
   assert.match(productionPageResult.body, /Desclassificar e devolver à fila/);
+  assert.match(productionPageResult.body, /classificationProduct/);
+  assert.match(productionPageResult.body, /HISTÓRICO DA PRODUÇÃO POR ARTIGO/);
 });
 
 test('classifica OS para colaborador com login sem expor precos e permite chat privado', async () => {
@@ -210,6 +212,56 @@ test('devolve OS para fila e transfere para novo colaborador preservando progres
   assert.equal(transferred.body.assignment.transitions.at(-1).type, 'transfer');
   const mountingSession = await workerRequest('/api/colaborador/session', mountingLogin.body.token);
   assert.ok(mountingSession.body.assignments.some(item => item.orderId === order.body.id));
+});
+
+test('classifica produtos da mesma OS para colaboradores diferentes com historico individual', async () => {
+  const order = await post('/api/database/commit', {
+    schema: 'pedido',
+    pageId: 'test',
+    payload: {
+      numero: 'PED-ITENS-1',
+      cliente: 'Cliente Multiplos Artigos',
+      produtos: [
+        { nome: 'Letreiro Neon', tamanho: '120x60', quantidade: 1, valor: 700 },
+        { nome: 'Placa ACM', tamanho: '200x100', quantidade: 1, valor: 500 }
+      ]
+    }
+  });
+  const neonWorker = await post('/api/production/workers', { name: 'Operador Neon', username: 'operador.neon', password: 'senha-segura-neon', role: 'montagem' });
+  const acmWorker = await post('/api/production/workers', { name: 'Operador ACM', username: 'operador.acm', password: 'senha-segura-acm', role: 'montagem' });
+  const neonLogin = await post('/api/colaborador/login', { username: 'operador.neon', password: 'senha-segura-neon' });
+  const acmLogin = await post('/api/colaborador/login', { username: 'operador.acm', password: 'senha-segura-acm' });
+  await post('/api/production/assignments', { orderId: order.body.id, productId: 'item_0', workerId: neonWorker.body.worker.id, commission: 45, steps: ['led_solda', 'acabamento'] });
+  await post('/api/production/assignments', { orderId: order.body.id, productId: 'item_1', workerId: acmWorker.body.worker.id, commission: 35, steps: ['usinagem_cnc', 'acabamento'] });
+  const invalidProduct = await post('/api/production/assignments', { orderId: order.body.id, productId: 'item_1_extra', workerId: acmWorker.body.worker.id, commission: 35, steps: ['acabamento'] });
+  assert.equal(invalidProduct.response.status, 400);
+
+  const neonSession = await workerRequest('/api/colaborador/session', neonLogin.body.token);
+  const acmSession = await workerRequest('/api/colaborador/session', acmLogin.body.token);
+  const neonTask = neonSession.body.assignments.find(item => item.orderId === order.body.id);
+  const acmTask = acmSession.body.assignments.find(item => item.orderId === order.body.id);
+  assert.equal(neonTask.product.nome, 'Letreiro Neon');
+  assert.equal(acmTask.product.nome, 'Placa ACM');
+  assert.equal('valor' in neonTask.product, false);
+  assert.equal(neonTask.order.produtos.length, 1);
+  assert.equal(neonTask.order.produtos[0].nome, 'Letreiro Neon');
+
+  const completed = await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas`, { productId: 'item_0', stepId: 'led_solda', done: true }, neonLogin.body.token);
+  assert.equal(completed.response.status, 200);
+  const assignments = await request('/api/production/assignments');
+  const neonAssignment = assignments.body.assignments.find(item => item.orderId === order.body.id && item.productId === 'item_0');
+  const acmAssignment = assignments.body.assignments.find(item => item.orderId === order.body.id && item.productId === 'item_1');
+  assert.equal(neonAssignment.steps.find(step => step.id === 'led_solda').done, true);
+  assert.equal(acmAssignment.steps.find(step => step.id === 'usinagem_cnc').done, false);
+  assert.equal(neonAssignment.history.at(-1).type, 'step_completed');
+  assert.equal(neonAssignment.history.at(-1).workerName, 'Operador Neon');
+
+  const transferred = await post('/api/production/assignments', { orderId: order.body.id, productId: 'item_0', workerId: acmWorker.body.worker.id, commission: 55, steps: ['led_solda', 'acabamento'] });
+  assert.equal(transferred.response.status, 200);
+  assert.equal(transferred.body.assignment.steps.find(step => step.id === 'led_solda').done, true);
+  assert.equal(transferred.body.assignment.history.at(-1).type, 'transferred');
+  const previousWorkerSession = await workerRequest('/api/colaborador/session', neonLogin.body.token);
+  assert.equal(previousWorkerSession.body.assignments.some(item => item.orderId === order.body.id && item.productId === 'item_0'), false);
 });
 
 test('exclui usuario de producao e bloqueia novo login', async () => {

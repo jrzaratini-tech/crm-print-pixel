@@ -966,12 +966,17 @@
             </div>
             <div class="modal-content">
                 <div class="classification-grid">
+                    <label>Produto da O.S.<select id="classificationProduct"></select></label>
                     <label>Colaborador responsável<select id="classificationWorker"></select></label>
                     <label>Comissão pelo trabalho (€)<input id="classificationCommission" type="number" min="0" step="0.01" value="0"></label>
                 </div>
                 <div class="classification-box">
                     <strong>Etapas direcionadas ao colaborador</strong>
                     <div class="classification-steps" id="classificationSteps"></div>
+                </div>
+                <div class="classification-box">
+                    <strong>Histórico produtivo do artigo</strong>
+                    <div class="production-chat-list" id="classificationHistory"></div>
                 </div>
                 <div class="classification-box">
                     <strong>Chat privado da O.S.</strong>
@@ -1019,9 +1024,11 @@
             const classificationOverlay = document.getElementById('classificationOverlay');
             const classificationClose = document.getElementById('classificationClose');
             const classificationTitle = document.getElementById('classificationTitle');
+            const classificationProduct = document.getElementById('classificationProduct');
             const classificationWorker = document.getElementById('classificationWorker');
             const classificationCommission = document.getElementById('classificationCommission');
             const classificationSteps = document.getElementById('classificationSteps');
+            const classificationHistory = document.getElementById('classificationHistory');
             const classificationMessages = document.getElementById('classificationMessages');
             const classificationChatForm = document.getElementById('classificationChatForm');
             const classificationChatInput = document.getElementById('classificationChatInput');
@@ -1516,8 +1523,16 @@
                 atualizarFiltrosOperacionais();
             }
 
-            function assignmentOf(orderId) {
-                return productionAssignments.find(item => item.orderId === orderId && item.active !== false);
+            function assignmentsOf(orderId) {
+                return productionAssignments.filter(item => item.orderId === orderId);
+            }
+
+            function activeAssignmentsOf(orderId) {
+                return assignmentsOf(orderId).filter(item => item.active !== false);
+            }
+
+            function assignmentOf(orderId, productId = '') {
+                return productionAssignments.find(item => item.orderId === orderId && (item.productId || '') === productId && item.active !== false);
             }
 
             function assignmentProgress(assignment) {
@@ -1526,6 +1541,15 @@
                 const total = assignment.steps.length;
                 const current = assignment.steps.filter(step => !step.done).map(step => step.label).join(', ') || 'Todas as etapas concluídas';
                 return { key: done === 0 ? 'not_started' : done === total ? 'done' : 'in_progress', done, total, percent: Math.round(done * 100 / total), current };
+            }
+
+            function orderProgress(orderId) {
+                const assignments = activeAssignmentsOf(orderId);
+                const steps = assignments.flatMap(item => item.steps || []);
+                if (!steps.length) return assignmentProgress(null);
+                const done = steps.filter(step => step.done).length;
+                const current = steps.filter(step => !step.done).map(step => step.label).filter((label, index, labels) => labels.indexOf(label) === index).join(', ') || 'Todas as etapas concluídas';
+                return { key: done === 0 ? 'not_started' : done === steps.length ? 'done' : 'in_progress', done, total: steps.length, percent: Math.round(done * 100 / steps.length), current };
             }
 
             function atualizarFiltrosOperacionais() {
@@ -1555,6 +1579,30 @@
                 }).join('');
             }
 
+            function renderClassificationHistory(assignment) {
+                const history = assignment?.history || [];
+                classificationHistory.innerHTML = history.slice().reverse().map(item => {
+                    const labels = {
+                        assigned: `Direcionado para ${item.workerName || 'colaborador'}`,
+                        transferred: `Transferido de ${item.fromWorkerName || 'fila'} para ${item.workerName || 'colaborador'}`,
+                        unassigned: `Devolvido por ${item.fromWorkerName || 'colaborador'} para a fila`,
+                        step_completed: `${item.workerName || 'Colaborador'} concluiu: ${item.stepLabel || item.stepId}`,
+                        step_reopened: `${item.workerName || 'Colaborador'} reabriu: ${item.stepLabel || item.stepId}`
+                    };
+                    return `<div class="production-chat-message"><strong>${escapeHtml(labels[item.type] || item.type)}</strong><small>${escapeHtml(formatarDataPadrao(item.createdAt, true))}</small></div>`;
+                }).join('') || '<p style="color:var(--text-secondary)">Este artigo ainda não possui movimentações.</p>';
+            }
+
+            function carregarItemClassificacao() {
+                if (!classificationOrder) return;
+                const assignment = assignmentOf(classificationOrder.id, classificationProduct.value);
+                classificationWorker.value = assignment?.workerId || '';
+                classificationCommission.value = assignment?.commission || 0;
+                renderClassificationSteps(assignment?.steps || []);
+                renderClassificationHistory(assignment || assignmentsOf(classificationOrder.id).find(item => (item.productId || '') === classificationProduct.value));
+                classificationUnassign.hidden = !assignment;
+            }
+
             async function carregarChatClassificacao(orderId) {
                 const response = await fetch(`/api/production/assignments/${encodeURIComponent(orderId)}/chat`);
                 if (!response.ok) {
@@ -1574,8 +1622,9 @@
 
             async function abrirClassificacao(ordem) {
                 classificationOrder = ordem;
-                const assignment = assignmentOf(ordem.id);
                 classificationTitle.textContent = `Classificar ${ordem.numero}`;
+                classificationProduct.innerHTML = (ordem.produtos || []).map((product, index) => `<option value="item_${index}">${escapeHtml(product.nome || `Produto ${index + 1}`)}${product.tamanho ? ` · ${escapeHtml(product.tamanho)}` : ''}</option>`).join('');
+                if (!classificationProduct.options.length) classificationProduct.innerHTML = '<option value="">Serviço geral da O.S.</option>';
                 classificationWorker.innerHTML = '<option value="">Não classificada / fila de produção</option>';
                 productionWorkers.forEach(worker => {
                     const option = document.createElement('option');
@@ -1583,10 +1632,7 @@
                     option.textContent = `${worker.name} · ${worker.role}`;
                     classificationWorker.append(option);
                 });
-                classificationWorker.value = assignment?.workerId || '';
-                classificationCommission.value = assignment?.commission || 0;
-                renderClassificationSteps(assignment?.steps || []);
-                classificationUnassign.hidden = !assignment;
+                carregarItemClassificacao();
                 await carregarChatClassificacao(ordem.id);
                 classificationOverlay.classList.add('active');
             }
@@ -1600,6 +1646,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         orderId: classificationOrder.id,
+                        productId: classificationProduct.value,
                         workerId: classificationWorker.value,
                         commission: classificationCommission.value,
                         steps
@@ -1615,13 +1662,17 @@
 
             async function desclassificarOS() {
                 if (!classificationOrder) return;
-                const assignment = assignmentOf(classificationOrder.id);
+                const assignment = assignmentOf(classificationOrder.id, classificationProduct.value);
                 if (!assignment) {
                     fecharClassificacao();
                     return aplicarFiltro();
                 }
                 if (!confirm('Devolver esta O.S. para a fila sem responsável? O progresso concluído será preservado.')) return;
-                const response = await fetch(`/api/production/assignments/${encodeURIComponent(classificationOrder.id)}/unassign`, { method: 'POST' });
+                const response = await fetch(`/api/production/assignments/${encodeURIComponent(classificationOrder.id)}/unassign`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ productId: classificationProduct.value })
+                });
                 const result = await response.json();
                 if (!response.ok) return alert(result.message || 'Não foi possível devolver a O.S. para a fila.');
                 await carregarMetadadosProducao();
@@ -1793,15 +1844,15 @@
                 }
 
                 if (workerFilter.value) {
-                    ordensFiltradas = ordensFiltradas.filter(ordem => assignmentOf(ordem.id)?.workerId === workerFilter.value);
+                    ordensFiltradas = ordensFiltradas.filter(ordem => activeAssignmentsOf(ordem.id).some(item => item.workerId === workerFilter.value));
                 }
 
                 if (activityFilter.value) {
-                    ordensFiltradas = ordensFiltradas.filter(ordem => assignmentOf(ordem.id)?.steps?.some(step => step.id === activityFilter.value && !step.done));
+                    ordensFiltradas = ordensFiltradas.filter(ordem => activeAssignmentsOf(ordem.id).some(item => item.steps?.some(step => step.id === activityFilter.value && !step.done)));
                 }
 
                 if (progressFilter.value) {
-                    ordensFiltradas = ordensFiltradas.filter(ordem => assignmentProgress(assignmentOf(ordem.id)).key === progressFilter.value);
+                    ordensFiltradas = ordensFiltradas.filter(ordem => orderProgress(ordem.id).key === progressFilter.value);
                 }
                 
                 // Remover concluídos do painel principal
@@ -1840,8 +1891,10 @@
             function criarCardOrdem(ordem) {
                 const produtos = ordem.produtos || [];
                 const total = ordem.total || 0;
-                const assignment = assignmentOf(ordem.id);
-                const progress = assignmentProgress(assignment);
+                const assignments = activeAssignmentsOf(ordem.id);
+                const assignment = assignments[0];
+                const progress = orderProgress(ordem.id);
+                const workerNames = assignments.map(item => item.workerName).filter((name, index, names) => name && names.indexOf(name) === index);
                 
                 // Formatadores
                 const formatarData = (dataStr) => {
@@ -1884,7 +1937,7 @@
                 const statusInfo = getStatusInfo(ordem.status);
                 
                 const card = document.createElement('div');
-                card.className = `order-card ${ordem.status} ${assignment ? 'classified' : ''}`;
+                card.className = `order-card ${ordem.status} ${assignments.length ? 'classified' : ''}`;
                 card.dataset.id = ordem.id;
                 
                 // Limitar produtos para exibição
@@ -1915,9 +1968,9 @@
                             </div>
                             <div class="meta-item">
                                 <i class="fas fa-hard-hat meta-icon"></i>
-                                <span>Execução: ${escapeHtml(assignment?.workerName || 'não classificada')}</span>
+                                <span>Execução: ${escapeHtml(workerNames.join(', ') || 'não classificada')}</span>
                             </div>
-                            ${assignment ? `<div class="assigned-worker"><i class="fas fa-user-check"></i> Responsável: ${escapeHtml(assignment.workerName)}</div>` : ''}
+                            ${assignments.length ? `<div class="assigned-worker"><i class="fas fa-user-check"></i> Responsáveis: ${escapeHtml(workerNames.join(', '))}<br><small>${assignments.length} artigo(s) em execução</small></div>` : ''}
                             <div class="production-progress"><strong>Progresso:</strong> ${progress.done}/${progress.total} etapas (${progress.percent}%)<br><strong>Agora:</strong> ${escapeHtml(progress.current)}</div>
                         </div>
                     </div>
@@ -2141,6 +2194,30 @@
                 const producao = ordem.producao || {};
                 const variacaoHoras = (parseFloat(producao.horasRealizadas) || 0) - (parseFloat(producao.horasPrevistas) || 0);
                 const variacaoCustos = (parseFloat(producao.custoRealizado) || 0) - (parseFloat(producao.custoPrevisto) || 0);
+                const assignmentHistoryLabels = {
+                    assigned: item => `Direcionado para ${item.workerName || 'colaborador'}`,
+                    transferred: item => `Transferido de ${item.fromWorkerName || 'fila'} para ${item.workerName || 'colaborador'}`,
+                    unassigned: item => `Devolvido por ${item.fromWorkerName || 'colaborador'} para a fila`,
+                    step_completed: item => `${item.workerName || 'Colaborador'} concluiu: ${item.stepLabel || item.stepId}`,
+                    step_reopened: item => `${item.workerName || 'Colaborador'} reabriu: ${item.stepLabel || item.stepId}`
+                };
+                const itemHistoryHtml = produtos.map((product, index) => {
+                    const productId = `item_${index}`;
+                    const assignments = assignmentsOf(ordem.id).filter(item => (item.productId || '') === productId);
+                    const current = assignments.find(item => item.active !== false);
+                    const latest = current || assignments[assignments.length - 1];
+                    const steps = latest?.steps || [];
+                    const history = assignments.flatMap(item => item.history || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                    return `<div style="padding:14px;margin-top:10px;border:1px solid var(--border-color);border-radius:8px;background:rgba(255,255,255,.04)">
+                        <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+                            <strong>${escapeHtml(product.nome || `Produto ${index + 1}`)}</strong>
+                            <span style="color:${current ? '#99f6e4' : 'var(--accent-yellow)'}">${current ? `Responsável: ${escapeHtml(current.workerName)}` : 'Na fila sem responsável'}</span>
+                        </div>
+                        <div style="margin-top:9px;color:var(--text-secondary)"><strong>Feito:</strong> ${steps.filter(step => step.done).map(step => escapeHtml(step.label)).join(', ') || 'Nenhuma etapa concluída'}</div>
+                        <div style="margin-top:5px;color:var(--text-secondary)"><strong>A fazer:</strong> ${steps.filter(step => !step.done).map(step => escapeHtml(step.label)).join(', ') || 'Aguardando classificação ou concluído'}</div>
+                        <div style="margin-top:10px">${history.map(item => `<div style="padding:5px 0;border-top:1px solid rgba(255,255,255,.05)"><small>${escapeHtml(formatarDataPadrao(item.createdAt, true))} · ${escapeHtml((assignmentHistoryLabels[item.type] || (entry => entry.type))(item))}</small></div>`).join('') || '<small style="color:var(--text-secondary)">Sem movimentações registradas.</small>'}</div>
+                    </div>`;
+                }).join('');
                 
                 modalContent.innerHTML = `
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px;">
@@ -2194,6 +2271,13 @@
                                     `).join('')}
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 30px;">
+                        <h3 style="color: var(--accent-blue); margin-bottom: 15px; font-size: 16px;">HISTÓRICO DA PRODUÇÃO POR ARTIGO</h3>
+                        <div style="background: rgba(255, 255, 255, 0.05); padding: 14px; border-radius: 8px;">
+                            ${itemHistoryHtml || '<div style="color:var(--text-secondary)">Nenhum artigo cadastrado nesta O.S.</div>'}
                         </div>
                     </div>
 
@@ -2539,6 +2623,7 @@
             });
             classificationSave.addEventListener('click', salvarClassificacao);
             classificationUnassign.addEventListener('click', desclassificarOS);
+            classificationProduct.addEventListener('change', carregarItemClassificacao);
             classificationChatForm.addEventListener('submit', async event => {
                 event.preventDefault();
                 if (!classificationOrder || !classificationChatInput.value.trim()) return;

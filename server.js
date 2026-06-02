@@ -349,6 +349,36 @@ function normalizeProductionSteps(selected = [], previous = []) {
     });
 }
 
+function productionProductId(value) {
+  const normalized = text(value, 40);
+  return normalized && /^[A-Za-z0-9_-]+$/.test(normalized) ? normalized : '';
+}
+
+function productionAssignmentId(orderId, productId = '') {
+  return productId ? `${orderId}__${productId}` : orderId;
+}
+
+function productForAssignment(order, productId) {
+  if (!productId) return null;
+  if (!/^item_(0|[1-9]\d*)$/.test(productId)) return null;
+  const index = Number.parseInt(productId.replace(/^item_/, ''), 10);
+  const products = Array.isArray(order?.payload?.produtos) ? order.payload.produtos : [];
+  if (!Number.isInteger(index) || index < 0 || index >= products.length) return null;
+  const product = products[index];
+  return sanitizeForResponse({
+    id: productId,
+    index,
+    nome: text(product.nome || 'Produto', 160),
+    tamanho: text(product.tamanho, 120),
+    quantidade: money(product.quantidade || 1),
+    observacoes: text(product.observacoes, 400)
+  });
+}
+
+function assignmentHistoryEntry(type, data = {}) {
+  return { type, ...data, createdAt: new Date().toISOString() };
+}
+
 async function getActiveWorkerByToken(token) {
   if (!token || token.length < 40 || token.length > 200) return null;
   const sessionDoc = await db.collection('production_sessions').doc(hash(token)).get();
@@ -381,8 +411,11 @@ async function getOrderEvent(orderId) {
   return !order.deleted && order.schema === 'pedido' ? { id: orderId, ...order } : null;
 }
 
-function safeOrderForWorker(order) {
+function safeOrderForWorker(order, productId = '', includeAllProducts = false) {
   const payload = order?.payload || {};
+  const products = Array.isArray(payload.produtos) ? payload.produtos : [];
+  const assignedProduct = productForAssignment(order, productId);
+  const visibleProducts = productId && !includeAllProducts && assignedProduct ? [products[assignedProduct.index]] : products;
   return sanitizeForResponse({
     id: order?.id,
     numero: text(payload.numero || `PED-${String(order?.id || '').slice(0, 8)}`, 80),
@@ -392,7 +425,7 @@ function safeOrderForWorker(order) {
     morada: text(payload.morada, 250),
     dataEntrega: text(payload.dataEntrega, 30),
     observacoes: text(payload.observacoes, 800),
-    produtos: (Array.isArray(payload.produtos) ? payload.produtos : []).map(product => ({
+    produtos: visibleProducts.map(product => ({
       nome: text(product.nome || 'Produto', 160),
       tamanho: text(product.tamanho, 120),
       quantidade: money(product.quantidade || 1),
@@ -401,14 +434,27 @@ function safeOrderForWorker(order) {
   });
 }
 
-async function assignmentForWorker(orderId, workerId) {
-  const assignmentDoc = await db.collection('production_assignments').doc(orderId).get();
+async function assignmentForWorker(orderId, workerId, productId = '') {
+  const assignmentId = productionAssignmentId(orderId, productId);
+  const assignmentDoc = await db.collection('production_assignments').doc(assignmentId).get();
   if (!assignmentDoc.exists) return null;
   const assignment = assignmentDoc.data();
   if (assignment.active === false) return null;
   const worker = (await productionWorkers()).find(item => item.id === workerId && item.active !== false);
   if (!worker || (!PRODUCTION_PRIVILEGED_ROLES.has(worker.role) && assignment.workerId !== workerId)) return null;
-  return { id: orderId, ...assignment };
+  return { id: assignmentId, ...assignment };
+}
+
+async function workerHasOrderAssignment(orderId, workerId) {
+  const worker = (await productionWorkers()).find(item => item.id === workerId && item.active !== false);
+  if (!worker) return false;
+  const snapshot = await db.collection('production_assignments').get();
+  return snapshot.docs.some(doc => {
+    const assignment = doc.data();
+    return assignment.orderId === orderId
+      && assignment.active !== false
+      && (PRODUCTION_PRIVILEGED_ROLES.has(worker.role) || assignment.workerId === workerId);
+  });
 }
 
 async function messagesForOrder(orderId) {
@@ -456,7 +502,11 @@ app.get('/api/colaborador/session', requireWorker, async (req, res) => {
       .filter(item => item.active !== false && (PRODUCTION_PRIVILEGED_ROLES.has(req.productionWorker.role) || item.workerId === req.productionWorker.id))
       .map(async assignment => {
         const order = await getOrderEvent(assignment.orderId);
-        return order ? { ...assignment, order: safeOrderForWorker(order) } : null;
+        return order ? {
+          ...assignment,
+          product: productForAssignment(order, assignment.productId),
+          order: safeOrderForWorker(order, assignment.productId, PRODUCTION_PRIVILEGED_ROLES.has(req.productionWorker.role))
+        } : null;
       }));
     res.json({
       success: true,
@@ -472,7 +522,8 @@ app.get('/api/colaborador/session', requireWorker, async (req, res) => {
 app.post('/api/colaborador/ordens/:id/etapas', requireWorker, async (req, res) => {
   try {
     const orderId = String(req.params.id || '');
-    const assignment = await assignmentForWorker(orderId, req.productionWorker.id);
+    const productId = productionProductId(req.body?.productId);
+    const assignment = await assignmentForWorker(orderId, req.productionWorker.id, productId);
     if (!assignment) return res.status(404).json({ success: false, message: 'Ordem nao encontrada para este colaborador.' });
     const stepId = productionStepId(req.body?.stepId);
     if (!stepId || !assignment.steps.some(step => step.id === stepId)) {
@@ -482,7 +533,16 @@ app.post('/api/colaborador/ordens/:id/etapas', requireWorker, async (req, res) =
     const steps = assignment.steps.map(step => step.id === stepId
       ? { ...step, done: Boolean(req.body?.done), completedAt: req.body?.done ? now : null }
       : step);
-    await db.collection('production_assignments').doc(orderId).set({ ...assignment, steps, updatedAt: now });
+    const history = [
+      ...(Array.isArray(assignment.history) ? assignment.history : []),
+      assignmentHistoryEntry(req.body?.done ? 'step_completed' : 'step_reopened', {
+        stepId,
+        stepLabel: steps.find(step => step.id === stepId)?.label,
+        workerId: req.productionWorker.id,
+        workerName: req.productionWorker.name
+      })
+    ].slice(-100);
+    await db.collection('production_assignments').doc(productionAssignmentId(orderId, productId)).set({ ...assignment, steps, history, updatedAt: now });
     res.json({ success: true, steps });
   } catch (error) {
     console.error('Erro ao atualizar etapa:', error);
@@ -492,16 +552,14 @@ app.post('/api/colaborador/ordens/:id/etapas', requireWorker, async (req, res) =
 
 app.get('/api/colaborador/ordens/:id/chat', requireWorker, async (req, res) => {
   const orderId = String(req.params.id || '');
-  const assignment = await assignmentForWorker(orderId, req.productionWorker.id);
-  if (!assignment) return res.status(404).json({ success: false, message: 'Conversa nao encontrada.' });
+  if (!await workerHasOrderAssignment(orderId, req.productionWorker.id)) return res.status(404).json({ success: false, message: 'Conversa nao encontrada.' });
   res.json({ success: true, messages: await messagesForOrder(orderId) });
 });
 
 app.post('/api/colaborador/ordens/:id/chat', requireWorker, async (req, res) => {
   try {
     const orderId = String(req.params.id || '');
-    const assignment = await assignmentForWorker(orderId, req.productionWorker.id);
-    if (!assignment) return res.status(404).json({ success: false, message: 'Conversa nao encontrada.' });
+    if (!await workerHasOrderAssignment(orderId, req.productionWorker.id)) return res.status(404).json({ success: false, message: 'Conversa nao encontrada.' });
     const message = text(req.body?.message, 1000);
     if (!message || containsUnsafeMarkup(message)) return res.status(400).json({ success: false, message: 'Mensagem invalida.' });
     const now = new Date().toISOString();
@@ -771,16 +829,22 @@ app.get('/api/production/assignments/:id', async (req, res) => {
 app.post('/api/production/assignments', async (req, res) => {
   try {
     const orderId = String(req.body?.orderId || '');
+    const productId = productionProductId(req.body?.productId);
     const workerId = String(req.body?.workerId || '');
     const order = await getOrderEvent(orderId);
     const worker = (await productionWorkers()).find(item => item.id === workerId && item.active !== false);
     if (!order) return res.status(404).json({ success: false, message: 'Ordem de producao nao encontrada.' });
+    const product = productForAssignment(order, productId);
+    if (req.body?.productId && !product) return res.status(400).json({ success: false, message: 'Produto da O.S. invalido.' });
     if (!worker) return res.status(400).json({ success: false, message: 'Selecione um colaborador ativo.' });
-    const oldDoc = await db.collection('production_assignments').doc(orderId).get();
+    const assignmentId = productionAssignmentId(orderId, productId);
+    const oldDoc = await db.collection('production_assignments').doc(assignmentId).get();
     const old = oldDoc.exists ? oldDoc.data() : {};
     const now = new Date().toISOString();
     const assignment = {
       orderId,
+      productId,
+      productName: product?.nome || '',
       workerId,
       workerName: worker.name,
       workerRole: worker.role,
@@ -797,12 +861,23 @@ app.post('/api/production/assignments', async (req, res) => {
           createdAt: now
         }] : [])
       ].slice(-50),
+      history: [
+        ...(Array.isArray(old.history) ? old.history : []),
+        assignmentHistoryEntry(old.workerId && old.workerId !== workerId ? 'transferred' : 'assigned', {
+          productId,
+          productName: product?.nome || '',
+          fromWorkerId: old.workerId || '',
+          fromWorkerName: old.workerName || '',
+          workerId,
+          workerName: worker.name
+        })
+      ].slice(-100),
       active: true,
       createdAt: old.createdAt || now,
       updatedAt: now
     };
     if (!assignment.steps.length) return res.status(400).json({ success: false, message: 'Selecione ao menos uma etapa.' });
-    await db.collection('production_assignments').doc(orderId).set(assignment);
+    await db.collection('production_assignments').doc(assignmentId).set(assignment);
     res.json({ success: true, assignment: sanitizeForResponse(assignment) });
   } catch (error) {
     console.error('Erro ao classificar OS:', error);
@@ -813,7 +888,9 @@ app.post('/api/production/assignments', async (req, res) => {
 app.post('/api/production/assignments/:id/unassign', async (req, res) => {
   try {
     const orderId = String(req.params.id || '');
-    const assignmentDoc = await db.collection('production_assignments').doc(orderId).get();
+    const productId = productionProductId(req.body?.productId);
+    const assignmentId = productionAssignmentId(orderId, productId);
+    const assignmentDoc = await db.collection('production_assignments').doc(assignmentId).get();
     if (!assignmentDoc.exists || assignmentDoc.data().active === false) {
       return res.status(404).json({ success: false, message: 'A O.S. ja esta na fila sem responsavel.' });
     }
@@ -826,9 +903,18 @@ app.post('/api/production/assignments/:id/unassign', async (req, res) => {
         ...(Array.isArray(old.transitions) ? old.transitions : []),
         { type: 'unassign', fromWorkerId: old.workerId, fromWorkerName: old.workerName, createdAt: now }
       ].slice(-50),
+      history: [
+        ...(Array.isArray(old.history) ? old.history : []),
+        assignmentHistoryEntry('unassigned', {
+          productId,
+          productName: old.productName || '',
+          fromWorkerId: old.workerId,
+          fromWorkerName: old.workerName
+        })
+      ].slice(-100),
       updatedAt: now
     };
-    await db.collection('production_assignments').doc(orderId).set(assignment);
+    await db.collection('production_assignments').doc(assignmentId).set(assignment);
     res.json({ success: true, assignment: sanitizeForResponse(assignment), message: 'O.S. devolvida para a fila de producao.' });
   } catch (error) {
     console.error('Erro ao desclassificar OS:', error);

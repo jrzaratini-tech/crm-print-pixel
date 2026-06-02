@@ -43,8 +43,8 @@
       const order = assignment.order;
       const card = document.createElement('article');
       card.className = `order ${isDone(assignment) ? 'done' : ''}`;
-      card.innerHTML = `<div class="row"><div><h2>${escapeHtml(order.numero)}</h2><p>${escapeHtml(order.cliente)}</p></div><span class="tag">${isDone(assignment) ? 'Concluído' : 'Em andamento'}</span></div><div class="meta"><span>Entrega: ${escapeHtml(order.dataEntrega || 'Não definida')}</span><span>Comissão: ${money(assignment.commission)}</span><span>${assignment.steps.filter(step => step.done).length}/${assignment.steps.length} etapas</span><span>${escapeHtml(order.empresa || '')}</span></div><button type="button">Abrir trabalho</button>`;
-      card.querySelector('button').addEventListener('click', () => openOrder(assignment.orderId));
+      card.innerHTML = `<div class="row"><div><h2>${escapeHtml(order.numero)}</h2><p>${escapeHtml(assignment.product?.nome || 'Serviço geral da O.S.')} · ${escapeHtml(order.cliente)}</p></div><span class="tag">${isDone(assignment) ? 'Concluído' : 'Em andamento'}</span></div><div class="meta"><span>Entrega: ${escapeHtml(order.dataEntrega || 'Não definida')}</span><span>Comissão: ${money(assignment.commission)}</span><span>${assignment.steps.filter(step => step.done).length}/${assignment.steps.length} etapas</span><span>${escapeHtml(order.empresa || '')}</span></div><button type="button">Abrir trabalho</button>`;
+      card.querySelector('button').addEventListener('click', () => openOrder(assignment.id));
       $('orderList').append(card);
     });
   }
@@ -74,14 +74,16 @@
     });
     node.scrollTop = node.scrollHeight;
   }
-  async function openOrder(orderId) {
-    currentOrderId = orderId;
-    const assignment = assignments.find(item => item.orderId === orderId);
+  async function openOrder(assignmentId) {
+    currentOrderId = assignmentId;
+    const assignment = assignments.find(item => item.id === assignmentId);
     if (!assignment) return;
+    const orderId = assignment.orderId;
     const order = assignment.order;
-    $('orderDetail').innerHTML = `<h2>${escapeHtml(order.numero)} · ${escapeHtml(order.cliente)}</h2><p>${escapeHtml(order.empresa)}</p><div class="box"><b>Informações do trabalho</b><p>Entrega: ${escapeHtml(order.dataEntrega || 'Não definida')}</p><p>Morada: ${escapeHtml(order.morada || 'Não informada')}</p><p>Contacto: ${escapeHtml(order.telemovel || 'Não informado')}</p><p>Comissão: <strong>${money(assignment.commission)}</strong></p><p>${escapeHtml(order.observacoes || '')}</p></div><div class="box"><b>Produtos</b>${order.produtos.map(product => `<div class="product"><strong>${escapeHtml(product.nome)}</strong><p>${escapeHtml(product.tamanho || '')} · Qtd. ${escapeHtml(product.quantidade)}</p><p>${escapeHtml(product.observacoes || '')}</p></div>`).join('')}</div><div class="box"><b>Etapas</b>${assignment.steps.map(step => `<label class="step"><input type="checkbox" data-step="${escapeHtml(step.id)}" ${step.done ? 'checked' : ''}><span>${escapeHtml(step.label)}</span></label>`).join('')}</div><div class="box"><b>Chat privado</b><div class="messages" id="messages"></div><form class="chat" id="chatForm"><input id="chatInput" maxlength="1000" required placeholder="Escreva uma mensagem"><button class="send">Enviar</button></form></div>`;
+    const products = assignment.product ? [assignment.product] : order.produtos;
+    $('orderDetail').innerHTML = `<h2>${escapeHtml(order.numero)} · ${escapeHtml(order.cliente)}</h2><p>${escapeHtml(order.empresa)}</p><div class="box"><b>Informações do trabalho</b><p>Entrega: ${escapeHtml(order.dataEntrega || 'Não definida')}</p><p>Morada: ${escapeHtml(order.morada || 'Não informada')}</p><p>Contacto: ${escapeHtml(order.telemovel || 'Não informado')}</p><p>Comissão: <strong>${money(assignment.commission)}</strong></p><p>${escapeHtml(order.observacoes || '')}</p></div><div class="box"><b>Artigo direcionado</b>${products.map(product => `<div class="product"><strong>${escapeHtml(product.nome)}</strong><p>${escapeHtml(product.tamanho || '')} · Qtd. ${escapeHtml(product.quantidade)}</p><p>${escapeHtml(product.observacoes || '')}</p></div>`).join('')}</div><div class="box"><b>Etapas</b>${assignment.steps.map(step => `<label class="step"><input type="checkbox" data-step="${escapeHtml(step.id)}" ${step.done ? 'checked' : ''}><span>${escapeHtml(step.label)}</span></label>`).join('')}</div><div class="box"><b>Chat privado</b><div class="messages" id="messages"></div><form class="chat" id="chatForm"><input id="chatInput" maxlength="1000" required placeholder="Escreva uma mensagem"><button class="send">Enviar</button></form></div>`;
     $('orderDetail').querySelectorAll('[data-step]').forEach(input => input.addEventListener('change', async event => {
-      await api(`/api/colaborador/ordens/${encodeURIComponent(orderId)}/etapas`, { method: 'POST', body: JSON.stringify({ stepId: event.target.dataset.step, done: event.target.checked }) });
+      await api(`/api/colaborador/ordens/${encodeURIComponent(orderId)}/etapas`, { method: 'POST', body: JSON.stringify({ productId: assignment.productId, stepId: event.target.dataset.step, done: event.target.checked }) });
       await load();
     }));
     $('chatForm').addEventListener('submit', async event => {
