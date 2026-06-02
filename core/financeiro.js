@@ -50,14 +50,15 @@
         const ano = data.getFullYear();
         const trimestre = Math.floor(data.getMonth() / 3) + 1;
         const mesInicial = (trimestre - 1) * 3;
+        const mesPrazo = trimestre === 2 ? 8 : mesInicial + 4;
 
         return {
             ano,
             trimestre,
             inicio: new Date(ano, mesInicial, 1),
             fim: new Date(ano, mesInicial + 3, 0, 23, 59, 59, 999),
-            entregaDeclaracao: new Date(ano, mesInicial + 4, 20),
-            pagamento: new Date(ano, mesInicial + 4, 25)
+            entregaDeclaracao: new Date(ano, mesPrazo, 20),
+            pagamento: new Date(ano, mesPrazo, 25)
         };
     }
 

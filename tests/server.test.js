@@ -44,15 +44,21 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   const moduleResult = await request('/core/custeio.js');
   const presetsResult = await request('/core/materiais-padrao.js');
   const financialResult = await request('/core/financeiro.js');
+  const fiscalQrResult = await request('/core/qr-fiscal.js');
   const pageResult = await request('/pages/materiais.html');
+  const scanPageResult = await request('/scan-fatura.html');
   assert.equal(moduleResult.response.status, 200);
   assert.equal(presetsResult.response.status, 200);
   assert.equal(financialResult.response.status, 200);
+  assert.equal(fiscalQrResult.response.status, 200);
   assert.equal(pageResult.response.status, 200);
+  assert.equal(scanPageResult.response.status, 200);
   assert.match(moduleResult.body, /calcularFicha/);
   assert.match(presetsResult.body, /Fonte de alimentação/);
   assert.match(financialResult.body, /faturamentoSemIva/);
+  assert.match(fiscalQrResult.body, /interpretar/);
   assert.match(pageResult.body, /Cadastro de Materiais/);
+  assert.match(scanPageResult.body, /Ler QR fiscal/);
 });
 
 test('salva, consulta com filtro por id e exclui registro', async () => {
@@ -91,6 +97,43 @@ test('rejeita upload inválido ou acima do limite', async () => {
     fileData: { tipo: 'image/jpeg', base64: Buffer.alloc(501 * 1024).toString('base64') }
   });
   assert.equal(large.response.status, 400);
+});
+
+test('recebe QR fiscal por sessão temporária para revisão no CRM', async () => {
+  const session = await post('/api/importacao-fiscal/session', {});
+  assert.equal(session.response.status, 200);
+  assert.match(session.body.token, /^[a-f0-9]{64}$/);
+
+  const received = await post('/api/importacao-fiscal/receber', {
+    token: session.body.token,
+    rawQr: 'A:501234567*B:509876543*D:FT*F:20260602*G:FT 2026/20*O:123.00*N:23.00'
+  });
+  assert.equal(received.response.status, 200);
+
+  const check = await request(`/api/importacao-fiscal/check?token=${session.body.token}`);
+  assert.equal(check.response.status, 200);
+  assert.equal(check.body.status, 'uploaded');
+  assert.equal(check.body.documento.valorBruto, 100);
+  assert.equal(check.body.documento.valorIVA, 23);
+});
+
+test('bloqueia importação fiscal duplicada', async () => {
+  await post('/api/database/commit', {
+    schema: 'despesa',
+    pageId: 'test',
+    payload: {
+      nifFornecedor: '501234567',
+      numeroFatura: 'FT 2026/21',
+      dataCompra: '2026-06-02',
+      valorTotal: 123
+    }
+  });
+  const session = await post('/api/importacao-fiscal/session', {});
+  const received = await post('/api/importacao-fiscal/receber', {
+    token: session.body.token,
+    rawQr: 'A:501234567*B:509876543*D:FT*F:20260602*G:FT 2026/21*O:123.00*N:23.00'
+  });
+  assert.equal(received.response.status, 409);
 });
 
 test('estatísticas respondem sem exigir índice composto do Firestore', async () => {

@@ -534,7 +534,7 @@
                 <div id="qrCodeDisplay"></div>
             </div>
 
-            <div class="qr-instructions">
+            <div class="qr-instructions" id="qrInstructions">
                 <strong>Como funciona:</strong>
                 <ol>
                     <li>Aponte a câmera do iPhone para o QR Code acima</li>
@@ -763,7 +763,11 @@
                             </button>
                             <button type="button" class="upload-option-btn active" id="uploadMobileBtn">
                                 <i class="fas fa-mobile-alt"></i>
-                                Celular (QR Code)
+                                Celular (Foto)
+                            </button>
+                            <button type="button" class="upload-option-btn" id="scanFiscalBtn">
+                                <i class="fas fa-qrcode"></i>
+                                Ler QR Fiscal
                             </button>
                         </div>
                         
@@ -789,6 +793,10 @@
             <input type="hidden" id="despesaTipoArquivo" data-bind="despesa.tipoArquivo" value="">
             <input type="hidden" id="despesaTamanhoOriginal" data-bind="despesa.tamanhoOriginal" value="">
             <input type="hidden" id="despesaTamanhoOtimizado" data-bind="despesa.tamanhoOtimizado" value="">
+            <input type="hidden" id="despesaOrigemLancamento" data-bind="despesa.origemLancamento" value="manual">
+            <input type="hidden" id="despesaQrFiscal" data-bind="despesa.qrFiscal" value="">
+            <input type="hidden" id="despesaNifAdquirente" data-bind="despesa.nifAdquirente" value="">
+            <input type="hidden" id="despesaTipoDocumento" data-bind="despesa.tipoDocumento" value="">
             
             <div class="form-actions">
                 <button type="button" class="btn-cancel" id="cancelBtn">CANCELAR</button>
@@ -797,6 +805,7 @@
         </form>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <script>
         // ============================================
         // SISTEMA DE DESPESAS COM QR CODE AUTOMÁTICO - CORRIGIDO
@@ -815,6 +824,7 @@
             let uploadSessionId = '';
             let qrCodeCheckInterval = null;
             let temporaryDespesaId = '';
+            let qrMode = 'photo';
             
             // Referências DOM
             const despesaForm = document.getElementById('despesaForm');
@@ -829,6 +839,7 @@
             const filePreview = document.getElementById('filePreview');
             const uploadPcBtn = document.getElementById('uploadPcBtn');
             const uploadMobileBtn = document.getElementById('uploadMobileBtn');
+            const scanFiscalBtn = document.getElementById('scanFiscalBtn');
             
             // QR Code elements
             const qrModalOverlay = document.getElementById('qrModalOverlay');
@@ -836,6 +847,7 @@
             const qrCloseBtn = document.getElementById('qrCloseBtn');
             const qrRefreshBtn = document.getElementById('qrRefreshBtn');
             const qrStatus = document.getElementById('qrStatus');
+            const qrInstructions = document.getElementById('qrInstructions');
             
             // Elementos para cálculo
             const valorBrutoInput = document.getElementById('valorBruto');
@@ -856,6 +868,10 @@
             const tipoArquivoHidden = document.getElementById('despesaTipoArquivo');
             const tamanhoOriginalHidden = document.getElementById('despesaTamanhoOriginal');
             const tamanhoOtimizadoHidden = document.getElementById('despesaTamanhoOtimizado');
+            const origemLancamentoHidden = document.getElementById('despesaOrigemLancamento');
+            const qrFiscalHidden = document.getElementById('despesaQrFiscal');
+            const nifAdquirenteHidden = document.getElementById('despesaNifAdquirente');
+            const tipoDocumentoHidden = document.getElementById('despesaTipoDocumento');
             
             // ============================================
             // INICIALIZAÇÃO
@@ -892,6 +908,7 @@
             }
             
             function gerarQRCode() {
+                qrMode = 'photo';
                 // Se estiver em modo de edição, usar o currentDespesaId
                 // Se for nova despesa, gerar um ID temporário
                 const sessionId = gerarUploadSession();
@@ -905,6 +922,14 @@
                 
                 // URL que será escaneada pelo iPhone
                 const uploadUrl = `${window.location.origin}/upload-mobile.html?session=${sessionId}&despesa=${encodeURIComponent(temporaryDespesaId)}&edit=${isEditMode ? 'true' : 'false'}`;
+                qrInstructions.innerHTML = `
+                    <strong>Como funciona:</strong>
+                    <ol>
+                        <li>Aponte a câmera do celular para o QR Code acima</li>
+                        <li>Abra o link e tire uma foto da nota</li>
+                        <li>A imagem será anexada à despesa atual</li>
+                    </ol>
+                `;
                 
                 console.log('🔗 URL para QR Code:', uploadUrl);
                 console.log('📋 ID da despesa:', temporaryDespesaId);
@@ -916,15 +941,14 @@
                         <div style="margin-bottom: 15px; color: #64748b; font-size: 14px;">
                             <i class="fas fa-qrcode"></i> Código: ${sessionId.substring(0, 8)}
                         </div>
-                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(uploadUrl)}" 
-                             alt="QR Code" 
-                             style="width: 200px; height: 200px; border: 1px solid #e2e8f0; border-radius: 8px;">
+                        <div id="photoQrLocal" style="display: inline-block; padding: 6px; border: 1px solid #e2e8f0; border-radius: 8px;"></div>
                         <div style="margin-top: 15px; color: #64748b; font-size: 12px;">
                             Válido por 15 minutos
                         </div>
                         ${isEditMode ? '<div style="margin-top: 10px; color: #3b82f6; font-size: 12px; font-weight: bold;"><i class="fas fa-edit"></i> Modo Edição</div>' : ''}
                     </div>
                 `;
+                new QRCode(document.getElementById('photoQrLocal'), { text: uploadUrl, width: 200, height: 200 });
                 
                 // Armazenar sessão no localStorage para verificação
                 localStorage.setItem('uploadSession_' + sessionId, JSON.stringify({
@@ -946,6 +970,91 @@
                 qrStatus.style.display = 'block';
                 
                 showMessage('QR Code gerado! Escaneie com o iPhone.', 'success');
+            }
+
+            async function gerarQRCodeFiscal() {
+                try {
+                    qrMode = 'fiscal';
+                    if (qrCodeCheckInterval) clearInterval(qrCodeCheckInterval);
+                    const response = await fetch('/api/importacao-fiscal/session', { method: 'POST' });
+                    const session = await response.json();
+                    if (!response.ok || !session.mobileUrl) throw new Error(session.message || 'Não foi possível criar a sessão fiscal.');
+
+                    qrInstructions.innerHTML = `
+                        <strong>Como funciona:</strong>
+                        <ol>
+                            <li>Aponte a câmera do celular para o QR Code acima</li>
+                            <li>Abra o link e leia o QR fiscal impresso na fatura</li>
+                            <li>Volte ao CRM e revise todos os campos antes de salvar</li>
+                        </ol>
+                    `;
+                    qrCodeDisplay.innerHTML = `
+                        <div style="text-align: center;">
+                            <div style="margin-bottom: 15px; color: #64748b; font-size: 14px;">
+                                <i class="fas fa-file-invoice"></i> Importação fiscal segura
+                            </div>
+                            <div id="fiscalQrLocal" style="display: inline-block; padding: 6px; border: 1px solid #e2e8f0; border-radius: 8px;"></div>
+                            <div style="margin-top: 15px; color: #64748b; font-size: 12px;">Válido por 15 minutos</div>
+                        </div>
+                    `;
+                    new QRCode(document.getElementById('fiscalQrLocal'), { text: session.mobileUrl, width: 200, height: 200 });
+                    qrModalOverlay.classList.add('active');
+                    qrStatus.className = 'qr-status pending';
+                    qrStatus.innerHTML = '<i class="fas fa-clock"></i> Aguardando leitura do QR fiscal pelo celular...';
+                    qrStatus.style.display = 'block';
+                    iniciarVerificacaoFiscal(session.token);
+                } catch (error) {
+                    showMessage(error.message, 'error');
+                }
+            }
+
+            function iniciarVerificacaoFiscal(token) {
+                if (qrCodeCheckInterval) clearInterval(qrCodeCheckInterval);
+                let checkCount = 0;
+                qrCodeCheckInterval = setInterval(async () => {
+                    if (++checkCount > 300) {
+                        clearInterval(qrCodeCheckInterval);
+                        qrStatus.className = 'qr-status error';
+                        qrStatus.textContent = 'Sessão fiscal expirada. Gere um novo código.';
+                        return;
+                    }
+                    try {
+                        const response = await fetch(`/api/importacao-fiscal/check?token=${encodeURIComponent(token)}`);
+                        const result = await response.json();
+                        if (result.status === 'uploaded' && result.documento) {
+                            clearInterval(qrCodeCheckInterval);
+                            preencherComQrFiscal(result.documento);
+                            qrStatus.className = 'qr-status success';
+                            qrStatus.innerHTML = '<i class="fas fa-check-circle"></i> Dados recebidos. Revise o formulário antes de salvar.';
+                            setTimeout(() => qrModalOverlay.classList.remove('active'), 1800);
+                        } else if (result.status === 'expired' || result.status === 'error') {
+                            clearInterval(qrCodeCheckInterval);
+                            qrStatus.className = 'qr-status error';
+                            qrStatus.textContent = result.message || 'Não foi possível importar a fatura.';
+                        }
+                    } catch (error) {
+                        if (checkCount % 10 === 0) console.log('Aguardando leitura fiscal...', error.message);
+                    }
+                }, 3000);
+            }
+
+            function preencherComQrFiscal(documento) {
+                document.getElementById('nifFornecedor').value = documento.nifEmitente || '';
+                document.getElementById('numeroFatura').value = documento.numeroFatura || '';
+                document.getElementById('dataCompra').value = documento.dataCompra || '';
+                document.getElementById('fornecedor').value ||= `Fornecedor NIF ${documento.nifEmitente || ''}`;
+                document.getElementById('descricao').value ||= `Fatura ${documento.numeroFatura || ''}`.trim();
+                valorBrutoInput.value = documento.valorBruto || 0;
+                valorTotalHidden.value = documento.valorTotal || 0;
+                valorIVAHidden.value = documento.valorIVA || 0;
+                ivaSimRadio.checked = Number(documento.valorIVA || 0) > 0;
+                ivaNaoRadio.checked = !ivaSimRadio.checked;
+                origemLancamentoHidden.value = 'qr_fiscal';
+                qrFiscalHidden.value = documento.rawQr || '';
+                nifAdquirenteHidden.value = documento.nifAdquirente || '';
+                tipoDocumentoHidden.value = documento.tipoDocumento || '';
+                calcularTotais();
+                showMessage('Fatura lida pelo QR fiscal. Revise os campos e confirme o lançamento.', 'success');
             }
             
             function iniciarVerificacaoUpload(sessionId, despesaId) {
@@ -1072,6 +1181,7 @@
                 uploadPcBtn.addEventListener('click', () => {
                     uploadPcBtn.classList.add('active');
                     uploadMobileBtn.classList.remove('active');
+                    scanFiscalBtn.classList.remove('active');
                     notaFiscalInput.style.display = 'block';
                     notaFiscalInput.click();
                 });
@@ -1079,6 +1189,7 @@
                 uploadMobileBtn.addEventListener('click', () => {
                     uploadMobileBtn.classList.add('active');
                     uploadPcBtn.classList.remove('active');
+                    scanFiscalBtn.classList.remove('active');
                     notaFiscalInput.style.display = 'none';
                     
                     // 🔥 CRÍTICO: Verificar se estamos em modo de edição
@@ -1090,6 +1201,14 @@
                     
                     gerarQRCode();
                 });
+
+                scanFiscalBtn.addEventListener('click', () => {
+                    scanFiscalBtn.classList.add('active');
+                    uploadPcBtn.classList.remove('active');
+                    uploadMobileBtn.classList.remove('active');
+                    notaFiscalInput.style.display = 'none';
+                    gerarQRCodeFiscal();
+                });
                 
                 // QR Code modal
                 qrCloseBtn.addEventListener('click', () => {
@@ -1100,7 +1219,7 @@
                     }
                 });
                 
-                qrRefreshBtn.addEventListener('click', gerarQRCode);
+                qrRefreshBtn.addEventListener('click', () => qrMode === 'fiscal' ? gerarQRCodeFiscal() : gerarQRCode());
                 
                 qrModalOverlay.addEventListener('click', (e) => {
                     if (e.target === qrModalOverlay) {
@@ -1113,9 +1232,18 @@
                 });
                 
                 // Cálculo automático de totais
-                valorBrutoInput.addEventListener('input', calcularTotais);
-                ivaSimRadio.addEventListener('change', calcularTotais);
-                ivaNaoRadio.addEventListener('change', calcularTotais);
+                valorBrutoInput.addEventListener('input', () => {
+                    origemLancamentoHidden.value = 'manual';
+                    calcularTotais();
+                });
+                ivaSimRadio.addEventListener('change', () => {
+                    origemLancamentoHidden.value = 'manual';
+                    calcularTotais();
+                });
+                ivaNaoRadio.addEventListener('change', () => {
+                    origemLancamentoHidden.value = 'manual';
+                    calcularTotais();
+                });
                 
                 // Status de pagamento condicional
                 statusPagoRadio.addEventListener('change', (e) => {
@@ -1214,6 +1342,13 @@
             function calcularTotais() {
                 const valorBruto = parseFloat(valorBrutoInput.value) || 0;
                 ivaDedutivelInput.disabled = !ivaSimRadio.checked;
+
+                if (origemLancamentoHidden.value === 'qr_fiscal') {
+                    valorBrutoDisplay.textContent = formatarMoeda(valorBruto);
+                    valorIVADisplay.textContent = formatarMoeda(parseFloat(valorIVAHidden.value) || 0);
+                    valorTotalDisplay.textContent = formatarMoeda(parseFloat(valorTotalHidden.value) || valorBruto);
+                    return;
+                }
                 
                 if (ivaSimRadio.checked) {
                     const valorComIVA = valorBruto * 1.23;
@@ -1290,6 +1425,13 @@
                     document.getElementById('observacoes').value = despesa.observacoes || '';
                     document.getElementById('telefone').value = despesa.telefone || '';
                     document.getElementById('nifFornecedor').value = despesa.nifFornecedor || '';
+                    document.getElementById('numeroFatura').value = despesa.numeroFatura || '';
+                    valorTotalHidden.value = despesa.valorTotal || 0;
+                    valorIVAHidden.value = despesa.valorIVA || 0;
+                    origemLancamentoHidden.value = despesa.origemLancamento || 'manual';
+                    qrFiscalHidden.value = despesa.qrFiscal || '';
+                    nifAdquirenteHidden.value = despesa.nifAdquirente || '';
+                    tipoDocumentoHidden.value = despesa.tipoDocumento || '';
                     
                     // Status de pagamento
                     if (despesa.statusPagamento) {

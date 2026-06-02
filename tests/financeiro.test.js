@@ -36,9 +36,9 @@ test('apura IVA trimestral de vendas e compras dedutiveis', () => {
   assert.equal(resumo.saldo, 2070);
   assert.equal(resumo.situacao, 'pagar');
   assert.equal(resumo.entregaDeclaracao.getDate(), 20);
-  assert.equal(resumo.entregaDeclaracao.getMonth(), 7);
+  assert.equal(resumo.entregaDeclaracao.getMonth(), 8);
   assert.equal(resumo.pagamento.getDate(), 25);
-  assert.equal(resumo.pagamento.getMonth(), 7);
+  assert.equal(resumo.pagamento.getMonth(), 8);
 });
 
 test('identifica credito trimestral de IVA a recuperar', () => {

@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const { db } = require('./firebase.js');
+const QR_FISCAL = require('./core/qr-fiscal.js');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -10,6 +11,7 @@ const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const AUTH_DISABLED = process.env.CRM_AUTH_DISABLED === 'true';
 const CRM_USERNAME = process.env.CRM_USERNAME || '';
 const CRM_PASSWORD = process.env.CRM_PASSWORD || '';
+const CRM_COMPANY_NIF = String(process.env.CRM_COMPANY_NIF || '').replace(/\D/g, '');
 const MAX_QUERY_LIMIT = 500;
 const MAX_UPLOAD_BYTES = 500 * 1024;
 const UPLOAD_TTL_MS = 15 * 60 * 1000;
@@ -105,7 +107,7 @@ app.set('trust proxy', 1);
 app.use((req, res, next) => {
   res.set({
     'Cache-Control': 'no-store',
-    'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data: https://api.qrserver.com; font-src 'self' data: https://cdnjs.cloudflare.com; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'",
+    'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; img-src 'self' data:; font-src 'self' data: https://cdnjs.cloudflare.com; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'",
     'Cross-Origin-Opener-Policy': 'same-origin',
     'Referrer-Policy': 'no-referrer',
     'X-Content-Type-Options': 'nosniff',
@@ -123,6 +125,64 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '1mb' }));
 app.use('/api', requestRateLimit({ windowMs: 60 * 1000, max: 180 }));
+
+function mobileSessionExpired(session) {
+  return !session || Date.now() > new Date(session.expiresAt || 0).getTime();
+}
+
+async function findDuplicateExpense(documento) {
+  const snapshot = await db.collection('events').get();
+  return snapshot.docs.some(doc => {
+    const data = doc.data();
+    const payload = data.payload || {};
+    return !data.deleted
+      && data.schema === 'despesa'
+      && String(payload.nifFornecedor || '').replace(/\D/g, '') === documento.nifEmitente
+      && String(payload.numeroFatura || '').trim() === documento.numeroFatura
+      && String(payload.dataCompra || payload.data || '').slice(0, 10) === documento.dataCompra
+      && Math.abs(Number(payload.valorTotal || 0) - documento.valorTotal) < 0.01;
+  });
+}
+
+app.get('/scan-fatura.html', (req, res) => res.sendFile(path.join(__dirname, 'scan-fatura.html')));
+
+app.post('/api/importacao-fiscal/receber', async (req, res) => {
+  try {
+    const token = String(req.body?.token || '');
+    const rawQr = String(req.body?.rawQr || '');
+    if (!isSafeIdentifier(token, 100) || rawQr.length < 10 || rawQr.length > 4000) {
+      return res.status(400).json({ success: false, message: 'Sessão ou QR fiscal inválido.' });
+    }
+
+    const sessionRef = db.collection('qr_import_sessions').doc(token);
+    const sessionDoc = await sessionRef.get();
+    const session = sessionDoc.exists ? sessionDoc.data() : null;
+    if (mobileSessionExpired(session)) {
+      if (sessionDoc.exists) await sessionRef.delete();
+      return res.status(410).json({ success: false, message: 'Sessão expirada. Gere um novo QR Code no CRM.' });
+    }
+    if (session.status !== 'waiting') return res.status(409).json({ success: false, message: 'Esta sessão já foi utilizada.' });
+
+    const documento = QR_FISCAL.interpretar(rawQr);
+    const erros = QR_FISCAL.validar(documento, CRM_COMPANY_NIF);
+    if (erros.length) return res.status(400).json({ success: false, message: erros.join(' ') });
+    if (await findDuplicateExpense(documento)) {
+      return res.status(409).json({ success: false, message: 'Esta fatura já está cadastrada no CRM.' });
+    }
+
+    await sessionRef.set({
+      ...session,
+      status: 'uploaded',
+      documento,
+      receivedAt: new Date().toISOString()
+    });
+    res.json({ success: true, message: 'Fatura recebida. Confirme os dados no CRM.' });
+  } catch (error) {
+    console.error('Erro ao receber QR fiscal:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível receber o QR fiscal.' });
+  }
+});
+
 app.use(requireAuth);
 
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
@@ -135,6 +195,49 @@ app.get('/api/database/init', async (req, res) => {
   } catch (error) {
     console.error('Erro Firebase:', error);
     res.status(500).json({ status: 'error', message: 'Erro ao conectar ao Firebase.' });
+  }
+});
+
+app.post('/api/importacao-fiscal/session', async (req, res) => {
+  try {
+    const token = crypto.randomBytes(32).toString('hex');
+    const now = Date.now();
+    await db.collection('qr_import_sessions').doc(token).set({
+      token,
+      status: 'waiting',
+      createdAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + UPLOAD_TTL_MS).toISOString()
+    });
+    res.json({
+      success: true,
+      token,
+      expiresAt: new Date(now + UPLOAD_TTL_MS).toISOString(),
+      mobileUrl: `${req.protocol}://${req.get('host')}/scan-fatura.html?token=${encodeURIComponent(token)}`
+    });
+  } catch (error) {
+    console.error('Erro ao criar sessão fiscal:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível criar a sessão fiscal.' });
+  }
+});
+
+app.get('/api/importacao-fiscal/check', async (req, res) => {
+  try {
+    const token = String(req.query.token || '');
+    if (!isSafeIdentifier(token, 100)) return res.status(400).json({ status: 'error', message: 'Sessão inválida.' });
+    const sessionRef = db.collection('qr_import_sessions').doc(token);
+    const sessionDoc = await sessionRef.get();
+    if (!sessionDoc.exists) return res.json({ status: 'waiting' });
+    const session = sessionDoc.data();
+    if (mobileSessionExpired(session)) {
+      await sessionRef.delete();
+      return res.status(410).json({ status: 'expired', message: 'Sessão expirada.' });
+    }
+    if (session.status !== 'uploaded') return res.json({ status: 'waiting' });
+    await sessionRef.delete();
+    res.json({ status: 'uploaded', documento: session.documento });
+  } catch (error) {
+    console.error('Erro ao verificar QR fiscal:', error);
+    res.status(500).json({ status: 'error', message: 'Não foi possível verificar a importação fiscal.' });
   }
 });
 
@@ -314,6 +417,7 @@ app.get('/core/security.js', (req, res) => res.sendFile(path.join(__dirname, 'co
 app.get('/core/custeio.js', (req, res) => res.sendFile(path.join(__dirname, 'core', 'custeio.js')));
 app.get('/core/materiais-padrao.js', (req, res) => res.sendFile(path.join(__dirname, 'core', 'materiais-padrao.js')));
 app.get('/core/financeiro.js', (req, res) => res.sendFile(path.join(__dirname, 'core', 'financeiro.js')));
+app.get('/core/qr-fiscal.js', (req, res) => res.sendFile(path.join(__dirname, 'core', 'qr-fiscal.js')));
 app.get('/menu/menu.config.js', (req, res) => res.sendFile(path.join(__dirname, 'menu', 'menu.config.js')));
 
 if (require.main === module) {
