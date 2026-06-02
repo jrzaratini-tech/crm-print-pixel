@@ -637,6 +637,17 @@
                             </div>
                         </div>
                     </div>
+
+                    <div class="form-group">
+                        <label>Dedução fiscal</label>
+                        <div class="radio-group">
+                            <div class="radio-option">
+                                <input type="checkbox" id="ivaDedutivel" data-bind="despesa.ivaDedutivel" checked>
+                                <label for="ivaDedutivel">IVA dedutível nesta compra</label>
+                            </div>
+                        </div>
+                        <div class="field-note">Desmarque quando a fatura não conferir direito à dedução. Confirme com a contabilidade em caso de dúvida.</div>
+                    </div>
                     
                     <div class="form-group">
                         <label>Status do Pagamento</label>
@@ -830,6 +841,7 @@
             const valorBrutoInput = document.getElementById('valorBruto');
             const ivaSimRadio = document.getElementById('ivaSim');
             const ivaNaoRadio = document.getElementById('ivaNao');
+            const ivaDedutivelInput = document.getElementById('ivaDedutivel');
             const statusPagoRadio = document.getElementById('statusPago');
             const statusPendenteRadio = document.getElementById('statusPendente');
             const valorBrutoDisplay = document.getElementById('valorBrutoDisplay');
@@ -1201,6 +1213,7 @@
             
             function calcularTotais() {
                 const valorBruto = parseFloat(valorBrutoInput.value) || 0;
+                ivaDedutivelInput.disabled = !ivaSimRadio.checked;
                 
                 if (ivaSimRadio.checked) {
                     const valorComIVA = valorBruto * 1.23;
@@ -1303,6 +1316,8 @@
                         const ivaRadio = comIVA ? ivaSimRadio : ivaNaoRadio;
                         if (ivaRadio) ivaRadio.checked = true;
                     }
+
+                    ivaDedutivelInput.checked = despesa.ivaDedutivel !== false && despesa.ivaDedutivel !== 'nao';
                     
                     // Categoria "Outros"
                     if (despesa.categoria === 'OUTROS' && despesa.outraCategoria) {

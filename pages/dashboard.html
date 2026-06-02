@@ -246,6 +246,10 @@
             border-left-color: #f44336;
             border-top: 4px solid #f44336;
         }
+        .metric-card.iva {
+            border-left-color: #7c3aed;
+            border-top: 4px solid #7c3aed;
+        }
         
         .metric-header {
             display: flex;
@@ -302,7 +306,8 @@
         .metric-value.receber { color: #4caf50; }
         .metric-value.pagar { color: #f44336; }
         
-        .metric-value.hidden {
+        .metric-value.hidden,
+        .sensitive-value.hidden {
             filter: blur(8px);
             user-select: none;
         }
@@ -658,7 +663,7 @@
         <div class="dashboard-grid">
             <div class="metric-card sales">
                 <div class="metric-header">
-                    <div class="metric-title">Faturamento Líquido do Mês</div>
+                    <div class="metric-title">Faturamento do Mês</div>
                     <div class="metric-icon sales">
                         <i class="fas fa-euro-sign"></i>
                     </div>
@@ -666,7 +671,7 @@
                 <div class="metric-value sales" data-bind="vendas.total">€0,00</div>
                 <div class="metric-change">
                     <i class="fas fa-arrow-up positive"></i>
-                    <span class="positive" data-bind="vendas.variacao">+0.0%</span> vs mês anterior
+                    Líquido: <span class="sensitive-value" data-bind="vendas.liquido">€0,00</span> | Bruto: <span class="sensitive-value" data-bind="vendas.bruto">€0,00</span>
                 </div>
             </div>
             
@@ -758,6 +763,28 @@
                 <div class="progress-labels">
                     <span>€0</span>
                     <span data-bind="equilibrio.meta">Meta: €10.000,00</span>
+                </div>
+            </div>
+
+            <div class="metric-card iva">
+                <div class="metric-header">
+                    <div class="metric-title">Estimativa Trimestral de IVA</div>
+                    <div class="metric-icon">
+                        <i class="fas fa-landmark"></i>
+                    </div>
+                </div>
+                <div class="metric-value" data-bind="iva.saldo">€0,00</div>
+                <div class="metric-change">
+                    <span data-bind="iva.situacao">Sem saldo estimado</span>
+                </div>
+                <div class="metric-change">
+                    <span class="sensitive-value" data-bind="iva.detalhe">IVA vendas: €0,00 | IVA dedutível: €0,00</span>
+                </div>
+                <div class="metric-change">
+                    <span data-bind="iva.prazo">Declaração: --/--/----</span>
+                </div>
+                <div class="metric-change">
+                    <span>Regime normal trimestral estimado. Validar com contabilista.</span>
                 </div>
             </div>
         </div>
@@ -943,7 +970,7 @@
             
             // Aplicar modo privacidade
             function aplicarModoPrivacidade(privado) {
-                const elementos = document.querySelectorAll('.metric-value, .equilibrium-stat-value');
+                const elementos = document.querySelectorAll('.metric-value, .equilibrium-stat-value, .sensitive-value');
                 
                 elementos.forEach(elemento => {
                     if (privado) {
@@ -978,8 +1005,8 @@
                     }
                     
                     // Para despesas: priorizar data da despesa se existir
-                    if (evento.schema === 'despesa' && evento.payload?.dataDespesa) {
-                        dataParaFiltragem = evento.payload.dataDespesa;
+                    if (evento.schema === 'despesa' && (evento.payload?.dataCompra || evento.payload?.dataDespesa)) {
+                        dataParaFiltragem = evento.payload.dataCompra || evento.payload.dataDespesa;
                     }
                     
                     // Adicionar campo especial para filtragem que NUNCA muda
@@ -1180,6 +1207,7 @@
                 console.log('📊 Processando eventos para dashboard:', eventos.length, 'eventos');
                 
                 let totalVendas = 0;
+                let totalVendasBruto = 0;
                 let totalPedidosValor = 0;
                 let pedidosAtivos = 0;
                 let pedidosConcluidos = 0;
@@ -1237,6 +1265,7 @@
                         if (!isNaN(valorTotal) && valorTotal > 0) {
                             // Contabilizar vendas
                             totalVendas += valorFaturamento;
+                            totalVendasBruto += valorTotal;
                             totalPedidosValor += valorFaturamento;
                             
                             // Calcular saldo pendente
@@ -1478,10 +1507,13 @@
                 
                 const margemContribuicao = Math.max(1, parseFloat(configuracaoEquilibrio.margemContribuicao) || 50) / 100;
                 const metaEquilibrio = (parseFloat(configuracaoEquilibrio.custosFixos) || 0) / margemContribuicao;
+                const resumoIva = FINANCEIRO.resumoIvaTrimestral(todosEventosComTimestampsCorrigidos, agora);
 
                 return {
                     vendas: {
                         total: totalVendas,
+                        liquido: totalVendas,
+                        bruto: totalVendasBruto,
                         variacao: variacaoVendas.toFixed(1)
                     },
                     pedidos: {
@@ -1503,6 +1535,7 @@
                         receber: totalAReceber,
                         pagar: totalAPagar
                     },
+                    iva: resumoIva,
                     vendasPorCategoria: topVendasCategorias,
                     despesasPorCategoria: topDespesasCategorias,
                     historicoMensal: historicoMensal,
@@ -1539,6 +1572,8 @@
                 // Atualizar todas as métricas
                 const elementos = {
                     vendas: document.querySelector('[data-bind="vendas.total"]'),
+                    vendasLiquido: document.querySelector('[data-bind="vendas.liquido"]'),
+                    vendasBruto: document.querySelector('[data-bind="vendas.bruto"]'),
                     despesas: document.querySelector('[data-bind="despesas.total"]'),
                     receber: document.querySelector('[data-bind="contas.receber"]'),
                     pagar: document.querySelector('[data-bind="contas.pagar"]'),
@@ -1556,6 +1591,14 @@
                 if (elementos.vendas) {
                     elementos.vendas.textContent = formatarMoeda(dados.vendas.total);
                 }
+
+                if (elementos.vendasLiquido) {
+                    elementos.vendasLiquido.textContent = formatarMoeda(dados.vendas.liquido);
+                }
+
+                if (elementos.vendasBruto) {
+                    elementos.vendasBruto.textContent = formatarMoeda(dados.vendas.bruto);
+                }
                 
                 if (elementos.despesas) {
                     elementos.despesas.textContent = formatarMoeda(dados.despesas.total);
@@ -1567,6 +1610,26 @@
                 
                 if (elementos.pagar) {
                     elementos.pagar.textContent = formatarMoeda(dados.contas?.pagar || 0);
+                }
+
+                const ivaSaldo = document.querySelector('[data-bind="iva.saldo"]');
+                const ivaSituacao = document.querySelector('[data-bind="iva.situacao"]');
+                const ivaDetalhe = document.querySelector('[data-bind="iva.detalhe"]');
+                const ivaPrazo = document.querySelector('[data-bind="iva.prazo"]');
+                const formatarData = data => new Intl.DateTimeFormat('pt-PT').format(data);
+                if (ivaSaldo) ivaSaldo.textContent = formatarMoeda(Math.abs(dados.iva.saldo));
+                if (ivaSituacao) {
+                    ivaSituacao.textContent = dados.iva.situacao === 'pagar'
+                        ? `Estimativa a pagar - ${dados.iva.trimestre}.º trimestre`
+                        : dados.iva.situacao === 'receber'
+                            ? `Crédito estimado a recuperar - ${dados.iva.trimestre}.º trimestre`
+                            : `Sem saldo estimado - ${dados.iva.trimestre}.º trimestre`;
+                }
+                if (ivaDetalhe) {
+                    ivaDetalhe.textContent = `IVA vendas: ${formatarMoeda(dados.iva.ivaVendas)} | IVA dedutível: ${formatarMoeda(dados.iva.ivaComprasDedutivel)}`;
+                }
+                if (ivaPrazo) {
+                    ivaPrazo.textContent = `Declaração até ${formatarData(dados.iva.entregaDeclaracao)} | Pagamento até ${formatarData(dados.iva.pagamento)}`;
                 }
                 
                 // Atualizar variações
