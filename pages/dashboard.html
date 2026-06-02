@@ -2,6 +2,7 @@
 <html lang="pt">
 <head>
     <script src="../core/security.js"></script>
+    <script src="../core/financeiro.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PrintPixel - Dashboard Profissional</title>
@@ -657,7 +658,7 @@
         <div class="dashboard-grid">
             <div class="metric-card sales">
                 <div class="metric-header">
-                    <div class="metric-title">Vendas do Mês</div>
+                    <div class="metric-title">Faturamento Líquido do Mês</div>
                     <div class="metric-icon sales">
                         <i class="fas fa-euro-sign"></i>
                     </div>
@@ -734,7 +735,7 @@
                 <div class="equilibrium-stats">
                     <div class="equilibrium-stat">
                         <div class="equilibrium-stat-value" data-bind="equilibrio.atingido">€0,00</div>
-                        <div class="equilibrium-stat-label">Vendas do Mês</div>
+                        <div class="equilibrium-stat-label">Faturamento Líquido</div>
                     </div>
                     <div class="equilibrium-stat">
                         <div class="equilibrium-stat-value" data-bind="equilibrio.meta">€10.000,00</div>
@@ -1228,14 +1229,15 @@
                     
                     // CORREÇÃO CRÍTICA: Processar pedidos
                     if (evento.schema === 'pedido') {
-                        const valorTotal = parseFloat(evento.payload?.total || evento.payload?.valorTotal || 0);
+                        const valorTotal = FINANCEIRO.totalComIva(evento.payload);
+                        const valorFaturamento = FINANCEIRO.faturamentoSemIva(evento.payload);
                         const totalPago = parseFloat(evento.payload?.totalPago || evento.payload?.pago || 0);
                         const status = evento.payload?.status || 'pendente';
                         
                         if (!isNaN(valorTotal) && valorTotal > 0) {
                             // Contabilizar vendas
-                            totalVendas += valorTotal;
-                            totalPedidosValor += valorTotal;
+                            totalVendas += valorFaturamento;
+                            totalPedidosValor += valorFaturamento;
                             
                             // Calcular saldo pendente
                             const saldoPendente = Math.max(0, valorTotal - totalPago);
@@ -1274,7 +1276,7 @@
                             
                             // Verificar se é do mês anterior para cálculo de variação
                             if (dataEvento >= dataInicioMesAnterior && dataEvento <= dataFimMesAnterior) {
-                                vendasMesAnterior += valorTotal;
+                                vendasMesAnterior += valorFaturamento;
                             }
                         }
                         
@@ -1335,7 +1337,7 @@
                         }
                         
                         if (evento.schema === 'pedido') {
-                            const valor = parseFloat(evento.payload?.total || evento.payload?.valorTotal || 0);
+                            const valor = FINANCEIRO.faturamentoSemIva(evento.payload);
                             if (!isNaN(valor)) meses[chaveMes].vendas += valor;
                         } else if (evento.schema === 'despesa') {
                             let valorDespesa = 0;
@@ -1362,7 +1364,7 @@
                         }
                         
                         if (evento.schema === 'pedido') {
-                            const valor = parseFloat(evento.payload?.total || evento.payload?.valorTotal || 0);
+                            const valor = FINANCEIRO.faturamentoSemIva(evento.payload);
                             if (!isNaN(valor)) meses12[chaveMes].vendas += valor;
                         } else if (evento.schema === 'despesa') {
                             let valorDespesa = 0;

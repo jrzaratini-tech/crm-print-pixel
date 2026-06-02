@@ -740,7 +740,7 @@
         let productIndex = 0;
         let isEditMode = false;
         let currentOrcamentoId = '';
-        let margemMinimaOrcamento = 25;
+        let margemMinimaOrcamento = 50;
         let catalogoMateriais = [];
         let technicalProductRow = null;
         
@@ -1402,9 +1402,9 @@
                 });
                 const configData = await configResponse.json();
                 const configEvent = (configData.events || [])[0];
-                if (configEvent && configEvent.payload) margemMinimaOrcamento = parseFloat(configEvent.payload.margemMinima) || 25;
+                if (configEvent && configEvent.payload) margemMinimaOrcamento = parseFloat(configEvent.payload.margemMinima) || 50;
             } catch (error) {
-                console.warn('Configuração de margem não disponível; usando padrão de 25%.');
+                console.warn('Configuração de margem não disponível; usando padrão de 50%.');
             }
 
             // Verificar se é modo de edição

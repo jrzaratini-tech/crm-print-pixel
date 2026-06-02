@@ -23,7 +23,7 @@ O servidor expõe somente:
 - `index.html`
 - `upload-mobile.html`
 - `pages/`
-- `core/engine.js`, `core/config.js` e `core/security.js`
+- `core/engine.js`, `core/config.js`, `core/security.js`, `core/custeio.js`, `core/materiais-padrao.js` e `core/financeiro.js`
 - `menu/menu.config.js`
 
 Arquivos como `server.js`, `firebase.js`, `package.json`, `DATA/` e `node_modules/` não devem responder publicamente.

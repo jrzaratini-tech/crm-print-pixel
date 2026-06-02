@@ -2,6 +2,7 @@
 <html lang="pt-PT">
 <head>
     <script src="../core/security.js"></script>
+    <script src="../core/financeiro.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ponto de Equilíbrio - PrintPixel</title>
@@ -60,7 +61,7 @@
         </div>
 
         <section class="metrics">
-            <div class="metric"><div class="metric-label">Vendas do mês</div><div class="metric-value success" id="vendasMes">€0,00</div></div>
+            <div class="metric"><div class="metric-label">Faturamento líquido do mês</div><div class="metric-value success" id="vendasMes">€0,00</div></div>
             <div class="metric"><div class="metric-label">Faturamento mínimo</div><div class="metric-value" id="pontoEquilibrio">€0,00</div></div>
             <div class="metric"><div class="metric-label">Falta faturar</div><div class="metric-value warning" id="faltaFaturar">€0,00</div></div>
             <div class="metric">
@@ -76,9 +77,9 @@
                     <div><label for="custosFixos">Custos fixos mensais (€)</label><input id="custosFixos" type="number" min="0" step="0.01" value="5000"></div>
                     <div><label for="margemContribuicao">Margem de contribuição média (%)</label><input id="margemContribuicao" type="number" min="1" max="100" step="0.1" value="50"></div>
                     <div><label for="diasUteis">Dias úteis do mês</label><input id="diasUteis" type="number" min="1" max="31" value="22"></div>
-                    <div><label for="margemMinima">Margem mínima nos orçamentos (%)</label><input id="margemMinima" type="number" min="0" max="100" step="0.1" value="25"></div>
+                    <div><label for="margemMinima">Margem mínima nos orçamentos (%)</label><input id="margemMinima" type="number" min="0" max="100" step="0.1" value="50"></div>
                 </div>
-                <p class="note">Faturamento mínimo = custos fixos / margem de contribuição. Atualize estes valores quando a estrutura mensal mudar.</p>
+                <p class="note">Faturamento mínimo = custos fixos / margem de contribuição. O indicador considera faturamento líquido, sem IVA. Atualize estes valores quando a estrutura mensal mudar.</p>
             </div>
 
             <div class="panel">
@@ -111,7 +112,7 @@
 
     <script>
         const defaults = {
-            custosFixos: 5000, margemContribuicao: 50, diasUteis: 22, margemMinima: 25,
+            custosFixos: 5000, margemContribuicao: 50, diasUteis: 22, margemMinima: 50,
             custoHoraImpressao: 35, custoHoraAcabamento: 22, custoHoraInstalacao: 30, perdaMaterial: 10, notas: ''
         };
         let configId = '';
@@ -169,7 +170,7 @@
                 vendasMes = (ordersData.events || []).reduce((sum, order) => {
                     const date = new Date(order.timestamp || order.created_at || 0);
                     return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear()
-                        ? sum + (Number(order.payload && order.payload.total) || 0) : sum;
+                        ? sum + FINANCEIRO.faturamentoSemIva(order.payload) : sum;
                 }, 0);
                 calculate();
             } catch (error) {
