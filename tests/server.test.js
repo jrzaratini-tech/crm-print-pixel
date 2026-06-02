@@ -72,6 +72,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   const inboxPageResult = await request('/pages/importacoes-fiscais.html');
   const productionPageResult = await request('/pages/ordemproducao.html');
   const workerAppResult = await request('/colaborador/');
+  const workerStylesResult = await request('/colaborador/styles.css');
   assert.equal(moduleResult.response.status, 200);
   assert.equal(presetsResult.response.status, 200);
   assert.equal(financialResult.response.status, 200);
@@ -84,6 +85,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.equal(inboxPageResult.response.status, 200);
   assert.equal(productionPageResult.response.status, 200);
   assert.equal(workerAppResult.response.status, 200);
+  assert.equal(workerStylesResult.response.status, 200);
   assert.match(moduleResult.body, /calcularFicha/);
   assert.match(presetsResult.body, /Fonte de alimentação/);
   assert.match(financialResult.body, /faturamentoSemIva/);
@@ -94,6 +96,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(mobilePageResult.body, /vendor\/jsQR\.js/);
   assert.match(workerAppResult.body, /PrintPixel Produ/);
   assert.match(workerAppResult.body, /Entrar no app/);
+  assert.match(workerStylesResult.body, /\[hidden\]\{display:none!important\}/);
   assert.match(linksPageResult.body, /PrintPixel Fiscal Móvel/);
   assert.match(linksPageResult.body, /App da produção/);
   assert.match(linksPageResult.body, /Usuários cadastrados/);
@@ -193,6 +196,19 @@ test('exclui usuario de producao e bloqueia novo login', async () => {
   assert.equal(login.response.status, 401);
   const workers = await request('/api/production/workers');
   assert.equal(workers.body.workers.some(worker => worker.username === 'usuario.excluir'), false);
+});
+
+test('permite recriar login de usuario de producao inativo', async () => {
+  const created = await post('/api/production/workers', { name: 'Usuario Inativo', username: 'usuario.inativo', password: 'senha-segura-inativo', role: 'montagem' });
+  assert.equal(created.response.status, 200);
+  const revoked = await post(`/api/production/workers/${created.body.worker.id}/revoke`, {});
+  assert.equal(revoked.response.status, 200);
+  const workersWithInactive = await request('/api/production/workers');
+  assert.equal(workersWithInactive.body.allWorkers.some(worker => worker.username === 'usuario.inativo' && worker.active === false), true);
+  const recreated = await post('/api/production/workers', { name: 'Usuario Recriado', username: 'usuario.inativo', password: 'senha-segura-recriado', role: 'montagem' });
+  assert.equal(recreated.response.status, 200);
+  const login = await post('/api/colaborador/login', { username: 'usuario.inativo', password: 'senha-segura-recriado' });
+  assert.equal(login.response.status, 200);
 });
 
 test('ativa celular e lanca compra manual automaticamente', async () => {

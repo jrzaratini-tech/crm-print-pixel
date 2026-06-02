@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Links - PrintPixel</title>
   <style>
-    *{box-sizing:border-box;font-family:Segoe UI,system-ui,sans-serif}body{margin:0;padding:24px;background:#f8fafc;color:#1e293b}.container{max-width:1300px;margin:auto}h1{margin:0;color:#1a237e}.subtitle{color:#64748b}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px;margin-top:24px}.card,.panel{display:flex;flex-direction:column;gap:12px;padding:20px;border:1px solid #e2e8f0;border-radius:14px;background:#fff;box-shadow:0 4px 16px #0f172a0d}.icon{display:grid;place-items:center;width:46px;height:46px;border-radius:12px;background:#dbeafe;color:#1d4ed8;font-size:22px;font-weight:800}.tag{width:max-content;padding:4px 8px;border-radius:999px;background:#dcfce7;color:#166534;font-size:12px;font-weight:700}.url{padding:10px;border:1px solid #cbd5e1;border-radius:8px;background:#f8fafc;color:#475569;word-break:break-all;font-size:13px}.actions{display:flex;flex-wrap:wrap;gap:9px}.btn{border:0;border-radius:8px;padding:10px 13px;color:#fff;background:#1a237e;font-weight:700;cursor:pointer;text-decoration:none;font-size:13px}.btn.secondary{background:#475569}.btn.danger{background:#b91c1c}.note{margin-top:22px;padding:16px;border-left:4px solid #2563eb;background:#eff6ff;color:#334155;line-height:1.55}.message{min-height:20px;color:#047857;font-weight:700;font-size:13px}.panel{margin-top:20px}.form-row{display:grid;grid-template-columns:1.2fr 1fr 1fr 170px auto;gap:9px}.form-row input,.form-row select{min-width:0;border:1px solid #cbd5e1;border-radius:8px;padding:10px}.worker{display:grid;grid-template-columns:1fr auto;gap:10px;padding:13px;border:1px solid #e2e8f0;border-radius:10px}.worker small{display:block;color:#64748b}.worker .actions{justify-content:flex-end}@media(max-width:900px){.form-row{grid-template-columns:1fr 1fr}}@media(max-width:700px){body{padding:14px}.form-row,.worker{grid-template-columns:1fr}.worker .actions{justify-content:flex-start}}
+    *{box-sizing:border-box;font-family:Segoe UI,system-ui,sans-serif}body{margin:0;padding:24px;background:#f8fafc;color:#1e293b}.container{max-width:1300px;margin:auto}h1{margin:0;color:#1a237e}.subtitle{color:#64748b}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px;margin-top:24px}.card,.panel{display:flex;flex-direction:column;gap:12px;padding:20px;border:1px solid #e2e8f0;border-radius:14px;background:#fff;box-shadow:0 4px 16px #0f172a0d}.icon{display:grid;place-items:center;width:46px;height:46px;border-radius:12px;background:#dbeafe;color:#1d4ed8;font-size:22px;font-weight:800}.tag{width:max-content;padding:4px 8px;border-radius:999px;background:#dcfce7;color:#166534;font-size:12px;font-weight:700}.url{padding:10px;border:1px solid #cbd5e1;border-radius:8px;background:#f8fafc;color:#475569;word-break:break-all;font-size:13px}.actions{display:flex;flex-wrap:wrap;gap:9px}.btn{border:0;border-radius:8px;padding:10px 13px;color:#fff;background:#1a237e;font-weight:700;cursor:pointer;text-decoration:none;font-size:13px}.btn.secondary{background:#475569}.btn.danger{background:#b91c1c}.note{margin-top:22px;padding:16px;border-left:4px solid #2563eb;background:#eff6ff;color:#334155;line-height:1.55}.message{min-height:20px;color:#047857;font-weight:700;font-size:13px}.panel{margin-top:20px}.form-row{display:grid;grid-template-columns:1.2fr 1fr 1fr 170px auto;gap:9px}.form-row input,.form-row select{min-width:0;border:1px solid #cbd5e1;border-radius:8px;padding:10px}.worker{display:grid;grid-template-columns:1fr auto;gap:10px;padding:13px;border:1px solid #e2e8f0;border-radius:10px}.worker.inactive{background:#f8fafc;opacity:.72}.worker small{display:block;color:#64748b}.worker .actions{justify-content:flex-end}@media(max-width:900px){.form-row{grid-template-columns:1fr 1fr}}@media(max-width:700px){body{padding:14px}.form-row,.worker{grid-template-columns:1fr}.worker .actions{justify-content:flex-start}}
   </style>
 </head>
 <body data-page-id="links" data-page-type="READ">
@@ -85,19 +85,20 @@
       const result = await api('/api/production/workers');
       const list = document.getElementById('workerList');
       list.replaceChildren();
-      document.getElementById('workerListTitle').textContent = `Usuários cadastrados (${result.workers.length})`;
-      if (!result.workers.length) {
+      const listedWorkers = result.allWorkers || result.workers;
+      document.getElementById('workerListTitle').textContent = `Usuários cadastrados (${listedWorkers.length})`;
+      if (!listedWorkers.length) {
         list.textContent = 'Nenhum usuário cadastrado.';
         return;
       }
-      result.workers.forEach(worker => {
+      listedWorkers.forEach(worker => {
         const row = document.createElement('div');
-        row.className = 'worker';
+        row.className = `worker ${worker.active === false ? 'inactive' : ''}`;
         const info = document.createElement('div');
         const title = document.createElement('strong');
         title.textContent = worker.name;
         const role = document.createElement('small');
-        role.textContent = `Usuário: ${worker.username || 'defina uma senha para migrar'} · Perfil: ${worker.role}`;
+        role.textContent = `Usuário: ${worker.username || 'defina uma senha para migrar'} · Perfil: ${worker.role} · ${worker.active === false ? 'Inativo' : 'Ativo'}`;
         const access = document.createElement('small');
         access.textContent = ['comercial', 'projetista'].includes(worker.role) ? 'Acesso: todas as O.S.' : 'Acesso: somente O.S. atribuídas';
         info.append(title, role, access);

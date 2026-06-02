@@ -678,8 +678,8 @@ async function revokeWorkerSessions(workerId) {
 }
 
 app.get('/api/production/workers', async (req, res) => {
-  const workers = (await productionWorkers()).filter(worker => worker.active !== false).map(safeProductionWorker);
-  res.json({ success: true, workers, steps: PRODUCTION_STEPS, appUrl: collaboratorUrl(req) });
+  const allWorkers = (await productionWorkers()).map(safeProductionWorker);
+  res.json({ success: true, workers: allWorkers.filter(worker => worker.active !== false), allWorkers, steps: PRODUCTION_STEPS, appUrl: collaboratorUrl(req) });
 });
 
 app.post('/api/production/workers', async (req, res) => {
@@ -691,7 +691,12 @@ app.post('/api/production/workers', async (req, res) => {
     if (!name || containsUnsafeMarkup(name)) return res.status(400).json({ success: false, message: 'Nome invalido.' });
     if (!/^[a-z0-9._-]{3,60}$/.test(username)) return res.status(400).json({ success: false, message: 'Usuario deve ter ao menos 3 caracteres e usar apenas letras, numeros, ponto, hifen ou sublinhado.' });
     if (password.length < 8 || password.length > 120) return res.status(400).json({ success: false, message: 'Senha deve possuir entre 8 e 120 caracteres.' });
-    if ((await productionWorkers()).some(worker => worker.username === username)) return res.status(409).json({ success: false, message: 'Este usuario ja esta cadastrado. Consulte a lista de usuarios autorizados.' });
+    const existingWorkers = await productionWorkers();
+    if (existingWorkers.some(worker => worker.username === username && worker.active !== false)) {
+      return res.status(409).json({ success: false, message: 'Este usuario ja esta cadastrado. Consulte a lista de usuarios autorizados.' });
+    }
+    const staleWorkers = existingWorkers.filter(worker => worker.username === username && worker.active === false);
+    await Promise.all(staleWorkers.map(worker => db.collection('production_workers').doc(worker.storageId || worker.id).delete()));
     const now = new Date().toISOString();
     const worker = { name, username, role, active: true, createdAt: now, updatedAt: now, ...productionPasswordFields(password) };
     const id = crypto.randomBytes(12).toString('hex');
