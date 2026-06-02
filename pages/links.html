@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <script src="../core/security.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Links - PrintPixel</title>
+  <style>
+    *{box-sizing:border-box;font-family:Segoe UI,system-ui,sans-serif}body{margin:0;padding:24px;background:#f8fafc;color:#1e293b}.container{max-width:1300px;margin:auto}h1{margin:0;color:#1a237e}.subtitle{color:#64748b}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:16px;margin-top:24px}.card{display:flex;flex-direction:column;gap:12px;padding:20px;border:1px solid #e2e8f0;border-radius:14px;background:#fff;box-shadow:0 4px 16px #0f172a0d}.icon{display:grid;place-items:center;width:46px;height:46px;border-radius:12px;background:#dbeafe;color:#1d4ed8;font-size:22px;font-weight:800}.tag{width:max-content;padding:4px 8px;border-radius:999px;background:#dcfce7;color:#166534;font-size:12px;font-weight:700}.url{padding:10px;border:1px solid #cbd5e1;border-radius:8px;background:#f8fafc;color:#475569;word-break:break-all;font-size:13px}.actions{display:flex;flex-wrap:wrap;gap:9px}.btn{border:0;border-radius:8px;padding:10px 13px;color:#fff;background:#1a237e;font-weight:700;cursor:pointer;text-decoration:none;font-size:13px}.btn.secondary{background:#475569}.note{margin-top:22px;padding:16px;border-left:4px solid #2563eb;background:#eff6ff;color:#334155;line-height:1.55}.message{min-height:20px;color:#047857;font-weight:700;font-size:13px}
+  </style>
+</head>
+<body data-page-id="links" data-page-type="READ">
+  <main class="container">
+    <h1>Links</h1>
+    <p class="subtitle">Atalhos permanentes para apps externos e telas operacionais da PrintPixel.</p>
+    <section class="grid">
+      <article class="card">
+        <div class="icon">QR</div><span class="tag">App instalável</span>
+        <div><h2>PrintPixel Fiscal Móvel</h2><p class="subtitle">Lance compras e vendas pelo celular, com QR Code ou preenchimento manual.</p></div>
+        <div class="url" id="mobileUrl"></div>
+        <div class="actions"><a class="btn" id="openMobile" target="_blank" rel="noopener">Abrir app</a><button class="btn secondary" id="copyMobile">Copiar link</button></div>
+        <div class="message" id="copyMessage"></div>
+      </article>
+      <article class="card">
+        <div class="icon">✓</div><span class="tag">CRM interno</span>
+        <div><h2>Caixa de entrada fiscal</h2><p class="subtitle">Confira os documentos enviados pelo celular antes do lançamento definitivo.</p></div>
+        <div class="actions"><a class="btn" href="importacoes-fiscais.html">Revisar documentos</a></div>
+      </article>
+    </section>
+    <div class="note"><strong>Primeira ativação:</strong> configure <code>CRM_MOBILE_ACCESS_KEY</code> no Render com uma senha longa e exclusiva. No celular, abra o link acima, informe a chave uma vez e use a opção do navegador para adicionar o app à tela inicial.</div>
+  </main>
+  <script>
+    const mobileUrl = `${location.origin}/mobile/`;
+    document.getElementById('mobileUrl').textContent = mobileUrl;
+    document.getElementById('openMobile').href = mobileUrl;
+    document.getElementById('copyMobile').addEventListener('click', async () => {
+      await navigator.clipboard.writeText(mobileUrl);
+      document.getElementById('copyMessage').textContent = 'Link copiado.';
+    });
+  </script>
+</body>
+</html>

@@ -66,6 +66,7 @@
         return new Date(
             evento.dataFiltragem
             || evento.payload?.dataPedido
+            || evento.payload?.dataFatura
             || evento.payload?.dataCompra
             || evento.payload?.dataDespesa
             || evento.created_at
@@ -77,13 +78,17 @@
         const periodo = trimestreFiscal(referencia);
         let ivaVendas = 0;
         let ivaComprasDedutivel = 0;
-
-        eventos.forEach(evento => {
-            if (!evento || evento.deleted) return;
+        const eventosDoPeriodo = eventos.filter(evento => {
+            if (!evento || evento.deleted) return false;
             const data = dataDoEvento(evento);
-            if (Number.isNaN(data.getTime()) || data < periodo.inicio || data > periodo.fim) return;
+            return !Number.isNaN(data.getTime()) && data >= periodo.inicio && data <= periodo.fim;
+        });
+        const temFaturasVenda = eventosDoPeriodo.some(evento => evento.schema === 'fatura_venda');
 
-            if (evento.schema === 'pedido') ivaVendas += ivaRegistado(evento.payload);
+        eventosDoPeriodo.forEach(evento => {
+            if (evento.schema === 'fatura_venda' || (!temFaturasVenda && evento.schema === 'pedido')) {
+                ivaVendas += ivaRegistado(evento.payload);
+            }
             if (evento.schema === 'despesa') ivaComprasDedutivel += ivaCompraDedutivel(evento.payload);
         });
 
@@ -93,6 +98,7 @@
             ivaVendas,
             ivaComprasDedutivel,
             saldo,
+            fonteVendas: temFaturasVenda ? 'faturas' : 'pedidos',
             situacao: saldo > 0 ? 'pagar' : saldo < 0 ? 'receber' : 'equilibrado'
         };
     }

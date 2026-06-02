@@ -12,9 +12,11 @@ const AUTH_DISABLED = process.env.CRM_AUTH_DISABLED === 'true';
 const CRM_USERNAME = process.env.CRM_USERNAME || '';
 const CRM_PASSWORD = process.env.CRM_PASSWORD || '';
 const CRM_COMPANY_NIF = String(process.env.CRM_COMPANY_NIF || '').replace(/\D/g, '');
+const CRM_MOBILE_ACCESS_KEY = process.env.CRM_MOBILE_ACCESS_KEY || (!IS_PRODUCTION ? 'dev-mobile-key' : '');
 const MAX_QUERY_LIMIT = 500;
 const MAX_UPLOAD_BYTES = 500 * 1024;
 const UPLOAD_TTL_MS = 15 * 60 * 1000;
+const MOBILE_DEVICE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 
 if (IS_PRODUCTION && !AUTH_DISABLED && (!CRM_USERNAME || !CRM_PASSWORD)) {
   throw new Error('Configure CRM_USERNAME e CRM_PASSWORD antes de iniciar o CRM em produção.');
@@ -130,6 +132,77 @@ function mobileSessionExpired(session) {
   return !session || Date.now() > new Date(session.expiresAt || 0).getTime();
 }
 
+function text(value, maxLength = 200) {
+  return String(value || '').trim().slice(0, maxLength);
+}
+
+function digits(value) {
+  return text(value).replace(/\D/g, '');
+}
+
+function money(value) {
+  const parsed = Number.parseFloat(String(value || '0').replace(',', '.'));
+  return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed * 100) / 100) : 0;
+}
+
+function hash(value) {
+  return crypto.createHash('sha256').update(String(value)).digest('hex');
+}
+
+function mobileDocumentFingerprint(documento) {
+  return hash([
+    documento.entryType,
+    documento.nifEmitente,
+    documento.numeroFatura.toUpperCase(),
+    documento.dataCompra,
+    documento.valorTotal.toFixed(2)
+  ].join('|'));
+}
+
+function normalizeMobileDocument(body = {}) {
+  const parsedQr = body.rawQr ? QR_FISCAL.interpretar(body.rawQr) : {};
+  const documento = {
+    rawQr: text(parsedQr.rawQr || body.rawQr, 4000),
+    entryType: body.entryType === 'income' ? 'income' : 'expense',
+    nifEmitente: digits(parsedQr.nifEmitente || body.nifEmitente),
+    nomeEmitente: text(body.nomeEmitente, 160),
+    nifAdquirente: digits(parsedQr.nifAdquirente || body.nifAdquirente),
+    tipoDocumento: text(parsedQr.tipoDocumento || body.tipoDocumento || 'FT', 30).toUpperCase(),
+    numeroFatura: text(parsedQr.numeroFatura || body.numeroFatura, 120),
+    dataCompra: text(parsedQr.dataCompra || body.dataCompra, 10),
+    valorTotal: money(parsedQr.valorTotal || body.valorTotal),
+    valorIVA: money(parsedQr.valorIVA || body.valorIVA),
+    valorBruto: money(parsedQr.valorBruto || body.valorBruto),
+    categoria: text(body.categoria || 'OUTROS', 80),
+    formaPagamento: text(body.formaPagamento || 'outro', 80),
+    observacoes: text(body.observacoes, 500)
+  };
+  if (!documento.valorBruto && documento.valorTotal) {
+    documento.valorBruto = Math.max(0, Math.round((documento.valorTotal - documento.valorIVA) * 100) / 100);
+  }
+  if (CRM_COMPANY_NIF) {
+    if (documento.nifEmitente === CRM_COMPANY_NIF) documento.entryType = 'income';
+    else if (documento.nifAdquirente === CRM_COMPANY_NIF) documento.entryType = 'expense';
+  }
+  return documento;
+}
+
+function validateMobileDocument(documento) {
+  const errors = [];
+  if (!/^\d{9}$/.test(documento.nifEmitente)) errors.push('NIF do emitente invalido.');
+  if (!documento.numeroFatura) errors.push('Numero da fatura ausente.');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(documento.dataCompra)) errors.push('Data da fatura invalida.');
+  if (!(documento.valorTotal > 0)) errors.push('Total da fatura invalido.');
+  if (documento.valorIVA > documento.valorTotal) errors.push('IVA superior ao total da fatura.');
+  if (CRM_COMPANY_NIF) {
+    const belongsToCompany = documento.entryType === 'income'
+      ? documento.nifEmitente === CRM_COMPANY_NIF
+      : documento.nifAdquirente === CRM_COMPANY_NIF;
+    if (!belongsToCompany) errors.push('A fatura nao pertence ao NIF configurado para a empresa.');
+  }
+  return errors;
+}
+
 async function findDuplicateExpense(documento) {
   const snapshot = await db.collection('events').get();
   return snapshot.docs.some(doc => {
@@ -144,7 +217,118 @@ async function findDuplicateExpense(documento) {
   });
 }
 
+async function requireMobileDevice(req, res, next) {
+  try {
+    const [scheme, token] = String(req.headers.authorization || '').split(' ');
+    if (scheme !== 'Bearer' || !token || token.length < 32 || token.length > 200) {
+      return res.status(401).json({ success: false, message: 'Ative este dispositivo para continuar.' });
+    }
+    const deviceDoc = await db.collection('mobile_devices').doc(hash(token)).get();
+    const device = deviceDoc.exists ? deviceDoc.data() : null;
+    if (!device || device.revoked || mobileSessionExpired(device)) {
+      return res.status(401).json({ success: false, message: 'Acesso expirado ou revogado. Ative novamente o dispositivo.' });
+    }
+    req.mobileDevice = device;
+    next();
+  } catch (error) {
+    console.error('Erro ao validar dispositivo movel:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel validar o dispositivo.' });
+  }
+}
+
+async function findDuplicateMobileDocument(documento, fingerprint) {
+  const inboxDoc = await db.collection('mobile_invoice_inbox').doc(fingerprint).get();
+  if (inboxDoc.exists) return true;
+  if (documento.entryType === 'expense') return findDuplicateExpense(documento);
+  const snapshot = await db.collection('events').get();
+  return snapshot.docs.some(doc => {
+    const data = doc.data();
+    const payload = data.payload || {};
+    return !data.deleted
+      && data.schema === 'fatura_venda'
+      && digits(payload.nifEmitente) === documento.nifEmitente
+      && text(payload.numeroFatura) === documento.numeroFatura
+      && text(payload.dataCompra || payload.dataFatura, 10) === documento.dataCompra
+      && Math.abs(money(payload.valorTotal) - documento.valorTotal) < 0.01;
+  });
+}
+
 app.get('/scan-fatura.html', (req, res) => res.sendFile(path.join(__dirname, 'scan-fatura.html')));
+app.use('/mobile', express.static(path.join(__dirname, 'mobile'), { index: 'index.html', fallthrough: false }));
+
+app.post('/api/mobile/login', requestRateLimit({ windowMs: 15 * 60 * 1000, max: 12 }), async (req, res) => {
+  try {
+    if (!CRM_MOBILE_ACCESS_KEY) {
+      return res.status(503).json({ success: false, message: 'Configure CRM_MOBILE_ACCESS_KEY no Render para ativar o app movel.' });
+    }
+    if (!safeEqual(req.body?.accessKey || '', CRM_MOBILE_ACCESS_KEY)) {
+      return res.status(401).json({ success: false, message: 'Chave de acesso incorreta.' });
+    }
+    const token = crypto.randomBytes(48).toString('hex');
+    const deviceId = hash(token);
+    const now = Date.now();
+    const device = {
+      id: deviceId,
+      name: text(req.body?.deviceName || 'Celular', 80),
+      createdAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + MOBILE_DEVICE_TTL_MS).toISOString(),
+      revoked: false
+    };
+    await db.collection('mobile_devices').doc(deviceId).set(device);
+    res.json({ success: true, token, expiresAt: device.expiresAt });
+  } catch (error) {
+    console.error('Erro ao ativar app movel:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel ativar este dispositivo.' });
+  }
+});
+
+app.get('/api/mobile/config', requireMobileDevice, (req, res) => {
+  res.json({ success: true, companyNif: CRM_COMPANY_NIF, device: req.mobileDevice.name });
+});
+
+app.get('/api/mobile/documents', requireMobileDevice, async (req, res) => {
+  try {
+    const snapshot = await db.collection('mobile_invoice_inbox').get();
+    const documents = snapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() }))
+      .filter(item => item.deviceId === req.mobileDevice.id)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 40)
+      .map(sanitizeForResponse);
+    res.json({ success: true, documents });
+  } catch (error) {
+    console.error('Erro ao listar documentos moveis:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel carregar os lancamentos.' });
+  }
+});
+
+app.post('/api/mobile/documents', requireMobileDevice, async (req, res) => {
+  try {
+    const documento = normalizeMobileDocument(req.body);
+    const errors = validateMobileDocument(documento);
+    if (containsUnsafeMarkup(documento)) errors.push('Conteudo potencialmente inseguro.');
+    if (errors.length) return res.status(400).json({ success: false, message: errors.join(' ') });
+    const fingerprint = mobileDocumentFingerprint(documento);
+    if (await findDuplicateMobileDocument(documento, fingerprint)) {
+      return res.status(409).json({ success: false, message: 'Esta fatura ja foi enviada ou cadastrada no CRM.' });
+    }
+    const now = new Date().toISOString();
+    await db.collection('mobile_invoice_inbox').doc(fingerprint).set({
+      ...documento,
+      fingerprint,
+      source: documento.rawQr ? 'mobile_qr' : 'mobile_manual',
+      status: 'pending_review',
+      deviceId: req.mobileDevice.id,
+      deviceName: req.mobileDevice.name,
+      createdAt: now,
+      updatedAt: now
+    });
+    res.json({ success: true, id: fingerprint, entryType: documento.entryType, message: 'Fatura enviada para revisao no CRM.' });
+  } catch (error) {
+    console.error('Erro ao receber documento movel:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel enviar a fatura.' });
+  }
+});
 
 app.post('/api/importacao-fiscal/receber', async (req, res) => {
   try {
@@ -186,6 +370,98 @@ app.post('/api/importacao-fiscal/receber', async (req, res) => {
 app.use(requireAuth);
 
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+
+app.get('/api/mobile/inbox', async (req, res) => {
+  try {
+    const snapshot = await db.collection('mobile_invoice_inbox').get();
+    const documents = snapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() }))
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .map(sanitizeForResponse);
+    res.json({ success: true, documents });
+  } catch (error) {
+    console.error('Erro ao listar caixa fiscal:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel carregar a caixa fiscal.' });
+  }
+});
+
+app.post('/api/mobile/inbox/:id/approve', async (req, res) => {
+  try {
+    const id = String(req.params.id || '');
+    if (!/^[a-f0-9]{64}$/.test(id)) return res.status(400).json({ success: false, message: 'Documento invalido.' });
+    const inboxRef = db.collection('mobile_invoice_inbox').doc(id);
+    const inboxDoc = await inboxRef.get();
+    if (!inboxDoc.exists) return res.status(404).json({ success: false, message: 'Documento nao encontrado.' });
+    const item = inboxDoc.data();
+    if (item.status === 'rejected') return res.status(409).json({ success: false, message: 'Documento rejeitado. Envie novamente para revisar.' });
+    const eventId = `mobile-${id.slice(0, 40)}`;
+    const eventRef = db.collection('events').doc(eventId);
+    const now = new Date().toISOString();
+    const payload = item.entryType === 'income'
+      ? {
+          nifEmitente: item.nifEmitente,
+          nifAdquirente: item.nifAdquirente,
+          numeroFatura: item.numeroFatura,
+          tipoDocumento: item.tipoDocumento,
+          dataFatura: item.dataCompra,
+          subtotal: item.valorBruto,
+          iva: item.valorIVA,
+          total: item.valorTotal,
+          origemLancamento: item.source,
+          observacoes: item.observacoes
+        }
+      : {
+          fornecedor: item.nomeEmitente || `Fornecedor NIF ${item.nifEmitente}`,
+          nifFornecedor: item.nifEmitente,
+          nifAdquirente: item.nifAdquirente,
+          numeroFatura: item.numeroFatura,
+          tipoDocumento: item.tipoDocumento,
+          dataCompra: item.dataCompra,
+          dataVencimento: item.dataCompra,
+          descricao: `${item.tipoDocumento} ${item.numeroFatura}`,
+          categoria: item.categoria,
+          formaPagamento: item.formaPagamento,
+          valorBruto: item.valorBruto,
+          valorIVA: item.valorIVA,
+          valorTotal: item.valorTotal,
+          comIVA: item.valorIVA > 0 ? 'sim' : 'nao',
+          ivaDedutivel: true,
+          statusPagamento: 'pago',
+          origemLancamento: item.source,
+          observacoes: item.observacoes
+        };
+    await eventRef.set({
+      schema: item.entryType === 'income' ? 'fatura_venda' : 'despesa',
+      payload,
+      pageId: 'importacoes-fiscais',
+      timestamp: now,
+      created_at: now,
+      updated_at: now,
+      deleted: false
+    }, { merge: true });
+    await inboxRef.set({ ...item, status: 'approved', eventId, reviewedAt: now, updatedAt: now });
+    res.json({ success: true, eventId, message: 'Documento aprovado e lancado no CRM.' });
+  } catch (error) {
+    console.error('Erro ao aprovar documento fiscal:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel aprovar o documento.' });
+  }
+});
+
+app.post('/api/mobile/inbox/:id/reject', async (req, res) => {
+  try {
+    const id = String(req.params.id || '');
+    if (!/^[a-f0-9]{64}$/.test(id)) return res.status(400).json({ success: false, message: 'Documento invalido.' });
+    const inboxRef = db.collection('mobile_invoice_inbox').doc(id);
+    const inboxDoc = await inboxRef.get();
+    if (!inboxDoc.exists) return res.status(404).json({ success: false, message: 'Documento nao encontrado.' });
+    const now = new Date().toISOString();
+    await inboxRef.set({ ...inboxDoc.data(), status: 'rejected', reviewedAt: now, updatedAt: now });
+    res.json({ success: true, message: 'Documento rejeitado.' });
+  } catch (error) {
+    console.error('Erro ao rejeitar documento fiscal:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel rejeitar o documento.' });
+  }
+});
 
 app.get('/api/database/init', async (req, res) => {
   try {

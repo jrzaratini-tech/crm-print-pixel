@@ -33,6 +33,14 @@ async function post(path, body) {
   });
 }
 
+async function mobilePost(path, body, token) {
+  return request(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body)
+  });
+}
+
 test('não publica arquivos internos', async () => {
   for (const path of ['/server.js', '/firebase.js', '/package.json', '/DATA/database/core.db', '/core/database.js']) {
     const { response } = await request(path);
@@ -47,18 +55,63 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   const fiscalQrResult = await request('/core/qr-fiscal.js');
   const pageResult = await request('/pages/materiais.html');
   const scanPageResult = await request('/scan-fatura.html');
+  const mobilePageResult = await request('/mobile/');
+  const linksPageResult = await request('/pages/links.html');
+  const inboxPageResult = await request('/pages/importacoes-fiscais.html');
   assert.equal(moduleResult.response.status, 200);
   assert.equal(presetsResult.response.status, 200);
   assert.equal(financialResult.response.status, 200);
   assert.equal(fiscalQrResult.response.status, 200);
   assert.equal(pageResult.response.status, 200);
   assert.equal(scanPageResult.response.status, 200);
+  assert.equal(mobilePageResult.response.status, 200);
+  assert.equal(linksPageResult.response.status, 200);
+  assert.equal(inboxPageResult.response.status, 200);
   assert.match(moduleResult.body, /calcularFicha/);
   assert.match(presetsResult.body, /Fonte de alimentação/);
   assert.match(financialResult.body, /faturamentoSemIva/);
   assert.match(fiscalQrResult.body, /interpretar/);
   assert.match(pageResult.body, /Cadastro de Materiais/);
   assert.match(scanPageResult.body, /Ler QR fiscal/);
+  assert.match(mobilePageResult.body, /PrintPixel Fiscal/);
+  assert.match(linksPageResult.body, /PrintPixel Fiscal Móvel/);
+});
+
+test('ativa celular e envia compra manual para revisao e aprovacao', async () => {
+  const login = await post('/api/mobile/login', { deviceName: 'Celular teste', accessKey: 'dev-mobile-key' });
+  assert.equal(login.response.status, 200);
+  assert.match(login.body.token, /^[a-f0-9]{96}$/);
+
+  const sent = await mobilePost('/api/mobile/documents', {
+    entryType: 'expense',
+    nifEmitente: '503456789',
+    nifAdquirente: '509876543',
+    tipoDocumento: 'FT',
+    numeroFatura: 'FT MOBILE/1',
+    dataCompra: '2026-06-02',
+    valorTotal: 246,
+    valorIVA: 46
+  }, login.body.token);
+  assert.equal(sent.response.status, 200);
+
+  const inbox = await request('/api/mobile/inbox');
+  assert.equal(inbox.response.status, 200);
+  assert.ok(inbox.body.documents.some(item => item.numeroFatura === 'FT MOBILE/1' && item.status === 'pending_review'));
+
+  const approved = await post(`/api/mobile/inbox/${sent.body.id}/approve`, {});
+  assert.equal(approved.response.status, 200);
+  const saved = await post('/api/database/query', { schema: 'despesa', filters: { id: approved.body.eventId } });
+  assert.equal(saved.body.events[0].payload.valorBruto, 200);
+});
+
+test('rejeita uso do app movel sem dispositivo ativado', async () => {
+  const result = await post('/api/mobile/documents', {
+    nifEmitente: '503456789',
+    numeroFatura: 'FT MOBILE/2',
+    dataCompra: '2026-06-02',
+    valorTotal: 10
+  });
+  assert.equal(result.response.status, 401);
 });
 
 test('salva, consulta com filtro por id e exclui registro', async () => {

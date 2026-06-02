@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#172554">
+  <title>PrintPixel Fiscal</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div><strong>PrintPixel</strong><span>Fiscal móvel</span></div>
+    <button class="ghost" id="installBtn" hidden>Instalar app</button>
+  </header>
+
+  <main>
+    <section class="screen active" id="loginScreen">
+      <div class="hero"><div class="logo">PP</div><h1>Ativar celular</h1><p>Use a chave móvel criada no Render. Ela será solicitada somente na primeira ativação.</p></div>
+      <form class="card" id="loginForm">
+        <label>Nome deste dispositivo<input id="deviceName" required placeholder="Ex.: Celular Nelson"></label>
+        <label>Chave móvel<input id="accessKey" type="password" required autocomplete="current-password" placeholder="CRM_MOBILE_ACCESS_KEY"></label>
+        <button class="primary" type="submit">Ativar acesso seguro</button>
+      </form>
+    </section>
+
+    <section class="screen" id="homeScreen">
+      <div class="hero compact"><h1>Notas fiscais</h1><p>Registre compras e vendas no ato. O CRM fará a conferência antes do lançamento definitivo.</p></div>
+      <div class="action-grid">
+        <button class="action" data-go="scan"><b>⌁</b><span>Ler QR Code</span></button>
+        <button class="action" data-go="entry"><b>+</b><span>Lançar manual</span></button>
+      </div>
+      <div class="card"><div class="card-title"><h2>Últimos envios</h2><button class="link" data-go="list">Ver todos</button></div><div id="recentList" class="list"></div></div>
+    </section>
+
+    <section class="screen" id="scanScreen">
+      <div class="screen-title"><button class="back" data-go="home">‹</button><div><h1>Ler QR fiscal</h1><p>Aponte para o QR Code da fatura.</p></div></div>
+      <div class="scanner card"><video id="camera" playsinline muted></video><canvas id="canvas" hidden></canvas><div class="scan-frame"></div></div>
+      <button class="primary" id="startCamera">Abrir câmera</button>
+      <label class="card paste">Ou cole o texto do QR<textarea id="rawQr" rows="4" placeholder="A:...*B:...*D:FT..."></textarea><button class="secondary" id="useRawQr" type="button">Usar texto</button></label>
+    </section>
+
+    <section class="screen" id="entryScreen">
+      <div class="screen-title"><button class="back" data-go="home">‹</button><div><h1>Conferir lançamento</h1><p>Revise os dados antes de enviar ao CRM.</p></div></div>
+      <form class="card form" id="documentForm">
+        <div class="segmented"><label><input type="radio" name="entryType" value="expense" checked><span>Compra</span></label><label><input type="radio" name="entryType" value="income"><span>Venda</span></label></div>
+        <label>NIF emitente<input id="nifEmitente" inputmode="numeric" maxlength="9" required></label>
+        <label>Nome do emitente<input id="nomeEmitente" maxlength="160" placeholder="Opcional"></label>
+        <label>NIF adquirente<input id="nifAdquirente" inputmode="numeric" maxlength="9"></label>
+        <div class="columns"><label>Documento<input id="tipoDocumento" value="FT" maxlength="30"></label><label>Número<input id="numeroFatura" required maxlength="120"></label></div>
+        <label>Data<input id="dataCompra" type="date" required></label>
+        <div class="columns"><label>Total (€)<input id="valorTotal" type="number" min="0.01" step="0.01" required></label><label>IVA (€)<input id="valorIVA" type="number" min="0" step="0.01" value="0"></label></div>
+        <label>Observações<textarea id="observacoes" rows="3" maxlength="500"></textarea></label>
+        <button class="primary" type="submit">Enviar para revisão</button>
+      </form>
+    </section>
+
+    <section class="screen" id="listScreen">
+      <div class="screen-title"><button class="back" data-go="home">‹</button><div><h1>Meus envios</h1><p>Acompanhe o estado das notas enviadas.</p></div></div>
+      <div class="card list" id="fullList"></div>
+    </section>
+
+    <section class="screen" id="settingsScreen">
+      <div class="screen-title"><button class="back" data-go="home">‹</button><div><h1>Configuração</h1><p>Gerencie o acesso salvo neste celular.</p></div></div>
+      <div class="card"><p id="deviceInfo"></p><button class="danger" id="logoutBtn">Desativar neste celular</button></div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" id="bottomNav" hidden>
+    <button data-go="home">⌂<span>Início</span></button>
+    <button data-go="scan">⌁<span>Ler</span></button>
+    <button data-go="entry">+<span>Manual</span></button>
+    <button data-go="list">☷<span>Lista</span></button>
+    <button data-go="settings">⚙<span>Ajustes</span></button>
+  </nav>
+  <div class="toast" id="toast"></div>
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

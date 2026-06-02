@@ -1,0 +1,1 @@
+{"name":"PrintPixel Fiscal","short_name":"PP Fiscal","description":"Leitor móvel de faturas da PrintPixel","start_url":"./","scope":"./","display":"standalone","background_color":"#f1f5f9","theme_color":"#172554","icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}

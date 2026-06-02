@@ -51,3 +51,13 @@ test('identifica credito trimestral de IVA a recuperar', () => {
   assert.equal(resumo.saldo, -130);
   assert.equal(resumo.situacao, 'receber');
 });
+
+test('usa faturas de venda como fonte fiscal sem duplicar IVA de pedidos', () => {
+  const eventos = [
+    { schema: 'pedido', created_at: '2026-04-10T12:00:00', payload: { iva: 230, total: 1230 } },
+    { schema: 'fatura_venda', created_at: '2026-04-11T12:00:00', payload: { dataFatura: '2026-04-11', iva: 115, total: 615 } }
+  ];
+  const resumo = FINANCEIRO.resumoIvaTrimestral(eventos, new Date('2026-06-02T12:00:00'));
+  assert.equal(resumo.ivaVendas, 115);
+  assert.equal(resumo.fonteVendas, 'faturas');
+});

@@ -137,5 +137,15 @@
         pos: 14,
         hidden: false,
         deleted: false
+    },
+
+    {
+        id: "nav_links",
+        name: "Links",
+        file: "pages/links.html",
+        type: "READ",
+        pos: 15,
+        hidden: false,
+        deleted: false
     }
 ];

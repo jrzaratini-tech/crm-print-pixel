@@ -36,7 +36,14 @@
         if (!('serviceWorker' in navigator)) return;
         const registrations = await navigator.serviceWorker.getRegistrations();
         const hadController = Boolean(navigator.serviceWorker.controller);
-        await Promise.all(registrations.map(registration => registration.unregister()));
+        const legacyRegistrations = registrations.filter(registration => {
+            try {
+                return !new URL(registration.scope).pathname.startsWith('/mobile/');
+            } catch {
+                return true;
+            }
+        });
+        await Promise.all(legacyRegistrations.map(registration => registration.unregister()));
         if ('caches' in window) {
             await caches.keys().then(keys => Promise.all(keys.map(key => caches.delete(key))));
         }

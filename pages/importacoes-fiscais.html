@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <script src="../core/security.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Caixa Fiscal - PrintPixel</title>
+  <style>
+    *{box-sizing:border-box;font-family:Segoe UI,system-ui,sans-serif}body{margin:0;padding:24px;background:#f8fafc;color:#1e293b}.container{max-width:1400px;margin:auto}.header{display:flex;justify-content:space-between;gap:16px;align-items:center}h1{margin:0;color:#1a237e}.subtitle{color:#64748b}.filters{display:flex;gap:8px;margin:20px 0}.btn{border:0;border-radius:8px;padding:10px 13px;background:#1a237e;color:#fff;font-weight:700;cursor:pointer}.btn.secondary{background:#475569}.btn.reject{background:#b91c1c}.btn.approve{background:#047857}.card{padding:18px;margin-bottom:13px;border:1px solid #e2e8f0;border-radius:12px;background:#fff;box-shadow:0 3px 14px #0f172a0d}.top{display:flex;justify-content:space-between;gap:12px}.tag{display:inline-block;padding:4px 8px;border-radius:999px;background:#fef3c7;color:#92400e;font-size:12px;font-weight:700}.tag.approved{background:#d1fae5;color:#065f46}.tag.rejected{background:#fee2e2;color:#991b1b}.details{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:16px 0;color:#475569}.details strong{display:block;color:#1e293b}.actions{display:flex;gap:8px;justify-content:flex-end}.empty{padding:30px;text-align:center;color:#64748b}
+  </style>
+</head>
+<body data-page-id="importacoes-fiscais" data-page-type="WRITE">
+  <main class="container">
+    <div class="header"><div><h1>Caixa de entrada fiscal</h1><p class="subtitle">Revise compras e vendas enviadas pelo app móvel antes de registrar.</p></div><button class="btn secondary" id="refreshBtn">Atualizar</button></div>
+    <div class="filters"><button class="btn" data-filter="pending_review">Pendentes</button><button class="btn secondary" data-filter="all">Todos</button></div>
+    <section id="list"></section>
+  </main>
+  <script>
+    let documents = [];
+    let filter = 'pending_review';
+    const list = document.getElementById('list');
+    const money = value => Number(value || 0).toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' });
+    function add(parent, tag, text, className) { const node = document.createElement(tag); node.textContent = text; if (className) node.className = className; parent.append(node); return node; }
+    function statusText(status) { return status === 'approved' ? 'Aprovado' : status === 'rejected' ? 'Rejeitado' : 'Pendente'; }
+    function render() {
+      list.replaceChildren();
+      const visible = documents.filter(item => filter === 'all' || item.status === filter);
+      if (!visible.length) return add(list, 'div', 'Nenhum documento nesta lista.', 'empty');
+      visible.forEach(item => {
+        const card = add(list, 'article', '', 'card');
+        const top = add(card, 'div', '', 'top');
+        add(top, 'strong', `${item.entryType === 'income' ? 'VENDA' : 'COMPRA'} · ${item.tipoDocumento} ${item.numeroFatura}`);
+        add(top, 'span', statusText(item.status), `tag ${item.status}`);
+        const details = add(card, 'div', '', 'details');
+        [['Emitente', `${item.nomeEmitente || 'Não informado'} · ${item.nifEmitente}`], ['Adquirente', item.nifAdquirente || 'Não informado'], ['Data', item.dataCompra], ['Base sem IVA', money(item.valorBruto)], ['IVA', money(item.valorIVA)], ['Total', money(item.valorTotal)], ['Origem', item.source === 'mobile_qr' ? 'QR Code' : 'Manual'], ['Dispositivo', item.deviceName]].forEach(([label, value]) => {
+          const cell = add(details, 'div', '');
+          add(cell, 'strong', label);
+          add(cell, 'span', value);
+        });
+        if (item.status === 'pending_review') {
+          const actions = add(card, 'div', '', 'actions');
+          const reject = add(actions, 'button', 'Rejeitar', 'btn reject');
+          const approve = add(actions, 'button', 'Aprovar e lançar', 'btn approve');
+          reject.addEventListener('click', () => action(item.id, 'reject'));
+          approve.addEventListener('click', () => action(item.id, 'approve'));
+        }
+      });
+    }
+    async function load() {
+      const response = await fetch('/api/mobile/inbox');
+      const body = await response.json();
+      if (!response.ok) return alert(body.message || 'Não foi possível carregar a caixa fiscal.');
+      documents = body.documents;
+      render();
+    }
+    async function action(id, name) {
+      const response = await fetch(`/api/mobile/inbox/${id}/${name}`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+      const body = await response.json();
+      if (!response.ok) return alert(body.message || 'Não foi possível concluir a operação.');
+      await load();
+    }
+    document.querySelectorAll('[data-filter]').forEach(button => button.addEventListener('click', () => { filter = button.dataset.filter; render(); }));
+    document.getElementById('refreshBtn').addEventListener('click', load);
+    load();
+  </script>
+</body>
+</html>
