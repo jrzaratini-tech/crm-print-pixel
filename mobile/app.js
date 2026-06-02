@@ -2,7 +2,6 @@
   'use strict';
   const TOKEN_KEY = 'printpixel_mobile_token';
   let token = localStorage.getItem(TOKEN_KEY) || '';
-  let companyNif = '';
   let stream = null;
   let scanTimer = null;
   let scanRequest = null;
@@ -41,7 +40,7 @@
     if (name === 'list' || name === 'home') loadDocuments();
   }
   function statusLabel(status) {
-    return status === 'approved' ? 'Aprovada' : status === 'rejected' ? 'Rejeitada' : 'Em revisão';
+    return status === 'approved' ? 'Lançada' : status === 'rejected' ? 'Rejeitada' : 'Processando';
   }
   function renderList(target, documents, max) {
     const node = $(target);
@@ -79,30 +78,20 @@
   }
   function logout(notify = true) {
     token = '';
-    companyNif = '';
     localStorage.removeItem(TOKEN_KEY);
     show('login');
     if (notify) toast('Acesso removido deste celular.');
   }
-  function parseQr(rawQr) {
-    const pairs = {};
-    rawQr.split('*').forEach(part => {
-      const index = part.indexOf(':');
-      if (index > 0) pairs[part.slice(0, index).trim().toUpperCase()] = part.slice(index + 1).trim();
-    });
-    const total = Number(String(pairs.O || pairs.P || pairs.Q || '0').replace(',', '.')) || 0;
-    const iva = Number(String(pairs.N || pairs.IVA || '0').replace(',', '.')) || 0;
-    const date = pairs.F && /^\d{8}$/.test(pairs.F) ? `${pairs.F.slice(0, 4)}-${pairs.F.slice(4, 6)}-${pairs.F.slice(6, 8)}` : '';
-    return { rawQr, nifEmitente: pairs.A || '', nifAdquirente: pairs.B || '', tipoDocumento: pairs.D || 'FT', numeroFatura: pairs.G || '', dataCompra: date, valorTotal: total, valorIVA: iva };
-  }
-  function fillEntry(data = {}) {
-    $('rawQr').value = data.rawQr || '';
-    ['nifEmitente', 'nomeEmitente', 'nifAdquirente', 'tipoDocumento', 'numeroFatura', 'dataCompra', 'valorTotal', 'valorIVA'].forEach(id => {
-      if (data[id] !== undefined && data[id] !== '') $(id).value = data[id];
-    });
-    const guessedType = companyNif && String(data.nifEmitente).replace(/\D/g, '') === companyNif ? 'income' : 'expense';
-    document.querySelector(`input[name="entryType"][value="${guessedType}"]`).checked = true;
-    show('entry');
+  async function submitScannedQr(rawQr) {
+    stopCamera();
+    try {
+      const result = await api('/api/mobile/documents', { method: 'POST', body: JSON.stringify({ rawQr }) });
+      alert(result.message);
+    } catch (error) {
+      alert(error.message);
+    }
+    $('rawQr').value = '';
+    show('home');
   }
   async function startCamera() {
     try {
@@ -118,7 +107,7 @@
           scanTimer = setInterval(async () => {
             try {
               const codes = await detector.detect($('camera'));
-              if (codes.length) fillEntry(parseQr(codes[0].rawValue));
+              if (codes.length) submitScannedQr(codes[0].rawValue);
             } catch {
               clearInterval(scanTimer);
               scanTimer = null;
@@ -155,7 +144,7 @@
       const image = context.getImageData(0, 0, canvas.width, canvas.height);
       const code = jsQR(image.data, image.width, image.height, { inversionAttempts: 'dontInvert' });
       if (code?.data) {
-        fillEntry(parseQr(code.data));
+        submitScannedQr(code.data);
         return;
       }
       scanRequest = requestAnimationFrame(tick);
@@ -167,7 +156,6 @@
     if (!token) return show('login');
     try {
       const config = await api('/api/mobile/config');
-      companyNif = config.companyNif || '';
       $('deviceInfo').textContent = `Dispositivo ativo: ${config.device}. O acesso permanece salvo somente neste celular.`;
       show('home');
     } catch {
@@ -190,7 +178,6 @@
   $('documentForm').addEventListener('submit', async event => {
     event.preventDefault();
     const body = Object.fromEntries(['nifEmitente', 'nomeEmitente', 'nifAdquirente', 'tipoDocumento', 'numeroFatura', 'dataCompra', 'valorTotal', 'valorIVA', 'observacoes'].map(id => [id, $(id).value]));
-    body.entryType = document.querySelector('input[name="entryType"]:checked').value;
     body.rawQr = $('rawQr').value;
     try {
       const result = await api('/api/mobile/documents', { method: 'POST', body: JSON.stringify(body) });
@@ -210,7 +197,7 @@
   });
   $('startCamera').addEventListener('click', startCamera);
   $('stopCamera').addEventListener('click', stopCamera);
-  $('useRawQr').addEventListener('click', () => fillEntry(parseQr($('rawQr').value)));
+  $('useRawQr').addEventListener('click', () => submitScannedQr($('rawQr').value));
   $('logoutBtn').addEventListener('click', () => logout());
   window.addEventListener('beforeinstallprompt', event => {
     event.preventDefault();

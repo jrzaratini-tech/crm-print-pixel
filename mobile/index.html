@@ -26,7 +26,7 @@
     </section>
 
     <section class="screen" id="homeScreen">
-      <div class="hero compact"><h1>Notas fiscais</h1><p>Registre compras e vendas no ato. O CRM fará a conferência antes do lançamento definitivo.</p></div>
+      <div class="hero compact"><h1>Notas fiscais</h1><p>Registre compras e vendas no ato. O CRM valida e lança automaticamente.</p></div>
       <div class="action-grid">
         <button class="action" data-go="scan"><b>⌁</b><span>Ler QR Code</span></button>
         <button class="action" data-go="entry"><b>+</b><span>Lançar manual</span></button>
@@ -42,9 +42,8 @@
     </section>
 
     <section class="screen" id="entryScreen">
-      <div class="screen-title"><button class="back" data-go="home">‹</button><div><h1>Conferir lançamento</h1><p>Revise os dados antes de enviar ao CRM.</p></div></div>
+      <div class="screen-title"><button class="back" data-go="home">‹</button><div><h1>Lançamento manual</h1><p>Use somente quando não houver QR Code.</p></div></div>
       <form class="card form" id="documentForm">
-        <div class="segmented"><label><input type="radio" name="entryType" value="expense" checked><span>Compra</span></label><label><input type="radio" name="entryType" value="income"><span>Venda</span></label></div>
         <label>NIF emitente<input id="nifEmitente" inputmode="numeric" maxlength="9" required></label>
         <label>Nome do emitente<input id="nomeEmitente" maxlength="160" placeholder="Opcional"></label>
         <label>NIF adquirente<input id="nifAdquirente" inputmode="numeric" maxlength="9"></label>
@@ -52,12 +51,12 @@
         <label>Data<input id="dataCompra" type="date" required></label>
         <div class="columns"><label>Total (€)<input id="valorTotal" type="number" min="0.01" step="0.01" required></label><label>IVA (€)<input id="valorIVA" type="number" min="0" step="0.01" value="0"></label></div>
         <label>Observações<textarea id="observacoes" rows="3" maxlength="500"></textarea></label>
-        <button class="primary" type="submit">Enviar para revisão</button>
+        <button class="primary" type="submit">Cadastrar fatura</button>
       </form>
     </section>
 
     <section class="screen" id="listScreen">
-      <div class="screen-title"><button class="back" data-go="home">‹</button><div><h1>Meus envios</h1><p>Acompanhe o estado das notas enviadas.</p></div></div>
+      <div class="screen-title"><button class="back" data-go="home">‹</button><div><h1>Meus lançamentos</h1><p>Consulte os últimos documentos enviados.</p></div></div>
       <div class="card list" id="fullList"></div>
     </section>
 

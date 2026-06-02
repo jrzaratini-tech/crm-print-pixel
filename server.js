@@ -253,6 +253,64 @@ async function findDuplicateMobileDocument(documento, fingerprint) {
   });
 }
 
+async function launchMobileDocument(item, fingerprint, now = new Date().toISOString()) {
+  const eventId = `mobile-${fingerprint.slice(0, 40)}`;
+  const payload = item.entryType === 'income'
+    ? {
+        nifEmitente: item.nifEmitente,
+        nifAdquirente: item.nifAdquirente,
+        numeroFatura: item.numeroFatura,
+        tipoDocumento: item.tipoDocumento,
+        dataFatura: item.dataCompra,
+        subtotal: item.valorBruto,
+        iva: item.valorIVA,
+        total: item.valorTotal,
+        origemLancamento: item.source,
+        observacoes: item.observacoes
+      }
+    : {
+        fornecedor: item.nomeEmitente || `Fornecedor NIF ${item.nifEmitente}`,
+        nifFornecedor: item.nifEmitente,
+        nifAdquirente: item.nifAdquirente,
+        numeroFatura: item.numeroFatura,
+        tipoDocumento: item.tipoDocumento,
+        dataCompra: item.dataCompra,
+        dataVencimento: item.dataCompra,
+        descricao: `${item.tipoDocumento} ${item.numeroFatura}`,
+        categoria: item.categoria,
+        formaPagamento: item.formaPagamento,
+        valorBruto: item.valorBruto,
+        valorIVA: item.valorIVA,
+        valorTotal: item.valorTotal,
+        comIVA: item.valorIVA > 0 ? 'sim' : 'nao',
+        ivaDedutivel: true,
+        statusPagamento: 'pago',
+        origemLancamento: item.source,
+        observacoes: item.observacoes
+      };
+  await db.collection('events').doc(eventId).set({
+    schema: item.entryType === 'income' ? 'fatura_venda' : 'despesa',
+    payload,
+    pageId: 'importacoes-fiscais',
+    timestamp: now,
+    created_at: now,
+    updated_at: now,
+    deleted: false
+  }, { merge: true });
+  return eventId;
+}
+
+async function launchLegacyPendingMobileDocuments(documents) {
+  return Promise.all(documents.map(async item => {
+    if (item.status !== 'pending_review') return item;
+    const now = new Date().toISOString();
+    const eventId = await launchMobileDocument(item, item.fingerprint || item.id, now);
+    const launched = { ...item, status: 'approved', eventId, reviewedAt: now, updatedAt: now };
+    await db.collection('mobile_invoice_inbox').doc(item.id).set(launched);
+    return launched;
+  }));
+}
+
 app.get('/scan-fatura.html', (req, res) => res.sendFile(path.join(__dirname, 'scan-fatura.html')));
 app.use('/mobile', express.static(path.join(__dirname, 'mobile'), { index: 'index.html', fallthrough: false }));
 
@@ -289,13 +347,12 @@ app.get('/api/mobile/config', requireMobileDevice, (req, res) => {
 app.get('/api/mobile/documents', requireMobileDevice, async (req, res) => {
   try {
     const snapshot = await db.collection('mobile_invoice_inbox').get();
-    const documents = snapshot.docs
+    const documents = (await launchLegacyPendingMobileDocuments(snapshot.docs
       .map(doc => ({ id: doc.id, ...doc.data() }))
       .filter(item => item.deviceId === req.mobileDevice.id)
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      .slice(0, 40)
-      .map(sanitizeForResponse);
-    res.json({ success: true, documents });
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))))
+      .slice(0, 40);
+    res.json({ success: true, documents: documents.map(sanitizeForResponse) });
   } catch (error) {
     console.error('Erro ao listar documentos moveis:', error);
     res.status(500).json({ success: false, message: 'Nao foi possivel carregar os lancamentos.' });
@@ -313,17 +370,23 @@ app.post('/api/mobile/documents', requireMobileDevice, async (req, res) => {
       return res.status(409).json({ success: false, message: 'Esta fatura ja foi enviada ou cadastrada no CRM.' });
     }
     const now = new Date().toISOString();
-    await db.collection('mobile_invoice_inbox').doc(fingerprint).set({
+    const item = {
       ...documento,
       fingerprint,
       source: documento.rawQr ? 'mobile_qr' : 'mobile_manual',
-      status: 'pending_review',
       deviceId: req.mobileDevice.id,
       deviceName: req.mobileDevice.name,
       createdAt: now,
       updatedAt: now
+    };
+    const eventId = await launchMobileDocument(item, fingerprint, now);
+    await db.collection('mobile_invoice_inbox').doc(fingerprint).set({
+      ...item,
+      status: 'approved',
+      eventId,
+      reviewedAt: now
     });
-    res.json({ success: true, id: fingerprint, entryType: documento.entryType, message: 'Fatura enviada para revisao no CRM.' });
+    res.json({ success: true, id: fingerprint, eventId, entryType: documento.entryType, message: 'Fatura cadastrada com sucesso.' });
   } catch (error) {
     console.error('Erro ao receber documento movel:', error);
     res.status(500).json({ success: false, message: 'Nao foi possivel enviar a fatura.' });
@@ -374,11 +437,12 @@ app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().
 app.get('/api/mobile/inbox', async (req, res) => {
   try {
     const snapshot = await db.collection('mobile_invoice_inbox').get();
-    const documents = snapshot.docs
+    const documents = (await launchLegacyPendingMobileDocuments(snapshot.docs
       .map(doc => ({ id: doc.id, ...doc.data() }))
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      .map(sanitizeForResponse);
-    res.json({ success: true, documents });
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))))
+      .filter(item => item.status === 'approved')
+      .slice(0, 10);
+    res.json({ success: true, documents: documents.map(sanitizeForResponse) });
   } catch (error) {
     console.error('Erro ao listar caixa fiscal:', error);
     res.status(500).json({ success: false, message: 'Nao foi possivel carregar a caixa fiscal.' });
@@ -394,51 +458,8 @@ app.post('/api/mobile/inbox/:id/approve', async (req, res) => {
     if (!inboxDoc.exists) return res.status(404).json({ success: false, message: 'Documento nao encontrado.' });
     const item = inboxDoc.data();
     if (item.status === 'rejected') return res.status(409).json({ success: false, message: 'Documento rejeitado. Envie novamente para revisar.' });
-    const eventId = `mobile-${id.slice(0, 40)}`;
-    const eventRef = db.collection('events').doc(eventId);
     const now = new Date().toISOString();
-    const payload = item.entryType === 'income'
-      ? {
-          nifEmitente: item.nifEmitente,
-          nifAdquirente: item.nifAdquirente,
-          numeroFatura: item.numeroFatura,
-          tipoDocumento: item.tipoDocumento,
-          dataFatura: item.dataCompra,
-          subtotal: item.valorBruto,
-          iva: item.valorIVA,
-          total: item.valorTotal,
-          origemLancamento: item.source,
-          observacoes: item.observacoes
-        }
-      : {
-          fornecedor: item.nomeEmitente || `Fornecedor NIF ${item.nifEmitente}`,
-          nifFornecedor: item.nifEmitente,
-          nifAdquirente: item.nifAdquirente,
-          numeroFatura: item.numeroFatura,
-          tipoDocumento: item.tipoDocumento,
-          dataCompra: item.dataCompra,
-          dataVencimento: item.dataCompra,
-          descricao: `${item.tipoDocumento} ${item.numeroFatura}`,
-          categoria: item.categoria,
-          formaPagamento: item.formaPagamento,
-          valorBruto: item.valorBruto,
-          valorIVA: item.valorIVA,
-          valorTotal: item.valorTotal,
-          comIVA: item.valorIVA > 0 ? 'sim' : 'nao',
-          ivaDedutivel: true,
-          statusPagamento: 'pago',
-          origemLancamento: item.source,
-          observacoes: item.observacoes
-        };
-    await eventRef.set({
-      schema: item.entryType === 'income' ? 'fatura_venda' : 'despesa',
-      payload,
-      pageId: 'importacoes-fiscais',
-      timestamp: now,
-      created_at: now,
-      updated_at: now,
-      deleted: false
-    }, { merge: true });
+    const eventId = await launchMobileDocument(item, id, now);
     await inboxRef.set({ ...item, status: 'approved', eventId, reviewedAt: now, updatedAt: now });
     res.json({ success: true, eventId, message: 'Documento aprovado e lancado no CRM.' });
   } catch (error) {

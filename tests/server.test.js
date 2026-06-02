@@ -80,7 +80,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(linksPageResult.body, /PrintPixel Fiscal Móvel/);
 });
 
-test('ativa celular e envia compra manual para revisao e aprovacao', async () => {
+test('ativa celular e lanca compra manual automaticamente', async () => {
   const login = await post('/api/mobile/login', { deviceName: 'Celular teste', accessKey: 'dev-mobile-key' });
   assert.equal(login.response.status, 200);
   assert.match(login.body.token, /^[a-f0-9]{96}$/);
@@ -99,12 +99,48 @@ test('ativa celular e envia compra manual para revisao e aprovacao', async () =>
 
   const inbox = await request('/api/mobile/inbox');
   assert.equal(inbox.response.status, 200);
-  assert.ok(inbox.body.documents.some(item => item.numeroFatura === 'FT MOBILE/1' && item.status === 'pending_review'));
-
-  const approved = await post(`/api/mobile/inbox/${sent.body.id}/approve`, {});
-  assert.equal(approved.response.status, 200);
-  const saved = await post('/api/database/query', { schema: 'despesa', filters: { id: approved.body.eventId } });
+  assert.ok(inbox.body.documents.some(item => item.numeroFatura === 'FT MOBILE/1' && item.status === 'approved'));
+  const saved = await post('/api/database/query', { schema: 'despesa', filters: { id: sent.body.eventId } });
   assert.equal(saved.body.events[0].payload.valorBruto, 200);
+});
+
+test('lanca QR fiscal automaticamente e bloqueia nova leitura duplicada', async () => {
+  const login = await post('/api/mobile/login', { deviceName: 'Celular QR', accessKey: 'dev-mobile-key' });
+  const body = { rawQr: 'A:504567890*B:509876543*D:FT*F:20260602*G:FT MOBILE/QR1*O:123.00*N:23.00' };
+  const sent = await mobilePost('/api/mobile/documents', body, login.body.token);
+  assert.equal(sent.response.status, 200);
+  assert.equal(sent.body.message, 'Fatura cadastrada com sucesso.');
+
+  const duplicate = await mobilePost('/api/mobile/documents', body, login.body.token);
+  assert.equal(duplicate.response.status, 409);
+  assert.match(duplicate.body.message, /ja foi enviada ou cadastrada/);
+});
+
+test('migra documento antigo em revisao para lancamento automatico', async () => {
+  const fingerprint = 'a'.repeat(64);
+  await db.collection('mobile_invoice_inbox').doc(fingerprint).set({
+    id: fingerprint,
+    fingerprint,
+    entryType: 'expense',
+    nifEmitente: '505678901',
+    nifAdquirente: '509876543',
+    tipoDocumento: 'FT',
+    numeroFatura: 'FT LEGACY/1',
+    dataCompra: '2026-06-02',
+    valorTotal: 61.5,
+    valorIVA: 11.5,
+    valorBruto: 50,
+    source: 'mobile_qr',
+    status: 'pending_review',
+    deviceId: 'legacy-device',
+    deviceName: 'Celular antigo',
+    createdAt: '2026-06-02T12:00:00.000Z'
+  });
+  const inbox = await request('/api/mobile/inbox');
+  assert.equal(inbox.response.status, 200);
+  assert.ok(inbox.body.documents.some(item => item.numeroFatura === 'FT LEGACY/1' && item.status === 'approved'));
+  const saved = await post('/api/database/query', { schema: 'despesa', filters: { id: `mobile-${fingerprint.slice(0, 40)}` } });
+  assert.equal(saved.body.count, 1);
 });
 
 test('rejeita uso do app movel sem dispositivo ativado', async () => {
