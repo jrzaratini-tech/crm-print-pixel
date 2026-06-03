@@ -559,6 +559,29 @@
             color: var(--primary-color);
             white-space: nowrap;
         }
+
+        .produto-modal-entregue {
+            background: #dcfce7;
+            box-shadow: inset 4px 0 0 #16a34a;
+        }
+
+        .produto-modal-entregue td {
+            border-bottom-color: #86efac;
+        }
+
+        .entrega-badge {
+            display: inline-flex;
+            align-items: center;
+            margin-left: 8px;
+            padding: 3px 8px;
+            border-radius: 999px;
+            background: #15803d;
+            color: #fff;
+            font-size: 11px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
         
         .pedido-resumo {
             flex: 1;
@@ -1659,8 +1682,8 @@
                             </thead>
                             <tbody>
                                 ${produtos.map(prod => `
-                                    <tr>
-                                        <td>${prod.nome || 'Produto'}</td>
+                                    <tr class="${prod.entregue === true || prod.entregue === 'true' ? 'produto-modal-entregue' : ''}">
+                                        <td>${prod.nome || 'Produto'}${prod.entregue === true || prod.entregue === 'true' ? '<span class="entrega-badge">Entregue</span>' : ''}</td>
                                         <td>${prod.tamanho || 'N/A'}</td>
                                         <td>${prod.quantidade || 1}</td>
                                         <td>${formatarMoeda(prod.valor || 0)}</td>
