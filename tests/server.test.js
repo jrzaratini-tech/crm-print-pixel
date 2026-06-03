@@ -101,6 +101,8 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(orderFormPageResult.body, /product-delivered/);
   assert.match(orderFormPageResult.body, /pedido\.produtos\.\$\{index\}\.entregue/);
   assert.match(orderFormPageResult.body, /window\.location\.href = 'pedidos\.html'/);
+  assert.match(orderFormPageResult.body, /window\.addEventListener\('coreCommitSuccess'/);
+  assert.match(orderFormPageResult.body, /setAttribute\('data-original-text', 'ATUALIZAR PEDIDO'\)/);
   assert.match(ordersPageResult.body, /produto-modal-entregue/);
   assert.match(ordersPageResult.body, /entrega-badge/);
   assert.match(scanPageResult.body, /Ler QR fiscal/);

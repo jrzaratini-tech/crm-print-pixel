@@ -1217,7 +1217,9 @@
                     numeroPedidoInput.style.backgroundColor = '';
                     
                     // Atualizar texto do botão
-                    document.getElementById('saveBtn').textContent = 'ATUALIZAR PEDIDO';
+                    const saveBtn = document.getElementById('saveBtn');
+                    saveBtn.textContent = 'ATUALIZAR PEDIDO';
+                    saveBtn.setAttribute('data-original-text', 'ATUALIZAR PEDIDO');
                     
                     // Calcular totais
                     calculateTotals();
@@ -1927,7 +1929,7 @@
             valorInstalacaoInput.addEventListener('input', calculateTotals);
             
             // Configurar listener para evento do engine.js
-            document.addEventListener('coreCommitSuccess', (event) => {
+            window.addEventListener('coreCommitSuccess', (event) => {
                 const detail = event.detail || {};
                 
                 if (detail.schema === 'pedido') {
@@ -1976,7 +1978,7 @@
                 }
             });
             
-            document.addEventListener('coreCommitError', (event) => {
+            window.addEventListener('coreCommitError', (event) => {
                 console.error('Erro no commit:', event.detail);
                 const saveBtn = document.getElementById('saveBtn');
                 saveBtn.classList.remove('saving');
