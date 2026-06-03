@@ -1,5 +1,6 @@
 (() => {
   'use strict';
+
   const TOKEN_KEY = 'printpixel_producao_token';
   let token = localStorage.getItem(TOKEN_KEY) || '';
   let assignments = [];
@@ -13,10 +14,15 @@
   async function api(path, options = {}) {
     const response = await fetch(path, { ...options, headers: { ...auth(), ...(options.headers || {}) } });
     const body = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(body.message || 'Não foi possível concluir a operação.');
+    if (!response.ok) throw new Error(body.message || 'Nao foi possivel concluir a operacao.');
     return body;
   }
-  function showNotice(message) { $('notice').textContent = message; $('notice').hidden = false; }
+
+  function showNotice(message) {
+    $('notice').textContent = message;
+    $('notice').hidden = false;
+  }
+
   function showLogin(message = '') {
     token = '';
     localStorage.removeItem(TOKEN_KEY);
@@ -26,28 +32,80 @@
     $('loginNotice').hidden = !message;
     $('loginNotice').textContent = message;
   }
+
   function showApp() {
     $('loginShell').hidden = true;
     $('appShell').hidden = false;
     $('logoutBtn').hidden = false;
   }
-  function isDone(assignment) { return assignment.steps.length > 0 && assignment.steps.every(step => step.done); }
-  function render() {
-    $('totalCount').textContent = assignments.length;
-    $('doneCount').textContent = assignments.filter(isDone).length;
-    $('openCount').textContent = assignments.filter(item => !isDone(item)).length;
-    $('orderList').replaceChildren();
-    if (!assignments.length) return showNotice('Nenhum trabalho foi direcionado para você até o momento.');
-    $('notice').hidden = true;
-    assignments.forEach(assignment => {
-      const order = assignment.order;
-      const card = document.createElement('article');
-      card.className = `order ${isDone(assignment) ? 'done' : ''}`;
-      card.innerHTML = `<div class="row"><div><h2>${escapeHtml(order.numero)}</h2><p>${escapeHtml(assignment.product?.nome || 'Serviço geral da O.S.')} · ${escapeHtml(order.cliente)}</p></div><span class="tag">${isDone(assignment) ? 'Concluído' : 'Em andamento'}</span></div><div class="meta"><span>Entrega: ${escapeHtml(order.dataEntrega || 'Não definida')}</span><span>Comissão: ${money(assignment.commission)}</span><span>${assignment.steps.filter(step => step.done).length}/${assignment.steps.length} etapas</span><span>${escapeHtml(order.empresa || '')}</span></div><button type="button">Abrir trabalho</button>`;
-      card.querySelector('button').addEventListener('click', () => openOrder(assignment.id));
-      $('orderList').append(card);
-    });
+
+  function isDone(assignment) {
+    return assignment.steps.length > 0 && assignment.steps.every(step => step.done);
   }
+
+  function isPaid(assignment) {
+    return assignment.paymentStatus === 'paid';
+  }
+
+  function groupAssignments() {
+    return {
+      open: assignments.filter(item => !isDone(item)),
+      receivable: assignments.filter(item => isDone(item) && !isPaid(item)),
+      paid: assignments.filter(item => isDone(item) && isPaid(item))
+    };
+  }
+
+  function renderCard(assignment, status) {
+    const order = assignment.order;
+    const card = document.createElement('article');
+    card.className = `order ${status}`;
+    const label = status === 'paid' ? 'Pago' : status === 'done' ? 'A receber' : 'Em andamento';
+    const tagClass = status === 'paid' ? 'paid' : status === 'done' ? 'waiting' : '';
+    card.innerHTML = `
+      <div class="row">
+        <div>
+          <h2>${escapeHtml(order.numero)}</h2>
+          <p>${escapeHtml(assignment.product?.nome || 'Servico geral da O.S.')} - ${escapeHtml(order.cliente)}</p>
+        </div>
+        <span class="tag ${tagClass}">${label}</span>
+      </div>
+      <div class="meta">
+        <span>Entrega: ${escapeHtml(order.dataEntrega || 'Nao definida')}</span>
+        <span>Comissao: ${money(assignment.commission)}</span>
+        <span>${assignment.steps.filter(step => step.done).length}/${assignment.steps.length} etapas</span>
+        <span>${status === 'paid' ? `Pago em ${new Date(assignment.paidAt).toLocaleDateString('pt-PT')}` : escapeHtml(order.empresa || '')}</span>
+      </div>
+      <button type="button">${status === 'paid' ? 'Abrir historico' : 'Abrir trabalho'}</button>`;
+    card.querySelector('button').addEventListener('click', () => openOrder(assignment.id));
+    return card;
+  }
+
+  function renderList(id, list, status, emptyMessage) {
+    const node = $(id);
+    node.replaceChildren();
+    if (!list.length) {
+      const empty = document.createElement('div');
+      empty.className = 'list-empty';
+      empty.textContent = emptyMessage;
+      node.append(empty);
+      return;
+    }
+    list.forEach(assignment => node.append(renderCard(assignment, status)));
+  }
+
+  function render() {
+    const grouped = groupAssignments();
+    $('totalCount').textContent = assignments.length;
+    $('openCount').textContent = grouped.open.length;
+    $('doneCount').textContent = grouped.receivable.length;
+    $('paidCount').textContent = grouped.paid.length;
+    if (!assignments.length) showNotice('Nenhum trabalho foi direcionado para voce ate o momento.');
+    else $('notice').hidden = true;
+    renderList('openList', grouped.open, 'open', 'Nenhum trabalho em andamento.');
+    renderList('receivableList', grouped.receivable, 'done', 'Nenhum trabalho concluido aguardando pagamento.');
+    renderList('paidList', grouped.paid, 'paid', 'Nenhum trabalho pago no historico.');
+  }
+
   async function load() {
     if (!token) return showLogin();
     try {
@@ -62,6 +120,7 @@
       showLogin(error.message);
     }
   }
+
   async function loadChat(orderId) {
     const result = await api(`/api/colaborador/ordens/${encodeURIComponent(orderId)}/chat`);
     const node = $('messages');
@@ -74,29 +133,62 @@
     });
     node.scrollTop = node.scrollHeight;
   }
+
   async function openOrder(assignmentId) {
     currentOrderId = assignmentId;
     const assignment = assignments.find(item => item.id === assignmentId);
     if (!assignment) return;
+    const paid = isPaid(assignment);
     const orderId = assignment.orderId;
     const order = assignment.order;
     const products = assignment.product ? [assignment.product] : order.produtos;
-    $('orderDetail').innerHTML = `<h2>${escapeHtml(order.numero)} · ${escapeHtml(order.cliente)}</h2><p>${escapeHtml(order.empresa)}</p><div class="box"><b>Informações do trabalho</b><p>Entrega: ${escapeHtml(order.dataEntrega || 'Não definida')}</p><p>Morada: ${escapeHtml(order.morada || 'Não informada')}</p><p>Contacto: ${escapeHtml(order.telemovel || 'Não informado')}</p><p>Comissão: <strong>${money(assignment.commission)}</strong></p><p>${escapeHtml(order.observacoes || '')}</p></div><div class="box"><b>Artigo direcionado</b>${products.map(product => `<div class="product"><strong>${escapeHtml(product.nome)}</strong><p>${escapeHtml(product.tamanho || '')} · Qtd. ${escapeHtml(product.quantidade)}</p><p>${escapeHtml(product.observacoes || '')}</p></div>`).join('')}</div><div class="box"><b>Etapas</b>${assignment.steps.map(step => `<label class="step"><input type="checkbox" data-step="${escapeHtml(step.id)}" ${step.done ? 'checked' : ''}><span>${escapeHtml(step.label)}</span></label>`).join('')}</div><div class="box"><b>Chat privado</b><div class="messages" id="messages"></div><form class="chat" id="chatForm"><input id="chatInput" maxlength="1000" required placeholder="Escreva uma mensagem"><button class="send">Enviar</button></form></div>`;
+    $('orderDetail').innerHTML = `
+      <h2>${escapeHtml(order.numero)} - ${escapeHtml(order.cliente)}</h2>
+      <p>${escapeHtml(order.empresa)}</p>
+      <div class="box">
+        <b>Informacoes do trabalho</b>
+        <p>Entrega: ${escapeHtml(order.dataEntrega || 'Nao definida')}</p>
+        <p>Morada: ${escapeHtml(order.morada || 'Nao informada')}</p>
+        <p>Contacto: ${escapeHtml(order.telemovel || 'Nao informado')}</p>
+        <p>Comissao: <strong>${money(assignment.commission)}</strong></p>
+        <p>Status do pagamento: <strong>${paid ? `Pago em ${new Date(assignment.paidAt).toLocaleString('pt-PT')}` : isDone(assignment) ? 'Concluido e aguardando pagamento' : 'Em andamento'}</strong></p>
+        <p>${escapeHtml(order.observacoes || '')}</p>
+      </div>
+      <div class="box">
+        <b>Artigo direcionado</b>
+        ${products.map(product => `<div class="product"><strong>${escapeHtml(product.nome)}</strong><p>${escapeHtml(product.tamanho || '')} - Qtd. ${escapeHtml(product.quantidade)}</p><p>${escapeHtml(product.observacoes || '')}</p></div>`).join('')}
+      </div>
+      <div class="box">
+        <b>Etapas</b>
+        ${assignment.steps.map(step => `<label class="step"><input type="checkbox" data-step="${escapeHtml(step.id)}" ${step.done ? 'checked' : ''} ${paid ? 'disabled' : ''}><span>${escapeHtml(step.label)}</span></label>`).join('')}
+      </div>
+      <div class="box">
+        <b>Chat privado</b>
+        <div class="messages" id="messages"></div>
+        ${paid ? '<p>Servico pago e arquivado. Use o CRM para novas tratativas.</p>' : '<form class="chat" id="chatForm"><input id="chatInput" maxlength="1000" required placeholder="Escreva uma mensagem"><button class="send">Enviar</button></form>'}
+      </div>`;
     $('orderDetail').querySelectorAll('[data-step]').forEach(input => input.addEventListener('change', async event => {
       await api(`/api/colaborador/ordens/${encodeURIComponent(orderId)}/etapas`, { method: 'POST', body: JSON.stringify({ productId: assignment.productId, stepId: event.target.dataset.step, done: event.target.checked }) });
       await load();
     }));
-    $('chatForm').addEventListener('submit', async event => {
-      event.preventDefault();
-      const input = $('chatInput');
-      await api(`/api/colaborador/ordens/${encodeURIComponent(orderId)}/chat`, { method: 'POST', body: JSON.stringify({ message: input.value }) });
-      input.value = '';
-      await loadChat(orderId);
-    });
+    if (!paid) {
+      $('chatForm').addEventListener('submit', async event => {
+        event.preventDefault();
+        const input = $('chatInput');
+        await api(`/api/colaborador/ordens/${encodeURIComponent(orderId)}/chat`, { method: 'POST', body: JSON.stringify({ message: input.value }) });
+        input.value = '';
+        await loadChat(orderId);
+      });
+    }
     await loadChat(orderId);
     if (!$('orderDialog').open) $('orderDialog').showModal();
   }
-  $('closeDialog').addEventListener('click', () => { currentOrderId = ''; $('orderDialog').close(); });
+
+  $('closeDialog').addEventListener('click', () => {
+    currentOrderId = '';
+    $('orderDialog').close();
+  });
+
   $('loginForm').addEventListener('submit', async event => {
     event.preventDefault();
     try {
@@ -106,7 +198,7 @@
         body: JSON.stringify({ username: $('username').value, password: $('password').value })
       });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.message || 'Não foi possível entrar.');
+      if (!response.ok) throw new Error(result.message || 'Nao foi possivel entrar.');
       token = result.token;
       $('password').value = '';
       await load();
@@ -115,9 +207,20 @@
       $('loginNotice').textContent = error.message;
     }
   });
+
   $('logoutBtn').addEventListener('click', () => showLogin());
-  window.addEventListener('beforeinstallprompt', event => { event.preventDefault(); deferredInstall = event; $('installBtn').hidden = false; });
-  $('installBtn').addEventListener('click', async () => { if (!deferredInstall) return; deferredInstall.prompt(); await deferredInstall.userChoice; deferredInstall = null; $('installBtn').hidden = true; });
+  window.addEventListener('beforeinstallprompt', event => {
+    event.preventDefault();
+    deferredInstall = event;
+    $('installBtn').hidden = false;
+  });
+  $('installBtn').addEventListener('click', async () => {
+    if (!deferredInstall) return;
+    deferredInstall.prompt();
+    await deferredInstall.userChoice;
+    deferredInstall = null;
+    $('installBtn').hidden = true;
+  });
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
   load();
 })();

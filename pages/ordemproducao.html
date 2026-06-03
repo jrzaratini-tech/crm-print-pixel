@@ -222,6 +222,115 @@
             background: var(--accent-green);
         }
 
+        .payment-panel {
+            margin: 0 30px 20px;
+            padding: 18px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            background: var(--card-bg);
+            box-shadow: var(--shadow);
+        }
+
+        .payment-panel-header {
+            display: flex;
+            justify-content: space-between;
+            gap: 14px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }
+
+        .payment-panel-header h2 {
+            margin: 0;
+            color: var(--accent-blue);
+            font-size: 18px;
+        }
+
+        .payment-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .payment-summary-card {
+            padding: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .payment-summary-card b,
+        .payment-summary-card span {
+            display: block;
+        }
+
+        .payment-summary-card b {
+            color: var(--accent-green);
+            font-size: 18px;
+        }
+
+        .payment-summary-card span {
+            color: var(--text-secondary);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .payment-list {
+            display: grid;
+            gap: 10px;
+        }
+
+        .payment-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px;
+            align-items: center;
+            padding: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 10px;
+            background: rgba(15, 23, 42, 0.28);
+        }
+
+        .payment-row small {
+            display: block;
+            color: var(--text-secondary);
+            margin-top: 3px;
+        }
+
+        .payment-row button {
+            border: 0;
+            border-radius: 9px;
+            padding: 10px 12px;
+            background: var(--accent-green);
+            color: #fff;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .payment-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .payment-tabs button {
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            padding: 8px 12px;
+            background: transparent;
+            color: var(--text-secondary);
+            font-weight: 800;
+            cursor: pointer;
+        }
+
+        .payment-tabs button.active {
+            border-color: var(--accent-blue);
+            color: var(--accent-blue);
+            background: rgba(59, 130, 246, 0.1);
+        }
+
         .operational-filters {
             display: grid;
             grid-template-columns: repeat(3, minmax(160px, 1fr));
@@ -964,6 +1073,21 @@
     <!-- ============================================
          PAINEL DE PRODUÇÃO
          ============================================ -->
+    <section class="payment-panel">
+        <div class="payment-panel-header">
+            <div>
+                <h2>Controle de comissoes da producao</h2>
+                <p style="margin:4px 0 0;color:var(--text-secondary)">Servicos concluidos entram como saldo a pagar. Ao confirmar o pagamento, somem do painel principal do colaborador.</p>
+            </div>
+        </div>
+        <div class="payment-summary" id="paymentSummary"></div>
+        <div class="payment-tabs">
+            <button type="button" class="active" data-payment-filter="pending">A pagar</button>
+            <button type="button" data-payment-filter="paid">Ja pagos</button>
+        </div>
+        <div class="payment-list" id="paymentList"></div>
+    </section>
+
     <section class="production-board" id="productionBoard">
         <!-- Os cards de pedido serão carregados dinamicamente aqui -->
     </section>
@@ -1064,6 +1188,9 @@
             const workerFilter = document.getElementById('workerFilter');
             const activityFilter = document.getElementById('activityFilter');
             const progressFilter = document.getElementById('progressFilter');
+            const paymentSummary = document.getElementById('paymentSummary');
+            const paymentList = document.getElementById('paymentList');
+            const paymentTabs = document.querySelectorAll('[data-payment-filter]');
             const classificationOverlay = document.getElementById('classificationOverlay');
             const classificationClose = document.getElementById('classificationClose');
             const classificationTitle = document.getElementById('classificationTitle');
@@ -1081,6 +1208,7 @@
             // Estado da aplicação
             let todasOrdens = [];
             let filtroAtual = 'all';
+            let paymentFilter = 'pending';
             let contadorRefresh = 30;
             let productionWorkers = [];
             let productionAssignments = [];
@@ -1586,6 +1714,74 @@
                 return { key: done === 0 ? 'not_started' : done === total ? 'done' : 'in_progress', done, total, percent: Math.round(done * 100 / total), current };
             }
 
+            function assignmentDone(assignment) {
+                return Array.isArray(assignment?.steps) && assignment.steps.length > 0 && assignment.steps.every(step => step.done);
+            }
+
+            function assignmentPaymentRows() {
+                const ordersById = new Map(todasOrdens.map(ordem => [ordem.id, ordem]));
+                return productionAssignments
+                    .filter(item => item.active !== false && parseFloat(item.commission) > 0 && assignmentDone(item))
+                    .map(item => ({
+                        ...item,
+                        order: ordersById.get(item.orderId),
+                        commissionValue: parseFloat(item.commission) || 0,
+                        paid: item.paymentStatus === 'paid'
+                    }))
+                    .sort((a, b) => new Date(b.paidAt || b.updatedAt || 0) - new Date(a.paidAt || a.updatedAt || 0));
+            }
+
+            function renderPaymentControl() {
+                const rows = assignmentPaymentRows();
+                const pendingRows = rows.filter(item => !item.paid);
+                const paidRows = rows.filter(item => item.paid);
+                const byWorker = new Map();
+                pendingRows.forEach(item => {
+                    const current = byWorker.get(item.workerId) || { name: item.workerName, total: 0, count: 0 };
+                    current.total += item.commissionValue;
+                    current.count += 1;
+                    byWorker.set(item.workerId, current);
+                });
+                const pendingTotal = pendingRows.reduce((sum, item) => sum + item.commissionValue, 0);
+                const paidTotal = paidRows.reduce((sum, item) => sum + item.commissionValue, 0);
+                paymentSummary.innerHTML = `
+                    <div class="payment-summary-card"><span>Total a pagar</span><b>${formatarMoedaPadrao(pendingTotal)}</b></div>
+                    <div class="payment-summary-card"><span>Servicos a pagar</span><b>${pendingRows.length}</b></div>
+                    <div class="payment-summary-card"><span>Ja pago</span><b>${formatarMoedaPadrao(paidTotal)}</b></div>
+                    ${Array.from(byWorker.values()).map(item => `<div class="payment-summary-card"><span>${escapeHtml(item.name)}</span><b>${formatarMoedaPadrao(item.total)}</b><small>${item.count} servico(s)</small></div>`).join('')}
+                `;
+                const visibleRows = paymentFilter === 'paid' ? paidRows : pendingRows;
+                paymentList.innerHTML = visibleRows.map(item => {
+                    const order = item.order || {};
+                    return `<div class="payment-row">
+                        <div>
+                            <strong>${escapeHtml(item.workerName)} - ${formatarMoedaPadrao(item.commissionValue)}</strong>
+                            <small>${escapeHtml(order.numero || item.orderId)} - ${escapeHtml(order.cliente || 'Cliente nao encontrado')} - ${escapeHtml(item.productName || 'Servico geral')}</small>
+                            <small>${item.paid ? `Pago em ${escapeHtml(formatarDataPadrao(item.paidAt, true))} por ${escapeHtml(item.paidBy || 'responsavel')}` : 'Concluido e aguardando pagamento'}</small>
+                        </div>
+                        ${item.paid ? '<span class="order-status status-concluido">Pago</span>' : `<button type="button" data-pay-assignment="${escapeHtml(item.orderId)}" data-product-id="${escapeHtml(item.productId || '')}">Marcar pago</button>`}
+                    </div>`;
+                }).join('') || `<div style="color:var(--text-secondary);padding:10px;">${paymentFilter === 'paid' ? 'Nenhum pagamento registrado ainda.' : 'Nenhuma comissao concluida pendente de pagamento.'}</div>`;
+                paymentList.querySelectorAll('[data-pay-assignment]').forEach(button => {
+                    button.addEventListener('click', () => markAssignmentPaid(button.dataset.payAssignment, button.dataset.productId || ''));
+                });
+            }
+
+            async function markAssignmentPaid(orderId, productId) {
+                if (!confirm('Confirmar que esta comissao ja foi paga ao colaborador?')) return;
+                const response = await fetch(`/api/production/assignments/${encodeURIComponent(orderId)}/payment`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ productId, paidBy: 'Equipe interna' })
+                });
+                const result = await response.json();
+                if (!response.ok) return alert(result.message || 'Nao foi possivel marcar como pago.');
+                await carregarMetadadosProducao();
+                renderPaymentControl();
+                if (classificationOrder?.id === orderId) carregarItemClassificacao();
+                alert('Pagamento registrado. O servico agora ira para o historico pago do colaborador.');
+            }
+
             function orderProgress(orderId) {
                 const assignments = activeAssignmentsOf(orderId);
                 const steps = assignments.flatMap(item => item.steps || []);
@@ -1630,7 +1826,8 @@
                         transferred: `Transferido de ${item.fromWorkerName || 'fila'} para ${item.workerName || 'colaborador'}`,
                         unassigned: `Devolvido por ${item.fromWorkerName || 'colaborador'} para a fila`,
                         step_completed: `${item.workerName || 'Colaborador'} concluiu: ${item.stepLabel || item.stepId}`,
-                        step_reopened: `${item.workerName || 'Colaborador'} reabriu: ${item.stepLabel || item.stepId}`
+                        step_reopened: `${item.workerName || 'Colaborador'} reabriu: ${item.stepLabel || item.stepId}`,
+                        payment_paid: `Comissao paga por ${item.paidBy || 'responsavel'}`
                     };
                     return `<div class="production-chat-message"><strong>${escapeHtml(labels[item.type] || item.type)}</strong><small>${escapeHtml(formatarDataPadrao(item.createdAt, true))}</small></div>`;
                 }).join('') || '<p style="color:var(--text-secondary)">Este artigo ainda não possui movimentações.</p>';
@@ -1856,6 +2053,7 @@
                 
                 // Atualizar UI
                 atualizarContadores();
+                renderPaymentControl();
                 aplicarFiltro();
                 
                 // Ocultar loading, mostrar board
@@ -2239,7 +2437,8 @@
                     transferred: item => `Transferido de ${item.fromWorkerName || 'fila'} para ${item.workerName || 'colaborador'}`,
                     unassigned: item => `Devolvido por ${item.fromWorkerName || 'colaborador'} para a fila`,
                     step_completed: item => `${item.workerName || 'Colaborador'} concluiu: ${item.stepLabel || item.stepId}`,
-                    step_reopened: item => `${item.workerName || 'Colaborador'} reabriu: ${item.stepLabel || item.stepId}`
+                    step_reopened: item => `${item.workerName || 'Colaborador'} reabriu: ${item.stepLabel || item.stepId}`,
+                    payment_paid: item => `Comissao paga por ${item.paidBy || 'responsavel'}`
                 };
                 const itemHistoryHtml = produtos.map((product, index) => {
                     const productId = `item_${index}`;
@@ -2254,6 +2453,7 @@
                         <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
                             <strong>${escapeHtml(product.nome || `Produto ${index + 1}`)}</strong>
                             <span style="color:${current ? '#99f6e4' : 'var(--accent-yellow)'}">${current ? `Responsável: ${escapeHtml(current.workerName)}` : 'Na fila sem responsável'}</span>
+                            ${latest ? `<span style="color:${latest.paymentStatus === 'paid' ? 'var(--accent-green)' : 'var(--accent-yellow)'}">${latest.paymentStatus === 'paid' ? `Comissao paga: ${escapeHtml(formatarDataPadrao(latest.paidAt, true))}` : `Comissao a pagar: ${formatarMoedaPadrao(latest.commission || 0)}`}</span>` : ''}
                         </div>
                         <div class="production-task-groups">
                             <div class="production-task-group">
@@ -2620,6 +2820,14 @@
                 });
             });
             [workerFilter, activityFilter, progressFilter].forEach(filter => filter.addEventListener('change', aplicarFiltro));
+            paymentTabs.forEach(tab => {
+                tab.addEventListener('click', () => {
+                    paymentTabs.forEach(item => item.classList.remove('active'));
+                    tab.classList.add('active');
+                    paymentFilter = tab.dataset.paymentFilter;
+                    renderPaymentControl();
+                });
+            });
             
             // Atualizar manualmente
             manualRefresh.addEventListener('click', () => {

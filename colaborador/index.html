@@ -22,8 +22,10 @@
   <main id="appShell" hidden>
     <section class="hero"><p class="eyebrow">Painel individual</p><h1 id="workerName">Carregando...</h1><p>Acompanhe apenas os trabalhos direcionados para você.</p></section>
     <section id="notice" class="notice" hidden></section>
-    <section class="summary"><div><b id="totalCount">0</b><span>Trabalhos</span></div><div><b id="openCount">0</b><span>Em andamento</span></div><div><b id="doneCount">0</b><span>Concluídos</span></div></section>
-    <section class="list" id="orderList"></section>
+    <section class="summary"><div><b id="totalCount">0</b><span>Trabalhos</span></div><div><b id="openCount">0</b><span>Em andamento</span></div><div><b id="doneCount">0</b><span>A receber</span></div><div><b id="paidCount">0</b><span>Pagos</span></div></section>
+    <section class="work-section"><h2>Em andamento</h2><div class="list" id="openList"></div></section>
+    <section class="work-section"><h2>Concluido a receber</h2><div class="list" id="receivableList"></div></section>
+    <section class="work-section paid-history"><h2>Concluido e pago</h2><div class="list" id="paidList"></div></section>
   </main>
   <dialog id="orderDialog"><div id="orderDetail"></div><button class="close" id="closeDialog">Fechar</button></dialog>
   <script src="app.js"></script>

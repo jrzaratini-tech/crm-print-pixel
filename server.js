@@ -524,6 +524,7 @@ app.post('/api/colaborador/ordens/:id/etapas', requireWorker, async (req, res) =
     const productId = productionProductId(req.body?.productId);
     const assignment = await assignmentForWorker(orderId, req.productionWorker.id, productId);
     if (!assignment) return res.status(404).json({ success: false, message: 'Ordem nao encontrada para este colaborador.' });
+    if (assignment.paymentStatus === 'paid') return res.status(400).json({ success: false, message: 'Servico ja pago e arquivado.' });
     const stepId = productionStepId(req.body?.stepId);
     if (!stepId || !assignment.steps.some(step => step.id === stepId)) {
       return res.status(400).json({ success: false, message: 'Etapa invalida.' });
@@ -840,6 +841,8 @@ app.post('/api/production/assignments', async (req, res) => {
     const oldDoc = await db.collection('production_assignments').doc(assignmentId).get();
     const old = oldDoc.exists ? oldDoc.data() : {};
     const now = new Date().toISOString();
+    const commission = money(req.body?.commission);
+    const keepPayment = old.paymentStatus === 'paid' && old.workerId === workerId && money(old.commission) === commission;
     const assignment = {
       orderId,
       productId,
@@ -847,7 +850,11 @@ app.post('/api/production/assignments', async (req, res) => {
       workerId,
       workerName: worker.name,
       workerRole: worker.role,
-      commission: money(req.body?.commission),
+      commission,
+      paymentStatus: keepPayment ? 'paid' : 'pending',
+      paidAt: keepPayment ? old.paidAt || null : null,
+      paidBy: keepPayment ? old.paidBy || '' : '',
+      paymentNote: keepPayment ? old.paymentNote || '' : '',
       steps: normalizeProductionSteps(req.body?.steps, old.steps),
       transitions: [
         ...(Array.isArray(old.transitions) ? old.transitions : []),
@@ -881,6 +888,54 @@ app.post('/api/production/assignments', async (req, res) => {
   } catch (error) {
     console.error('Erro ao classificar OS:', error);
     res.status(500).json({ success: false, message: 'Nao foi possivel classificar a OS.' });
+  }
+});
+
+app.post('/api/production/assignments/:id/payment', async (req, res) => {
+  try {
+    const orderId = String(req.params.id || '');
+    const productId = productionProductId(req.body?.productId);
+    const assignmentId = productionAssignmentId(orderId, productId);
+    const assignmentDoc = await db.collection('production_assignments').doc(assignmentId).get();
+    if (!assignmentDoc.exists || assignmentDoc.data().active === false) {
+      return res.status(404).json({ success: false, message: 'Servico nao encontrado para pagamento.' });
+    }
+    const assignment = assignmentDoc.data();
+    const steps = Array.isArray(assignment.steps) ? assignment.steps : [];
+    if (!steps.length || steps.some(step => !step.done)) {
+      return res.status(400).json({ success: false, message: 'Conclua todas as etapas antes de marcar a comissao como paga.' });
+    }
+    if (money(assignment.commission) <= 0) {
+      return res.status(400).json({ success: false, message: 'Este servico nao possui comissao para pagar.' });
+    }
+    const now = new Date().toISOString();
+    const paidBy = text(req.body?.paidBy || 'Equipe interna', 120);
+    const paymentNote = text(req.body?.note, 300);
+    const updated = {
+      ...assignment,
+      paymentStatus: 'paid',
+      paidAt: now,
+      paidBy,
+      paymentNote,
+      history: [
+        ...(Array.isArray(assignment.history) ? assignment.history : []),
+        assignmentHistoryEntry('payment_paid', {
+          productId,
+          productName: assignment.productName || '',
+          workerId: assignment.workerId,
+          workerName: assignment.workerName,
+          paidBy,
+          commission: money(assignment.commission),
+          note: paymentNote
+        })
+      ].slice(-100),
+      updatedAt: now
+    };
+    await db.collection('production_assignments').doc(assignmentId).set(updated);
+    res.json({ success: true, assignment: sanitizeForResponse({ id: assignmentId, ...updated }) });
+  } catch (error) {
+    console.error('Erro ao marcar comissao como paga:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel marcar a comissao como paga.' });
   }
 });
 
