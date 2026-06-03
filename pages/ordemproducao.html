@@ -167,6 +167,14 @@
             margin-top: 3px;
         }
 
+        .production-responsibles {
+            grid-column: 1 / -1;
+            color: #99f6e4;
+            font-size: 13px;
+            font-weight: 800;
+            line-height: 1.35;
+        }
+
         .production-progress-track {
             height: 10px;
             overflow: hidden;
@@ -2134,6 +2142,9 @@
                 const total = ordem.total || 0;
                 const assignments = activeAssignmentsOf(ordem.id);
                 const progress = orderProgress(ordem.id);
+                const workerNames = assignments
+                    .map(item => item.workerName)
+                    .filter((name, index, names) => name && names.indexOf(name) === index);
                 
                 // Formatadores
                 const formatarData = (dataStr) => {
@@ -2205,6 +2216,7 @@
                                 <i class="fas fa-user-tie meta-icon"></i>
                                 <span>Atendente: ${ordem.atendente || 'N/A'}</span>
                             </div>
+                            ${workerNames.length ? `<div class="production-responsibles">${escapeHtml(workerNames.join(', '))}</div>` : ''}
                             <div class="production-progress" role="progressbar" aria-label="Progresso da produção" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress.percent}" title="Progresso da produção: ${progress.percent}%">
                                 <div class="production-progress-track">
                                     <div class="production-progress-fill" style="width: ${progress.percent}%"></div>

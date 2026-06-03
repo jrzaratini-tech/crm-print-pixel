@@ -107,6 +107,8 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(productionPageResult.body, /classificationProduct/);
   assert.match(productionPageResult.body, /Controle de comissoes da producao/);
   assert.match(workerAppResult.body, /Concluido a receber/);
+  assert.match(workerAppResult.body, /Historico \/ pagos/);
+  assert.match(workerAppResult.body, /assignedValue/);
   assert.match(productionPageResult.body, /HISTÓRICO DA PRODUÇÃO POR ARTIGO/);
 });
 

@@ -55,6 +55,10 @@
     };
   }
 
+  function sumCommission(list) {
+    return list.reduce((sum, item) => sum + (Number(item.commission) || 0), 0);
+  }
+
   function renderCard(assignment, status) {
     const order = assignment.order;
     const card = document.createElement('article');
@@ -99,6 +103,8 @@
     $('openCount').textContent = grouped.open.length;
     $('doneCount').textContent = grouped.receivable.length;
     $('paidCount').textContent = grouped.paid.length;
+    $('assignedValue').textContent = money(sumCommission([...grouped.open, ...grouped.receivable]));
+    $('receivableValue').textContent = money(sumCommission(grouped.receivable));
     if (!assignments.length) showNotice('Nenhum trabalho foi direcionado para voce ate o momento.');
     else $('notice').hidden = true;
     renderList('openList', grouped.open, 'open', 'Nenhum trabalho em andamento.');
@@ -209,6 +215,9 @@
   });
 
   $('logoutBtn').addEventListener('click', () => showLogin());
+  $('historyToggle').addEventListener('click', () => {
+    $('paidSection').hidden = !$('paidSection').hidden;
+  });
   window.addEventListener('beforeinstallprompt', event => {
     event.preventDefault();
     deferredInstall = event;
