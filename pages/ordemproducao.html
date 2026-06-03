@@ -1090,6 +1090,7 @@
         </div>
         <div class="payment-summary" id="paymentSummary"></div>
         <div class="payment-tabs">
+            <button type="button" data-payment-filter="process">Em processo</button>
             <button type="button" class="active" data-payment-filter="pending">A pagar</button>
             <button type="button" data-payment-filter="paid">Ja pagos</button>
         </div>
@@ -1729,11 +1730,12 @@
             function assignmentPaymentRows() {
                 const ordersById = new Map(todasOrdens.map(ordem => [ordem.id, ordem]));
                 return productionAssignments
-                    .filter(item => item.active !== false && parseFloat(item.commission) > 0 && assignmentDone(item))
+                    .filter(item => item.active !== false && parseFloat(item.commission) > 0)
                     .map(item => ({
                         ...item,
                         order: ordersById.get(item.orderId),
                         commissionValue: parseFloat(item.commission) || 0,
+                        done: assignmentDone(item),
                         paid: item.paymentStatus === 'paid'
                     }))
                     .sort((a, b) => new Date(b.paidAt || b.updatedAt || 0) - new Date(a.paidAt || a.updatedAt || 0));
@@ -1741,7 +1743,8 @@
 
             function renderPaymentControl() {
                 const rows = assignmentPaymentRows();
-                const pendingRows = rows.filter(item => !item.paid);
+                const processRows = rows.filter(item => !item.done && !item.paid);
+                const pendingRows = rows.filter(item => item.done && !item.paid);
                 const paidRows = rows.filter(item => item.paid);
                 const byWorker = new Map();
                 pendingRows.forEach(item => {
@@ -1755,21 +1758,23 @@
                 paymentSummary.innerHTML = `
                     <div class="payment-summary-card"><span>Total a pagar</span><b>${formatarMoedaPadrao(pendingTotal)}</b></div>
                     <div class="payment-summary-card"><span>Servicos a pagar</span><b>${pendingRows.length}</b></div>
+                    <div class="payment-summary-card"><span>Em processo</span><b>${processRows.length}</b></div>
                     <div class="payment-summary-card"><span>Ja pago</span><b>${formatarMoedaPadrao(paidTotal)}</b></div>
                     ${Array.from(byWorker.values()).map(item => `<div class="payment-summary-card"><span>${escapeHtml(item.name)}</span><b>${formatarMoedaPadrao(item.total)}</b><small>${item.count} servico(s)</small></div>`).join('')}
                 `;
-                const visibleRows = paymentFilter === 'paid' ? paidRows : pendingRows;
+                const visibleRows = paymentFilter === 'paid' ? paidRows : paymentFilter === 'process' ? processRows : pendingRows;
                 paymentList.innerHTML = visibleRows.map(item => {
                     const order = item.order || {};
+                    const progress = assignmentProgress(item);
                     return `<div class="payment-row">
                         <div>
                             <strong>${escapeHtml(item.workerName)} - ${formatarMoedaPadrao(item.commissionValue)}</strong>
                             <small>${escapeHtml(order.numero || item.orderId)} - ${escapeHtml(order.cliente || 'Cliente nao encontrado')} - ${escapeHtml(item.productName || 'Servico geral')}</small>
-                            <small>${item.paid ? `Pago em ${escapeHtml(formatarDataPadrao(item.paidAt, true))} por ${escapeHtml(item.paidBy || 'responsavel')}` : 'Concluido e aguardando pagamento'}</small>
+                            <small>${item.paid ? `Pago em ${escapeHtml(formatarDataPadrao(item.paidAt, true))} por ${escapeHtml(item.paidBy || 'responsavel')}` : item.done ? 'Concluido e aguardando pagamento' : `Em andamento: ${progress.done}/${progress.total} etapas`}</small>
                         </div>
-                        ${item.paid ? '<span class="order-status status-concluido">Pago</span>' : `<button type="button" data-pay-assignment="${escapeHtml(item.orderId)}" data-product-id="${escapeHtml(item.productId || '')}">Marcar pago</button>`}
+                        ${item.paid ? '<span class="order-status status-concluido">Pago</span>' : item.done ? `<button type="button" data-pay-assignment="${escapeHtml(item.orderId)}" data-product-id="${escapeHtml(item.productId || '')}">Marcar pago</button>` : '<span class="order-status status-processamento">Em processo</span>'}
                     </div>`;
-                }).join('') || `<div style="color:var(--text-secondary);padding:10px;">${paymentFilter === 'paid' ? 'Nenhum pagamento registrado ainda.' : 'Nenhuma comissao concluida pendente de pagamento.'}</div>`;
+                }).join('') || `<div style="color:var(--text-secondary);padding:10px;">${paymentFilter === 'paid' ? 'Nenhum pagamento registrado ainda.' : paymentFilter === 'process' ? 'Nenhum servico em processo.' : 'Nenhuma comissao concluida pendente de pagamento.'}</div>`;
                 paymentList.querySelectorAll('[data-pay-assignment]').forEach(button => {
                     button.addEventListener('click', () => markAssignmentPaid(button.dataset.payAssignment, button.dataset.productId || ''));
                 });

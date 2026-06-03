@@ -174,6 +174,12 @@
         ${paid ? '<p>Servico pago e arquivado. Use o CRM para novas tratativas.</p>' : '<form class="chat" id="chatForm"><input id="chatInput" maxlength="1000" required placeholder="Escreva uma mensagem"><button class="send">Enviar</button></form>'}
       </div>`;
     $('orderDetail').querySelectorAll('[data-step]').forEach(input => input.addEventListener('change', async event => {
+      const stepId = event.target.dataset.step;
+      const willCompleteAll = event.target.checked && assignment.steps.every(step => step.id === stepId ? true : step.done);
+      if (willCompleteAll && !confirm('Todos os processos deste trabalho foram executados e conferidos?')) {
+        event.target.checked = false;
+        return;
+      }
       await api(`/api/colaborador/ordens/${encodeURIComponent(orderId)}/etapas`, { method: 'POST', body: JSON.stringify({ productId: assignment.productId, stepId: event.target.dataset.step, done: event.target.checked }) });
       await load();
     }));

@@ -73,6 +73,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   const productionPageResult = await request('/pages/ordemproducao.html');
   const workerAppResult = await request('/colaborador/');
   const workerStylesResult = await request('/colaborador/styles.css');
+  const workerScriptResult = await request('/colaborador/app.js');
   assert.equal(moduleResult.response.status, 200);
   assert.equal(presetsResult.response.status, 200);
   assert.equal(financialResult.response.status, 200);
@@ -86,6 +87,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.equal(productionPageResult.response.status, 200);
   assert.equal(workerAppResult.response.status, 200);
   assert.equal(workerStylesResult.response.status, 200);
+  assert.equal(workerScriptResult.response.status, 200);
   assert.match(moduleResult.body, /calcularFicha/);
   assert.match(presetsResult.body, /Fonte de alimentação/);
   assert.match(financialResult.body, /faturamentoSemIva/);
@@ -106,9 +108,11 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(productionPageResult.body, /Desclassificar e devolver à fila/);
   assert.match(productionPageResult.body, /classificationProduct/);
   assert.match(productionPageResult.body, /Controle de comissoes da producao/);
+  assert.match(productionPageResult.body, /data-payment-filter="process"/);
   assert.match(workerAppResult.body, /Concluido a receber/);
   assert.match(workerAppResult.body, /Historico \/ pagos/);
   assert.match(workerAppResult.body, /assignedValue/);
+  assert.match(workerScriptResult.body, /Todos os processos deste trabalho foram executados/);
   assert.match(productionPageResult.body, /HISTÓRICO DA PRODUÇÃO POR ARTIGO/);
 });
 
