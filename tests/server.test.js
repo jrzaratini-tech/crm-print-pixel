@@ -65,6 +65,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   const financialResult = await request('/core/financeiro.js');
   const fiscalQrResult = await request('/core/qr-fiscal.js');
   const pageResult = await request('/pages/materiais.html');
+  const orderFormPageResult = await request('/pages/novopedido.html');
   const scanPageResult = await request('/scan-fatura.html');
   const mobilePageResult = await request('/mobile/');
   const mobileQrLibraryResult = await request('/mobile/vendor/jsQR.js');
@@ -79,6 +80,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.equal(financialResult.response.status, 200);
   assert.equal(fiscalQrResult.response.status, 200);
   assert.equal(pageResult.response.status, 200);
+  assert.equal(orderFormPageResult.response.status, 200);
   assert.equal(scanPageResult.response.status, 200);
   assert.equal(mobilePageResult.response.status, 200);
   assert.equal(mobileQrLibraryResult.response.status, 200);
@@ -93,6 +95,9 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(financialResult.body, /faturamentoSemIva/);
   assert.match(fiscalQrResult.body, /interpretar/);
   assert.match(pageResult.body, /Cadastro de Materiais/);
+  assert.match(orderFormPageResult.body, /delivery-btn/);
+  assert.match(orderFormPageResult.body, /product-delivered/);
+  assert.match(orderFormPageResult.body, /pedido\.produtos\.\$\{index\}\.entregue/);
   assert.match(scanPageResult.body, /Ler QR fiscal/);
   assert.match(mobilePageResult.body, /PrintPixel Fiscal/);
   assert.match(mobilePageResult.body, /vendor\/jsQR\.js/);

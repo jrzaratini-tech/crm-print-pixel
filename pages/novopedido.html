@@ -319,22 +319,84 @@
         }
         
         .remove-btn {
-            background-color: transparent;
-            border: none;
-            color: #ef4444;
+            width: 38px;
+            height: 38px;
+            background-color: #fff1f2;
+            border: 1px solid #fecdd3;
+            color: #be123c;
             cursor: pointer;
-            font-size: 18px;
-            padding: 5px;
-            border-radius: 4px;
+            padding: 0;
+            border-radius: 10px;
             transition: all 0.2s;
-            display: flex;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
         }
         
         .remove-btn:hover {
-            background-color: #fee2e2;
-            transform: scale(1.1);
+            background-color: #ffe4e6;
+            border-color: #fb7185;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(190, 18, 60, 0.14);
+        }
+
+        .remove-btn svg {
+            width: 17px;
+            height: 17px;
+            stroke: currentColor;
+        }
+
+        .edit-payment-btn {
+            background-color: #eff6ff;
+            border-color: #bfdbfe;
+            color: #1d4ed8;
+        }
+
+        .edit-payment-btn:hover {
+            background-color: #dbeafe;
+            border-color: #60a5fa;
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.14);
+        }
+
+        .product-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .delivery-btn {
+            min-width: 92px;
+            height: 38px;
+            border: 1px solid #bbf7d0;
+            border-radius: 10px;
+            background: #f0fdf4;
+            color: #166534;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 800;
+            transition: all 0.2s;
+        }
+
+        .delivery-btn:hover {
+            background: #dcfce7;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(22, 101, 52, 0.12);
+        }
+
+        .delivery-btn.active {
+            background: #16a34a;
+            border-color: #15803d;
+            color: #fff;
+        }
+
+        .product-delivered {
+            background: #f0fdf4;
+            box-shadow: inset 4px 0 0 #22c55e;
+        }
+
+        .product-delivered td {
+            border-bottom-color: #bbf7d0;
         }
         
         .add-product-btn {
@@ -778,7 +840,7 @@
                             <th>Quantidade</th>
                             <th>Valor Unitário (€)</th>
                             <th>Observações</th>
-                            <th style="width: 50px;"></th>
+                            <th style="width: 150px;">Ações</th>
                         </tr>
                     </thead>
                     <tbody id="productsTableBody">
@@ -1227,6 +1289,8 @@
             function addProductRow(productData = null) {
                 const row = document.createElement('tr');
                 const index = productIndex++;
+                const isDelivered = productData && (productData.entregue === true || productData.entregue === 'true');
+                row.classList.toggle('product-delivered', isDelivered);
                 
                 row.innerHTML = `
                     <td>
@@ -1252,9 +1316,19 @@
                                   placeholder="Observações do produto..." rows="2">${productData ? (productData.observacoes || '') : ''}</textarea>
                     </td>
                     <td>
-                        <button type="button" class="remove-btn" title="Remover produto">
-                            🗑️
-                        </button>
+                        <div class="product-actions">
+                            <input type="hidden" class="delivered-input" data-bind="pedido.produtos.${index}.entregue" value="${isDelivered ? 'true' : 'false'}">
+                            <button type="button" class="delivery-btn ${isDelivered ? 'active' : ''}" title="${isDelivered ? 'Clique para desmarcar entrega' : 'Marcar item como entregue'}">${isDelivered ? 'Entregue' : 'Entregar'}</button>
+                            <button type="button" class="remove-btn" title="Remover produto" aria-label="Remover produto">
+                                <svg viewBox="0 0 24 24" fill="none" stroke-width="2">
+                                    <path d="M4 7h16"></path>
+                                    <path d="M10 11v6"></path>
+                                    <path d="M14 11v6"></path>
+                                    <path d="M6 7l1 14h10l1-14"></path>
+                                    <path d="M9 7V4h6v3"></path>
+                                </svg>
+                            </button>
+                        </div>
                     </td>
                 `;
                 
@@ -1262,14 +1336,27 @@
                 
                 // Event listeners
                 const removeBtn = row.querySelector('.remove-btn');
+                const deliveryBtn = row.querySelector('.delivery-btn');
                 const valorInput = row.querySelector('.valor-input');
                 const quantidadeInput = row.querySelector('.quantidade-input');
                 
                 removeBtn.addEventListener('click', () => removeProductRow(row));
+                deliveryBtn.addEventListener('click', () => toggleProductDelivered(row));
                 valorInput.addEventListener('input', calculateTotals);
                 quantidadeInput.addEventListener('input', calculateTotals);
                 
                 return row;
+            }
+
+            function toggleProductDelivered(row) {
+                const input = row.querySelector('.delivered-input');
+                const button = row.querySelector('.delivery-btn');
+                const delivered = input.value !== 'true';
+                input.value = delivered ? 'true' : 'false';
+                row.classList.toggle('product-delivered', delivered);
+                button.classList.toggle('active', delivered);
+                button.textContent = delivered ? 'Entregue' : 'Entregar';
+                button.title = delivered ? 'Clique para desmarcar entrega' : 'Marcar item como entregue';
             }
             
             function removeProductRow(row) {
@@ -1294,12 +1381,14 @@
                     const quantidade = row.querySelector('.quantidade-input');
                     const valor = row.querySelector('.valor-input');
                     const obs = row.querySelector('.obs-input');
+                    const entregue = row.querySelector('.delivered-input');
                     
                     if (select) select.setAttribute('data-bind', `pedido.produtos.${index}.nome`);
                     if (tamanho) tamanho.setAttribute('data-bind', `pedido.produtos.${index}.tamanho`);
                     if (quantidade) quantidade.setAttribute('data-bind', `pedido.produtos.${index}.quantidade`);
                     if (valor) valor.setAttribute('data-bind', `pedido.produtos.${index}.valor`);
                     if (obs) obs.setAttribute('data-bind', `pedido.produtos.${index}.observacoes`);
+                    if (entregue) entregue.setAttribute('data-bind', `pedido.produtos.${index}.entregue`);
                     
                     productIndex = index + 1;
                 });
