@@ -817,16 +817,16 @@
             <div class="equilibrium-header">
                 <div class="equilibrium-title">
                     <i class="fas fa-chart-line"></i>
-                    GestÃ£o Profissional
+                    Gest&atilde;o Profissional
                 </div>
             </div>
             <div class="equilibrium-stats" id="managementOverview">
                 <div class="equilibrium-stat">
-                    <div class="equilibrium-stat-value" data-bind="gestao.resultado">â‚¬0,00</div>
+                    <div class="equilibrium-stat-value" data-bind="gestao.resultado">&euro;0,00</div>
                     <div class="equilibrium-stat-label">Resultado Operacional</div>
                 </div>
                 <div class="equilibrium-stat">
-                    <div class="equilibrium-stat-value" data-bind="gestao.fluxo">â‚¬0,00</div>
+                    <div class="equilibrium-stat-value" data-bind="gestao.fluxo">&euro;0,00</div>
                     <div class="equilibrium-stat-label">Fluxo Projetado</div>
                 </div>
                 <div class="equilibrium-stat">
@@ -835,7 +835,7 @@
                 </div>
                 <div class="equilibrium-stat">
                     <div class="equilibrium-stat-value" data-bind="gestao.desvios">0</div>
-                    <div class="equilibrium-stat-label">ServiÃ§os Acima do Previsto</div>
+                    <div class="equilibrium-stat-label">Servi&ccedil;os Acima do Previsto</div>
                 </div>
             </div>
         </div>
@@ -979,7 +979,7 @@
                     const dre = overview.dre || {};
                     const estoque = Array.isArray(overview.estoque) ? overview.estoque : [];
                     const previstoRealizado = Array.isArray(overview.previstoRealizado) ? overview.previstoRealizado : [];
-                    const formatarMoedaGestao = valor => 'â‚¬' + (Number(valor || 0)).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace('.', ',');
+                    const formatarMoedaGestao = valor => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(Number(valor || 0));
 
                     const resultado = document.querySelector('[data-bind="gestao.resultado"]');
                     const fluxo = document.querySelector('[data-bind="gestao.fluxo"]');

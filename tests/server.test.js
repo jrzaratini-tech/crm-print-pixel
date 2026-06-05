@@ -113,7 +113,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(orderBudgetPageResult.body, /Letra Caixa PETG 3D/);
   assert.match(ordersPageResult.body, /produto-modal-entregue/);
   assert.match(ordersPageResult.body, /entrega-badge/);
-  assert.match(dashboardPageResult.body, /GestÃ£o Profissional/);
+  assert.match(dashboardPageResult.body, /Gest&atilde;o Profissional/);
   assert.match(dashboardPageResult.body, /api\/management\/overview/);
   assert.match(scanPageResult.body, /Ler QR fiscal/);
   assert.match(mobilePageResult.body, /PrintPixel Fiscal/);
