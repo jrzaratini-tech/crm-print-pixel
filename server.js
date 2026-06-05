@@ -4,6 +4,7 @@ const cors = require('cors');
 const path = require('path');
 const { db } = require('./firebase.js');
 const QR_FISCAL = require('./core/qr-fiscal.js');
+const GESTAO = require('./core/gestao.js');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -344,7 +345,7 @@ function normalizeProductionSteps(selected = [], previous = []) {
     .map(label => {
       const id = productionStepId(label);
       const old = (Array.isArray(previous) ? previous : []).find(step => step.id === id);
-      return old ? { ...old, id, label } : { id, label, done: false, completedAt: null };
+      return old ? { ...old, id, label, tempoPrevistoMin: old.tempoPrevistoMin || 30 } : { id, label, done: false, completedAt: null, tempoPrevistoMin: 30, actualMinutes: 0 };
     });
 }
 
@@ -372,6 +373,14 @@ function productForAssignment(order, productId) {
     quantidade: money(product.quantidade || 1),
     observacoes: text(product.observacoes, 400)
   });
+}
+
+function rawProductForAssignment(order, productId) {
+  if (!productId) return null;
+  if (!/^item_(0|[1-9]\d*)$/.test(productId)) return null;
+  const index = Number.parseInt(productId.replace(/^item_/, ''), 10);
+  const products = Array.isArray(order?.payload?.produtos) ? order.payload.produtos : [];
+  return Number.isInteger(index) && index >= 0 && index < products.length ? products[index] : null;
 }
 
 function assignmentHistoryEntry(type, data = {}) {
@@ -466,11 +475,67 @@ async function messagesForOrder(orderId) {
     .map(sanitizeForResponse);
 }
 
+async function materialsCatalog() {
+  const snapshot = await db.collection('events').get();
+  return snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }))
+    .filter(event => event.schema === 'material' && !event.deleted && event.payload?.ativo !== false)
+    .map(event => ({ id: event.id, ...event.payload }));
+}
+
+async function issueStockForAssignment(orderId, productId, assignment, now) {
+  const order = await getOrderEvent(orderId);
+  if (!order) return [];
+  const products = productId
+    ? [rawProductForAssignment(order, productId)].filter(Boolean)
+    : (Array.isArray(order.payload?.produtos) ? order.payload.produtos : []);
+  const materiais = await materialsCatalog();
+  const created = [];
+
+  for (const [productIndex, product] of products.entries()) {
+    const ficha = GESTAO.calcularFichaProduto(product, materiais);
+    for (const [itemIndex, detalhe] of ficha.detalhes.entries()) {
+      if (!detalhe.materialId || String(detalhe.materialId).startsWith('preset:')) continue;
+      const movementId = `stock-${productionAssignmentId(orderId, productId)}-${productIndex}-${itemIndex}`;
+      const movementRef = db.collection('events').doc(movementId);
+      const existing = await movementRef.get();
+      if (existing.exists) continue;
+      const quantidadeProduto = Math.max(1, money(product.quantidade) || 1);
+      const quantidade = -Math.abs(money(detalhe.calculo.consumo) * quantidadeProduto);
+      if (!quantidade) continue;
+      await movementRef.set({
+        schema: 'estoque_movimento',
+        pageId: 'ordemproducao',
+        timestamp: now,
+        created_at: now,
+        updated_at: now,
+        deleted: false,
+        payload: {
+          materialId: detalhe.materialId,
+          materialNome: detalhe.material?.nome || detalhe.materialId,
+          orderId,
+          productId,
+          productName: product.nome || assignment.productName || '',
+          quantidade,
+          unidade: detalhe.calculo.unidade,
+          origem: 'baixa_automatica_producao',
+          assignmentId: productionAssignmentId(orderId, productId),
+          workerId: assignment.workerId,
+          workerName: assignment.workerName
+        }
+      });
+      created.push(movementId);
+    }
+  }
+
+  return created;
+}
+
 app.get('/scan-fatura.html', (req, res) => res.sendFile(path.join(__dirname, 'scan-fatura.html')));
 app.use('/mobile', express.static(path.join(__dirname, 'mobile'), { index: 'index.html', fallthrough: false }));
 app.use('/colaborador', express.static(path.join(__dirname, 'colaborador'), { index: 'index.html', fallthrough: false }));
 
-app.post('/api/colaborador/login', requestRateLimit({ windowMs: 15 * 60 * 1000, max: 12 }), async (req, res) => {
+app.post('/api/colaborador/login', requestRateLimit({ windowMs: 15 * 60 * 1000, max: 30 }), async (req, res) => {
   try {
     const username = normalizeProductionUsername(req.body?.username);
     const password = String(req.body?.password || '');
@@ -547,6 +612,87 @@ app.post('/api/colaborador/ordens/:id/etapas', requireWorker, async (req, res) =
   } catch (error) {
     console.error('Erro ao atualizar etapa:', error);
     res.status(500).json({ success: false, message: 'Nao foi possivel atualizar a etapa.' });
+  }
+});
+
+app.post('/api/colaborador/ordens/:id/etapas/tempo', requireWorker, async (req, res) => {
+  try {
+    const orderId = String(req.params.id || '');
+    const productId = productionProductId(req.body?.productId);
+    const assignment = await assignmentForWorker(orderId, req.productionWorker.id, productId);
+    if (!assignment) return res.status(404).json({ success: false, message: 'Ordem nao encontrada para este colaborador.' });
+    if (assignment.paymentStatus === 'paid') return res.status(400).json({ success: false, message: 'Servico ja pago e arquivado.' });
+    const stepId = productionStepId(req.body?.stepId);
+    if (!stepId || !assignment.steps.some(step => step.id === stepId)) {
+      return res.status(400).json({ success: false, message: 'Etapa invalida.' });
+    }
+
+    const action = req.body?.action === 'stop' ? 'stop' : 'start';
+    const now = new Date();
+    const activeTimer = assignment.activeTimer || null;
+    let steps = Array.isArray(assignment.steps) ? assignment.steps : [];
+    let timeLogs = Array.isArray(assignment.timeLogs) ? assignment.timeLogs : [];
+    let nextTimer = activeTimer;
+    let historyType = 'timer_started';
+    let elapsedMinutes = 0;
+
+    if (action === 'start') {
+      if (activeTimer && activeTimer.stepId !== stepId) {
+        return res.status(409).json({ success: false, message: 'Finalize o apontamento em andamento antes de iniciar outra etapa.' });
+      }
+      nextTimer = {
+        stepId,
+        startedAt: now.toISOString(),
+        workerId: req.productionWorker.id,
+        workerName: req.productionWorker.name
+      };
+    } else {
+      if (!activeTimer || activeTimer.stepId !== stepId) {
+        return res.status(400).json({ success: false, message: 'Nenhum apontamento ativo para esta etapa.' });
+      }
+      elapsedMinutes = Math.max(1, Math.round((now - new Date(activeTimer.startedAt)) / 60000));
+      timeLogs = [
+        ...timeLogs,
+        {
+          stepId,
+          productId,
+          startedAt: activeTimer.startedAt,
+          stoppedAt: now.toISOString(),
+          minutes: elapsedMinutes,
+          workerId: req.productionWorker.id,
+          workerName: req.productionWorker.name
+        }
+      ].slice(-200);
+      steps = steps.map(step => step.id === stepId
+        ? { ...step, actualMinutes: money(step.actualMinutes) + elapsedMinutes }
+        : step);
+      nextTimer = null;
+      historyType = 'timer_stopped';
+    }
+
+    const updated = {
+      ...assignment,
+      steps,
+      timeLogs,
+      activeTimer: nextTimer,
+      history: [
+        ...(Array.isArray(assignment.history) ? assignment.history : []),
+        assignmentHistoryEntry(historyType, {
+          stepId,
+          productId,
+          minutes: elapsedMinutes,
+          workerId: req.productionWorker.id,
+          workerName: req.productionWorker.name
+        })
+      ].slice(-100),
+      updatedAt: now.toISOString()
+    };
+
+    await db.collection('production_assignments').doc(productionAssignmentId(orderId, productId)).set(updated);
+    res.json({ success: true, assignment: sanitizeForResponse({ id: productionAssignmentId(orderId, productId), ...updated }) });
+  } catch (error) {
+    console.error('Erro ao apontar tempo:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel apontar o tempo da etapa.' });
   }
 });
 
@@ -932,7 +1078,8 @@ app.post('/api/production/assignments/:id/payment', async (req, res) => {
       updatedAt: now
     };
     await db.collection('production_assignments').doc(assignmentId).set(updated);
-    res.json({ success: true, assignment: sanitizeForResponse({ id: assignmentId, ...updated }) });
+    const stockMovements = await issueStockForAssignment(orderId, productId, updated, now);
+    res.json({ success: true, assignment: sanitizeForResponse({ id: assignmentId, ...updated }), stockMovements });
   } catch (error) {
     console.error('Erro ao marcar comissao como paga:', error);
     res.status(500).json({ success: false, message: 'Nao foi possivel marcar a comissao como paga.' });
@@ -1204,6 +1351,39 @@ app.get('/api/database/stats', async (req, res) => {
   }
 });
 
+async function allEvents() {
+  const snapshot = await db.collection('events').get();
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
+async function allProductionAssignments() {
+  const snapshot = await db.collection('production_assignments').get();
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
+async function latestManagementConfig(events) {
+  const configs = events
+    .filter(event => event.schema === 'config_equilibrio' && !event.deleted)
+    .sort((a, b) => new Date(b.updated_at || b.timestamp || 0) - new Date(a.updated_at || a.timestamp || 0));
+  return configs[0]?.payload || {};
+}
+
+app.get('/api/management/overview', async (req, res) => {
+  try {
+    const events = await allEvents();
+    const assignments = await allProductionAssignments();
+    const materiais = events
+      .filter(event => event.schema === 'material' && !event.deleted && event.payload?.ativo !== false)
+      .map(event => ({ id: event.id, ...event.payload }));
+    const config = await latestManagementConfig(events);
+    const overview = GESTAO.painelGestao({ eventos: events, assignments, materiais, config });
+    res.json({ success: true, overview: sanitizeForResponse(overview) });
+  } catch (error) {
+    console.error('Erro ao gerar visao gerencial:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel gerar a visao gerencial.' });
+  }
+});
+
 app.post('/api/upload/nota-fiscal', requestRateLimit({ windowMs: 15 * 60 * 1000, max: 30 }), async (req, res) => {
   try {
     const { sessionId, despesaId, fileData } = req.body || {};
@@ -1276,6 +1456,7 @@ app.get('/core/custeio.js', (req, res) => res.sendFile(path.join(__dirname, 'cor
 app.get('/core/materiais-padrao.js', (req, res) => res.sendFile(path.join(__dirname, 'core', 'materiais-padrao.js')));
 app.get('/core/financeiro.js', (req, res) => res.sendFile(path.join(__dirname, 'core', 'financeiro.js')));
 app.get('/core/qr-fiscal.js', (req, res) => res.sendFile(path.join(__dirname, 'core', 'qr-fiscal.js')));
+app.get('/core/gestao.js', (req, res) => res.sendFile(path.join(__dirname, 'core', 'gestao.js')));
 app.get('/menu/menu.config.js', (req, res) => res.sendFile(path.join(__dirname, 'menu', 'menu.config.js')));
 
 if (require.main === module) {

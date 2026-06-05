@@ -813,6 +813,33 @@
         </div>
 
         <!-- SEÇÃO DE GRÁFICOS -->
+        <div class="equilibrium-card">
+            <div class="equilibrium-header">
+                <div class="equilibrium-title">
+                    <i class="fas fa-chart-line"></i>
+                    GestÃ£o Profissional
+                </div>
+            </div>
+            <div class="equilibrium-stats" id="managementOverview">
+                <div class="equilibrium-stat">
+                    <div class="equilibrium-stat-value" data-bind="gestao.resultado">â‚¬0,00</div>
+                    <div class="equilibrium-stat-label">Resultado Operacional</div>
+                </div>
+                <div class="equilibrium-stat">
+                    <div class="equilibrium-stat-value" data-bind="gestao.fluxo">â‚¬0,00</div>
+                    <div class="equilibrium-stat-label">Fluxo Projetado</div>
+                </div>
+                <div class="equilibrium-stat">
+                    <div class="equilibrium-stat-value" data-bind="gestao.estoque">0</div>
+                    <div class="equilibrium-stat-label">Materiais em Alerta</div>
+                </div>
+                <div class="equilibrium-stat">
+                    <div class="equilibrium-stat-value" data-bind="gestao.desvios">0</div>
+                    <div class="equilibrium-stat-label">ServiÃ§os Acima do Previsto</div>
+                </div>
+            </div>
+        </div>
+
         <div class="charts-section">
             <div class="section-title">
                 <i class="fas fa-chart-bar"></i>
@@ -935,6 +962,7 @@
                 atualizarDataAtual();
                 criarGraficos();
                 configurarEventListeners();
+                carregarGestaoProfissional();
                 
                 // Solicitar dados ao Core
                 solicitarTodosDadosAoCore();
@@ -942,6 +970,30 @@
                 console.log('✅ Dashboard inicializado');
             }
             
+            async function carregarGestaoProfissional() {
+                try {
+                    const response = await fetch('/api/management/overview');
+                    if (!response.ok) throw new Error(`Erro gerencial: ${response.status}`);
+                    const result = await response.json();
+                    const overview = result.overview || {};
+                    const dre = overview.dre || {};
+                    const estoque = Array.isArray(overview.estoque) ? overview.estoque : [];
+                    const previstoRealizado = Array.isArray(overview.previstoRealizado) ? overview.previstoRealizado : [];
+                    const formatarMoedaGestao = valor => 'â‚¬' + (Number(valor || 0)).toLocaleString('pt-PT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace('.', ',');
+
+                    const resultado = document.querySelector('[data-bind="gestao.resultado"]');
+                    const fluxo = document.querySelector('[data-bind="gestao.fluxo"]');
+                    const estoqueAlerta = document.querySelector('[data-bind="gestao.estoque"]');
+                    const desvios = document.querySelector('[data-bind="gestao.desvios"]');
+                    if (resultado) resultado.textContent = formatarMoedaGestao(dre.resultadoOperacional);
+                    if (fluxo) fluxo.textContent = formatarMoedaGestao(dre.fluxoCaixaProjetado);
+                    if (estoqueAlerta) estoqueAlerta.textContent = estoque.filter(item => item.status === 'comprar').length;
+                    if (desvios) desvios.textContent = previstoRealizado.filter(item => item.status === 'acima_do_previsto').length;
+                } catch (error) {
+                    console.warn('Nao foi possivel carregar a gestao profissional:', error);
+                }
+            }
+
             // Atualizar data atual
             function atualizarDataAtual() {
                 const now = new Date();

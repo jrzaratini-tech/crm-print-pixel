@@ -260,7 +260,10 @@ dialog::backdrop { background: #0f172a99; }
   border-bottom: 1px solid var(--line);
 }
 
-.step { display: flex; gap: 9px; align-items: center; }
+.step { display: grid; grid-template-columns: 1fr auto auto; gap: 9px; align-items: center; }
+.step label { display: flex; gap: 9px; align-items: center; }
+.step small { color: var(--muted); }
+.step button { border: 0; border-radius: 999px; padding: 7px 10px; background: #dbeafe; color: #1d4ed8; font-weight: 700; }
 .step input { width: 20px; height: 20px; }
 .messages { max-height: 250px; overflow: auto; }
 .message b,

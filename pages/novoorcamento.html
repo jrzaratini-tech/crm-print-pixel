@@ -4,6 +4,8 @@
     <script src="../core/security.js"></script>
     <script src="../core/custeio.js"></script>
     <script src="../core/materiais-padrao.js"></script>
+    <script src="../core/financeiro.js"></script>
+    <script src="../core/gestao.js"></script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Novo Orçamento - PrintPixel</title>
@@ -1516,6 +1518,14 @@
             try {
                 // Preparar produtos estruturados
                 const produtosArray = prepararProdutosParaSalvar();
+                const resumoProfissional = GESTAO.resumoOrcamentoProfissional(
+                    {
+                        produtos: produtosArray,
+                        comIVA: document.querySelector('input[name="ivaOption"]:checked').value
+                    },
+                    catalogoMateriais,
+                    { margemMinima: margemMinimaOrcamento }
+                );
                 
                 // Preparar dados do orçamento
                 const validadeDias = document.getElementById('validade').value;
@@ -1535,6 +1545,13 @@
                     subtotal: parseFloat(document.getElementById('orcamentoSubtotal').value) || 0,
                     iva: parseFloat(document.getElementById('orcamentoIVA').value) || 0,
                     total: parseFloat(document.getElementById('orcamentoTotal').value) || 0,
+                    resumoProfissional: resumoProfissional,
+                    custoPrevisto: resumoProfissional.custoPrevisto,
+                    lucroPrevisto: resumoProfissional.lucroPrevisto,
+                    margemPrevista: resumoProfissional.margemPrevista,
+                    precoMinimo: resumoProfissional.precoMinimo,
+                    precoSugerido: resumoProfissional.precoSugerido,
+                    abaixoMargem: resumoProfissional.abaixoMargem,
                     comIVA: document.querySelector('input[name="ivaOption"]:checked').value,
                     status: 'pendente', // Sempre definir como pendente ao salvar/editar
                     validade: validadeData,

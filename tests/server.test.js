@@ -64,9 +64,11 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   const presetsResult = await request('/core/materiais-padrao.js');
   const financialResult = await request('/core/financeiro.js');
   const fiscalQrResult = await request('/core/qr-fiscal.js');
+  const managementModuleResult = await request('/core/gestao.js');
   const pageResult = await request('/pages/materiais.html');
   const orderFormPageResult = await request('/pages/novopedido.html');
   const ordersPageResult = await request('/pages/pedidos.html');
+  const dashboardPageResult = await request('/pages/dashboard.html');
   const scanPageResult = await request('/scan-fatura.html');
   const mobilePageResult = await request('/mobile/');
   const mobileQrLibraryResult = await request('/mobile/vendor/jsQR.js');
@@ -80,9 +82,11 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.equal(presetsResult.response.status, 200);
   assert.equal(financialResult.response.status, 200);
   assert.equal(fiscalQrResult.response.status, 200);
+  assert.equal(managementModuleResult.response.status, 200);
   assert.equal(pageResult.response.status, 200);
   assert.equal(orderFormPageResult.response.status, 200);
   assert.equal(ordersPageResult.response.status, 200);
+  assert.equal(dashboardPageResult.response.status, 200);
   assert.equal(scanPageResult.response.status, 200);
   assert.equal(mobilePageResult.response.status, 200);
   assert.equal(mobileQrLibraryResult.response.status, 200);
@@ -96,6 +100,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(presetsResult.body, /Fonte de alimentação/);
   assert.match(financialResult.body, /faturamentoSemIva/);
   assert.match(fiscalQrResult.body, /interpretar/);
+  assert.match(managementModuleResult.body, /painelGestao/);
   assert.match(pageResult.body, /Cadastro de Materiais/);
   assert.match(orderFormPageResult.body, /delivery-btn/);
   assert.match(orderFormPageResult.body, /product-delivered/);
@@ -105,6 +110,8 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(orderFormPageResult.body, /setAttribute\('data-original-text', 'ATUALIZAR PEDIDO'\)/);
   assert.match(ordersPageResult.body, /produto-modal-entregue/);
   assert.match(ordersPageResult.body, /entrega-badge/);
+  assert.match(dashboardPageResult.body, /GestÃ£o Profissional/);
+  assert.match(dashboardPageResult.body, /api\/management\/overview/);
   assert.match(scanPageResult.body, /Ler QR fiscal/);
   assert.match(mobilePageResult.body, /PrintPixel Fiscal/);
   assert.match(mobilePageResult.body, /vendor\/jsQR\.js/);
@@ -124,6 +131,8 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(workerAppResult.body, /Concluido a receber/);
   assert.match(workerAppResult.body, /Historico \/ pagos/);
   assert.match(workerAppResult.body, /assignedValue/);
+  assert.match(workerScriptResult.body, /Iniciar tempo/);
+  assert.match(workerScriptResult.body, /etapas\/tempo/);
   assert.match(workerScriptResult.body, /Todos os processos deste trabalho foram executados/);
   assert.match(productionPageResult.body, /HISTÓRICO DA PRODUÇÃO POR ARTIGO/);
 });
@@ -308,6 +317,54 @@ test('classifica produtos da mesma OS para colaboradores diferentes com historic
   assert.equal(transferred.body.assignment.history.at(-1).type, 'transferred');
   const previousWorkerSession = await workerRequest('/api/colaborador/session', neonLogin.body.token);
   assert.equal(previousWorkerSession.body.assignments.some(item => item.orderId === order.body.id && item.productId === 'item_0'), false);
+});
+
+test('aponta tempo real, baixa estoque e gera visao gerencial', async () => {
+  const material = await post('/api/database/commit', {
+    schema: 'material',
+    pageId: 'test',
+    payload: { nome: 'Fita LED teste', formulaPadrao: 'linear', unidade: 'm', precoCusto: 10, estoqueAtual: 3, estoqueMinimo: 5, ativo: true }
+  });
+  const order = await post('/api/database/commit', {
+    schema: 'pedido',
+    pageId: 'test',
+    payload: {
+      numero: 'PED-GESTAO-1',
+      cliente: 'Cliente Gestao',
+      subtotal: 300,
+      total: 369,
+      iva: 69,
+      produtos: [{
+        nome: 'Letreiro LED',
+        quantidade: 1,
+        valor: 300,
+        custo: 20,
+        materiais: [{ materialId: material.body.id, formula: 'linear', comprimentoM: 2, quantidade: 1 }]
+      }]
+    }
+  });
+  const worker = await post('/api/production/workers', { name: 'Apontador Tempo', username: 'apontador.tempo', password: 'senha-segura-tempo', role: 'montagem' });
+  const login = await post('/api/colaborador/login', { username: 'apontador.tempo', password: 'senha-segura-tempo' });
+  await post('/api/production/assignments', { orderId: order.body.id, productId: 'item_0', workerId: worker.body.worker.id, commission: 25, steps: ['led_solda'] });
+
+  const started = await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas/tempo`, { productId: 'item_0', stepId: 'led_solda', action: 'start' }, login.body.token);
+  assert.equal(started.response.status, 200);
+  const stopped = await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas/tempo`, { productId: 'item_0', stepId: 'led_solda', action: 'stop' }, login.body.token);
+  assert.equal(stopped.response.status, 200);
+  assert.ok(stopped.body.assignment.timeLogs[0].minutes >= 1);
+
+  await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas`, { productId: 'item_0', stepId: 'led_solda', done: true }, login.body.token);
+  const paid = await post(`/api/production/assignments/${order.body.id}/payment`, { productId: 'item_0', paidBy: 'Financeiro' });
+  assert.equal(paid.response.status, 200);
+  assert.equal(paid.body.stockMovements.length, 1);
+
+  const stock = await post('/api/database/query', { schema: 'estoque_movimento', limit: 20 });
+  assert.ok(stock.body.events.some(event => event.payload.orderId === order.body.id && event.payload.quantidade < 0));
+  const overview = await request('/api/management/overview');
+  assert.equal(overview.response.status, 200);
+  assert.ok(overview.body.overview.dre);
+  assert.ok(overview.body.overview.previstoRealizado.some(item => item.orderId === order.body.id));
+  assert.ok(overview.body.overview.estoque.some(item => item.id === material.body.id && item.status === 'comprar'));
 });
 
 test('exclui usuario de producao e bloqueia novo login', async () => {
