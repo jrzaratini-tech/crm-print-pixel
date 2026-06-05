@@ -65,23 +65,56 @@ test('calcula estoque inteligente e DRE gerencial', () => {
   assert.equal(dre.pontoEquilibrio, 10000);
 });
 
-test('calcula letras caixa PETG para Neptune 4 Max com parede fixa de 2 mm', () => {
+test('calcula letras caixa PETG com perfil real de impressao e sem limitar por volume', () => {
   const result = GESTAO.calcularLetraCaixaPETG({
     palavra: 'AMOR',
-    alturaCm: 30,
+    alturaCm: 60,
     profundidadeCm: 5,
     precoKgFilamento: 18,
     perdaPercentual: 10,
-    gramasPorHora: 55
+    gramasPorHora: 75
   });
 
-  assert.equal(result.paredeMm, 2);
+  assert.equal(result.paredeMm, 0.8);
+  assert.equal(result.larguraLinhaMm, 0.42);
+  assert.equal(result.alturaCamadaMm, 0.28);
+  assert.equal(result.preenchimentoPercentual, 90);
   assert.equal(result.impressora, 'ELEGOO Neptune 4 Max');
   assert.equal(result.detalhes.length, 4);
   assert.ok(result.gramasTotal > 0);
   assert.ok(result.horasTotal > 0);
   assert.ok(result.custoTotal > result.custoFilamento);
   assert.equal(result.cabeNaMaquina, true);
+  assert.equal(result.segmentacaoRecomendada, true);
+});
+
+test('ajusta PETG com apontamentos reais anteriores', () => {
+  const base = GESTAO.calcularLetraCaixaPETG({
+    palavra: 'A',
+    alturaCm: 30,
+    profundidadeCm: 5,
+    precoKgFilamento: 18,
+    gramasPorHora: 75
+  });
+  const learned = GESTAO.calcularLetraCaixaPETG({
+    palavra: 'A',
+    alturaCm: 30,
+    profundidadeCm: 5,
+    precoKgFilamento: 18,
+    gramasPorHora: 75,
+    historicoReal: [{
+      gramasEstimadas: base.gramasTotal,
+      gramasReais: base.gramasTotal * 1.2,
+      horasEstimadas: base.horasTotal,
+      horasReais: base.horasTotal * 1.1
+    }]
+  });
+
+  assert.equal(learned.aprendizado.amostras, 1);
+  assert.equal(learned.aprendizado.fatorMaterial, 1.2);
+  assert.equal(learned.aprendizado.fatorTempo, 1.1);
+  assert.ok(learned.gramasTotal > base.gramasTotal);
+  assert.ok(learned.horasTotal > base.horasTotal);
 });
 
 test('conta letras da palavra removendo acentos e espacos', () => {

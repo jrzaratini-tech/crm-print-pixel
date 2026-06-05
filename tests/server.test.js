@@ -111,10 +111,11 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(orderFormPageResult.body, /window\.addEventListener\('coreCommitSuccess'/);
   assert.match(orderFormPageResult.body, /setAttribute\('data-original-text', 'ATUALIZAR PEDIDO'\)/);
   assert.match(orderBudgetPageResult.body, /Letra Caixa PETG 3D/);
+  assert.match(orderBudgetPageResult.body, /Apontamento real apos impressao/);
+  assert.match(orderBudgetPageResult.body, /petgRealGrams/);
   assert.match(ordersPageResult.body, /produto-modal-entregue/);
   assert.match(ordersPageResult.body, /entrega-badge/);
-  assert.match(dashboardPageResult.body, /Gest&atilde;o Profissional/);
-  assert.match(dashboardPageResult.body, /api\/management\/overview/);
+  assert.doesNotMatch(dashboardPageResult.body, /Gest&atilde;o Profissional/);
   assert.match(scanPageResult.body, /Ler QR fiscal/);
   assert.match(mobilePageResult.body, /PrintPixel Fiscal/);
   assert.match(mobilePageResult.body, /vendor\/jsQR\.js/);

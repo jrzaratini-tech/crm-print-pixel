@@ -25,10 +25,23 @@
         alturaMm: 480,
         velocidadeMaxMmS: 500,
         temperaturaMaxC: 300,
-        gramasPorHora: 55,
+        gramasPorHora: 75,
         custoHoraImpressora: 2,
         energiaKw: 0.35,
         custoKwh: 0.25
+    };
+    const PETG_PRINT_PROFILE = {
+        nome: 'Extra Draft 0.28',
+        alturaCamadaMm: 0.28,
+        larguraLinhaMm: 0.42,
+        espessuraParedeMm: 0.8,
+        espessuraTopoBaseMm: 1,
+        densidadePreenchimento: 0.9,
+        velocidadeImpressaoMmS: 100,
+        velocidadeParedeMmS: 50,
+        aceleracaoMmS2: 2000,
+        temperaturaBicoC: 240,
+        temperaturaMesaC: 70
     };
     const LETTER_FACTORS = {
         A: 4.3, B: 4.8, C: 3.8, D: 4.4, E: 4.1, F: 3.7, G: 4.6, H: 4.2, I: 2.4, J: 3.1,
@@ -83,11 +96,29 @@
         return Object.entries(counts).map(([letter, quantidade]) => ({ letter, quantidade }));
     }
 
+    function calcularFatorAprendizadoPETG(historico = [], campoPrevisto, campoReal) {
+        const fatores = (Array.isArray(historico) ? historico : [])
+            .map(item => {
+                const previsto = numero(item[campoPrevisto]);
+                const real = numero(item[campoReal]);
+                if (previsto <= 0 || real <= 0) return 0;
+                return real / previsto;
+            })
+            .filter(fator => fator >= 0.5 && fator <= 2);
+        if (!fatores.length) return 1;
+        const media = fatores.reduce((total, fator) => total + fator, 0) / fatores.length;
+        return Math.round(media * 1000) / 1000;
+    }
+
     function calcularLetraCaixaPETG(config = {}) {
         const alturaCm = Math.max(0, numero(config.alturaCm));
         const profundidadeCm = Math.max(0, numero(config.profundidadeCm || config.espessuraCm));
-        const paredeMm = 2;
+        const paredeMm = Math.max(0.1, numero(config.paredeMm || PETG_PRINT_PROFILE.espessuraParedeMm));
         const paredeCm = paredeMm / 10;
+        const topoBaseMm = Math.max(0, numero(config.espessuraTopoBaseMm ?? PETG_PRINT_PROFILE.espessuraTopoBaseMm));
+        const topoBaseCm = topoBaseMm / 10;
+        const preenchimento = Math.max(0, Math.min(1, numero(config.preenchimentoPercentual ?? (PETG_PRINT_PROFILE.densidadePreenchimento * 100)) / 100));
+        const areaFaceCoeficiente = Math.max(0, numero(config.areaFaceCoeficiente ?? 0.42));
         const perda = Math.max(0, numero(config.perdaPercentual ?? 10)) / 100;
         const precoKg = dinheiro(config.precoKgFilamento || config.precoKg || 0);
         const gramasPorHora = Math.max(1, numero(config.gramasPorHora || NEPTUNE_4_MAX.gramasPorHora));
@@ -105,7 +136,10 @@
                 if (!letter || !quantidade) return null;
                 const fator = LETTER_FACTORS[letter] || 4.2;
                 const contornoCm = alturaCm * fator;
-                const volumeCm3 = contornoCm * profundidadeCm * paredeCm * quantidade;
+                const volumeParedeCm3 = contornoCm * profundidadeCm * paredeCm;
+                const areaFaceCm2 = Math.pow(alturaCm, 2) * areaFaceCoeficiente;
+                const volumeFaceCm3 = areaFaceCm2 * topoBaseCm * preenchimento;
+                const volumeCm3 = (volumeParedeCm3 + volumeFaceCm3) * quantidade;
                 const gramas = volumeCm3 * PETG_DENSITY_G_CM3 * (1 + perda);
                 const horas = gramas / gramasPorHora;
                 return {
@@ -113,6 +147,9 @@
                     quantidade,
                     fator,
                     contornoCm: Math.round(contornoCm * 100) / 100,
+                    areaFaceCm2: Math.round(areaFaceCm2 * 100) / 100,
+                    volumeParedeCm3: Math.round(volumeParedeCm3 * quantidade * 100) / 100,
+                    volumeFaceCm3: Math.round(volumeFaceCm3 * quantidade * 100) / 100,
                     volumeCm3: Math.round(volumeCm3 * 100) / 100,
                     gramas: Math.round(gramas * 100) / 100,
                     horas: Math.round(horas * 100) / 100
@@ -120,32 +157,50 @@
             })
             .filter(Boolean);
 
-        const gramasTotal = detalhes.reduce((total, item) => total + item.gramas, 0);
-        const horasTotal = detalhes.reduce((total, item) => total + item.horas, 0);
+        const gramasBaseTotal = detalhes.reduce((total, item) => total + item.gramas, 0);
+        const horasBaseTotal = detalhes.reduce((total, item) => total + item.horas, 0);
+        const fatorMaterial = calcularFatorAprendizadoPETG(config.historicoReal, 'gramasEstimadas', 'gramasReais');
+        const fatorTempo = calcularFatorAprendizadoPETG(config.historicoReal, 'horasEstimadas', 'horasReais');
+        const gramasTotal = gramasBaseTotal * fatorMaterial;
+        const horasTotal = horasBaseTotal * fatorTempo;
         const custoFilamento = (gramasTotal / 1000) * precoKg;
         const custoMaquina = horasTotal * custoHoraImpressora;
         const custoEnergia = horasTotal * energiaKw * custoKwh;
-        const cabeNaMaquina = alturaCm * 10 <= NEPTUNE_4_MAX.alturaMm
-            && profundidadeCm * 10 <= Math.min(NEPTUNE_4_MAX.larguraMm, NEPTUNE_4_MAX.profundidadeMm);
+        const segmentacaoRecomendada = alturaCm * 10 > NEPTUNE_4_MAX.alturaMm
+            || profundidadeCm * 10 > Math.min(NEPTUNE_4_MAX.larguraMm, NEPTUNE_4_MAX.profundidadeMm);
 
         return {
             tipo: 'letra_caixa_petg_3d',
             impressora: NEPTUNE_4_MAX.nome,
             volumeUtilMm: `${NEPTUNE_4_MAX.larguraMm} x ${NEPTUNE_4_MAX.profundidadeMm} x ${NEPTUNE_4_MAX.alturaMm}`,
+            perfilImpressao: PETG_PRINT_PROFILE,
             paredeMm,
+            larguraLinhaMm: PETG_PRINT_PROFILE.larguraLinhaMm,
+            alturaCamadaMm: PETG_PRINT_PROFILE.alturaCamadaMm,
+            espessuraTopoBaseMm: topoBaseMm,
+            preenchimentoPercentual: Math.round(preenchimento * 10000) / 100,
+            areaFaceCoeficiente,
             alturaCm,
             profundidadeCm,
             precoKgFilamento: precoKg,
             gramasPorHora,
             detalhes,
+            gramasBaseTotal: Math.round(gramasBaseTotal * 100) / 100,
+            horasBaseTotal: Math.round(horasBaseTotal * 100) / 100,
             gramasTotal: Math.round(gramasTotal * 100) / 100,
             horasTotal: Math.round(horasTotal * 100) / 100,
+            aprendizado: {
+                amostras: Array.isArray(config.historicoReal) ? config.historicoReal.length : 0,
+                fatorMaterial,
+                fatorTempo
+            },
             custoFilamento: dinheiro(custoFilamento),
             custoMaquina: dinheiro(custoMaquina),
             custoEnergia: dinheiro(custoEnergia),
             custoTotal: dinheiro(custoFilamento + custoMaquina + custoEnergia),
-            cabeNaMaquina,
-            alerta: cabeNaMaquina ? '' : 'A medida informada ultrapassa o volume util da Neptune 4 Max.'
+            cabeNaMaquina: true,
+            segmentacaoRecomendada,
+            alerta: segmentacaoRecomendada ? 'Peca grande: calcular normalmente e imprimir em partes quando necessario.' : ''
         };
     }
 

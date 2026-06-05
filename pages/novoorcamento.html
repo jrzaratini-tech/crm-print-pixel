@@ -715,14 +715,23 @@
             </div>
             <div class="petg-calculator">
                 <h3>Letra caixa PETG / Impressao 3D</h3>
-                <p style="color:#9a3412; margin-bottom:10px;">Base: ELEGOO Neptune 4 Max, volume 420 x 420 x 480 mm, parede fixa de 2 mm e PETG por kg.</p>
+                <p style="color:#9a3412; margin-bottom:10px;">Base: ELEGOO Neptune 4 Max com perfil Extra Draft 0.28: parede 0,8 mm, linha 0,42 mm, camada 0,28 mm e preenchimento 90%. Pe&ccedil;as maiores podem ser impressas em partes.</p>
                 <div class="petg-grid">
                     <label>Palavra / texto<input id="petgWord" placeholder="Ex: AMOR"></label>
                     <label>Altura da letra (cm)<input id="petgHeight" type="number" min="1" step="0.1" value="30"></label>
                     <label>Profundidade / espessura (cm)<input id="petgDepth" type="number" min="0.5" step="0.1" value="5"></label>
                     <label>Preco kg PETG (EUR)<input id="petgKgPrice" type="number" min="0" step="0.01" value="18"></label>
                     <label>Perda (%)<input id="petgWaste" type="number" min="0" step="0.1" value="10"></label>
-                    <label>Producao estimada (g/h)<input id="petgGramsHour" type="number" min="1" step="1" value="55"></label>
+                    <label>Producao estimada (g/h)<input id="petgGramsHour" type="number" min="1" step="1" value="75"></label>
+                </div>
+                <div style="margin-top:14px; padding:12px; border:1px solid #fed7aa; border-radius:12px; background:#fff7ed;">
+                    <strong style="display:block; margin-bottom:8px;">Apontamento real apos impressao</strong>
+                    <div class="petg-grid">
+                        <label>Consumo real (g)<input id="petgRealGrams" type="number" min="0" step="0.1" placeholder="Ex: 485"></label>
+                        <label>Tempo real (h)<input id="petgRealHours" type="number" min="0" step="0.01" placeholder="Ex: 6.5"></label>
+                        <label>Observacao real<input id="petgRealNotes" placeholder="Ex: impresso em 2 partes"></label>
+                    </div>
+                    <small style="color:#9a3412;">Estes dados ficam guardados no produto para comparar previsto x realizado e refinar a estimativa com o historico.</small>
                 </div>
                 <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
                     <button type="button" class="materials-btn" id="calculatePetgBtn">Calcular letras PETG</button>
@@ -776,6 +785,7 @@
         let currentOrcamentoId = '';
         let margemMinimaOrcamento = 50;
         let catalogoMateriais = [];
+        let historicoPetgReal = [];
         let technicalProductRow = null;
         
         // Referências DOM
@@ -1248,7 +1258,10 @@
             document.getElementById('petgHeight').value = petg.alturaCm || 30;
             document.getElementById('petgDepth').value = petg.profundidadeCm || 5;
             document.getElementById('petgWaste').value = petg.perdaPercentual ?? 10;
-            document.getElementById('petgGramsHour').value = petg.gramasPorHora || 55;
+            document.getElementById('petgGramsHour').value = petg.gramasPorHora || 75;
+            document.getElementById('petgRealGrams').value = petg.real?.gramasReais || '';
+            document.getElementById('petgRealHours').value = petg.real?.horasReais || '';
+            document.getElementById('petgRealNotes').value = petg.real?.observacoes || '';
             if (petg.precoKgFilamento) document.getElementById('petgKgPrice').value = petg.precoKgFilamento;
             document.getElementById('petgResult').textContent = petg.custoTotal
                 ? `PETG calculado: ${formatarMoeda(petg.custoTotal)} | ${petg.gramasTotal} g | ${petg.horasTotal} h`
@@ -1262,7 +1275,21 @@
                 profundidadeCm: parseFloat(document.getElementById('petgDepth').value) || 0,
                 precoKgFilamento: parseFloat(document.getElementById('petgKgPrice').value) || 0,
                 perdaPercentual: parseFloat(document.getElementById('petgWaste').value) || 10,
-                gramasPorHora: parseFloat(document.getElementById('petgGramsHour').value) || 55
+                gramasPorHora: parseFloat(document.getElementById('petgGramsHour').value) || 75,
+                historicoReal: historicoPetgReal
+            };
+        }
+
+        function petgRealFromForm() {
+            const gramasReais = parseFloat(document.getElementById('petgRealGrams').value) || 0;
+            const horasReais = parseFloat(document.getElementById('petgRealHours').value) || 0;
+            const observacoes = document.getElementById('petgRealNotes').value.trim();
+            if (!gramasReais && !horasReais && !observacoes) return null;
+            return {
+                gramasReais,
+                horasReais,
+                observacoes,
+                registradoEm: new Date().toISOString()
             };
         }
 
@@ -1270,14 +1297,43 @@
             const config = petgConfigFromForm();
             const result = GESTAO.calcularLetraCaixaPETG(config);
             const detalhes = result.detalhes.map(item => `${item.quantidade}x ${item.letter}: ${item.gramas} g`).join(' | ') || 'Nenhuma letra identificada';
+            const real = petgRealFromForm();
+            const comparativo = real
+                ? `<br><strong>Real:</strong> ${real.gramasReais || 0} g | ${real.horasReais || 0} h`
+                : '';
+            const aprendizado = result.aprendizado?.amostras
+                ? `<br><strong>Aprendizado:</strong> ${result.aprendizado.amostras} apontamentos | material x${result.aprendizado.fatorMaterial} | tempo x${result.aprendizado.fatorTempo}`
+                : '';
             document.getElementById('petgResult').innerHTML = `
                 <strong>Custo PETG:</strong> ${formatarMoeda(result.custoTotal)}
                 | <strong>Filamento:</strong> ${result.gramasTotal} g
                 | <strong>Tempo:</strong> ${result.horasTotal} h
                 <br><strong>Letras:</strong> ${detalhes}
+                <br><strong>Perfil:</strong> parede ${result.paredeMm} mm | linha ${result.larguraLinhaMm} mm | camada ${result.alturaCamadaMm} mm | preenchimento ${result.preenchimentoPercentual}%
+                ${comparativo}
+                ${aprendizado}
                 ${result.alerta ? `<br><strong style="color:#dc2626">${result.alerta}</strong>` : ''}
             `;
-            return { ...result, palavra: config.palavra, perdaPercentual: config.perdaPercentual };
+            return { ...result, palavra: config.palavra, perdaPercentual: config.perdaPercentual, real };
+        }
+
+        function extrairHistoricoPetgReal(eventos = []) {
+            const apontamentos = [];
+            eventos.forEach(evento => {
+                const payload = evento.payload || {};
+                const produtos = Array.isArray(payload.produtos) ? payload.produtos : Object.values(payload.produtos || {});
+                produtos.forEach(produto => {
+                    const petg = produto.petg3d || {};
+                    if (!petg.real) return;
+                    apontamentos.push({
+                        gramasEstimadas: petg.gramasBaseTotal || petg.gramasTotal,
+                        gramasReais: petg.real.gramasReais,
+                        horasEstimadas: petg.horasBaseTotal || petg.horasTotal,
+                        horasReais: petg.real.horasReais
+                    });
+                });
+            });
+            return apontamentos.slice(-30);
         }
 
         function aplicarPetgAoProduto() {
@@ -1496,6 +1552,18 @@
                 catalogoMateriais = (materialsData.events || []).map(event => ({ id: event.id, ...event.payload })).filter(material => material.ativo !== false);
             } catch (error) {
                 console.warn('Catálogo de materiais não disponível:', error);
+            }
+
+            try {
+                const petgHistoryResponse = await fetch('/api/database/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ schema: 'orcamento', limit: 500 })
+                });
+                const petgHistoryData = await petgHistoryResponse.json();
+                historicoPetgReal = extrairHistoricoPetgReal(petgHistoryData.events || []);
+            } catch (error) {
+                console.warn('Historico PETG nao disponivel:', error);
             }
 
             try {
