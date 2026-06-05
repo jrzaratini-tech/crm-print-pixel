@@ -54,6 +54,10 @@
             question('potencia', 'Potência', [], '1 W'),
             question('cor', 'Cor / temperatura', coresLed)
         ] },
+        { key: 'filamento_petg', nome: 'Filamento PETG', categoria: 'Impressao 3D', formulaPadrao: 'unidade', unidade: 'kg', questions: [
+            question('cor', 'Cor', ['Branco', 'Preto', 'Natural', 'Transparente', 'Outro']),
+            question('diametro', 'Diametro', [], '1,75 mm')
+        ] },
         { key: 'adesivo', nome: 'Adesivo', categoria: 'Adesivo', formulaPadrao: 'area', unidade: 'm²', questions: [
             question('tipo', 'Tipo', ['Brilho', 'Fosco', 'Transparente', 'Impressão digital', 'Outro'])
         ] },

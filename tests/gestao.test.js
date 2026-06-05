@@ -64,3 +64,31 @@ test('calcula estoque inteligente e DRE gerencial', () => {
   assert.equal(dre.resultadoOperacional, 250);
   assert.equal(dre.pontoEquilibrio, 10000);
 });
+
+test('calcula letras caixa PETG para Neptune 4 Max com parede fixa de 2 mm', () => {
+  const result = GESTAO.calcularLetraCaixaPETG({
+    palavra: 'AMOR',
+    alturaCm: 30,
+    profundidadeCm: 5,
+    precoKgFilamento: 18,
+    perdaPercentual: 10,
+    gramasPorHora: 55
+  });
+
+  assert.equal(result.paredeMm, 2);
+  assert.equal(result.impressora, 'ELEGOO Neptune 4 Max');
+  assert.equal(result.detalhes.length, 4);
+  assert.ok(result.gramasTotal > 0);
+  assert.ok(result.horasTotal > 0);
+  assert.ok(result.custoTotal > result.custoFilamento);
+  assert.equal(result.cabeNaMaquina, true);
+});
+
+test('conta letras da palavra removendo acentos e espacos', () => {
+  assert.deepEqual(GESTAO.lettersFromWord('AMOR'), [
+    { letter: 'A', quantidade: 1 },
+    { letter: 'M', quantidade: 1 },
+    { letter: 'O', quantidade: 1 },
+    { letter: 'R', quantidade: 1 }
+  ]);
+});

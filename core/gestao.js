@@ -17,6 +17,25 @@
 
     const DEFAULT_MARGIN = 50;
     const DEFAULT_VAT = 0.23;
+    const PETG_DENSITY_G_CM3 = 1.27;
+    const NEPTUNE_4_MAX = {
+        nome: 'ELEGOO Neptune 4 Max',
+        larguraMm: 420,
+        profundidadeMm: 420,
+        alturaMm: 480,
+        velocidadeMaxMmS: 500,
+        temperaturaMaxC: 300,
+        gramasPorHora: 55,
+        custoHoraImpressora: 2,
+        energiaKw: 0.35,
+        custoKwh: 0.25
+    };
+    const LETTER_FACTORS = {
+        A: 4.3, B: 4.8, C: 3.8, D: 4.4, E: 4.1, F: 3.7, G: 4.6, H: 4.2, I: 2.4, J: 3.1,
+        K: 4.2, L: 3.0, M: 5.3, N: 4.5, O: 4.4, P: 4.0, Q: 4.8, R: 4.7, S: 4.2, T: 3.5,
+        U: 4.0, V: 3.7, W: 5.5, X: 4.1, Y: 3.8, Z: 3.8,
+        0: 4.4, 1: 2.5, 2: 4.0, 3: 4.1, 4: 4.0, 5: 4.0, 6: 4.4, 7: 3.4, 8: 4.8, 9: 4.4
+    };
 
     function numero(value) {
         const parsed = Number.parseFloat(String(value ?? 0).replace(',', '.'));
@@ -46,6 +65,88 @@
             || evento.timestamp
             || 0
         );
+    }
+
+    function normalizeLetter(value) {
+        return texto(value)
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toUpperCase()
+            .replace(/[^A-Z0-9]/g, '');
+    }
+
+    function lettersFromWord(word = '') {
+        const counts = {};
+        normalizeLetter(word).split('').forEach(letter => {
+            counts[letter] = (counts[letter] || 0) + 1;
+        });
+        return Object.entries(counts).map(([letter, quantidade]) => ({ letter, quantidade }));
+    }
+
+    function calcularLetraCaixaPETG(config = {}) {
+        const alturaCm = Math.max(0, numero(config.alturaCm));
+        const profundidadeCm = Math.max(0, numero(config.profundidadeCm || config.espessuraCm));
+        const paredeMm = 2;
+        const paredeCm = paredeMm / 10;
+        const perda = Math.max(0, numero(config.perdaPercentual ?? 10)) / 100;
+        const precoKg = dinheiro(config.precoKgFilamento || config.precoKg || 0);
+        const gramasPorHora = Math.max(1, numero(config.gramasPorHora || NEPTUNE_4_MAX.gramasPorHora));
+        const custoHoraImpressora = Math.max(0, numero(config.custoHoraImpressora ?? NEPTUNE_4_MAX.custoHoraImpressora));
+        const energiaKw = Math.max(0, numero(config.energiaKw ?? NEPTUNE_4_MAX.energiaKw));
+        const custoKwh = Math.max(0, numero(config.custoKwh ?? NEPTUNE_4_MAX.custoKwh));
+        const letras = Array.isArray(config.letras) && config.letras.length
+            ? config.letras
+            : lettersFromWord(config.palavra || '');
+
+        const detalhes = letras
+            .map(item => {
+                const letter = normalizeLetter(item.letter || item.letra).charAt(0);
+                const quantidade = Math.max(0, Math.round(numero(item.quantidade) || 0));
+                if (!letter || !quantidade) return null;
+                const fator = LETTER_FACTORS[letter] || 4.2;
+                const contornoCm = alturaCm * fator;
+                const volumeCm3 = contornoCm * profundidadeCm * paredeCm * quantidade;
+                const gramas = volumeCm3 * PETG_DENSITY_G_CM3 * (1 + perda);
+                const horas = gramas / gramasPorHora;
+                return {
+                    letter,
+                    quantidade,
+                    fator,
+                    contornoCm: Math.round(contornoCm * 100) / 100,
+                    volumeCm3: Math.round(volumeCm3 * 100) / 100,
+                    gramas: Math.round(gramas * 100) / 100,
+                    horas: Math.round(horas * 100) / 100
+                };
+            })
+            .filter(Boolean);
+
+        const gramasTotal = detalhes.reduce((total, item) => total + item.gramas, 0);
+        const horasTotal = detalhes.reduce((total, item) => total + item.horas, 0);
+        const custoFilamento = (gramasTotal / 1000) * precoKg;
+        const custoMaquina = horasTotal * custoHoraImpressora;
+        const custoEnergia = horasTotal * energiaKw * custoKwh;
+        const cabeNaMaquina = alturaCm * 10 <= NEPTUNE_4_MAX.alturaMm
+            && profundidadeCm * 10 <= Math.min(NEPTUNE_4_MAX.larguraMm, NEPTUNE_4_MAX.profundidadeMm);
+
+        return {
+            tipo: 'letra_caixa_petg_3d',
+            impressora: NEPTUNE_4_MAX.nome,
+            volumeUtilMm: `${NEPTUNE_4_MAX.larguraMm} x ${NEPTUNE_4_MAX.profundidadeMm} x ${NEPTUNE_4_MAX.alturaMm}`,
+            paredeMm,
+            alturaCm,
+            profundidadeCm,
+            precoKgFilamento: precoKg,
+            gramasPorHora,
+            detalhes,
+            gramasTotal: Math.round(gramasTotal * 100) / 100,
+            horasTotal: Math.round(horasTotal * 100) / 100,
+            custoFilamento: dinheiro(custoFilamento),
+            custoMaquina: dinheiro(custoMaquina),
+            custoEnergia: dinheiro(custoEnergia),
+            custoTotal: dinheiro(custoFilamento + custoMaquina + custoEnergia),
+            cabeNaMaquina,
+            alerta: cabeNaMaquina ? '' : 'A medida informada ultrapassa o volume util da Neptune 4 Max.'
+        };
     }
 
     function materialMap(materiais = []) {
@@ -257,6 +358,8 @@
 
     return {
         numero,
+        lettersFromWord,
+        calcularLetraCaixaPETG,
         calcularFichaProduto,
         resumoOrcamentoProfissional,
         roteiroPadraoProduto,

@@ -67,6 +67,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   const managementModuleResult = await request('/core/gestao.js');
   const pageResult = await request('/pages/materiais.html');
   const orderFormPageResult = await request('/pages/novopedido.html');
+  const orderBudgetPageResult = await request('/pages/novoorcamento.html');
   const ordersPageResult = await request('/pages/pedidos.html');
   const dashboardPageResult = await request('/pages/dashboard.html');
   const scanPageResult = await request('/scan-fatura.html');
@@ -85,6 +86,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.equal(managementModuleResult.response.status, 200);
   assert.equal(pageResult.response.status, 200);
   assert.equal(orderFormPageResult.response.status, 200);
+  assert.equal(orderBudgetPageResult.response.status, 200);
   assert.equal(ordersPageResult.response.status, 200);
   assert.equal(dashboardPageResult.response.status, 200);
   assert.equal(scanPageResult.response.status, 200);
@@ -108,6 +110,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(orderFormPageResult.body, /window\.location\.href = 'pedidos\.html'/);
   assert.match(orderFormPageResult.body, /window\.addEventListener\('coreCommitSuccess'/);
   assert.match(orderFormPageResult.body, /setAttribute\('data-original-text', 'ATUALIZAR PEDIDO'\)/);
+  assert.match(orderBudgetPageResult.body, /Letra Caixa PETG 3D/);
   assert.match(ordersPageResult.body, /produto-modal-entregue/);
   assert.match(ordersPageResult.body, /entrega-badge/);
   assert.match(dashboardPageResult.body, /GestÃ£o Profissional/);

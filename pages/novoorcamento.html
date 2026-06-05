@@ -292,6 +292,12 @@
         .technical-table .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; min-width: 190px; }
         .technical-table label { font-size: 11px; margin: 0; }
         .technical-total { display: flex; justify-content: flex-end; gap: 15px; align-items: center; margin-top: 16px; font-weight: 700; }
+        .petg-calculator { border: 1px solid #fed7aa; background: #fff7ed; border-radius: 10px; padding: 14px; margin: 14px 0; }
+        .petg-calculator h3 { color: #c2410c; margin-bottom: 8px; }
+        .petg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+        .petg-grid label { font-size: 12px; color: #475569; font-weight: 700; }
+        .petg-grid input { width: 100%; margin-top: 5px; padding: 9px; border: 1px solid #fdba74; border-radius: 6px; }
+        .petg-result { margin-top: 10px; color: #7c2d12; font-size: 13px; line-height: 1.5; }
         
         .iva-option-section {
             margin-top: 30px;
@@ -707,6 +713,23 @@
                 </div>
                 <button type="button" class="btn btn-secondary" id="closeTechnicalBtn">Fechar</button>
             </div>
+            <div class="petg-calculator">
+                <h3>Letra caixa PETG / Impressao 3D</h3>
+                <p style="color:#9a3412; margin-bottom:10px;">Base: ELEGOO Neptune 4 Max, volume 420 x 420 x 480 mm, parede fixa de 2 mm e PETG por kg.</p>
+                <div class="petg-grid">
+                    <label>Palavra / texto<input id="petgWord" placeholder="Ex: AMOR"></label>
+                    <label>Altura da letra (cm)<input id="petgHeight" type="number" min="1" step="0.1" value="30"></label>
+                    <label>Profundidade / espessura (cm)<input id="petgDepth" type="number" min="0.5" step="0.1" value="5"></label>
+                    <label>Preco kg PETG (EUR)<input id="petgKgPrice" type="number" min="0" step="0.01" value="18"></label>
+                    <label>Perda (%)<input id="petgWaste" type="number" min="0" step="0.1" value="10"></label>
+                    <label>Producao estimada (g/h)<input id="petgGramsHour" type="number" min="1" step="1" value="55"></label>
+                </div>
+                <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
+                    <button type="button" class="materials-btn" id="calculatePetgBtn">Calcular letras PETG</button>
+                    <button type="button" class="materials-btn" id="applyPetgBtn">Aplicar custo PETG ao produto</button>
+                </div>
+                <div class="petg-result" id="petgResult">Informe a palavra, altura e profundidade para calcular.</div>
+            </div>
             <div class="technical-table-wrap">
                 <table class="technical-table">
                     <thead><tr><th>O que será usado?</th><th>Características</th><th>Medidas para cálculo</th><th>Qtd.</th><th>Perda %</th><th>Consumo</th><th>Custo</th><th></th></tr></thead>
@@ -733,6 +756,15 @@
             "Alto Colante",
             "Logo 3D com LED",
             "Logo 3D sem LED",
+            "Letra Caixa PETG 3D",
+            "Adesivo vinil impresso",
+            "Adesivo vinil impresso com recorte",
+            "LED neon com base acrilico 6 mm",
+            "Lona impressa sem ilhos",
+            "Lona impressa com ilhos",
+            "Corte laser acrilico 3 mm",
+            "Painel ACM com letras em relevo",
+            "Caixa de luz face opalino",
             "Brindes",
             "Painel de ACM",
             "Caixa de Luz",
@@ -755,10 +787,14 @@
         const closeTechnicalBtn = document.getElementById('closeTechnicalBtn');
         const addMaterialBtn = document.getElementById('addMaterialBtn');
         const applyTechnicalBtn = document.getElementById('applyTechnicalBtn');
+        const calculatePetgBtn = document.getElementById('calculatePetgBtn');
+        const applyPetgBtn = document.getElementById('applyPetgBtn');
 
         closeTechnicalBtn.addEventListener('click', fecharFichaTecnica);
         addMaterialBtn.addEventListener('click', () => addTechnicalRow());
         applyTechnicalBtn.addEventListener('click', aplicarFichaTecnica);
+        calculatePetgBtn.addEventListener('click', calcularPetgTecnico);
+        applyPetgBtn.addEventListener('click', aplicarPetgAoProduto);
         
         // ============================================
         // FUNÇÕES ESPECÍFICAS PARA ORÇAMENTO
@@ -1064,6 +1100,7 @@
             
             productsTableBody.appendChild(row);
             row._materiais = productData && Array.isArray(productData.materiais) ? productData.materiais : [];
+            row._petg3d = productData && productData.petg3d ? productData.petg3d : null;
             
             // Adicionar event listeners
             const removeBtn = row.querySelector('.remove-btn');
@@ -1111,6 +1148,8 @@
 
         function abrirFichaTecnica(row) {
             technicalProductRow = row;
+            preencherPrecoPetgPadrao();
+            preencherPetgDaLinha(row);
             renderTechnicalRows();
             document.getElementById('technicalModal').classList.add('active');
         }
@@ -1193,11 +1232,73 @@
             return { detalhes, custoTotal: detalhes.reduce((total, detalhe) => total + detalhe.calculo.custo, 0) };
         }
 
+        function preencherPrecoPetgPadrao() {
+            const petg = catalogoMateriais.find(material =>
+                material.presetKey === 'filamento_petg'
+                || String(material.nome || '').toLowerCase().includes('petg')
+            );
+            if (petg && Number(petg.precoCusto) > 0) {
+                document.getElementById('petgKgPrice').value = Number(petg.precoCusto).toFixed(2);
+            }
+        }
+
+        function preencherPetgDaLinha(row) {
+            const petg = row._petg3d || {};
+            document.getElementById('petgWord').value = petg.palavra || '';
+            document.getElementById('petgHeight').value = petg.alturaCm || 30;
+            document.getElementById('petgDepth').value = petg.profundidadeCm || 5;
+            document.getElementById('petgWaste').value = petg.perdaPercentual ?? 10;
+            document.getElementById('petgGramsHour').value = petg.gramasPorHora || 55;
+            if (petg.precoKgFilamento) document.getElementById('petgKgPrice').value = petg.precoKgFilamento;
+            document.getElementById('petgResult').textContent = petg.custoTotal
+                ? `PETG calculado: ${formatarMoeda(petg.custoTotal)} | ${petg.gramasTotal} g | ${petg.horasTotal} h`
+                : 'Informe a palavra, altura e profundidade para calcular.';
+        }
+
+        function petgConfigFromForm() {
+            return {
+                palavra: document.getElementById('petgWord').value,
+                alturaCm: parseFloat(document.getElementById('petgHeight').value) || 0,
+                profundidadeCm: parseFloat(document.getElementById('petgDepth').value) || 0,
+                precoKgFilamento: parseFloat(document.getElementById('petgKgPrice').value) || 0,
+                perdaPercentual: parseFloat(document.getElementById('petgWaste').value) || 10,
+                gramasPorHora: parseFloat(document.getElementById('petgGramsHour').value) || 55
+            };
+        }
+
+        function calcularPetgTecnico() {
+            const config = petgConfigFromForm();
+            const result = GESTAO.calcularLetraCaixaPETG(config);
+            const detalhes = result.detalhes.map(item => `${item.quantidade}x ${item.letter}: ${item.gramas} g`).join(' | ') || 'Nenhuma letra identificada';
+            document.getElementById('petgResult').innerHTML = `
+                <strong>Custo PETG:</strong> ${formatarMoeda(result.custoTotal)}
+                | <strong>Filamento:</strong> ${result.gramasTotal} g
+                | <strong>Tempo:</strong> ${result.horasTotal} h
+                <br><strong>Letras:</strong> ${detalhes}
+                ${result.alerta ? `<br><strong style="color:#dc2626">${result.alerta}</strong>` : ''}
+            `;
+            return { ...result, palavra: config.palavra, perdaPercentual: config.perdaPercentual };
+        }
+
+        function aplicarPetgAoProduto() {
+            if (!technicalProductRow) return;
+            const result = calcularPetgTecnico();
+            technicalProductRow._petg3d = result;
+            technicalProductRow.querySelector('.custo-input').value = result.custoTotal.toFixed(2);
+            technicalProductRow.querySelector('.materials-summary').textContent = `PETG 3D | ${result.gramasTotal} g | ${formatarMoeda(result.custoTotal)}`;
+            const select = technicalProductRow.querySelector('.product-select');
+            if (select && !select.value) select.value = 'Letra Caixa PETG 3D';
+            calculateTotals();
+        }
+
         function aplicarFichaTecnica() {
             if (!technicalProductRow) return;
             const ficha = calcularFichaOrcamento(technicalProductRow._materiais);
-            technicalProductRow.querySelector('.custo-input').value = ficha.custoTotal.toFixed(2);
-            technicalProductRow.querySelector('.materials-summary').textContent = `${technicalProductRow._materiais.length} itens | ${formatarMoeda(ficha.custoTotal)}`;
+            const petgCost = parseFloat(technicalProductRow._petg3d?.custoTotal || 0);
+            const custoTotal = ficha.custoTotal + petgCost;
+            technicalProductRow.querySelector('.custo-input').value = custoTotal.toFixed(2);
+            const petgLabel = petgCost > 0 ? ` + PETG ${formatarMoeda(petgCost)}` : '';
+            technicalProductRow.querySelector('.materials-summary').textContent = `${technicalProductRow._materiais.length} itens${petgLabel} | ${formatarMoeda(custoTotal)}`;
             calculateTotals();
             fecharFichaTecnica();
         }
@@ -1371,6 +1472,7 @@
                         valor: valor,
                         custo: custo,
                         materiais: Array.isArray(row._materiais) ? row._materiais : [],
+                        petg3d: row._petg3d || null,
                         observacoes: observacoes
                     });
                 }

@@ -4,9 +4,16 @@ const MATERIAIS_PADRAO = require('../core/materiais-padrao.js');
 
 test('lista familias padrao da operacao', () => {
   const keys = MATERIAIS_PADRAO.materiais.map(material => material.key);
-  for (const key of ['fonte', 'acrilico', 'acm', 'pvc_expandido', 'metalon_aluminio', 'perfil_caixa_slim', 'perfil_caixa_luz', 'canto_ligacao', 'fita_led_zigzag', 'fita_led_vtec', 'led_neon', 'modulo_led_1w', 'adesivo', 'outro']) {
+  for (const key of ['fonte', 'acrilico', 'acm', 'pvc_expandido', 'metalon_aluminio', 'perfil_caixa_slim', 'perfil_caixa_luz', 'canto_ligacao', 'fita_led_zigzag', 'fita_led_vtec', 'led_neon', 'modulo_led_1w', 'filamento_petg', 'adesivo', 'outro']) {
     assert.ok(keys.includes(key), key);
   }
+});
+
+test('filamento petg usa cadastro por kg para letras caixa 3d', () => {
+  const petg = MATERIAIS_PADRAO.get('filamento_petg');
+  assert.equal(petg.unidade, 'kg');
+  assert.equal(petg.categoria, 'Impressao 3D');
+  assert.equal(petg.questions[1].fixed, '1,75 mm');
 });
 
 test('fonte pergunta tensao e potencia padronizadas', () => {
