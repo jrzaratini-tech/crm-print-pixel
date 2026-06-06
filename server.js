@@ -1286,7 +1286,7 @@ app.get('/api/expenses/unclassified', async (req, res) => {
       .map(doc => ({ id: doc.id, ...doc.data() }))
       .filter(event => !event.deleted && event.schema === 'despesa' && expenseNeedsClassification(event.payload || {}))
       .sort((a, b) => new Date(b.timestamp || b.created_at || 0) - new Date(a.timestamp || a.created_at || 0))
-      .map(event => sanitizeForResponse({ id: event.id, ...event.payload, timestamp: event.timestamp }));
+      .map(event => sanitizeForResponse({ ...event.payload, id: event.id, timestamp: event.timestamp }));
     res.json({ success: true, expenses, pendingCount: expenses.length, autoClassifiedCount });
   } catch (error) {
     console.error('Erro ao listar despesas sem classificacao:', error);
@@ -1318,9 +1318,21 @@ async function saveSupplierFromClassification(body = {}, fallbackPayload = {}) {
   return { savedSupplier, now };
 }
 
+async function expenseDocumentRefByIdentifier(id) {
+  const cleanId = String(id || '');
+  const directRef = db.collection('events').doc(cleanId);
+  const directDoc = await directRef.get();
+  if (directDoc.exists && directDoc.data().schema === 'despesa') return { ref: directRef, doc: directDoc };
+  const snapshot = await db.collection('events').get();
+  const match = snapshot.docs.find(doc => {
+    const data = doc.data();
+    return !data.deleted && data.schema === 'despesa' && String(data.payload?.id || '') === cleanId;
+  });
+  return match ? { ref: db.collection('events').doc(match.id), doc: match } : { ref: directRef, doc: directDoc };
+}
+
 async function classifyExpenseById(id, body = {}) {
-  const expenseRef = db.collection('events').doc(String(id || ''));
-  const expenseDoc = await expenseRef.get();
+  const { ref: expenseRef, doc: expenseDoc } = await expenseDocumentRefByIdentifier(id);
   if (!expenseDoc.exists || expenseDoc.data().schema !== 'despesa') {
     const error = new Error('Despesa nao encontrada.');
     error.status = 404;

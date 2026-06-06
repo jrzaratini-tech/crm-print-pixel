@@ -696,6 +696,37 @@ test('despesa vinculada a fornecedor nao volta para a fila mesmo com categoria a
   assert.equal(pending.body.expenses.some(item => item.id === 'legacy-dimatur-no-return'), false);
 });
 
+test('fila usa ID real do documento mesmo quando payload tem id antigo', async () => {
+  await db.collection('events').doc('doc-real-dimatur').set({
+    schema: 'despesa',
+    payload: {
+      id: 'payload-antigo-dimatur',
+      fornecedor: 'Fornecedor NIF 507333559',
+      nifFornecedor: '507333559',
+      categoria: 'OUTROS',
+      valorTotal: 90
+    },
+    deleted: false,
+    timestamp: new Date().toISOString()
+  });
+
+  const pending = await request('/api/expenses/unclassified');
+  const row = pending.body.expenses.find(item => item.nifFornecedor === '507333559');
+  assert.equal(row.id, 'doc-real-dimatur');
+
+  const classified = await post(`/api/expenses/${row.id}/classify`, {
+    supplierName: 'Dimatur Documento Real',
+    nif: '507333559',
+    category: 'DIMATUR',
+    expenseType: 'material',
+    applyToSameNif: true
+  });
+  assert.equal(classified.response.status, 200);
+
+  const after = await request('/api/expenses/unclassified');
+  assert.equal(after.body.expenses.some(item => item.id === 'doc-real-dimatur'), false);
+});
+
 test('fila de despesas reconcilia pendencias com fornecedores ja cadastrados', async () => {
   const supplier = await post('/api/suppliers', {
     name: 'Fornecedor Reconciliado',
