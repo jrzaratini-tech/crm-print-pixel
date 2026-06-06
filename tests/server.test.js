@@ -77,9 +77,14 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   const mobilePageResult = await request('/mobile/');
   const mobileQrLibraryResult = await request('/mobile/vendor/jsQR.js');
   const linksPageResult = await request('/pages/links.html');
+  const suppliersPageResult = await request('/pages/fornecedores.html');
+  const classifyExpensesPageResult = await request('/pages/classificar-despesas.html');
+  const commissionsPageResult = await request('/pages/comissoes.html');
   const inboxPageResult = await request('/pages/importacoes-fiscais.html');
   const productionPageResult = await request('/pages/ordemproducao.html');
   const workerAppResult = await request('/colaborador/');
+  const sellerAppResult = await request('/vendedor/');
+  const sellerScriptResult = await request('/vendedor/app.js');
   const workerStylesResult = await request('/colaborador/styles.css');
   const workerScriptResult = await request('/colaborador/app.js');
   assert.equal(moduleResult.response.status, 200);
@@ -99,9 +104,14 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.equal(mobilePageResult.response.status, 200);
   assert.equal(mobileQrLibraryResult.response.status, 200);
   assert.equal(linksPageResult.response.status, 200);
+  assert.equal(suppliersPageResult.response.status, 200);
+  assert.equal(classifyExpensesPageResult.response.status, 200);
+  assert.equal(commissionsPageResult.response.status, 200);
   assert.equal(inboxPageResult.response.status, 200);
   assert.equal(productionPageResult.response.status, 200);
   assert.equal(workerAppResult.response.status, 200);
+  assert.equal(sellerAppResult.response.status, 200);
+  assert.equal(sellerScriptResult.response.status, 200);
   assert.equal(workerStylesResult.response.status, 200);
   assert.equal(workerScriptResult.response.status, 200);
   assert.match(moduleResult.body, /calcularFicha/);
@@ -118,6 +128,8 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(orderFormPageResult.body, /window\.location\.href = 'pedidos\.html'/);
   assert.match(orderFormPageResult.body, /window\.addEventListener\('coreCommitSuccess'/);
   assert.match(orderFormPageResult.body, /setAttribute\('data-original-text', 'ATUALIZAR PEDIDO'\)/);
+  assert.match(orderFormPageResult.body, /sellerCommissionRate/);
+  assert.match(orderFormPageResult.body, /sellerCommissionValue/);
   assert.match(ordersPageResult.body, /excluirPedido/);
   assert.match(ordersPageResult.body, /hardDelete: true/);
   assert.match(expensesPageResult.body, /excluirDespesa/);
@@ -154,6 +166,15 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(linksPageResult.body, /App da produção/);
   assert.match(linksPageResult.body, /Usuários cadastrados/);
   assert.doesNotMatch(linksPageResult.body, /CRM_MOBILE_ACCESS_KEY/);
+  assert.match(linksPageResult.body, /openSeller/);
+  assert.match(menuResult.body, /nav_fornecedores/);
+  assert.match(menuResult.body, /nav_classificar_despesas/);
+  assert.match(menuResult.body, /nav_comissoes/);
+  assert.match(suppliersPageResult.body, /supplierForm/);
+  assert.match(classifyExpensesPageResult.body, /expenses\/unclassified/);
+  assert.match(commissionsPageResult.body, /sellerForm/);
+  assert.match(sellerAppResult.body, /PrintPixel Vendedor/);
+  assert.match(sellerScriptResult.body, /api\/vendedor\/session/);
   assert.match(productionPageResult.body, /classificationOverlay/);
   assert.match(productionPageResult.body, /workerFilter/);
   assert.match(productionPageResult.body, /Desclassificar e devolver à fila/);
@@ -484,6 +505,76 @@ test('migra documento antigo em revisao para lancamento automatico', async () =>
   assert.ok(inbox.body.documents.some(item => item.numeroFatura === 'FT LEGACY/1' && item.status === 'approved'));
   const saved = await post('/api/database/query', { schema: 'despesa', filters: { id: `mobile-${fingerprint.slice(0, 40)}` } });
   assert.equal(saved.body.count, 1);
+});
+
+test('classifica despesas antigas por fornecedor cadastrado pelo NIF', async () => {
+  const first = await post('/api/database/commit', {
+    schema: 'despesa',
+    payload: { fornecedor: 'Fornecedor NIF 508111222', nifFornecedor: '508111222', categoria: 'OUTROS', valorTotal: 40, origemLancamento: 'mobile_qr' },
+    pageId: 'test'
+  });
+  const second = await post('/api/database/commit', {
+    schema: 'despesa',
+    payload: { fornecedor: 'Fornecedor NIF 508111222', nifFornecedor: '508111222', categoria: 'OUTROS', valorTotal: 60, origemLancamento: 'mobile_qr' },
+    pageId: 'test'
+  });
+
+  const pending = await request('/api/expenses/unclassified');
+  assert.ok(pending.body.expenses.some(item => item.id === first.body.id));
+
+  const classified = await post(`/api/expenses/${first.body.id}/classify`, {
+    supplierName: 'Fornecedor Teste',
+    nif: '508111222',
+    category: 'COMBUSTIVEL',
+    expenseType: 'combustivel',
+    applyToSameNif: true
+  });
+  assert.equal(classified.response.status, 200);
+  assert.equal(classified.body.updatedCount, 2);
+
+  const updated = await post('/api/database/query', { schema: 'despesa', filters: { id: second.body.id } });
+  assert.equal(updated.body.events[0].payload.fornecedor, 'Fornecedor Teste');
+  assert.equal(updated.body.events[0].payload.categoria, 'COMBUSTIVEL');
+  assert.equal(updated.body.events[0].payload.classificationStatus, 'classified');
+});
+
+test('cadastra vendedor, calcula comissao sem IVA e instalacao e exibe no app', async () => {
+  const seller = await post('/api/sellers', { name: 'Vendedor Teste', username: 'vendedor.teste', password: 'senha-segura-vendedor' });
+  assert.equal(seller.response.status, 200);
+
+  const order = await post('/api/database/commit', {
+    schema: 'pedido',
+    pageId: 'test',
+    payload: {
+      numero: 'PED-VEND-1',
+      cliente: 'Cliente Vendedor',
+      produtos: [{ nome: 'Letreiro', quantidade: 1, valor: 1000 }],
+      instalacao: 200,
+      subtotal: 1200,
+      iva: 276,
+      total: 1476,
+      sellerId: seller.body.seller.id,
+      sellerName: seller.body.seller.name,
+      sellerCommissionRate: 7
+    }
+  });
+
+  const commissions = await request('/api/sales/commissions');
+  const commission = commissions.body.commissions.find(item => item.orderId === order.body.id);
+  assert.equal(commission.base, 1000);
+  assert.equal(commission.commission, 70);
+  assert.equal(commission.status, 'pending');
+
+  const login = await post('/api/vendedor/login', { username: 'vendedor.teste', password: 'senha-segura-vendedor' });
+  assert.equal(login.response.status, 200);
+  const sellerSession = await workerRequest('/api/vendedor/session', login.body.token);
+  assert.equal(sellerSession.body.sales.length, 1);
+  assert.equal(sellerSession.body.sales[0].commission, 70);
+
+  const paid = await post(`/api/sales/commissions/${order.body.id}/payment`, { paidBy: 'Financeiro' });
+  assert.equal(paid.response.status, 200);
+  const afterPay = await workerRequest('/api/vendedor/session', login.body.token);
+  assert.equal(afterPay.body.sales[0].paymentStatus, 'paid');
 });
 
 test('rejeita uso do app movel sem dispositivo ativado', async () => {

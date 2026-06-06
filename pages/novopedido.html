@@ -803,6 +803,21 @@
                         <label for="atendente" class="required">Atendente</label>
                         <input type="text" id="atendente" name="atendente" data-bind="pedido.atendente" required>
                     </div>
+
+                    <div class="form-group">
+                        <label for="sellerId">Vendedor externo</label>
+                        <select id="sellerId" name="sellerId" data-bind="pedido.sellerId">
+                            <option value="">Sem vendedor externo</option>
+                        </select>
+                        <input type="hidden" id="sellerName" data-bind="pedido.sellerName" value="">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="sellerCommissionRate">Comissão vendedor (%)</label>
+                        <input type="number" id="sellerCommissionRate" name="sellerCommissionRate" data-bind="pedido.sellerCommissionRate" min="5" max="10" step="0.1" value="5">
+                        <input type="hidden" id="sellerCommissionValue" data-bind="pedido.sellerCommissionValue" value="0">
+                        <input type="hidden" id="sellerCommissionStatus" data-bind="pedido.sellerCommissionStatus" value="pending">
+                    </div>
                     
                     <div class="form-group">
                         <label class="required">Status do Pedido</label>
@@ -1041,6 +1056,7 @@
             let paymentIndex = 0;
             let isEditMode = false;
             let currentPedidoId = '';
+            let sellersCache = [];
             
             // Referências DOM
             const productsTableBody = document.getElementById('productsTableBody');
@@ -1050,6 +1066,11 @@
             const numeroFaturaInput = document.getElementById('numeroFatura');
             const valorInstalacaoInput = document.getElementById('valorInstalacao');
             const dataFechamentoInput = document.getElementById('dataFechamento');
+            const sellerSelect = document.getElementById('sellerId');
+            const sellerNameInput = document.getElementById('sellerName');
+            const sellerCommissionRateInput = document.getElementById('sellerCommissionRate');
+            const sellerCommissionValueInput = document.getElementById('sellerCommissionValue');
+            const sellerCommissionStatusInput = document.getElementById('sellerCommissionStatus');
             
             // Elementos de exibição de totais
             const subtotalProdutosEl = document.getElementById('subtotalProdutos');
@@ -1071,6 +1092,7 @@
             // Verificar se é modo de edição
             const urlParams = new URLSearchParams(window.location.search);
             const editId = urlParams.get('edit');
+            loadSellers();
             
             if (editId) {
                 console.log(`✏️ Modo EDIÇÃO detectado para ID: ${editId}`);
@@ -1084,6 +1106,42 @@
             // FUNÇÕES PRINCIPAIS
             // ============================================
             
+            async function loadSellers() {
+                try {
+                    const response = await fetch('/api/sellers');
+                    if (!response.ok) throw new Error('Erro ao carregar vendedores');
+                    const result = await response.json();
+                    sellersCache = (result.sellers || []).filter(seller => seller.active !== false);
+                    const current = sellerSelect.value;
+                    sellerSelect.innerHTML = '<option value="">Sem vendedor externo</option>';
+                    sellersCache.forEach(seller => {
+                        const option = document.createElement('option');
+                        option.value = seller.id;
+                        option.textContent = seller.name;
+                        sellerSelect.appendChild(option);
+                    });
+                    if (current) sellerSelect.value = current;
+                    syncSellerFields();
+                } catch (error) {
+                    console.warn('Nao foi possivel carregar vendedores:', error);
+                }
+            }
+
+            function syncSellerFields() {
+                const seller = sellersCache.find(item => item.id === sellerSelect.value);
+                sellerNameInput.value = seller ? seller.name : '';
+                const rate = Math.min(10, Math.max(5, parseFloat(sellerCommissionRateInput.value) || 5));
+                sellerCommissionRateInput.value = rate;
+                const productsSubtotal = Array.from(productsTableBody.querySelectorAll('tr')).reduce((sum, row) => {
+                    const quantidade = parseFloat(row.querySelector('.quantidade-input')?.value) || 1;
+                    const valor = parseFloat(row.querySelector('.valor-input')?.value) || 0;
+                    return sum + quantidade * valor;
+                }, 0);
+                sellerCommissionValueInput.value = seller ? (productsSubtotal * rate / 100).toFixed(2) : '0';
+                if (!sellerSelect.value) sellerCommissionStatusInput.value = '';
+                else if (!sellerCommissionStatusInput.value) sellerCommissionStatusInput.value = 'pending';
+            }
+
             function setupNewPedido() {
                 // Configurar datas padrão
                 const today = new Date();
@@ -1160,6 +1218,11 @@
                     document.getElementById('dataFechamento').value = pedido.dataFechamento || '';
                     document.getElementById('valorInstalacao').value = pedido.instalacao || '0';
                     document.getElementById('atendente').value = pedido.atendente || '';
+                    document.getElementById('sellerId').value = pedido.sellerId || '';
+                    document.getElementById('sellerName').value = pedido.sellerName || '';
+                    document.getElementById('sellerCommissionRate').value = pedido.sellerCommissionRate || '5';
+                    document.getElementById('sellerCommissionValue').value = pedido.sellerCommissionValue || '0';
+                    document.getElementById('sellerCommissionStatus').value = pedido.sellerCommissionStatus || (pedido.sellerId ? 'pending' : '');
                     document.getElementById('observacoes').value = pedido.observacoes || '';
                     
                     // Status
@@ -1636,6 +1699,7 @@
                 pedidoSubtotalInput.value = subtotalGeral;
                 pedidoIVAInput.value = iva;
                 pedidoTotalInput.value = totalFinal;
+                syncSellerFields();
                 
                 // Atualizar resumo de pagamentos
                 updatePaymentSummary();
@@ -1927,6 +1991,8 @@
             document.getElementById('ivaSim').addEventListener('change', calculateTotals);
             document.getElementById('ivaNao').addEventListener('change', calculateTotals);
             valorInstalacaoInput.addEventListener('input', calculateTotals);
+            sellerSelect.addEventListener('change', calculateTotals);
+            sellerCommissionRateInput.addEventListener('input', calculateTotals);
             
             // Configurar listener para evento do engine.js
             window.addEventListener('coreCommitSuccess', (event) => {

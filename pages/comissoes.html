@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <script src="../core/security.js"></script>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Comissões - PrintPixel</title>
+  <style>
+    *{box-sizing:border-box;font-family:Segoe UI,system-ui,sans-serif}body{margin:0;padding:24px;background:#f4f7fb;color:#10233f}.container{max-width:1300px;margin:auto}.panel{background:#fff;border:1px solid #dce5f2;border-radius:16px;padding:22px;margin-bottom:18px;box-shadow:0 8px 24px #0f172a0d}h1{margin:0;color:#1a237e}.subtitle{color:#64748b}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}input{width:100%;border:1px solid #cbd5e1;border-radius:10px;padding:11px}label{font-size:12px;font-weight:800;color:#334155}.btn{border:0;border-radius:10px;padding:11px 14px;background:#1a237e;color:#fff;font-weight:800;cursor:pointer}.btn.danger{background:#b91c1c}.btn.ok{background:#047857}.row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;border:1px solid #e2e8f0;border-radius:12px;padding:14px;margin-top:10px}.tag{display:inline-block;border-radius:999px;padding:4px 8px;font-size:12px;font-weight:800;background:#fef3c7;color:#92400e}.tag.paid{background:#dcfce7;color:#166534}.message{font-weight:800;color:#047857;min-height:20px}.url{padding:10px;border:1px solid #cbd5e1;border-radius:8px;background:#f8fafc;color:#475569;word-break:break-all}
+  </style>
+</head>
+<body data-page-id="comissoes" data-page-type="WRITE">
+  <main class="container">
+    <section class="panel"><h1>Comissões</h1><p class="subtitle">Cadastre vendedores, copie o link do app e acompanhe valores a pagar/pagos.</p><div class="url" id="sellerUrl"></div><div class="message" id="message"></div></section>
+    <section class="panel"><h2>Cadastrar vendedor</h2><form id="sellerForm" class="grid"><label>Nome<input id="name" required></label><label>Usuário<input id="username" required></label><label>Senha<input id="password" type="password" minlength="8" required></label><button class="btn">Cadastrar</button></form><div id="sellerList"></div></section>
+    <section class="panel"><h2>Comissões dos pedidos</h2><div id="commissionList"></div></section>
+  </main>
+  <script>
+    const $=id=>document.getElementById(id);const money=v=>Number(v||0).toLocaleString('pt-PT',{style:'currency',currency:'EUR'});
+    async function api(path,options={}){const r=await fetch(path,{...options,headers:{'Content-Type':'application/json',...(options.headers||{})}});const b=await r.json();if(!r.ok)throw new Error(b.message||'Erro');return b;}
+    async function pay(id){if(!confirm('Marcar esta comissão como paga?'))return;await api('/api/sales/commissions/'+id+'/payment',{method:'POST',body:JSON.stringify({paidBy:'CRM'})});$('message').textContent='Comissão marcada como paga.';await load();}
+    async function removeSeller(id){if(!confirm('Excluir vendedor?'))return;await api('/api/sellers/'+id+'/delete',{method:'POST'});await load();}
+    async function load(){
+      const sellers=await api('/api/sellers');$('sellerUrl').textContent=sellers.appUrl;const sl=$('sellerList');sl.replaceChildren();sellers.sellers.forEach(s=>{const r=document.createElement('div');r.className='row';r.innerHTML=`<div><strong>${s.name}</strong><small>Usuário: ${s.username}</small></div><button class="btn danger">Excluir</button>`;r.querySelector('button').onclick=()=>removeSeller(s.id);sl.append(r);});
+      const result=await api('/api/sales/commissions');const cl=$('commissionList');cl.replaceChildren();if(!result.commissions.length){cl.textContent='Nenhum pedido com vendedor associado.';return;}result.commissions.forEach(c=>{const r=document.createElement('div');r.className='row';r.innerHTML=`<div><strong>${c.numero||c.orderId} - ${c.cliente||''}</strong><p>${c.sellerName} · Base ${money(c.base)} · ${c.rate}% · Comissão ${money(c.commission)} <span class="tag ${c.status==='paid'?'paid':''}">${c.status==='paid'?'Pago':'A pagar'}</span></p></div>${c.status==='paid'?'<span></span>':'<button class="btn ok">Marcar pago</button>'}`;const b=r.querySelector('button');if(b)b.onclick=()=>pay(c.orderId);cl.append(r);});
+    }
+    $('sellerForm').addEventListener('submit',async e=>{e.preventDefault();try{await api('/api/sellers',{method:'POST',body:JSON.stringify({name:$('name').value,username:$('username').value,password:$('password').value})});$('sellerForm').reset();$('message').textContent='Vendedor cadastrado.';await load();}catch(error){$('message').textContent=error.message;}});
+    load().catch(e=>$('message').textContent=e.message);
+  </script>
+</body>
+</html>

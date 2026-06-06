@@ -26,6 +26,13 @@
         <div><h2>Últimos lançamentos fiscais</h2><p class="subtitle">Consulte os 10 documentos mais recentes cadastrados automaticamente pelo celular.</p></div>
         <div class="actions"><a class="btn" href="importacoes-fiscais.html">Ver lançamentos</a></div>
       </article>
+      <article class="card">
+        <div class="icon">€</div><span class="tag">App instalável</span>
+        <div><h2>App do vendedor</h2><p class="subtitle">Cada vendedor acompanha vendas, comissões a receber e histórico pago.</p></div>
+        <div class="url" id="sellerUrl"></div>
+        <div class="actions"><a class="btn" id="openSeller" target="_blank" rel="noopener">Abrir app</a><button class="btn secondary" id="copySeller">Copiar link</button></div>
+        <div class="message" id="sellerMessage"></div>
+      </article>
     </section>
     <section class="panel">
       <div><h2>App da produção</h2><p class="subtitle">Use um único link no celular. Cada colaborador entra com o próprio usuário e senha.</p></div>
@@ -51,6 +58,13 @@
     document.getElementById('copyMobile').addEventListener('click', async () => {
       await navigator.clipboard.writeText(mobileUrl);
       document.getElementById('copyMessage').textContent = 'Link copiado.';
+    });
+    const sellerUrl = `${location.origin}/vendedor/`;
+    document.getElementById('sellerUrl').textContent = sellerUrl;
+    document.getElementById('openSeller').href = sellerUrl;
+    document.getElementById('copySeller').addEventListener('click', async () => {
+      await navigator.clipboard.writeText(sellerUrl);
+      document.getElementById('sellerMessage').textContent = 'Link do app do vendedor copiado.';
     });
     const workerMessage = document.getElementById('workerMessage');
     const productionUrl = `${location.origin}/colaborador/`;

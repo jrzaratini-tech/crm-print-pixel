@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <script src="../core/security.js"></script>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fornecedores - PrintPixel</title>
+  <style>
+    *{box-sizing:border-box;font-family:Segoe UI,system-ui,sans-serif}body{margin:0;padding:24px;background:#f4f7fb;color:#10233f}.container{max-width:1200px;margin:auto}.panel{background:#fff;border:1px solid #dce5f2;border-radius:16px;padding:22px;margin-bottom:18px;box-shadow:0 8px 24px #0f172a0d}h1{margin:0;color:#1a237e}.subtitle{color:#64748b}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}input,select{width:100%;border:1px solid #cbd5e1;border-radius:10px;padding:11px}label{font-size:12px;font-weight:800;color:#334155}.btn{border:0;border-radius:10px;padding:11px 14px;background:#1a237e;color:#fff;font-weight:800;cursor:pointer}.btn.danger{background:#b91c1c}.list{display:grid;gap:10px}.row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;border:1px solid #e2e8f0;border-radius:12px;padding:14px}.row small{display:block;color:#64748b}.message{font-weight:800;color:#047857;min-height:20px}@media(max-width:700px){.row{grid-template-columns:1fr}}
+  </style>
+</head>
+<body data-page-id="fornecedores" data-page-type="WRITE">
+  <main class="container">
+    <section class="panel"><h1>Fornecedores</h1><p class="subtitle">Cadastre o NIF, nome e categoria padrão. O QR fiscal passa a classificar automaticamente as próximas despesas.</p></section>
+    <section class="panel">
+      <form id="supplierForm" class="grid">
+        <label>Nome<input id="name" required maxlength="160"></label>
+        <label>NIF<input id="nif" required maxlength="20"></label>
+        <label>Categoria<select id="category"></select></label>
+        <label>Tipo de despesa<input id="expenseType" maxlength="80" placeholder="Ex: material, combustível"></label>
+        <label>IVA dedutível<select id="ivaDedutivel"><option value="true">Sim</option><option value="false">Não</option></select></label>
+        <label>Observações<input id="notes" maxlength="500"></label>
+        <button class="btn" type="submit">Salvar fornecedor</button>
+      </form>
+      <div class="message" id="message"></div>
+    </section>
+    <section class="panel"><h2>Fornecedores cadastrados</h2><div class="list" id="list"></div></section>
+  </main>
+  <script>
+    const CATEGORIES = ['ÁGUA','AMAZON','ALIMENTAÇÃO','ARRENDAMENTO','COMISSÃO','CONTABILIDADE','CTT','COMBUSTÍVEL','CAFÉ','DIMATUR','DAGOL','ENERGIA','FILAMENTO 3D','IMPOSTOS','LEROY MERLIN','LUZACRIL','MANUTENÇÃO','MATERIAL ESCRITORIO','MAKRO','PLOTTERZONE','POLEGADA LED','SALÁRIO','SANTANDER','TRANSPORTE','TELEFONE/INTERNET','WEDDT','OUTROS'];
+    const $ = id => document.getElementById(id);
+    const category = $('category'); CATEGORIES.forEach(item => category.add(new Option(item, item)));
+    async function api(path, options={}){const r=await fetch(path,{...options,headers:{'Content-Type':'application/json',...(options.headers||{})}});const b=await r.json();if(!r.ok)throw new Error(b.message||'Erro');return b;}
+    async function load(){const result=await api('/api/suppliers');const list=$('list');list.replaceChildren();if(!result.suppliers.length){list.textContent='Nenhum fornecedor cadastrado.';return;}result.suppliers.forEach(s=>{const row=document.createElement('div');row.className='row';row.innerHTML=`<div><strong>${s.name}</strong><small>NIF ${s.nif} · ${s.category} · ${s.expenseType||'geral'} · IVA ${s.ivaDedutivel===false?'não dedutível':'dedutível'}</small></div><button class="btn danger">Excluir</button>`;row.querySelector('button').onclick=async()=>{if(confirm('Excluir fornecedor?')){await api('/api/suppliers/'+s.id+'/delete',{method:'POST'});await load();}};list.append(row);});}
+    $('supplierForm').addEventListener('submit',async e=>{e.preventDefault();try{await api('/api/suppliers',{method:'POST',body:JSON.stringify({name:$('name').value,nif:$('nif').value,category:$('category').value,expenseType:$('expenseType').value,ivaDedutivel:$('ivaDedutivel').value==='true',notes:$('notes').value})});$('supplierForm').reset();$('message').textContent='Fornecedor salvo.';await load();}catch(error){$('message').textContent=error.message;}});
+    load().catch(error=>$('message').textContent=error.message);
+  </script>
+</body>
+</html>

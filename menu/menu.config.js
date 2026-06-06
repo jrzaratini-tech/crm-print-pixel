@@ -50,6 +50,16 @@
     },
 
     {
+        id: "nav_classificar_despesas",
+        name: "Despesas a Classificar",
+        file: "pages/classificar-despesas.html",
+        type: "WRITE",
+        pos: 3.2,
+        hidden: false,
+        deleted: false
+    },
+
+    {
         id: "nav_novoorcamento",
         name: "Novo Orçamento",
         file: "pages/novoorcamento.html",
@@ -145,6 +155,26 @@
         file: "pages/materiais.html",
         type: "WRITE",
         pos: 12,
+        hidden: false,
+        deleted: false
+    },
+
+    {
+        id: "nav_fornecedores",
+        name: "Fornecedores",
+        file: "pages/fornecedores.html",
+        type: "WRITE",
+        pos: 12.2,
+        hidden: false,
+        deleted: false
+    },
+
+    {
+        id: "nav_comissoes",
+        name: "Comissões",
+        file: "pages/comissoes.html",
+        type: "WRITE",
+        pos: 12.4,
         hidden: false,
         deleted: false
     },

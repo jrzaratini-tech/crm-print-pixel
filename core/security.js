@@ -39,7 +39,7 @@
         const legacyRegistrations = registrations.filter(registration => {
             try {
                 const pathname = new URL(registration.scope).pathname;
-                return !pathname.startsWith('/mobile/') && !pathname.startsWith('/colaborador/');
+                return !pathname.startsWith('/mobile/') && !pathname.startsWith('/colaborador/') && !pathname.startsWith('/vendedor/');
             } catch {
                 return true;
             }

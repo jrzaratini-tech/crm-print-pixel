@@ -273,6 +273,7 @@ async function findDuplicateMobileDocument(documento, fingerprint) {
 
 async function launchMobileDocument(item, fingerprint, now = new Date().toISOString()) {
   const eventId = `mobile-${fingerprint.slice(0, 40)}`;
+  const supplier = item.entryType === 'expense' ? await supplierByNif(item.nifEmitente) : null;
   const payload = item.entryType === 'income'
     ? {
         nifEmitente: item.nifEmitente,
@@ -287,7 +288,7 @@ async function launchMobileDocument(item, fingerprint, now = new Date().toISOStr
         observacoes: item.observacoes
       }
     : {
-        fornecedor: item.nomeEmitente || `Fornecedor NIF ${item.nifEmitente}`,
+        fornecedor: supplier?.name || item.nomeEmitente || `Fornecedor NIF ${item.nifEmitente}`,
         nifFornecedor: item.nifEmitente,
         nifAdquirente: item.nifAdquirente,
         numeroFatura: item.numeroFatura,
@@ -295,15 +296,18 @@ async function launchMobileDocument(item, fingerprint, now = new Date().toISOStr
         dataCompra: item.dataCompra,
         dataVencimento: item.dataCompra,
         descricao: `${item.tipoDocumento} ${item.numeroFatura}`,
-        categoria: item.categoria,
+        categoria: supplier?.category || item.categoria || 'A CLASSIFICAR',
+        tipoDespesa: supplier?.expenseType || '',
         formaPagamento: item.formaPagamento,
         valorBruto: item.valorBruto,
         valorIVA: item.valorIVA,
         valorTotal: item.valorTotal,
         comIVA: item.valorIVA > 0 ? 'sim' : 'nao',
-        ivaDedutivel: true,
+        ivaDedutivel: supplier ? supplier.ivaDedutivel !== false : true,
         statusPagamento: 'pago',
         origemLancamento: item.source,
+        classificationStatus: supplier ? 'classified' : 'pending',
+        supplierId: supplier?.id || '',
         observacoes: item.observacoes
       };
   await db.collection('events').doc(eventId).set({
@@ -356,6 +360,87 @@ function productionProductId(value) {
 
 function productionAssignmentId(orderId, productId = '') {
   return productId ? `${orderId}__${productId}` : orderId;
+}
+
+function normalizeUsername(value) {
+  return text(value, 60).toLowerCase().replace(/\s+/g, '.').replace(/[^a-z0-9._-]/g, '');
+}
+
+function sellerCommissionBase(payload = {}) {
+  const products = Array.isArray(payload.produtos) ? payload.produtos : [];
+  const productsSubtotal = products.reduce((sum, product) => sum + money(product.valor) * Math.max(1, money(product.quantidade || 1)), 0);
+  const fallbackSubtotal = Math.max(0, money(payload.subtotal) - money(payload.instalacao));
+  return Math.round((productsSubtotal || fallbackSubtotal) * 100) / 100;
+}
+
+function sellerCommissionRate(value) {
+  const parsed = money(value);
+  return Math.min(10, Math.max(5, parsed || 5));
+}
+
+async function suppliers() {
+  const snapshot = await db.collection('suppliers').get();
+  return snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }))
+    .filter(item => item.active !== false)
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'pt'));
+}
+
+async function supplierByNif(nif) {
+  const clean = digits(nif);
+  return (await suppliers()).find(item => item.nif === clean) || null;
+}
+
+function normalizeSupplierPayload(body = {}) {
+  return {
+    name: text(body.name || body.nome || body.fornecedor, 160),
+    nif: digits(body.nif || body.nifFornecedor),
+    category: text(body.category || body.categoria || 'OUTROS', 80).toUpperCase(),
+    expenseType: text(body.expenseType || body.tipoDespesa || 'geral', 80),
+    ivaDedutivel: body.ivaDedutivel !== false,
+    notes: text(body.notes || body.observacoes, 500),
+    active: body.active !== false
+  };
+}
+
+async function sellers(includeInactive = false) {
+  const snapshot = await db.collection('sellers').get();
+  return snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }))
+    .filter(item => includeInactive || item.active !== false)
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'pt'));
+}
+
+function safeSellerForResponse(seller) {
+  const { passwordHash, ...safe } = seller || {};
+  return sanitizeForResponse(safe);
+}
+
+async function sellerById(id) {
+  return (await sellers(true)).find(item => item.id === id) || null;
+}
+
+async function getActiveSellerByToken(token) {
+  if (!token || token.length < 40 || token.length > 200) return null;
+  const sessionDoc = await db.collection('seller_sessions').doc(hash(token)).get();
+  if (!sessionDoc.exists) return null;
+  const session = sessionDoc.data();
+  if (session.revoked || Date.now() > new Date(session.expiresAt || 0).getTime()) return null;
+  const seller = await sellerById(session.sellerId);
+  return !seller || seller.active === false ? null : seller;
+}
+
+async function requireSeller(req, res, next) {
+  try {
+    const [scheme, bearer] = String(req.headers.authorization || '').split(' ');
+    const seller = await getActiveSellerByToken(scheme === 'Bearer' ? bearer : '');
+    if (!seller) return res.status(401).json({ success: false, message: 'Sessao invalida ou expirada. Entre novamente.' });
+    req.seller = seller;
+    next();
+  } catch (error) {
+    console.error('Erro ao validar vendedor:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel validar o acesso.' });
+  }
 }
 
 function productForAssignment(order, productId) {
@@ -555,6 +640,7 @@ async function issueStockForAssignment(orderId, productId, assignment, now) {
 app.get('/scan-fatura.html', (req, res) => res.sendFile(path.join(__dirname, 'scan-fatura.html')));
 app.use('/mobile', express.static(path.join(__dirname, 'mobile'), { index: 'index.html', fallthrough: false }));
 app.use('/colaborador', express.static(path.join(__dirname, 'colaborador'), { index: 'index.html', fallthrough: false }));
+app.use('/vendedor', express.static(path.join(__dirname, 'vendedor'), { index: 'index.html', fallthrough: false }));
 
 app.post('/api/colaborador/login', requestRateLimit({ windowMs: 15 * 60 * 1000, max: 30 }), async (req, res) => {
   try {
@@ -576,6 +662,69 @@ app.post('/api/colaborador/login', requestRateLimit({ windowMs: 15 * 60 * 1000, 
   } catch (error) {
     console.error('Erro ao entrar no app de producao:', error);
     res.status(500).json({ success: false, message: 'Nao foi possivel entrar no app.' });
+  }
+});
+
+app.post('/api/vendedor/login', requestRateLimit({ windowMs: 15 * 60 * 1000, max: 30 }), async (req, res) => {
+  try {
+    const username = normalizeUsername(req.body?.username);
+    const password = String(req.body?.password || '');
+    const seller = (await sellers()).find(item => item.username === username && item.active !== false);
+    if (password.length < 8 || password.length > 120 || !seller || !verifyProductionPassword(password, seller)) {
+      return res.status(401).json({ success: false, message: 'Usuario ou senha incorretos.' });
+    }
+    const token = crypto.randomBytes(48).toString('hex');
+    const now = Date.now();
+    await db.collection('seller_sessions').doc(hash(token)).set({
+      sellerId: seller.id,
+      createdAt: new Date(now).toISOString(),
+      expiresAt: new Date(now + PRODUCTION_SESSION_TTL_MS).toISOString(),
+      revoked: false
+    });
+    res.json({ success: true, token });
+  } catch (error) {
+    console.error('Erro ao entrar no app do vendedor:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel entrar no app.' });
+  }
+});
+
+async function sellerOrders(sellerId) {
+  const snapshot = await db.collection('events').get();
+  const rows = snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }))
+    .filter(event => !event.deleted && event.schema === 'pedido' && event.payload?.sellerId === sellerId)
+    .map(event => {
+      const payload = event.payload || {};
+      const base = sellerCommissionBase(payload);
+      const rate = sellerCommissionRate(payload.sellerCommissionRate);
+      const commission = money(payload.sellerCommissionValue || (base * rate / 100));
+      return sanitizeForResponse({
+        id: event.id,
+        numero: payload.numero || event.id,
+        cliente: payload.cliente || '',
+        empresa: payload.empresa || '',
+        dataEntrega: payload.dataEntrega || '',
+        subtotalServicos: base,
+        instalacao: money(payload.instalacao),
+        iva: money(payload.iva),
+        total: money(payload.total),
+        commissionRate: rate,
+        commission,
+        paymentStatus: payload.sellerCommissionStatus === 'paid' ? 'paid' : 'pending',
+        paidAt: payload.sellerCommissionPaidAt || '',
+        paidBy: payload.sellerCommissionPaidBy || '',
+        observacoes: payload.observacoes || ''
+      });
+    });
+  return rows.sort((a, b) => new Date(b.paidAt || b.dataEntrega || 0) - new Date(a.paidAt || a.dataEntrega || 0));
+}
+
+app.get('/api/vendedor/session', requireSeller, async (req, res) => {
+  try {
+    res.json({ success: true, seller: safeSellerForResponse(req.seller), sales: await sellerOrders(req.seller.id) });
+  } catch (error) {
+    console.error('Erro ao carregar painel do vendedor:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel carregar suas vendas.' });
   }
 });
 
@@ -980,6 +1129,196 @@ app.post('/api/production/workers/:id/delete', async (req, res) => {
   } catch (error) {
     console.error('Erro ao excluir colaborador:', error);
     res.status(500).json({ success: false, message: 'Nao foi possivel excluir o usuario.' });
+  }
+});
+
+app.get('/api/suppliers', async (req, res) => {
+  res.json({ success: true, suppliers: (await suppliers()).map(sanitizeForResponse) });
+});
+
+app.post('/api/suppliers', async (req, res) => {
+  try {
+    const supplier = normalizeSupplierPayload(req.body || {});
+    if (!supplier.name || containsUnsafeMarkup(supplier)) return res.status(400).json({ success: false, message: 'Fornecedor invalido.' });
+    if (!/^\d{9}$/.test(supplier.nif)) return res.status(400).json({ success: false, message: 'NIF do fornecedor invalido.' });
+    const existing = await supplierByNif(supplier.nif);
+    const id = existing?.id || crypto.randomBytes(12).toString('hex');
+    const now = new Date().toISOString();
+    await db.collection('suppliers').doc(id).set({ ...existing, ...supplier, id, createdAt: existing?.createdAt || now, updatedAt: now });
+    res.json({ success: true, supplier: sanitizeForResponse({ ...supplier, id }) });
+  } catch (error) {
+    console.error('Erro ao salvar fornecedor:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel salvar o fornecedor.' });
+  }
+});
+
+app.post('/api/suppliers/:id/delete', async (req, res) => {
+  try {
+    const supplier = (await suppliers()).find(item => item.id === req.params.id);
+    if (!supplier) return res.status(404).json({ success: false, message: 'Fornecedor nao encontrado.' });
+    await db.collection('suppliers').doc(supplier.id).delete();
+    res.json({ success: true, message: 'Fornecedor excluido.' });
+  } catch (error) {
+    console.error('Erro ao excluir fornecedor:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel excluir o fornecedor.' });
+  }
+});
+
+function expenseNeedsClassification(payload = {}) {
+  const fornecedor = text(payload.fornecedor, 160);
+  const categoria = text(payload.categoria, 80).toUpperCase();
+  return payload.classificationStatus !== 'classified'
+    || !fornecedor
+    || /^FORNECEDOR NIF/.test(fornecedor.toUpperCase())
+    || !categoria
+    || categoria === 'OUTROS'
+    || categoria === 'A CLASSIFICAR';
+}
+
+app.get('/api/expenses/unclassified', async (req, res) => {
+  const snapshot = await db.collection('events').get();
+  const expenses = snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }))
+    .filter(event => !event.deleted && event.schema === 'despesa' && expenseNeedsClassification(event.payload || {}))
+    .sort((a, b) => new Date(b.timestamp || b.created_at || 0) - new Date(a.timestamp || a.created_at || 0))
+    .map(event => sanitizeForResponse({ id: event.id, ...event.payload, timestamp: event.timestamp }));
+  res.json({ success: true, expenses });
+});
+
+app.post('/api/expenses/:id/classify', async (req, res) => {
+  try {
+    const expenseRef = db.collection('events').doc(String(req.params.id || ''));
+    const expenseDoc = await expenseRef.get();
+    if (!expenseDoc.exists || expenseDoc.data().schema !== 'despesa') return res.status(404).json({ success: false, message: 'Despesa nao encontrada.' });
+    const current = expenseDoc.data();
+    const payload = current.payload || {};
+    const supplierPayload = normalizeSupplierPayload({
+      name: req.body?.supplierName || req.body?.fornecedor || payload.fornecedor,
+      nif: req.body?.nif || payload.nifFornecedor,
+      category: req.body?.category || req.body?.categoria || payload.categoria,
+      expenseType: req.body?.expenseType || req.body?.tipoDespesa || payload.tipoDespesa,
+      ivaDedutivel: req.body?.ivaDedutivel,
+      notes: req.body?.notes || ''
+    });
+    if (!supplierPayload.name || !/^\d{9}$/.test(supplierPayload.nif)) return res.status(400).json({ success: false, message: 'Informe fornecedor e NIF validos.' });
+    const existingSupplier = await supplierByNif(supplierPayload.nif);
+    const supplierId = existingSupplier?.id || crypto.randomBytes(12).toString('hex');
+    const now = new Date().toISOString();
+    await db.collection('suppliers').doc(supplierId).set({ ...existingSupplier, ...supplierPayload, id: supplierId, createdAt: existingSupplier?.createdAt || now, updatedAt: now });
+
+    const updatePayload = data => ({
+      ...data,
+      fornecedor: supplierPayload.name,
+      nifFornecedor: supplierPayload.nif,
+      categoria: supplierPayload.category,
+      tipoDespesa: supplierPayload.expenseType,
+      ivaDedutivel: supplierPayload.ivaDedutivel,
+      supplierId,
+      classificationStatus: 'classified',
+      classifiedAt: now
+    });
+    await expenseRef.set({ ...current, payload: updatePayload(payload), updated_at: now }, { merge: true });
+
+    let updatedCount = 1;
+    if (req.body?.applyToSameNif) {
+      const snapshot = await db.collection('events').get();
+      const sameNif = snapshot.docs.filter(doc => {
+        const data = doc.data();
+        return doc.id !== req.params.id
+          && !data.deleted
+          && data.schema === 'despesa'
+          && digits(data.payload?.nifFornecedor) === supplierPayload.nif
+          && expenseNeedsClassification(data.payload || {});
+      });
+      await Promise.all(sameNif.map(doc => {
+        const data = doc.data();
+        updatedCount += 1;
+        return db.collection('events').doc(doc.id).set({ ...data, payload: updatePayload(data.payload || {}), updated_at: now }, { merge: true });
+      }));
+    }
+    res.json({ success: true, supplier: sanitizeForResponse({ ...supplierPayload, id: supplierId }), updatedCount });
+  } catch (error) {
+    console.error('Erro ao classificar despesa:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel classificar a despesa.' });
+  }
+});
+
+app.get('/api/sellers', async (req, res) => {
+  res.json({ success: true, sellers: (await sellers(true)).map(safeSellerForResponse), appUrl: `${req.protocol}://${req.get('host')}/vendedor/` });
+});
+
+app.post('/api/sellers', async (req, res) => {
+  try {
+    const name = text(req.body?.name, 100);
+    const username = normalizeUsername(req.body?.username);
+    const password = String(req.body?.password || '');
+    if (!name || containsUnsafeMarkup(name)) return res.status(400).json({ success: false, message: 'Nome invalido.' });
+    if (!/^[a-z0-9._-]{3,60}$/.test(username)) return res.status(400).json({ success: false, message: 'Usuario invalido.' });
+    if (password.length < 8 || password.length > 120) return res.status(400).json({ success: false, message: 'Senha deve possuir entre 8 e 120 caracteres.' });
+    if ((await sellers(true)).some(seller => seller.username === username && seller.active !== false)) return res.status(409).json({ success: false, message: 'Este vendedor ja esta cadastrado.' });
+    const now = new Date().toISOString();
+    const id = crypto.randomBytes(12).toString('hex');
+    const seller = { id, name, username, active: true, createdAt: now, updatedAt: now, ...productionPasswordFields(password) };
+    await db.collection('sellers').doc(id).set(seller);
+    res.json({ success: true, seller: safeSellerForResponse(seller), appUrl: `${req.protocol}://${req.get('host')}/vendedor/` });
+  } catch (error) {
+    console.error('Erro ao cadastrar vendedor:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel cadastrar o vendedor.' });
+  }
+});
+
+app.post('/api/sellers/:id/delete', async (req, res) => {
+  try {
+    const seller = await sellerById(req.params.id);
+    if (!seller) return res.status(404).json({ success: false, message: 'Vendedor nao encontrado.' });
+    await db.collection('sellers').doc(seller.id).delete();
+    res.json({ success: true, message: 'Vendedor excluido.' });
+  } catch (error) {
+    console.error('Erro ao excluir vendedor:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel excluir o vendedor.' });
+  }
+});
+
+app.get('/api/sales/commissions', async (req, res) => {
+  const allSellers = await sellers(true);
+  const snapshot = await db.collection('events').get();
+  const commissions = snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }))
+    .filter(event => !event.deleted && event.schema === 'pedido' && event.payload?.sellerId)
+    .map(event => {
+      const payload = event.payload || {};
+      const seller = allSellers.find(item => item.id === payload.sellerId);
+      const base = sellerCommissionBase(payload);
+      const rate = sellerCommissionRate(payload.sellerCommissionRate);
+      const commission = money(payload.sellerCommissionValue || base * rate / 100);
+      return sanitizeForResponse({ id: event.id, orderId: event.id, numero: payload.numero, cliente: payload.cliente, sellerId: payload.sellerId, sellerName: seller?.name || payload.sellerName || 'Vendedor', base, rate, commission, status: payload.sellerCommissionStatus === 'paid' ? 'paid' : 'pending', paidAt: payload.sellerCommissionPaidAt || '' });
+    });
+  res.json({ success: true, sellers: allSellers.map(safeSellerForResponse), commissions });
+});
+
+app.post('/api/sales/commissions/:id/payment', async (req, res) => {
+  try {
+    const orderRef = db.collection('events').doc(String(req.params.id || ''));
+    const orderDoc = await orderRef.get();
+    if (!orderDoc.exists || orderDoc.data().schema !== 'pedido') return res.status(404).json({ success: false, message: 'Pedido nao encontrado.' });
+    const order = orderDoc.data();
+    const payload = order.payload || {};
+    if (!payload.sellerId) return res.status(400).json({ success: false, message: 'Pedido sem vendedor associado.' });
+    const now = new Date().toISOString();
+    const base = sellerCommissionBase(payload);
+    const rate = sellerCommissionRate(payload.sellerCommissionRate);
+    const updatedPayload = {
+      ...payload,
+      sellerCommissionValue: money(payload.sellerCommissionValue || base * rate / 100),
+      sellerCommissionStatus: 'paid',
+      sellerCommissionPaidAt: now,
+      sellerCommissionPaidBy: text(req.body?.paidBy || 'CRM', 100)
+    };
+    await orderRef.set({ ...order, payload: updatedPayload, updated_at: now }, { merge: true });
+    res.json({ success: true, commission: sanitizeForResponse({ orderId: req.params.id, ...updatedPayload }) });
+  } catch (error) {
+    console.error('Erro ao pagar comissao comercial:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel marcar a comissao como paga.' });
   }
 });
 
