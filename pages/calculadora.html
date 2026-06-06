@@ -19,8 +19,12 @@
         .subtitle { color: #526789; margin: 7px 0 0; line-height: 1.45; }
         .panel { background: #fff; border: 1px solid #dce5f2; border-radius: 16px; padding: 22px; box-shadow: 0 8px 28px rgba(15,23,42,.06); margin-bottom: 22px; }
         .panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
-        .tab { border: 1px solid #c7d2fe; color: #1e3a8a; background: #eef2ff; border-radius: 999px; padding: 10px 15px; font-weight: 800; }
-        .tab.active { background: #101f6b; color: #fff; border-color: #101f6b; }
+        .calculator-menu { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; min-width: min(520px, 100%); }
+        .calculator-tab { border: 1px solid #c7d2fe; color: #1e3a8a; background: #eef2ff; border-radius: 16px; padding: 14px 16px; font-weight: 900; text-align: left; cursor: pointer; }
+        .calculator-tab small { display: block; margin-top: 4px; color: #526789; font-weight: 700; }
+        .calculator-tab.active { background: #101f6b; color: #fff; border-color: #101f6b; box-shadow: 0 8px 18px rgba(16,31,107,.18); }
+        .calculator-tab.active small { color: #dbeafe; }
+        .calculator-section[hidden] { display: none !important; }
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(178px, 1fr)); gap: 14px; }
         .entry-grid { display: grid; grid-template-columns: minmax(260px, 2fr) minmax(145px, 1fr) minmax(145px, 1fr) auto; gap: 12px; align-items: end; }
         .component-grid { display: grid; grid-template-columns: minmax(230px, 1.2fr) minmax(230px, 1fr) minmax(230px, 1fr) minmax(190px, .8fr) minmax(160px, .7fr) auto; gap: 14px; align-items: end; }
@@ -42,6 +46,7 @@
         .pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; background: #eef2ff; color: #1e3a8a; padding: 7px 10px; font-size: 12px; font-weight: 900; }
         .cost-pill { background: #ecfdf5; color: #047857; }
         .summary { padding: 15px; border-radius: 14px; background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; line-height: 1.55; margin-top: 14px; }
+        .vinyl-total { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-top: 18px; }
         .result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
         .metric { border: 1px solid #dbeafe; background: linear-gradient(180deg, #f8fbff, #eef6ff); border-radius: 14px; padding: 16px; }
         .metric-label { color: #475569; font-size: 12px; text-transform: uppercase; font-weight: 900; letter-spacing: .04em; }
@@ -66,10 +71,19 @@
                 <h1>Calculadora</h1>
                 <p class="subtitle">Calcule produtos antes do orçamento: consumo, horas, componentes, custo total e preço sugerido com margem mínima.</p>
             </div>
-            <button type="button" class="tab active">Letras caixa impressas</button>
+            <div class="calculator-menu" aria-label="Calculadoras disponíveis">
+                <button type="button" class="calculator-tab active" data-calculator-tab="letter">
+                    Letras caixa impressas
+                    <small>PETG, LED, estrutura e componentes</small>
+                </button>
+                <button type="button" class="calculator-tab" data-calculator-tab="vinyl">
+                    Rótulo em vinil
+                    <small>Etiquetas em rolo ou separadas em folhas</small>
+                </button>
+            </div>
         </div>
 
-        <section class="panel">
+        <section class="panel calculator-section" data-calculator-section="letter">
             <div class="panel-head">
                 <div>
                     <h2>Letras caixa impressas em PETG</h2>
@@ -96,7 +110,7 @@
             </div>
         </section>
 
-        <section class="panel">
+        <section class="panel calculator-section" data-calculator-section="letter">
             <div class="panel-head">
                 <div>
                     <h2>Componentes adicionais</h2>
@@ -109,7 +123,7 @@
             </div>
         </section>
 
-        <section class="panel">
+        <section class="panel calculator-section" data-calculator-section="letter">
             <h2>Resultado do produto</h2>
             <div class="result-grid">
                 <div class="metric">
@@ -135,23 +149,84 @@
             </div>
             <div id="message" class="message"></div>
         </section>
+
+        <section class="panel calculator-section" data-calculator-section="vinyl" hidden>
+            <div class="panel-head">
+                <div>
+                    <h2>Rótulo em vinil</h2>
+                    <p class="subtitle">Informe o tamanho da etiqueta em milímetros e a quantidade. O preço base é por metro quadrado e pode ser ajustado na hora.</p>
+                </div>
+            </div>
+            <div class="grid">
+                <label>Largura da etiqueta (mm)<input id="vinylWidthMm" type="number" min="0" step="1" value="50"></label>
+                <label>Altura da etiqueta (mm)<input id="vinylHeightMm" type="number" min="0" step="1" value="30"></label>
+                <label>Quantidade (un.)<input id="vinylQuantity" type="number" min="0" step="1" value="100"></label>
+                <label>Preço base (€/m²)<input id="vinylBasePrice" type="number" min="0" step="0.01" value="35"></label>
+                <label>Entrega<select id="vinylFinish">
+                    <option value="roll">Em rolo</option>
+                    <option value="sheets">Separado em folhas</option>
+                </select></label>
+                <label>Acréscimo folhas (€/m²)<input id="vinylSheetExtra" type="number" min="0" step="0.01" value="5"></label>
+            </div>
+            <div class="summary" id="vinylSummary">Informe os dados do rótulo para calcular.</div>
+        </section>
+
+        <section class="panel calculator-section" data-calculator-section="vinyl" hidden>
+            <h2>Resultado do rótulo</h2>
+            <div class="result-grid">
+                <div class="metric">
+                    <div class="metric-label">Área unitária</div>
+                    <div class="metric-value" id="vinylUnitArea">0 mm²</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Área total</div>
+                    <div class="metric-value" id="vinylTotalArea">0 mm²</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Preço aplicado</div>
+                    <div class="metric-value" id="vinylAppliedPrice">€0,00/m²</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Custo total</div>
+                    <div class="metric-value good" id="vinylTotalCost">€0,00</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Preço unitário</div>
+                    <div class="metric-value" id="vinylUnitCost">€0,00</div>
+                </div>
+            </div>
+        </section>
     </main>
 
     <script>
         let catalogoMateriais = [];
         let materialItems = [];
+        let activeCalculator = 'letter';
 
         const money = value => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(Number(value) || 0);
         const number = id => Number.parseFloat(document.getElementById(id).value) || 0;
         const mmToCm = value => (Number(value) || 0) / 10;
         const mmToM = value => (Number(value) || 0) / 1000;
         const formatMm = value => `${Math.round((Number(value) || 0) * 100) / 100} mm`;
+        const formatMm2 = value => `${Math.round(Number(value) || 0).toLocaleString('pt-PT')} mm²`;
+        const mm2ToM2 = value => (Number(value) || 0) / 1000000;
 
         function showMessage(text, type = 'success') {
             const message = document.getElementById('message');
             message.textContent = text;
             message.className = `message ${type}`;
             setTimeout(() => { message.textContent = ''; }, 4200);
+        }
+
+        function setActiveCalculator(name) {
+            activeCalculator = name;
+            document.querySelectorAll('[data-calculator-tab]').forEach(button => {
+                button.classList.toggle('active', button.dataset.calculatorTab === name);
+            });
+            document.querySelectorAll('[data-calculator-section]').forEach(section => {
+                section.hidden = section.dataset.calculatorSection !== name;
+            });
+            calculateAll();
         }
 
         function resolveMaterial(materialId = '') {
@@ -370,6 +445,36 @@
             }, 0);
         }
 
+        function calculateVinyl() {
+            const larguraMm = number('vinylWidthMm');
+            const alturaMm = number('vinylHeightMm');
+            const quantidade = Math.max(0, Math.round(number('vinylQuantity')));
+            const areaUnitMm2 = larguraMm * alturaMm;
+            const areaTotalMm2 = areaUnitMm2 * quantidade;
+            const basePrice = number('vinylBasePrice') || 35;
+            const sheetExtra = number('vinylSheetExtra') || 0;
+            const isSheets = document.getElementById('vinylFinish').value === 'sheets';
+            const appliedPrice = basePrice + (isSheets ? sheetExtra : 0);
+            const totalCost = mm2ToM2(areaTotalMm2) * appliedPrice;
+            const unitCost = quantidade > 0 ? totalCost / quantidade : 0;
+            const finishText = isSheets ? `Separado em folhas: +${money(sheetExtra)} por m²` : 'Entrega em rolo: sem acréscimo por m²';
+
+            document.getElementById('vinylUnitArea').textContent = formatMm2(areaUnitMm2);
+            document.getElementById('vinylTotalArea').textContent = formatMm2(areaTotalMm2);
+            document.getElementById('vinylAppliedPrice').textContent = `${money(appliedPrice)}/m²`;
+            document.getElementById('vinylTotalCost').textContent = money(totalCost);
+            document.getElementById('vinylUnitCost').textContent = money(unitCost);
+            document.getElementById('vinylSummary').innerHTML = `
+                <strong>Formato:</strong> ${formatMm(larguraMm)} x ${formatMm(alturaMm)}
+                | <strong>Quantidade:</strong> ${quantidade} un.
+                | <strong>${finishText}</strong>
+                <br><strong>Base:</strong> ${money(basePrice)}/m²
+                | <strong>Preço aplicado:</strong> ${money(appliedPrice)}/m²
+                | <strong>Total:</strong> ${money(totalCost)}
+            `;
+            return { areaUnitMm2, areaTotalMm2, appliedPrice, totalCost, unitCost };
+        }
+
         function calculateAll() {
             const petg = calculatePetg();
             const materialsCost = calculateMaterialsCost();
@@ -381,6 +486,7 @@
             document.getElementById('estimatedWidth').textContent = formatMm(petg.larguraEstimadaMm);
             document.getElementById('totalCost').textContent = money(totalCost);
             document.getElementById('suggestedPrice').textContent = money(suggested);
+            calculateVinyl();
         }
 
         function fillPetgPriceFromCatalog() {
@@ -409,11 +515,19 @@
 
             renderPetgEntries();
             renderMaterials();
+            document.querySelectorAll('[data-calculator-tab]').forEach(button => {
+                button.addEventListener('click', () => setActiveCalculator(button.dataset.calculatorTab));
+            });
             document.getElementById('addPetgEntryBtn').addEventListener('click', () => addPetgEntry());
             document.getElementById('addMaterialBtn').addEventListener('click', () => addMaterialItem());
             ['petgDepthMm', 'petgKgPrice', 'petgWaste', 'petgGramsHour', 'petgLedFactor', 'petgLedManualMm', 'marginPercent'].forEach(id => {
                 document.getElementById(id).addEventListener('input', calculateAll);
             });
+            ['vinylWidthMm', 'vinylHeightMm', 'vinylQuantity', 'vinylBasePrice', 'vinylFinish', 'vinylSheetExtra'].forEach(id => {
+                document.getElementById(id).addEventListener('input', calculateAll);
+                document.getElementById(id).addEventListener('change', calculateAll);
+            });
+            setActiveCalculator('letter');
             calculateAll();
         });
     </script>

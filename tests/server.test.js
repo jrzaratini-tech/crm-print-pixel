@@ -119,10 +119,17 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(orderBudgetPageResult.body, /Letra Caixa PETG 3D/);
   assert.doesNotMatch(orderBudgetPageResult.body, /Textos e alturas do mesmo trabalho/);
   assert.match(calculatorPageResult.body, /Letras caixa impressas/);
+  assert.match(calculatorPageResult.body, /data-calculator-tab="vinyl"/);
   assert.match(calculatorPageResult.body, /Componentes adicionais/);
   assert.doesNotMatch(calculatorPageResult.body, /calculateBtn/);
   assert.doesNotMatch(calculatorPageResult.body, /addEstimatedLedBtn/);
   assert.match(calculatorPageResult.body, /Profundidade padrão \(mm\)/);
+  assert.match(calculatorPageResult.body, /id="vinylWidthMm"/);
+  assert.match(calculatorPageResult.body, /id="vinylHeightMm"/);
+  assert.match(calculatorPageResult.body, /id="vinylQuantity"/);
+  assert.match(calculatorPageResult.body, /value="35"/);
+  assert.match(calculatorPageResult.body, /value="sheets"/);
+  assert.match(calculatorPageResult.body, /value="5"/);
   assert.match(calculatorPageResult.body, /Novo item cadastrado/);
   assert.match(calculatorPageResult.body, /Preço unitário/);
   assert.doesNotMatch(calculatorPageResult.body, /Altura \(cm\)/);
