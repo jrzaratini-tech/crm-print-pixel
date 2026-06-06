@@ -1285,38 +1285,69 @@ app.get('/api/expenses/unclassified', async (req, res) => {
   }
 });
 
+async function saveSupplierFromClassification(body = {}, fallbackPayload = {}) {
+  const supplierPayload = normalizeSupplierPayload({
+    name: body.supplierName || body.fornecedor || fallbackPayload.fornecedor,
+    nif: body.nif || fallbackPayload.nifFornecedor,
+    category: body.category || body.categoria || fallbackPayload.categoria,
+    expenseType: body.expenseType || body.tipoDespesa || fallbackPayload.tipoDespesa,
+    ivaDedutivel: body.ivaDedutivel,
+    notes: body.notes || ''
+  });
+  if (!supplierPayload.name || !/^\d{9}$/.test(supplierPayload.nif)) {
+    const error = new Error('Informe fornecedor e NIF validos.');
+    error.status = 400;
+    throw error;
+  }
+  const existingSupplier = await supplierByNif(supplierPayload.nif);
+  const supplierId = existingSupplier?.id || crypto.randomBytes(12).toString('hex');
+  const now = new Date().toISOString();
+  const savedSupplier = { ...existingSupplier, ...supplierPayload, id: supplierId, createdAt: existingSupplier?.createdAt || now, updatedAt: now };
+  await db.collection('suppliers').doc(supplierId).set(savedSupplier);
+  return { savedSupplier, now };
+}
+
+async function classifyExpenseById(id, body = {}) {
+  const expenseRef = db.collection('events').doc(String(id || ''));
+  const expenseDoc = await expenseRef.get();
+  if (!expenseDoc.exists || expenseDoc.data().schema !== 'despesa') {
+    const error = new Error('Despesa nao encontrada.');
+    error.status = 404;
+    throw error;
+  }
+  const current = expenseDoc.data();
+  const { savedSupplier, now } = await saveSupplierFromClassification(body, current.payload || {});
+  await expenseRef.set({
+    ...current,
+    payload: applySupplierToExpensePayload(current.payload || {}, savedSupplier, now),
+    updated_at: now
+  }, { merge: true });
+
+  let updatedCount = 1;
+  if (body.applyToSameNif) {
+    updatedCount += await classifyExistingExpensesForSupplier(savedSupplier, now);
+  }
+  return { savedSupplier, updatedCount };
+}
+
+app.post('/api/expenses/classify', async (req, res) => {
+  try {
+    const { savedSupplier, now } = await saveSupplierFromClassification(req.body || {});
+    const updatedCount = await classifyExistingExpensesForSupplier(savedSupplier, now);
+    res.json({ success: true, supplier: sanitizeForResponse(savedSupplier), updatedCount });
+  } catch (error) {
+    console.error('Erro ao classificar despesas por NIF:', error);
+    res.status(error.status || 500).json({ success: false, message: error.status ? error.message : 'Nao foi possivel classificar as despesas.' });
+  }
+});
+
 app.post('/api/expenses/:id/classify', async (req, res) => {
   try {
-    const expenseRef = db.collection('events').doc(String(req.params.id || ''));
-    const expenseDoc = await expenseRef.get();
-    if (!expenseDoc.exists || expenseDoc.data().schema !== 'despesa') return res.status(404).json({ success: false, message: 'Despesa nao encontrada.' });
-    const current = expenseDoc.data();
-    const payload = current.payload || {};
-    const supplierPayload = normalizeSupplierPayload({
-      name: req.body?.supplierName || req.body?.fornecedor || payload.fornecedor,
-      nif: req.body?.nif || payload.nifFornecedor,
-      category: req.body?.category || req.body?.categoria || payload.categoria,
-      expenseType: req.body?.expenseType || req.body?.tipoDespesa || payload.tipoDespesa,
-      ivaDedutivel: req.body?.ivaDedutivel,
-      notes: req.body?.notes || ''
-    });
-    if (!supplierPayload.name || !/^\d{9}$/.test(supplierPayload.nif)) return res.status(400).json({ success: false, message: 'Informe fornecedor e NIF validos.' });
-    const existingSupplier = await supplierByNif(supplierPayload.nif);
-    const supplierId = existingSupplier?.id || crypto.randomBytes(12).toString('hex');
-    const now = new Date().toISOString();
-    const savedSupplier = { ...existingSupplier, ...supplierPayload, id: supplierId, createdAt: existingSupplier?.createdAt || now, updatedAt: now };
-    await db.collection('suppliers').doc(supplierId).set(savedSupplier);
-    const updatePayload = data => applySupplierToExpensePayload(data, savedSupplier, now);
-    await expenseRef.set({ ...current, payload: updatePayload(payload), updated_at: now }, { merge: true });
-
-    let updatedCount = 1;
-    if (req.body?.applyToSameNif) {
-      updatedCount += await classifyExistingExpensesForSupplier(savedSupplier, now);
-    }
+    const { savedSupplier, updatedCount } = await classifyExpenseById(req.params.id, req.body || {});
     res.json({ success: true, supplier: sanitizeForResponse(savedSupplier), updatedCount });
   } catch (error) {
     console.error('Erro ao classificar despesa:', error);
-    res.status(500).json({ success: false, message: 'Nao foi possivel classificar a despesa.' });
+    res.status(error.status || 500).json({ success: false, message: error.status ? error.message : 'Nao foi possivel classificar a despesa.' });
   }
 });
 

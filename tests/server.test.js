@@ -603,6 +603,28 @@ test('lancamento novo de despesa usa fornecedor cadastrado pelo NIF', async () =
   assert.equal(expense.body.event.payload.supplierId, supplier.body.supplier.id);
 });
 
+test('classifica despesas por NIF mesmo sem ID na URL', async () => {
+  const expense = await post('/api/database/commit', {
+    schema: 'despesa',
+    payload: { fornecedor: 'Fornecedor NIF 507333556', nifFornecedor: '507333556', categoria: 'OUTROS', valorTotal: 33 },
+    pageId: 'test'
+  });
+
+  const classified = await post('/api/expenses/classify', {
+    supplierName: 'Fornecedor Sem ID',
+    nif: '507333556',
+    category: 'IMPOSTOS',
+    expenseType: 'fiscal'
+  });
+  assert.equal(classified.response.status, 200);
+  assert.equal(classified.body.updatedCount, 1);
+
+  const updated = await post('/api/database/query', { schema: 'despesa', filters: { id: expense.body.id } });
+  assert.equal(updated.body.events[0].payload.fornecedor, 'Fornecedor Sem ID');
+  assert.equal(updated.body.events[0].payload.categoria, 'IMPOSTOS');
+  assert.equal(updated.body.events[0].payload.classificationSource, 'supplier_nif');
+});
+
 test('fila de despesas reconcilia pendencias com fornecedores ja cadastrados', async () => {
   const supplier = await post('/api/suppliers', {
     name: 'Fornecedor Reconciliado',

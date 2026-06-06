@@ -30,7 +30,14 @@
     function options(selected){return CATEGORIES.map(c=>`<option value="${c}" ${c===(selected||'')?'selected':''}>${c}</option>`).join('');}
     async function classify(id, card){
       const body={supplierName:card.querySelector('[data-name]').value,nif:card.querySelector('[data-nif]').value,category:card.querySelector('[data-category]').value,expenseType:card.querySelector('[data-type]').value,ivaDedutivel:card.querySelector('[data-iva]').value==='true',applyToSameNif:card.querySelector('[data-apply]').checked};
-      const result=await api('/api/expenses/'+id+'/classify',{method:'POST',body:JSON.stringify(body)});
+      const request={method:'POST',body:JSON.stringify(body)};
+      let result;
+      try{
+        result=id?await api('/api/expenses/'+encodeURIComponent(id)+'/classify',request):await api('/api/expenses/classify',request);
+      }catch(error){
+        if(error.message==='API nao encontrada.'&&body.nif)result=await api('/api/expenses/classify',request);
+        else throw error;
+      }
       document.getElementById('message').textContent=`${result.updatedCount} despesa(s) atualizada(s).`;
       await load();
     }
