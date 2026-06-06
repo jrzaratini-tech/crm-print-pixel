@@ -4,8 +4,8 @@
         name: "Novo Pedido",
         file: "pages/novopedido.html",
         type: "WRITE",
-        pos: 1,
-        hidden: false,
+        pos: 90,
+        hidden: true,
         deleted: false
     },
 
@@ -14,7 +14,7 @@
         name: "Pedidos",
         file: "pages/pedidos.html",
         type: "READ",
-        pos: 2,
+        pos: 1,
         hidden: false,
         deleted: false
     },
@@ -24,7 +24,7 @@
         name: "Ordem de Produção",
         file: "pages/ordemproducao.html",
         type: "WRITE",
-        pos: 3,
+        pos: 2,
         hidden: false,
         deleted: false
     },
@@ -34,8 +34,8 @@
         name: "Nova Despesa",
         file: "pages/novadespesa.html",
         type: "WRITE",
-        pos: 4,
-        hidden: false,
+        pos: 91,
+        hidden: true,
         deleted: false
     },
 
@@ -44,7 +44,7 @@
         name: "Despesas",
         file: "pages/despesas.html",
         type: "READ",
-        pos: 5,
+        pos: 3,
         hidden: false,
         deleted: false
     },
@@ -54,8 +54,8 @@
         name: "Novo Orçamento",
         file: "pages/novoorcamento.html",
         type: "WRITE",
-        pos: 6,
-        hidden: false,
+        pos: 92,
+        hidden: true,
         deleted: false
     },
 
@@ -64,7 +64,7 @@
         name: "Calculadora",
         file: "pages/calculadora.html",
         type: "WRITE",
-        pos: 6.5,
+        pos: 5,
         hidden: false,
         deleted: false
     },
@@ -74,7 +74,7 @@
         name: "Orçamentos",
         file: "pages/orcamentos.html",
         type: "READ",
-        pos: 7,
+        pos: 4,
         hidden: false,
         deleted: false
     },
@@ -84,7 +84,7 @@
         name: "Contabilidade",
         file: "pages/contabilidade.html",
         type: "READ",
-        pos: 8,
+        pos: 6,
         hidden: false,
         deleted: false
     },
@@ -94,7 +94,7 @@
         name: "Verificação",
         file: "pages/verificacao.html",
         type: "READ",
-        pos: 9,
+        pos: 7,
         hidden: false,
         deleted: false
     },
@@ -104,7 +104,7 @@
         name: "A Receber",
         file: "pages/areceber.html",
         type: "READ",
-        pos: 10,
+        pos: 8,
         hidden: false,
         deleted: false
     },
@@ -114,7 +114,7 @@
         name: "Gestão",
         file: "pages/painel-financeiro.html",
         type: "READ",
-        pos: 11,
+        pos: 9,
         hidden: false,
         deleted: false
     },
@@ -124,7 +124,7 @@
         name: "Finanças",
         file: "pages/financas.html",
         type: "READ",
-        pos: 12,
+        pos: 10,
         hidden: false,
         deleted: false
     },
@@ -134,7 +134,7 @@
         name: "Ponto de Equilíbrio",
         file: "pages/equilibrio.html",
         type: "READ",
-        pos: 13,
+        pos: 11,
         hidden: false,
         deleted: false
     },
@@ -144,7 +144,7 @@
         name: "Materiais",
         file: "pages/materiais.html",
         type: "WRITE",
-        pos: 14,
+        pos: 12,
         hidden: false,
         deleted: false
     },
@@ -154,7 +154,7 @@
         name: "Links",
         file: "pages/links.html",
         type: "READ",
-        pos: 15,
+        pos: 13,
         hidden: false,
         deleted: false
     }
