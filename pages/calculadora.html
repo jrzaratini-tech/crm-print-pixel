@@ -11,59 +11,51 @@
     <title>Calculadora - PrintPixel</title>
     <style>
         * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
-        body { margin: 0; background: #f8fafc; color: #1e293b; padding: 24px; }
-        .container { max-width: 1500px; margin: auto; }
+        body { margin: 0; background: #f3f6fb; color: #10233f; padding: 24px; }
+        .container { max-width: 1480px; margin: auto; }
         .header { display: flex; justify-content: space-between; gap: 18px; align-items: flex-start; margin-bottom: 22px; }
-        h1 { margin: 0; color: #1a237e; }
-        h2, h3 { margin: 0 0 12px; }
-        .subtitle { color: #64748b; margin: 6px 0 0; line-height: 1.45; }
-        .panel { background: white; border: 1px solid #e2e8f0; border-radius: 14px; padding: 20px; box-shadow: 0 3px 16px rgba(15,23,42,.05); margin-bottom: 20px; }
-        .product-tabs { display: flex; gap: 10px; flex-wrap: wrap; }
+        h1 { margin: 0; color: #101f6b; font-size: 32px; }
+        h2, h3 { margin: 0; color: #10233f; }
+        .subtitle { color: #526789; margin: 7px 0 0; line-height: 1.45; }
+        .panel { background: #fff; border: 1px solid #dce5f2; border-radius: 16px; padding: 22px; box-shadow: 0 8px 28px rgba(15,23,42,.06); margin-bottom: 22px; }
+        .panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 18px; }
         .tab { border: 1px solid #c7d2fe; color: #1e3a8a; background: #eef2ff; border-radius: 999px; padding: 10px 15px; font-weight: 800; }
-        .tab.active { background: #1a237e; color: white; border-color: #1a237e; }
-        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
-        .mini-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(115px, 1fr)); gap: 8px; align-items: end; }
-        label { display: block; color: #475569; font-size: 13px; font-weight: 800; }
-        input, select, textarea { width: 100%; margin-top: 6px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; background: white; }
+        .tab.active { background: #101f6b; color: #fff; border-color: #101f6b; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(178px, 1fr)); gap: 14px; }
+        .entry-grid { display: grid; grid-template-columns: minmax(260px, 2fr) minmax(145px, 1fr) minmax(145px, 1fr) auto; gap: 12px; align-items: end; }
+        .component-grid { display: grid; grid-template-columns: minmax(230px, 1.2fr) minmax(230px, 1fr) minmax(230px, 1fr) minmax(190px, .8fr) minmax(160px, .7fr) auto; gap: 14px; align-items: end; }
+        .inline-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 9px; align-items: end; }
+        label { display: block; color: #334a69; font-size: 12px; font-weight: 900; letter-spacing: .01em; }
+        input, select, textarea { width: 100%; margin-top: 6px; border: 1px solid #c8d5e8; border-radius: 10px; padding: 11px 12px; background: #fff; color: #0f172a; }
+        input:focus, select:focus, textarea:focus { border-color: #2563eb; outline: none; box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
         input[type="number"] { text-align: right; }
-        textarea { min-height: 74px; resize: vertical; }
         .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
-        .btn { border: 0; border-radius: 8px; padding: 11px 16px; color: white; cursor: pointer; font-weight: 800; }
+        .btn { border: 0; border-radius: 10px; padding: 11px 16px; color: #fff; cursor: pointer; font-weight: 900; }
         .btn-primary { background: #2563eb; }
-        .btn-success { background: #059669; }
-        .btn-warning { background: #f59e0b; color: #111827; }
         .btn-danger { background: #dc2626; }
         .btn-secondary { background: #64748b; }
-        .btn:hover { filter: brightness(.95); }
-        .table-wrap { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; min-width: 980px; }
-        .components-table { min-width: 1220px; table-layout: fixed; }
-        .components-table th:nth-child(1), .components-table td:nth-child(1) { width: 220px; }
-        .components-table th:nth-child(2), .components-table td:nth-child(2) { width: 250px; }
-        .components-table th:nth-child(3), .components-table td:nth-child(3) { width: 230px; }
-        .components-table th:nth-child(4), .components-table td:nth-child(4) { width: 90px; }
-        .components-table th:nth-child(5), .components-table td:nth-child(5) { width: 90px; }
-        .components-table th:nth-child(6), .components-table td:nth-child(6) { width: 120px; }
-        .components-table th:nth-child(7), .components-table td:nth-child(7) { width: 120px; }
-        .components-table th:nth-child(8), .components-table td:nth-child(8) { width: 120px; }
-        .components-table th:nth-child(9), .components-table td:nth-child(9) { width: 105px; }
-        th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; vertical-align: top; }
-        th { background: #f8fafc; color: #475569; text-transform: uppercase; font-size: 12px; }
-        td input, td select { padding: 8px; font-size: 13px; }
+        .btn:hover { filter: brightness(.96); }
+        .entry-list, .component-list { display: grid; gap: 12px; margin-top: 14px; }
+        .entry-row { padding: 12px; border: 1px solid #dbeafe; background: #f8fbff; border-radius: 14px; }
+        .component-card { border: 1px solid #dce5f2; border-radius: 16px; padding: 16px; background: #fbfdff; }
+        .component-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-top: 12px; margin-top: 12px; border-top: 1px solid #e2e8f0; }
+        .pill { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; background: #eef2ff; color: #1e3a8a; padding: 7px 10px; font-size: 12px; font-weight: 900; }
+        .cost-pill { background: #ecfdf5; color: #047857; }
+        .summary { padding: 15px; border-radius: 14px; background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; line-height: 1.55; margin-top: 14px; }
         .result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
-        .metric { border: 1px solid #dbeafe; background: #eff6ff; border-radius: 12px; padding: 16px; }
-        .metric-label { color: #475569; font-size: 12px; text-transform: uppercase; font-weight: 800; letter-spacing: .04em; }
-        .metric-value { color: #111827; font-size: 24px; font-weight: 900; margin-top: 8px; }
+        .metric { border: 1px solid #dbeafe; background: linear-gradient(180deg, #f8fbff, #eef6ff); border-radius: 14px; padding: 16px; }
+        .metric-label { color: #475569; font-size: 12px; text-transform: uppercase; font-weight: 900; letter-spacing: .04em; }
+        .metric-value { color: #111827; font-size: 24px; font-weight: 950; margin-top: 8px; }
         .metric-value.good { color: #059669; }
         .metric-value.warn { color: #f59e0b; }
-        .summary { padding: 14px; border-radius: 12px; background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; line-height: 1.55; }
-        .empty { text-align: center; color: #64748b; padding: 18px; }
-        .message { margin-top: 12px; font-weight: 800; }
+        .empty { border: 1px dashed #cbd5e1; border-radius: 14px; padding: 20px; color: #64748b; text-align: center; background: #f8fafc; }
+        .message { margin-top: 12px; font-weight: 900; }
         .success { color: #059669; } .error { color: #dc2626; } .warning { color: #b45309; }
-        @media (max-width: 760px) {
+        @media (max-width: 920px) {
             body { padding: 14px; }
-            .header { display: block; }
-            table { min-width: 820px; }
+            .header, .panel-head, .component-footer { display: block; }
+            .entry-grid, .component-grid { grid-template-columns: 1fr; }
+            .btn { width: 100%; margin-top: 8px; }
         }
     </style>
 </head>
@@ -72,52 +64,48 @@
         <div class="header">
             <div>
                 <h1>Calculadora</h1>
-                <p class="subtitle">Calcule produtos antes do or&ccedil;amento: consumo, horas, componentes, custo total e pre&ccedil;o sugerido com margem m&iacute;nima.</p>
+                <p class="subtitle">Calcule produtos antes do orçamento: consumo, horas, componentes, custo total e preço sugerido com margem mínima.</p>
             </div>
-            <div class="product-tabs">
-                <button type="button" class="tab active">Letras caixa impressas</button>
-            </div>
+            <button type="button" class="tab active">Letras caixa impressas</button>
         </div>
 
         <section class="panel">
-            <h2>Letras caixa impressas em PETG</h2>
-            <p class="subtitle">Informe uma ou mais linhas de texto. Use alturas diferentes quando o mesmo letreiro tiver letras grandes, pequenas ou s&iacute;mbolos.</p>
-            <div class="grid" style="margin-top:14px;">
-                <label>Profundidade padr&atilde;o (cm)<input id="petgDepth" type="number" min="0" step="0.1" value="5"></label>
-                <label>Pre&ccedil;o kg PETG (&euro;)<input id="petgKgPrice" type="number" min="0" step="0.01" value="18"></label>
+            <div class="panel-head">
+                <div>
+                    <h2>Letras caixa impressas em PETG</h2>
+                    <p class="subtitle">Todas as medidas desta tela são em milímetros. Use várias linhas quando o mesmo letreiro tiver letras grandes, pequenas ou símbolos.</p>
+                </div>
+            </div>
+            <div class="grid">
+                <label>Profundidade padrão (mm)<input id="petgDepthMm" type="number" min="0" step="1" value="50"></label>
+                <label>Preço kg PETG (€)<input id="petgKgPrice" type="number" min="0" step="0.01" value="18"></label>
                 <label>Perda PETG (%)<input id="petgWaste" type="number" min="0" step="0.1" value="10"></label>
-                <label>Produ&ccedil;&atilde;o estimada (g/h)<input id="petgGramsHour" type="number" min="1" step="1" value="75"></label>
+                <label>Produção estimada (g/h)<input id="petgGramsHour" type="number" min="1" step="1" value="75"></label>
                 <label>Fator estimativa LED<input id="petgLedFactor" type="number" min="0" step="0.05" value="1.2"></label>
-                <label>LED corrigido manualmente (m)<input id="petgLedManual" type="number" min="0" step="0.01" placeholder="Opcional"></label>
-                <label>Margem m&iacute;nima (%)<input id="marginPercent" type="number" min="1" max="95" step="0.1" value="50"></label>
+                <label>LED corrigido manualmente (mm)<input id="petgLedManualMm" type="number" min="0" step="1" placeholder="Opcional"></label>
+                <label>Margem mínima (%)<input id="marginPercent" type="number" min="1" max="95" step="0.1" value="50"></label>
             </div>
 
-            <div style="margin-top:16px;">
+            <div style="margin-top:18px;">
                 <h3>Textos e alturas</h3>
-                <div class="table-wrap">
-                    <table>
-                        <thead><tr><th>Texto / letras</th><th>Altura (cm)</th><th>Profundidade (cm)</th><th>A&ccedil;&atilde;o</th></tr></thead>
-                        <tbody id="petgEntriesBody"></tbody>
-                    </table>
-                </div>
+                <div class="entry-list" id="petgEntriesBody"></div>
                 <div class="actions">
                     <button type="button" class="btn btn-primary" id="addPetgEntryBtn">+ Adicionar texto / altura</button>
                 </div>
-                <div id="petgResult" class="summary" style="margin-top:14px;">Informe os textos, alturas e materiais para calcular.</div>
+                <div id="petgResult" class="summary">Informe os textos, alturas e componentes para calcular.</div>
             </div>
         </section>
 
         <section class="panel">
-            <h2>Componentes adicionais</h2>
-            <p class="subtitle">Acrescente fonte, barras de alum&iacute;nio, acr&iacute;lico, fios, parafusos, estanho ou qualquer material cadastrado.</p>
-            <div class="table-wrap">
-                <table class="components-table">
-                    <thead><tr><th>Material</th><th>Caracter&iacute;sticas</th><th>Medidas</th><th>Qtd.</th><th>Perda %</th><th>Pre&ccedil;o un.</th><th>Consumo</th><th>Custo</th><th>A&ccedil;&atilde;o</th></tr></thead>
-                    <tbody id="materialsBody"></tbody>
-                </table>
+            <div class="panel-head">
+                <div>
+                    <h2>Componentes adicionais</h2>
+                    <p class="subtitle">Só entram materiais cadastrados. Se o material cadastrado não tiver preço, a calculadora sugere €1,00 e você pode editar.</p>
+                </div>
             </div>
+            <div class="component-list" id="materialsBody"></div>
             <div class="actions">
-                <button type="button" class="btn btn-primary" id="addMaterialBtn">+ Novo item</button>
+                <button type="button" class="btn btn-primary" id="addMaterialBtn">+ Novo item cadastrado</button>
             </div>
         </section>
 
@@ -125,24 +113,24 @@
             <h2>Resultado do produto</h2>
             <div class="result-grid">
                 <div class="metric">
-                    <div class="metric-label">PETG + m&aacute;quina</div>
-                    <div class="metric-value" id="petgCost">&euro;0,00</div>
+                    <div class="metric-label">PETG + máquina</div>
+                    <div class="metric-value" id="petgCost">€0,00</div>
                 </div>
                 <div class="metric">
                     <div class="metric-label">Componentes</div>
-                    <div class="metric-value" id="materialsCost">&euro;0,00</div>
+                    <div class="metric-value" id="materialsCost">€0,00</div>
                 </div>
                 <div class="metric">
                     <div class="metric-label">Largura estimada</div>
-                    <div class="metric-value" id="estimatedWidth">0,00 m</div>
+                    <div class="metric-value" id="estimatedWidth">0 mm</div>
                 </div>
                 <div class="metric">
                     <div class="metric-label">Custo total</div>
-                    <div class="metric-value warn" id="totalCost">&euro;0,00</div>
+                    <div class="metric-value warn" id="totalCost">€0,00</div>
                 </div>
                 <div class="metric">
-                    <div class="metric-label">Pre&ccedil;o sugerido</div>
-                    <div class="metric-value good" id="suggestedPrice">&euro;0,00</div>
+                    <div class="metric-label">Preço sugerido</div>
+                    <div class="metric-value good" id="suggestedPrice">€0,00</div>
                 </div>
             </div>
             <div id="message" class="message"></div>
@@ -152,10 +140,12 @@
     <script>
         let catalogoMateriais = [];
         let materialItems = [];
-        let lastPetgResult = null;
 
         const money = value => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(Number(value) || 0);
         const number = id => Number.parseFloat(document.getElementById(id).value) || 0;
+        const mmToCm = value => (Number(value) || 0) / 10;
+        const mmToM = value => (Number(value) || 0) / 1000;
+        const formatMm = value => `${Math.round((Number(value) || 0) * 100) / 100} mm`;
 
         function showMessage(text, type = 'success') {
             const message = document.getElementById('message');
@@ -165,59 +155,72 @@
         }
 
         function resolveMaterial(materialId = '') {
-            if (materialId.startsWith('preset:')) return { id: materialId, ...MATERIAIS_PADRAO.get(materialId.replace('preset:', '')) };
             return catalogoMateriais.find(entry => entry.id === materialId) || {};
         }
 
         function precoPadraoMaterial(material = {}) {
-            if (!material.id && !material.nome && !material.key) return 0;
+            if (!material.id && !material.nome) return 0;
             const preco = Number.parseFloat(material.precoCusto);
             return Number.isFinite(preco) && preco > 0 ? preco : 1;
         }
 
         function materialComPreco(item = {}, material = {}) {
             const precoUnitario = Number.parseFloat(item.precoUnitario);
-            return {
-                ...material,
-                precoCusto: Number.isFinite(precoUnitario) && precoUnitario > 0
-                    ? precoUnitario
-                    : precoPadraoMaterial(material)
-            };
+            return { ...material, precoCusto: Number.isFinite(precoUnitario) && precoUnitario > 0 ? precoUnitario : precoPadraoMaterial(material) };
         }
 
         function materialOptions(selectedId = '') {
-            const cadastrados = catalogoMateriais.map(material => `<option value="${material.id}" ${selectedId === material.id ? 'selected' : ''}>${material.nome}</option>`).join('');
-            const padroes = MATERIAIS_PADRAO.materiais.map(material => `<option value="preset:${material.key}" ${selectedId === 'preset:' + material.key ? 'selected' : ''}>${material.nome}${material.key === 'outro' ? ' / cadastrar exce&ccedil;&atilde;o' : ''}</option>`).join('');
-            return `<option value="">Selecione</option><optgroup label="Materiais cadastrados">${cadastrados || '<option disabled>Nenhum pre&ccedil;o cadastrado</option>'}</optgroup><optgroup label="Lista padr&atilde;o">${padroes}</optgroup>`;
+            return catalogoMateriais.map(material => `<option value="${material.id}" ${selectedId === material.id ? 'selected' : ''}>${material.nome}</option>`).join('');
         }
 
         function variantInputs(item, material) {
-            const preset = MATERIAIS_PADRAO.get(material.presetKey || String(material.id || '').replace('preset:', ''));
+            const preset = MATERIAIS_PADRAO.get(material.presetKey || '');
             return preset.questions.map(question => {
                 const value = item.variantes && item.variantes[question.key] || question.fixed || '';
                 if (question.fixed) return `<label>${question.label}<input data-variant="${question.key}" value="${question.fixed}" readonly></label>`;
-                if (question.options.length) return `<label>${question.label}<select data-variant="${question.key}"><option value="">Selecione</option>${question.options.map(option => `<option ${option === value ? 'selected' : ''}>${option}</option>`).join('')}</select></label>`;
+                if (question.options.length) return `<label>${question.label}<select data-variant="${question.key}">${question.options.map(option => `<option ${option === value ? 'selected' : ''}>${option}</option>`).join('')}</select></label>`;
                 return `<label>${question.label}<input data-variant="${question.key}" value="${value}"></label>`;
             }).join('');
         }
 
         function measureInputs(item, material) {
             const formula = item.formula || material.formulaPadrao || 'unidade';
-            if (['area', 'placa', 'perimetro', 'densidade_area'].includes(formula)) return `<label>Largura (cm)<input class="item-largura" type="number" min="0" step="0.1" value="${item.larguraCm || 0}"></label><label>Altura (cm)<input class="item-altura" type="number" min="0" step="0.1" value="${item.alturaCm || 0}"></label>`;
-            if (['linear', 'barra'].includes(formula)) return `<label>Comprimento (m)<input class="item-comprimento" type="number" min="0" step="0.01" value="${item.comprimentoM || 0}"></label>`;
-            return '<span style="color:#64748b;">C&aacute;lculo por unidade</span>';
+            if (['area', 'placa', 'perimetro', 'densidade_area'].includes(formula)) {
+                return `<label>Largura (mm)<input class="item-largura-mm" type="number" min="0" step="1" value="${item.larguraMm || 0}"></label><label>Altura (mm)<input class="item-altura-mm" type="number" min="0" step="1" value="${item.alturaMm || 0}"></label>`;
+            }
+            if (['linear', 'barra'].includes(formula)) return `<label>Comprimento (mm)<input class="item-comprimento-mm" type="number" min="0" step="1" value="${item.comprimentoMm || 0}"></label>`;
+            return '<span class="pill">Cálculo por unidade</span>';
+        }
+
+        function itemForCalc(item, material) {
+            return {
+                ...item,
+                larguraCm: mmToCm(item.larguraMm),
+                alturaCm: mmToCm(item.alturaMm),
+                comprimentoM: mmToM(item.comprimentoMm),
+                formula: item.formula || material.formulaPadrao || 'unidade'
+            };
+        }
+
+        function formatConsumo(calculo) {
+            if (calculo.formula === 'linear') return formatMm(calculo.linear * 1000);
+            if (calculo.formula === 'barra') return `${calculo.consumo.toFixed(2)} barra`;
+            if (['area', 'placa', 'perimetro', 'densidade_area'].includes(calculo.formula)) return `${calculo.consumo.toFixed(2)} ${calculo.unidade}`;
+            return `${calculo.consumo.toFixed(2)} ${calculo.unidade}`;
         }
 
         function renderPetgEntries(entries = []) {
             const body = document.getElementById('petgEntriesBody');
-            const normalized = entries.length ? entries : [{ texto: '', alturaCm: 12, profundidadeCm: number('petgDepth') || 5 }];
+            const normalized = entries.length ? entries : [{ texto: '', alturaMm: 120, profundidadeMm: number('petgDepthMm') || 50 }];
             body.innerHTML = normalized.map((entry, index) => `
-                <tr data-index="${index}">
-                    <td><input class="petg-entry-text" value="${entry.texto || ''}" placeholder="Ex: CRISTIANA FABIANA"></td>
-                    <td><input class="petg-entry-height" type="number" min="0" step="0.1" value="${entry.alturaCm || 12}"></td>
-                    <td><input class="petg-entry-depth" type="number" min="0" step="0.1" value="${entry.profundidadeCm || number('petgDepth') || 5}"></td>
-                    <td><button type="button" class="btn btn-danger petg-remove">Remover</button></td>
-                </tr>
+                <div class="entry-row" data-index="${index}">
+                    <div class="entry-grid">
+                        <label>Texto / letras<input class="petg-entry-text" value="${entry.texto || ''}" placeholder="Ex: CRISTIANA FABIANA"></label>
+                        <label>Altura (mm)<input class="petg-entry-height-mm" type="number" min="0" step="1" value="${entry.alturaMm || 120}"></label>
+                        <label>Profundidade (mm)<input class="petg-entry-depth-mm" type="number" min="0" step="1" value="${entry.profundidadeMm || number('petgDepthMm') || 50}"></label>
+                        <button type="button" class="btn btn-danger petg-remove">Remover</button>
+                    </div>
+                </div>
             `).join('');
             body.querySelectorAll('input').forEach(input => input.addEventListener('input', calculateAll));
             body.querySelectorAll('.petg-remove').forEach((button, index) => {
@@ -231,30 +234,35 @@
         }
 
         function petgEntriesFromForm() {
-            return Array.from(document.querySelectorAll('#petgEntriesBody tr')).map(row => ({
+            return Array.from(document.querySelectorAll('#petgEntriesBody .entry-row')).map(row => ({
                 texto: row.querySelector('.petg-entry-text')?.value || '',
-                alturaCm: Number.parseFloat(row.querySelector('.petg-entry-height')?.value) || 0,
-                profundidadeCm: Number.parseFloat(row.querySelector('.petg-entry-depth')?.value) || number('petgDepth') || 0
-            })).filter(entry => entry.texto || entry.alturaCm || entry.profundidadeCm);
+                alturaMm: Number.parseFloat(row.querySelector('.petg-entry-height-mm')?.value) || 0,
+                profundidadeMm: Number.parseFloat(row.querySelector('.petg-entry-depth-mm')?.value) || number('petgDepthMm') || 0
+            })).filter(entry => entry.texto || entry.alturaMm || entry.profundidadeMm);
         }
 
         function addPetgEntry(entry = {}) {
             renderPetgEntries([...petgEntriesFromForm(), {
                 texto: entry.texto || '',
-                alturaCm: entry.alturaCm || 12,
-                profundidadeCm: entry.profundidadeCm || number('petgDepth') || 5
+                alturaMm: entry.alturaMm || 120,
+                profundidadeMm: entry.profundidadeMm || number('petgDepthMm') || 50
             }]);
             calculateAll();
         }
 
         function addMaterialItem(item = {}) {
-            const material = resolveMaterial(item.materialId || '');
+            if (!catalogoMateriais.length) {
+                showMessage('Cadastre materiais antes de adicionar componentes.', 'warning');
+                return;
+            }
+            const materialId = item.materialId || catalogoMateriais[0].id;
+            const material = resolveMaterial(materialId);
             materialItems.push({
-                materialId: item.materialId || '',
-                formula: item.formula || '',
-                larguraCm: item.larguraCm || 0,
-                alturaCm: item.alturaCm || 0,
-                comprimentoM: item.comprimentoM || 0,
+                materialId,
+                formula: item.formula || material.formulaPadrao || 'unidade',
+                larguraMm: item.larguraMm || 0,
+                alturaMm: item.alturaMm || 0,
+                comprimentoMm: item.comprimentoMm || 0,
                 quantidade: item.quantidade || 1,
                 perdaPercentual: item.perdaPercentual ?? '',
                 precoUnitario: item.precoUnitario || precoPadraoMaterial(material),
@@ -265,31 +273,43 @@
 
         function renderMaterials() {
             const body = document.getElementById('materialsBody');
-            body.innerHTML = materialItems.length ? materialItems.map((item, index) => {
+            if (!materialItems.length) {
+                body.innerHTML = '<div class="empty">Adicione um material cadastrado para compor o produto.</div>';
+                calculateAll();
+                return;
+            }
+            body.innerHTML = materialItems.map((item, index) => {
                 const material = resolveMaterial(item.materialId);
                 if (!item.precoUnitario) item.precoUnitario = precoPadraoMaterial(material);
+                const calcItem = itemForCalc(item, material);
                 const materialPreco = materialComPreco(item, material);
-                const calculo = CUSTEIO.calcular(item, materialPreco);
-                return `<tr data-index="${index}">
-                    <td><select class="item-material">${materialOptions(item.materialId)}</select></td>
-                    <td><div class="mini-grid">${variantInputs(item, material)}</div></td>
-                    <td><div class="mini-grid">${measureInputs(item, material)}</div></td>
-                    <td><input class="item-quantidade" type="number" min="0" step="0.01" value="${item.quantidade || 1}"></td>
-                    <td><input class="item-perda" type="number" min="0" step="0.1" placeholder="${material.perdaPercentual || 0}" value="${item.perdaPercentual ?? ''}"></td>
-                    <td><input class="item-preco" type="number" min="0" step="0.01" value="${Number(item.precoUnitario || precoPadraoMaterial(material)).toFixed(2)}"></td>
-                    <td>${calculo.consumo.toFixed(2)} ${calculo.unidade}</td>
-                    <td>${money(calculo.custo)}</td>
-                    <td><button type="button" class="btn btn-danger item-remove">Remover</button></td>
-                </tr>`;
-            }).join('') : '<tr><td colspan="9" class="empty">Adicione fonte, LED, barras, acr&iacute;lico ou outros componentes.</td></tr>';
+                const calculo = CUSTEIO.calcular(calcItem, materialPreco);
+                return `<div class="component-card" data-index="${index}">
+                    <div class="component-grid">
+                        <label>Material cadastrado<select class="item-material">${materialOptions(item.materialId)}</select></label>
+                        <div class="inline-grid">${variantInputs(item, material)}</div>
+                        <div class="inline-grid">${measureInputs(item, material)}</div>
+                        <div class="inline-grid">
+                            <label>Qtd.<input class="item-quantidade" type="number" min="0" step="0.01" value="${item.quantidade || 1}"></label>
+                            <label>Perda %<input class="item-perda" type="number" min="0" step="0.1" placeholder="${material.perdaPercentual || 0}" value="${item.perdaPercentual ?? ''}"></label>
+                        </div>
+                        <label>Preço unitário (€)<input class="item-preco" type="number" min="0" step="0.01" value="${Number(item.precoUnitario || precoPadraoMaterial(material)).toFixed(2)}"></label>
+                        <button type="button" class="btn btn-danger item-remove">Remover</button>
+                    </div>
+                    <div class="component-footer">
+                        <span class="pill">Consumo: ${formatConsumo(calculo)}</span>
+                        <span class="pill cost-pill">Custo: ${money(calculo.custo)}</span>
+                    </div>
+                </div>`;
+            }).join('');
 
-            body.querySelectorAll('tr[data-index]').forEach(row => {
-                const index = Number(row.dataset.index);
-                row.querySelectorAll('input, select').forEach(element => {
-                    element.addEventListener('change', () => updateMaterialItem(index, row, true));
-                    element.addEventListener('input', () => updateMaterialItem(index, row, false));
+            body.querySelectorAll('.component-card').forEach(card => {
+                const index = Number(card.dataset.index);
+                card.querySelectorAll('input, select').forEach(element => {
+                    element.addEventListener('change', () => updateMaterialItem(index, card, true));
+                    element.addEventListener('input', () => updateMaterialItem(index, card, false));
                 });
-                row.querySelector('.item-remove').addEventListener('click', () => {
+                card.querySelector('.item-remove').addEventListener('click', () => {
                     materialItems.splice(index, 1);
                     renderMaterials();
                     calculateAll();
@@ -298,23 +318,23 @@
             calculateAll();
         }
 
-        function updateMaterialItem(index, row, shouldRender = true) {
+        function updateMaterialItem(index, card, shouldRender = true) {
             const item = materialItems[index];
-            const materialId = row.querySelector('.item-material').value;
+            const materialId = card.querySelector('.item-material').value;
             const previousMaterialId = item.materialId;
             const materialChanged = previousMaterialId !== materialId;
             const material = resolveMaterial(materialId);
             item.materialId = materialId;
             item.formula = material.formulaPadrao || 'unidade';
             if (materialChanged) item.precoUnitario = precoPadraoMaterial(material);
-            item.larguraCm = Number.parseFloat(row.querySelector('.item-largura')?.value) || 0;
-            item.alturaCm = Number.parseFloat(row.querySelector('.item-altura')?.value) || 0;
-            item.comprimentoM = Number.parseFloat(row.querySelector('.item-comprimento')?.value) || 0;
-            item.quantidade = Number.parseFloat(row.querySelector('.item-quantidade').value) || 1;
-            item.perdaPercentual = row.querySelector('.item-perda').value;
-            if (!materialChanged) item.precoUnitario = Number.parseFloat(row.querySelector('.item-preco')?.value) || precoPadraoMaterial(material);
-            item.variantes = Object.fromEntries(Array.from(row.querySelectorAll('[data-variant]')).map(element => [element.dataset.variant, element.value]));
-            if (previousMaterialId !== materialId) item.variantes = {};
+            item.larguraMm = Number.parseFloat(card.querySelector('.item-largura-mm')?.value) || 0;
+            item.alturaMm = Number.parseFloat(card.querySelector('.item-altura-mm')?.value) || 0;
+            item.comprimentoMm = Number.parseFloat(card.querySelector('.item-comprimento-mm')?.value) || 0;
+            item.quantidade = Number.parseFloat(card.querySelector('.item-quantidade')?.value) || 1;
+            item.perdaPercentual = card.querySelector('.item-perda')?.value ?? '';
+            if (!materialChanged) item.precoUnitario = Number.parseFloat(card.querySelector('.item-preco')?.value) || precoPadraoMaterial(material);
+            item.variantes = Object.fromEntries(Array.from(card.querySelectorAll('[data-variant]')).map(element => [element.dataset.variant, element.value]));
+            if (materialChanged) item.variantes = {};
             if (shouldRender || materialChanged) renderMaterials();
             else calculateAll();
         }
@@ -322,22 +342,21 @@
         function calculatePetg() {
             const result = GESTAO.calcularLetreiroPETG({
                 entradas: petgEntriesFromForm(),
-                profundidadeCm: number('petgDepth'),
+                profundidadeMm: number('petgDepthMm'),
                 precoKgFilamento: number('petgKgPrice'),
                 perdaPercentual: number('petgWaste') || 10,
                 gramasPorHora: number('petgGramsHour') || 75,
                 fatorLed: number('petgLedFactor') || 1.2,
-                ledManualM: number('petgLedManual')
+                ledManualM: mmToM(number('petgLedManualMm'))
             });
-            lastPetgResult = result;
-            const detalhes = result.partes.map(parte => `${parte.texto || 'Texto'}: ${parte.calculo.gramasTotal} g / ${parte.calculo.horasTotal} h`).join(' | ') || 'Nenhuma entrada identificada';
+            const detalhes = result.entradas.map(entry => `${entry.texto || 'Texto'}: ${formatMm(entry.larguraEstimadaMm)} largura | ${entry.gramas} g | ${entry.horas} h`).join(' | ') || 'Nenhuma entrada identificada';
             document.getElementById('petgResult').innerHTML = `
                 <strong>PETG:</strong> ${result.gramasTotal} g
                 | <strong>Tempo 3D:</strong> ${result.horasTotal} h
-                | <strong>LED estimado:</strong> ${result.ledFinalM} m
-                | <strong>Largura aprox.:</strong> ${result.larguraEstimadaM} m
+                | <strong>LED estimado:</strong> ${formatMm(result.ledFinalMm)}
+                | <strong>Largura aprox.:</strong> ${formatMm(result.larguraEstimadaMm)}
                 <br><strong>Entradas:</strong> ${detalhes}
-                <br><strong>Contorno base:</strong> ${result.contornoTotalM} m | fator LED x${result.fatorLed}
+                <br><strong>Contorno base:</strong> ${formatMm(result.contornoTotalMm)} | fator LED x${result.fatorLed}
                 ${result.alerta ? `<br><strong>${result.alerta}</strong>` : ''}
             `;
             return result;
@@ -345,8 +364,9 @@
 
         function calculateMaterialsCost() {
             return materialItems.reduce((total, item) => {
-                const material = materialComPreco(item, resolveMaterial(item.materialId));
-                return total + CUSTEIO.calcular(item, material).custo;
+                const material = resolveMaterial(item.materialId);
+                const materialPreco = materialComPreco(item, material);
+                return total + CUSTEIO.calcular(itemForCalc(item, material), materialPreco).custo;
             }, 0);
         }
 
@@ -358,10 +378,9 @@
             const suggested = totalCost / (1 - margem / 100);
             document.getElementById('petgCost').textContent = money(petg.custoTotal);
             document.getElementById('materialsCost').textContent = money(materialsCost);
-            document.getElementById('estimatedWidth').textContent = `${petg.larguraEstimadaM.toFixed(2)} m`;
+            document.getElementById('estimatedWidth').textContent = formatMm(petg.larguraEstimadaMm);
             document.getElementById('totalCost').textContent = money(totalCost);
             document.getElementById('suggestedPrice').textContent = money(suggested);
-            return { petg, materialsCost, totalCost, suggested };
         }
 
         function fillPetgPriceFromCatalog() {
@@ -392,7 +411,7 @@
             renderMaterials();
             document.getElementById('addPetgEntryBtn').addEventListener('click', () => addPetgEntry());
             document.getElementById('addMaterialBtn').addEventListener('click', () => addMaterialItem());
-            ['petgDepth', 'petgKgPrice', 'petgWaste', 'petgGramsHour', 'petgLedFactor', 'petgLedManual', 'marginPercent'].forEach(id => {
+            ['petgDepthMm', 'petgKgPrice', 'petgWaste', 'petgGramsHour', 'petgLedFactor', 'petgLedManualMm', 'marginPercent'].forEach(id => {
                 document.getElementById(id).addEventListener('input', calculateAll);
             });
             calculateAll();

@@ -225,8 +225,8 @@
             ? config.entradas
             : [{
                 palavra: config.palavra,
-                alturaCm: config.alturaCm,
-                profundidadeCm: config.profundidadeCm || config.espessuraCm
+                alturaCm: config.alturaCm || (numero(config.alturaMm) / 10),
+                profundidadeCm: config.profundidadeCm || config.espessuraCm || (numero(config.profundidadeMm) / 10)
             }];
         const precoKgFilamento = config.precoKgFilamento || config.precoKg || 0;
         const perdaPercentual = config.perdaPercentual ?? 10;
@@ -238,8 +238,8 @@
                     ...config,
                     palavra: entrada.palavra || entrada.texto || '',
                     letras: entrada.letras,
-                    alturaCm: entrada.alturaCm,
-                    profundidadeCm: entrada.profundidadeCm || entrada.espessuraCm || config.profundidadeCm,
+                    alturaCm: entrada.alturaCm || (numero(entrada.alturaMm) / 10),
+                    profundidadeCm: entrada.profundidadeCm || entrada.espessuraCm || (numero(entrada.profundidadeMm) / 10) || config.profundidadeCm || (numero(config.profundidadeMm) / 10),
                     precoKgFilamento,
                     perdaPercentual,
                     gramasPorHora,
@@ -247,12 +247,14 @@
                 });
                 return {
                     id: entrada.id || `entrada_${index + 1}`,
-                    texto: entrada.palavra || entrada.texto || '',
-                    alturaCm: calculo.alturaCm,
-                    profundidadeCm: calculo.profundidadeCm,
-                    larguraEstimadaCm: larguraTextoLetreiroCm(entrada.palavra || entrada.texto || '', calculo.alturaCm),
-                    calculo
-                };
+                texto: entrada.palavra || entrada.texto || '',
+                alturaCm: calculo.alturaCm,
+                alturaMm: Math.round(calculo.alturaCm * 10 * 100) / 100,
+                profundidadeCm: calculo.profundidadeCm,
+                profundidadeMm: Math.round(calculo.profundidadeCm * 10 * 100) / 100,
+                larguraEstimadaCm: larguraTextoLetreiroCm(entrada.palavra || entrada.texto || '', calculo.alturaCm),
+                calculo
+            };
             })
             .filter(parte => parte.texto || parte.calculo.detalhes.length);
         const gramasTotal = partes.reduce((total, parte) => total + parte.calculo.gramasTotal, 0);
@@ -276,8 +278,11 @@
                 id: parte.id,
                 texto: parte.texto,
                 alturaCm: parte.alturaCm,
+                alturaMm: parte.alturaMm,
                 profundidadeCm: parte.profundidadeCm,
+                profundidadeMm: parte.profundidadeMm,
                 larguraEstimadaCm: parte.larguraEstimadaCm,
+                larguraEstimadaMm: Math.round((parte.larguraEstimadaCm * 10) * 100) / 100,
                 gramas: parte.calculo.gramasTotal,
                 horas: parte.calculo.horasTotal
             })),
@@ -288,11 +293,15 @@
             custoEnergia: dinheiro(custoEnergia),
             custoTotal: dinheiro(custoFilamento + custoMaquina + custoEnergia),
             contornoTotalM: Math.round(contornoTotalM * 100) / 100,
+            contornoTotalMm: Math.round(contornoTotalM * 1000 * 100) / 100,
             larguraEstimadaCm,
             larguraEstimadaM: Math.round((larguraEstimadaCm / 100) * 100) / 100,
+            larguraEstimadaMm: Math.round(larguraEstimadaCm * 10 * 100) / 100,
             fatorLed,
             ledEstimadoM,
+            ledEstimadoMm: Math.round(ledEstimadoM * 1000 * 100) / 100,
             ledFinalM,
+            ledFinalMm: Math.round(ledFinalM * 1000 * 100) / 100,
             segmentacaoRecomendada: partes.some(parte => parte.calculo.segmentacaoRecomendada),
             alerta: partes.some(parte => parte.calculo.segmentacaoRecomendada)
                 ? 'Uma ou mais partes podem precisar de impressao segmentada.'
