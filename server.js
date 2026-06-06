@@ -274,7 +274,7 @@ async function findDuplicateMobileDocument(documento, fingerprint) {
 async function launchMobileDocument(item, fingerprint, now = new Date().toISOString()) {
   const eventId = `mobile-${fingerprint.slice(0, 40)}`;
   const supplier = item.entryType === 'expense' ? await supplierByNif(item.nifEmitente) : null;
-  const payload = item.entryType === 'income'
+  let payload = item.entryType === 'income'
     ? {
         nifEmitente: item.nifEmitente,
         nifAdquirente: item.nifAdquirente,
@@ -310,6 +310,9 @@ async function launchMobileDocument(item, fingerprint, now = new Date().toISOStr
         supplierId: supplier?.id || '',
         observacoes: item.observacoes
       };
+  if (item.entryType === 'expense' && supplier) {
+    payload = applySupplierToExpensePayload(payload, supplier, now);
+  }
   await db.collection('events').doc(eventId).set({
     schema: item.entryType === 'income' ? 'fatura_venda' : 'despesa',
     payload,
@@ -390,6 +393,95 @@ async function supplierByNif(nif) {
   const clean = digits(nif);
   return (await suppliers()).find(item => item.nif === clean) || null;
 }
+
+function expenseSupplierNif(payload = {}) {
+  return digits(payload.nifFornecedor || payload.nifEmitente || payload.nif || payload.fornecedorNif);
+}
+
+function applySupplierToExpensePayload(payload = {}, supplier = {}, now = new Date().toISOString()) {
+  return {
+    ...payload,
+    fornecedor: supplier.name,
+    nifFornecedor: supplier.nif,
+    categoria: supplier.category,
+    tipoDespesa: supplier.expenseType,
+    ivaDedutivel: supplier.ivaDedutivel !== false,
+    supplierId: supplier.id,
+    classificationStatus: 'classified',
+    classificationSource: 'supplier_nif',
+    classifiedAt: payload.classifiedAt || now,
+    supplierClassificationUpdatedAt: now
+  };
+}
+
+function expenseHasSupplierClassification(payload = {}, supplier = {}) {
+  return payload.classificationStatus === 'classified'
+    && payload.classificationSource === 'supplier_nif'
+    && payload.supplierId === supplier.id
+    && text(payload.fornecedor, 160) === supplier.name
+    && expenseSupplierNif(payload) === supplier.nif
+    && text(payload.categoria, 80).toUpperCase() === supplier.category
+    && text(payload.tipoDespesa, 80) === supplier.expenseType
+    && (payload.ivaDedutivel !== false) === (supplier.ivaDedutivel !== false);
+}
+
+async function classifyExpensePayloadByKnownSupplier(payload = {}, now = new Date().toISOString()) {
+  const supplier = await supplierByNif(expenseSupplierNif(payload));
+  if (!supplier) return { payload, supplier: null, classified: false };
+  return {
+    payload: applySupplierToExpensePayload(payload, supplier, now),
+    supplier,
+    classified: true
+  };
+}
+
+async function classifyExistingExpensesForSupplier(supplier = {}, now = new Date().toISOString()) {
+  if (!supplier.name || !/^\d{9}$/.test(supplier.nif)) return 0;
+  const snapshot = await db.collection('events').get();
+  const matchingExpenses = snapshot.docs.filter(doc => {
+    const data = doc.data();
+    const payload = data.payload || {};
+    return !data.deleted
+      && data.schema === 'despesa'
+      && expenseSupplierNif(payload) === supplier.nif
+      && !expenseHasSupplierClassification(payload, supplier);
+  });
+  await Promise.all(matchingExpenses.map(doc => {
+    const data = doc.data();
+    return db.collection('events').doc(doc.id).set({
+      ...data,
+      payload: applySupplierToExpensePayload(data.payload || {}, supplier, now),
+      updated_at: now
+    }, { merge: true });
+  }));
+  return matchingExpenses.length;
+}
+
+async function classifyExpensesByKnownSuppliers(now = new Date().toISOString()) {
+  const supplierMap = new Map((await suppliers()).filter(supplier => /^\d{9}$/.test(supplier.nif)).map(supplier => [supplier.nif, supplier]));
+  if (!supplierMap.size) return 0;
+  const snapshot = await db.collection('events').get();
+  const matches = snapshot.docs
+    .map(doc => ({ doc, data: doc.data() }))
+    .filter(({ data }) => {
+      const payload = data.payload || {};
+      const supplier = supplierMap.get(expenseSupplierNif(payload));
+      return supplier
+        && !data.deleted
+        && data.schema === 'despesa'
+        && !expenseHasSupplierClassification(payload, supplier);
+    });
+  await Promise.all(matches.map(({ doc, data }) => {
+    const supplier = supplierMap.get(expenseSupplierNif(data.payload || {}));
+    return db.collection('events').doc(doc.id).set({
+      ...data,
+      payload: applySupplierToExpensePayload(data.payload || {}, supplier, now),
+      updated_at: now
+    }, { merge: true });
+  }));
+  return matches.length;
+}
+
 
 function normalizeSupplierPayload(body = {}) {
   return {
@@ -1144,8 +1236,10 @@ app.post('/api/suppliers', async (req, res) => {
     const existing = await supplierByNif(supplier.nif);
     const id = existing?.id || crypto.randomBytes(12).toString('hex');
     const now = new Date().toISOString();
-    await db.collection('suppliers').doc(id).set({ ...existing, ...supplier, id, createdAt: existing?.createdAt || now, updatedAt: now });
-    res.json({ success: true, supplier: sanitizeForResponse({ ...supplier, id }) });
+    const savedSupplier = { ...existing, ...supplier, id, createdAt: existing?.createdAt || now, updatedAt: now };
+    await db.collection('suppliers').doc(id).set(savedSupplier);
+    const autoClassifiedCount = await classifyExistingExpensesForSupplier(savedSupplier, now);
+    res.json({ success: true, supplier: sanitizeForResponse(savedSupplier), autoClassifiedCount });
   } catch (error) {
     console.error('Erro ao salvar fornecedor:', error);
     res.status(500).json({ success: false, message: 'Nao foi possivel salvar o fornecedor.' });
@@ -1176,13 +1270,19 @@ function expenseNeedsClassification(payload = {}) {
 }
 
 app.get('/api/expenses/unclassified', async (req, res) => {
-  const snapshot = await db.collection('events').get();
-  const expenses = snapshot.docs
-    .map(doc => ({ id: doc.id, ...doc.data() }))
-    .filter(event => !event.deleted && event.schema === 'despesa' && expenseNeedsClassification(event.payload || {}))
-    .sort((a, b) => new Date(b.timestamp || b.created_at || 0) - new Date(a.timestamp || a.created_at || 0))
-    .map(event => sanitizeForResponse({ id: event.id, ...event.payload, timestamp: event.timestamp }));
-  res.json({ success: true, expenses });
+  try {
+    const autoClassifiedCount = await classifyExpensesByKnownSuppliers();
+    const snapshot = await db.collection('events').get();
+    const expenses = snapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() }))
+      .filter(event => !event.deleted && event.schema === 'despesa' && expenseNeedsClassification(event.payload || {}))
+      .sort((a, b) => new Date(b.timestamp || b.created_at || 0) - new Date(a.timestamp || a.created_at || 0))
+      .map(event => sanitizeForResponse({ id: event.id, ...event.payload, timestamp: event.timestamp }));
+    res.json({ success: true, expenses, autoClassifiedCount });
+  } catch (error) {
+    console.error('Erro ao listar despesas sem classificacao:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel carregar as despesas a classificar.' });
+  }
 });
 
 app.post('/api/expenses/:id/classify', async (req, res) => {
@@ -1204,39 +1304,16 @@ app.post('/api/expenses/:id/classify', async (req, res) => {
     const existingSupplier = await supplierByNif(supplierPayload.nif);
     const supplierId = existingSupplier?.id || crypto.randomBytes(12).toString('hex');
     const now = new Date().toISOString();
-    await db.collection('suppliers').doc(supplierId).set({ ...existingSupplier, ...supplierPayload, id: supplierId, createdAt: existingSupplier?.createdAt || now, updatedAt: now });
-
-    const updatePayload = data => ({
-      ...data,
-      fornecedor: supplierPayload.name,
-      nifFornecedor: supplierPayload.nif,
-      categoria: supplierPayload.category,
-      tipoDespesa: supplierPayload.expenseType,
-      ivaDedutivel: supplierPayload.ivaDedutivel,
-      supplierId,
-      classificationStatus: 'classified',
-      classifiedAt: now
-    });
+    const savedSupplier = { ...existingSupplier, ...supplierPayload, id: supplierId, createdAt: existingSupplier?.createdAt || now, updatedAt: now };
+    await db.collection('suppliers').doc(supplierId).set(savedSupplier);
+    const updatePayload = data => applySupplierToExpensePayload(data, savedSupplier, now);
     await expenseRef.set({ ...current, payload: updatePayload(payload), updated_at: now }, { merge: true });
 
     let updatedCount = 1;
     if (req.body?.applyToSameNif) {
-      const snapshot = await db.collection('events').get();
-      const sameNif = snapshot.docs.filter(doc => {
-        const data = doc.data();
-        return doc.id !== req.params.id
-          && !data.deleted
-          && data.schema === 'despesa'
-          && digits(data.payload?.nifFornecedor) === supplierPayload.nif
-          && expenseNeedsClassification(data.payload || {});
-      });
-      await Promise.all(sameNif.map(doc => {
-        const data = doc.data();
-        updatedCount += 1;
-        return db.collection('events').doc(doc.id).set({ ...data, payload: updatePayload(data.payload || {}), updated_at: now }, { merge: true });
-      }));
+      updatedCount += await classifyExistingExpensesForSupplier(savedSupplier, now);
     }
-    res.json({ success: true, supplier: sanitizeForResponse({ ...supplierPayload, id: supplierId }), updatedCount });
+    res.json({ success: true, supplier: sanitizeForResponse(savedSupplier), updatedCount });
   } catch (error) {
     console.error('Erro ao classificar despesa:', error);
     res.status(500).json({ success: false, message: 'Nao foi possivel classificar a despesa.' });
@@ -1615,13 +1692,17 @@ app.post('/api/database/commit', async (req, res) => {
     if (id && !isSafeIdentifier(id)) return res.status(400).json({ error: 'ID inválido.' });
     if (containsUnsafeMarkup(payload)) return res.status(400).json({ error: 'Conteúdo HTML potencialmente inseguro não é permitido.' });
 
+    const now = new Date().toISOString();
+    const classification = schema === 'despesa'
+      ? await classifyExpensePayloadByKnownSupplier(payload, now)
+      : { payload };
     const event = {
       schema,
-      payload,
+      payload: classification.payload,
       pageId: typeof pageId === 'string' ? pageId.slice(0, 100) : 'unknown',
-      timestamp: new Date().toISOString(),
+      timestamp: now,
       deleted: false,
-      updated_at: new Date().toISOString()
+      updated_at: now
     };
 
     let result;
@@ -1632,15 +1713,15 @@ app.post('/api/database/commit', async (req, res) => {
         await docRef.set({ ...docSnap.data(), ...event, updated: true }, { merge: true });
         result = { id, action: 'updated', exists: true };
       } else {
-        await docRef.set({ ...event, created_at: new Date().toISOString() });
+        await docRef.set({ ...event, created_at: now });
         result = { id, action: 'created_new', exists: false };
       }
     } else {
-      const docRef = await db.collection('events').add({ ...event, created_at: new Date().toISOString() });
+      const docRef = await db.collection('events').add({ ...event, created_at: now });
       result = { id: docRef.id, action: 'created', exists: false };
     }
 
-    res.json({ status: 'success', success: true, message: 'Evento salvo no Firebase', ...result, event });
+    res.json({ status: 'success', success: true, message: 'Evento salvo no Firebase', autoClassified: Boolean(classification.classified), ...result, event });
   } catch (error) {
     console.error('Erro ao salvar:', error);
     res.status(500).json({ error: 'Não foi possível salvar o registro.' });

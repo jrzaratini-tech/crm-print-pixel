@@ -555,6 +555,79 @@ test('classifica despesas antigas por fornecedor cadastrado pelo NIF', async () 
   assert.equal(updated.body.events[0].payload.classificationStatus, 'classified');
 });
 
+test('cadastrar fornecedor classifica despesas antigas automaticamente pelo NIF', async () => {
+  const legacy = await post('/api/database/commit', {
+    schema: 'despesa',
+    payload: { fornecedor: 'Fornecedor NIF 507333444', nifFornecedor: '507333444', categoria: 'A CLASSIFICAR', valorTotal: 80 },
+    pageId: 'test'
+  });
+
+  const supplier = await post('/api/suppliers', {
+    name: 'Fornecedor Auto Antigo',
+    nif: '507333444',
+    category: 'ENERGIA',
+    expenseType: 'energia',
+    ivaDedutivel: false
+  });
+  assert.equal(supplier.response.status, 200);
+  assert.equal(supplier.body.autoClassifiedCount, 1);
+
+  const updated = await post('/api/database/query', { schema: 'despesa', filters: { id: legacy.body.id } });
+  const payload = updated.body.events[0].payload;
+  assert.equal(payload.fornecedor, 'Fornecedor Auto Antigo');
+  assert.equal(payload.categoria, 'ENERGIA');
+  assert.equal(payload.tipoDespesa, 'energia');
+  assert.equal(payload.ivaDedutivel, false);
+  assert.equal(payload.classificationStatus, 'classified');
+  assert.equal(payload.classificationSource, 'supplier_nif');
+});
+
+test('lancamento novo de despesa usa fornecedor cadastrado pelo NIF', async () => {
+  const supplier = await post('/api/suppliers', {
+    name: 'Fornecedor Auto Novo',
+    nif: '507333555',
+    category: 'CTT',
+    expenseType: 'correios'
+  });
+  assert.equal(supplier.response.status, 200);
+
+  const expense = await post('/api/database/commit', {
+    schema: 'despesa',
+    payload: { fornecedor: 'Fornecedor NIF 507333555', nifFornecedor: '507333555', categoria: 'OUTROS', valorTotal: 25 },
+    pageId: 'test'
+  });
+  assert.equal(expense.body.autoClassified, true);
+  assert.equal(expense.body.event.payload.fornecedor, 'Fornecedor Auto Novo');
+  assert.equal(expense.body.event.payload.categoria, 'CTT');
+  assert.equal(expense.body.event.payload.tipoDespesa, 'correios');
+  assert.equal(expense.body.event.payload.supplierId, supplier.body.supplier.id);
+});
+
+test('fila de despesas reconcilia pendencias com fornecedores ja cadastrados', async () => {
+  const supplier = await post('/api/suppliers', {
+    name: 'Fornecedor Reconciliado',
+    nif: '507333666',
+    category: 'MANUTENCAO',
+    expenseType: 'manutencao'
+  });
+  assert.equal(supplier.response.status, 200);
+  await db.collection('events').doc('legacy-reconcile-507333666').set({
+    schema: 'despesa',
+    payload: { fornecedor: 'Fornecedor NIF 507333666', nifFornecedor: '507333666', categoria: 'OUTROS', valorTotal: 110 },
+    deleted: false,
+    timestamp: new Date().toISOString()
+  });
+
+  const pending = await request('/api/expenses/unclassified');
+  assert.equal(pending.response.status, 200);
+  assert.equal(pending.body.autoClassifiedCount, 1);
+  assert.equal(pending.body.expenses.some(item => item.id === 'legacy-reconcile-507333666'), false);
+
+  const updated = await post('/api/database/query', { schema: 'despesa', filters: { id: 'legacy-reconcile-507333666' } });
+  assert.equal(updated.body.events[0].payload.fornecedor, 'Fornecedor Reconciliado');
+  assert.equal(updated.body.events[0].payload.classificationSource, 'supplier_nif');
+});
+
 test('cadastra vendedor, calcula comissao sem IVA e instalacao e exibe no app', async () => {
   const seller = await post('/api/sellers', { name: 'Vendedor Teste', username: 'vendedor.teste', password: 'senha-segura-vendedor' });
   assert.equal(seller.response.status, 200);
