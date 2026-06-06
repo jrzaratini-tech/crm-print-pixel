@@ -1261,6 +1261,9 @@ app.post('/api/suppliers/:id/delete', async (req, res) => {
 function expenseNeedsClassification(payload = {}) {
   const fornecedor = text(payload.fornecedor, 160);
   const categoria = text(payload.categoria, 80).toUpperCase();
+  if (payload.supplierId && expenseSupplierNif(payload) && fornecedor && !/^FORNECEDOR NIF/.test(fornecedor.toUpperCase())) {
+    return false;
+  }
   if (payload.classificationStatus === 'classified'
     && fornecedor
     && !/^FORNECEDOR NIF/.test(fornecedor.toUpperCase())
@@ -1284,7 +1287,7 @@ app.get('/api/expenses/unclassified', async (req, res) => {
       .filter(event => !event.deleted && event.schema === 'despesa' && expenseNeedsClassification(event.payload || {}))
       .sort((a, b) => new Date(b.timestamp || b.created_at || 0) - new Date(a.timestamp || a.created_at || 0))
       .map(event => sanitizeForResponse({ id: event.id, ...event.payload, timestamp: event.timestamp }));
-    res.json({ success: true, expenses, autoClassifiedCount });
+    res.json({ success: true, expenses, pendingCount: expenses.length, autoClassifiedCount });
   } catch (error) {
     console.error('Erro ao listar despesas sem classificacao:', error);
     res.status(500).json({ success: false, message: 'Nao foi possivel carregar as despesas a classificar.' });

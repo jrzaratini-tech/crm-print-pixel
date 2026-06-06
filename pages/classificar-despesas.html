@@ -5,12 +5,12 @@
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Despesas a Classificar - PrintPixel</title>
   <style>
-    *{box-sizing:border-box;font-family:Segoe UI,system-ui,sans-serif}body{margin:0;padding:24px;background:#f4f7fb;color:#10233f}.container{max-width:1300px;margin:auto}.panel,.card{background:#fff;border:1px solid #dce5f2;border-radius:16px;padding:20px;margin-bottom:16px;box-shadow:0 8px 24px #0f172a0d}h1{margin:0;color:#1a237e}.subtitle{color:#64748b}.list{display:grid;gap:14px}.card{display:grid;gap:12px}.meta{display:flex;flex-wrap:wrap;gap:10px;color:#64748b}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}input,select{width:100%;border:1px solid #cbd5e1;border-radius:10px;padding:10px}label{font-size:12px;font-weight:800;color:#334155}.btn{border:0;border-radius:10px;padding:11px 14px;background:#1a237e;color:#fff;font-weight:800;cursor:pointer}.message{font-weight:800;color:#047857;min-height:20px}
+    *{box-sizing:border-box;font-family:Segoe UI,system-ui,sans-serif}body{margin:0;padding:24px;background:#f4f7fb;color:#10233f}.container{max-width:1300px;margin:auto}.panel,.card{background:#fff;border:1px solid #dce5f2;border-radius:16px;padding:20px;margin-bottom:16px;box-shadow:0 8px 24px #0f172a0d}.header{display:flex;justify-content:space-between;gap:16px;align-items:flex-start;flex-wrap:wrap}h1{margin:0;color:#1a237e}.subtitle{color:#64748b}.counter{background:#eef2ff;color:#1a237e;border:1px solid #c7d2fe;border-radius:12px;padding:12px 16px;font-weight:900;text-align:center;min-width:150px}.counter strong{display:block;font-size:28px;line-height:1}.counter span{font-size:12px;color:#475569}.list{display:grid;gap:14px}.card{display:grid;gap:12px}.meta{display:flex;flex-wrap:wrap;gap:10px;color:#64748b}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}input,select{width:100%;border:1px solid #cbd5e1;border-radius:10px;padding:10px}label{font-size:12px;font-weight:800;color:#334155}.btn{border:0;border-radius:10px;padding:11px 14px;background:#1a237e;color:#fff;font-weight:800;cursor:pointer}.btn:disabled{opacity:.65;cursor:wait}.message{font-weight:800;color:#047857;min-height:20px}
   </style>
 </head>
 <body data-page-id="classificar_despesas" data-page-type="WRITE">
   <main class="container">
-    <section class="panel"><h1>Despesas a Classificar</h1><p class="subtitle">Aqui aparecem despesas antigas e novas que vieram sem fornecedor/categoria confiável.</p><div class="message" id="message"></div></section>
+    <section class="panel"><div class="header"><div><h1>Despesas a Classificar</h1><p class="subtitle">Aqui aparecem despesas antigas e novas que vieram sem fornecedor/categoria confiável.</p></div><div class="counter"><strong id="pendingCount">0</strong><span>pendentes</span></div></div><div class="message" id="message"></div></section>
     <section class="list" id="list"></section>
   </main>
   <script>
@@ -30,6 +30,7 @@
     }
     function options(selected){return CATEGORIES.map(c=>`<option value="${c}" ${c===(selected||'')?'selected':''}>${c}</option>`).join('');}
     function supplierForNif(nif){return suppliersByNif.get(String(nif||'').replace(/\D/g,''));}
+    function updateCounter(count){document.getElementById('pendingCount').textContent=String(Math.max(0,Number(count)||0));}
     function fillSupplier(card){
       const supplier=supplierForNif(card.querySelector('[data-nif]').value);
       if(!supplier)return false;
@@ -54,13 +55,15 @@
       document.getElementById('message').textContent=`${result.updatedCount} despesa(s) atualizada(s).`;
       const cleanNif=String(body.nif||'').replace(/\D/g,'');
       document.querySelectorAll('.card').forEach(item=>{if(body.applyToSameNif&&item.dataset.nif===cleanNif)item.remove();});
-      if(!body.applyToSameNif)card.remove();
+      if(!body.applyToSameNif&&card.isConnected)card.remove();
+      updateCounter(document.querySelectorAll('.card').length);
       if(!document.querySelector('.card'))document.getElementById('list').innerHTML='<div class="panel">Nenhuma despesa pendente de classificação.</div>';
     }
     async function load(){
       const supplierResult=await api('/api/suppliers');
       suppliersByNif=new Map((supplierResult.suppliers||[]).map(s=>[String(s.nif||'').replace(/\D/g,''),s]));
       const result=await api('/api/expenses/unclassified');const list=document.getElementById('list');list.replaceChildren();
+      updateCounter(result.pendingCount ?? result.expenses.length);
       if(result.autoClassifiedCount)document.getElementById('message').textContent=`${result.autoClassifiedCount} despesa(s) classificadas automaticamente pelo NIF do fornecedor.`;
       if(!result.expenses.length){list.innerHTML='<div class="panel">Nenhuma despesa pendente de classificação.</div>';return;}
       result.expenses.forEach(exp=>{const card=document.createElement('article');card.className='card';card.dataset.id=exp.id||'';card.dataset.nif=String(exp.nifFornecedor||'').replace(/\D/g,'');card.innerHTML=`<h2>${exp.fornecedor||'Fornecedor não identificado'}</h2><div class="meta"><span>NIF ${exp.nifFornecedor||'sem NIF'}</span><span>${exp.numeroFatura||''}</span><span>${exp.dataCompra||exp.data||''}</span><strong>${money(exp.valorTotal)}</strong></div><div class="grid"><label>Fornecedor<input data-name value="${exp.fornecedor&& !String(exp.fornecedor).startsWith('Fornecedor NIF')?exp.fornecedor:''}"></label><label>NIF<input data-nif value="${exp.nifFornecedor||''}"></label><label>Categoria<select data-category>${options(exp.categoria)}</select></label><label>Tipo despesa<input data-type value="${exp.tipoDespesa||''}"></label><label>IVA dedutível<select data-iva><option value="true">Sim</option><option value="false">Não</option></select></label><label><input type="checkbox" data-apply checked> aplicar a antigas com este NIF</label><button class="btn">Classificar</button></div>`;card.querySelector('[data-nif]').addEventListener('input',()=>{card.dataset.nif=String(card.querySelector('[data-nif]').value||'').replace(/\D/g,'');fillSupplier(card);});card.querySelector('[data-nif]').addEventListener('blur',()=>fillSupplier(card));fillSupplier(card);card.querySelector('button').onclick=()=>classify(exp.id,card).catch(e=>{card.querySelector('button').disabled=false;card.querySelector('button').textContent='Classificar';document.getElementById('message').textContent=e.message;});list.append(card);});

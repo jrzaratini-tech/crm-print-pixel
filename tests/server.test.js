@@ -189,6 +189,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(menuResult.body, /nav_comissoes/);
   assert.match(suppliersPageResult.body, /supplierForm/);
   assert.match(classifyExpensesPageResult.body, /expenses\/unclassified/);
+  assert.match(classifyExpensesPageResult.body, /pendingCount/);
   assert.match(classifyExpensesPageResult.body, /Classificando/);
   assert.match(classifyExpensesPageResult.body, /dataset\.nif/);
   assert.match(classifyExpensesPageResult.body, /BRICO DEPÔT/);
@@ -665,6 +666,34 @@ test('classificacao por NIF usa cadastro existente e remove item da fila', async
 
   const pending = await request('/api/expenses/unclassified');
   assert.equal(pending.body.expenses.some(item => item.id === expense.body.id), false);
+});
+
+test('despesa vinculada a fornecedor nao volta para a fila mesmo com categoria antiga', async () => {
+  const supplier = await post('/api/suppliers', {
+    name: 'Dimatur Teste',
+    nif: '507333558',
+    category: 'DIMATUR',
+    expenseType: 'material'
+  });
+  assert.equal(supplier.response.status, 200);
+  await db.collection('events').doc('legacy-dimatur-no-return').set({
+    schema: 'despesa',
+    payload: {
+      fornecedor: 'Dimatur Teste',
+      nifFornecedor: '507333558',
+      categoria: 'OUTROS',
+      supplierId: supplier.body.supplier.id,
+      classificationStatus: 'classified',
+      valorTotal: 70
+    },
+    deleted: false,
+    timestamp: new Date().toISOString()
+  });
+
+  const pending = await request('/api/expenses/unclassified');
+  assert.equal(pending.response.status, 200);
+  assert.equal(typeof pending.body.pendingCount, 'number');
+  assert.equal(pending.body.expenses.some(item => item.id === 'legacy-dimatur-no-return'), false);
 });
 
 test('fila de despesas reconcilia pendencias com fornecedores ja cadastrados', async () => {
