@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <script src="../core/security.js"></script>
+    <script src="../core/custeio.js"></script>
+    <script src="../core/materiais-padrao.js"></script>
+    <script src="../core/financeiro.js"></script>
+    <script src="../core/gestao.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calculadora - PrintPixel</title>
+    <style>
+        * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+        body { margin: 0; background: #f8fafc; color: #1e293b; padding: 24px; }
+        .container { max-width: 1500px; margin: auto; }
+        .header { display: flex; justify-content: space-between; gap: 18px; align-items: flex-start; margin-bottom: 22px; }
+        h1 { margin: 0; color: #1a237e; }
+        h2, h3 { margin: 0 0 12px; }
+        .subtitle { color: #64748b; margin: 6px 0 0; line-height: 1.45; }
+        .panel { background: white; border: 1px solid #e2e8f0; border-radius: 14px; padding: 20px; box-shadow: 0 3px 16px rgba(15,23,42,.05); margin-bottom: 20px; }
+        .product-tabs { display: flex; gap: 10px; flex-wrap: wrap; }
+        .tab { border: 1px solid #c7d2fe; color: #1e3a8a; background: #eef2ff; border-radius: 999px; padding: 10px 15px; font-weight: 800; }
+        .tab.active { background: #1a237e; color: white; border-color: #1a237e; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+        label { display: block; color: #475569; font-size: 13px; font-weight: 800; }
+        input, select, textarea { width: 100%; margin-top: 6px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; background: white; }
+        input[type="number"] { text-align: right; }
+        textarea { min-height: 74px; resize: vertical; }
+        .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+        .btn { border: 0; border-radius: 8px; padding: 11px 16px; color: white; cursor: pointer; font-weight: 800; }
+        .btn-primary { background: #2563eb; }
+        .btn-success { background: #059669; }
+        .btn-warning { background: #f59e0b; color: #111827; }
+        .btn-danger { background: #dc2626; }
+        .btn-secondary { background: #64748b; }
+        .btn:hover { filter: brightness(.95); }
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; min-width: 980px; }
+        th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; vertical-align: top; }
+        th { background: #f8fafc; color: #475569; text-transform: uppercase; font-size: 12px; }
+        td input, td select { padding: 8px; font-size: 13px; }
+        .result-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; }
+        .metric { border: 1px solid #dbeafe; background: #eff6ff; border-radius: 12px; padding: 16px; }
+        .metric-label { color: #475569; font-size: 12px; text-transform: uppercase; font-weight: 800; letter-spacing: .04em; }
+        .metric-value { color: #111827; font-size: 24px; font-weight: 900; margin-top: 8px; }
+        .metric-value.good { color: #059669; }
+        .metric-value.warn { color: #f59e0b; }
+        .summary { padding: 14px; border-radius: 12px; background: #fff7ed; border: 1px solid #fed7aa; color: #9a3412; line-height: 1.55; }
+        .empty { text-align: center; color: #64748b; padding: 18px; }
+        .message { margin-top: 12px; font-weight: 800; }
+        .success { color: #059669; } .error { color: #dc2626; } .warning { color: #b45309; }
+        @media (max-width: 760px) {
+            body { padding: 14px; }
+            .header { display: block; }
+            table { min-width: 820px; }
+        }
+    </style>
+</head>
+<body data-page-id="calculadora" data-page-type="WRITE">
+    <main class="container">
+        <div class="header">
+            <div>
+                <h1>Calculadora</h1>
+                <p class="subtitle">Calcule produtos antes do or&ccedil;amento: consumo, horas, componentes, custo total e pre&ccedil;o sugerido com margem m&iacute;nima.</p>
+            </div>
+            <div class="product-tabs">
+                <button type="button" class="tab active">Letras caixa impressas</button>
+            </div>
+        </div>
+
+        <section class="panel">
+            <h2>Letras caixa impressas em PETG</h2>
+            <p class="subtitle">Informe uma ou mais linhas de texto. Use alturas diferentes quando o mesmo letreiro tiver letras grandes, pequenas ou s&iacute;mbolos.</p>
+            <div class="grid" style="margin-top:14px;">
+                <label>Profundidade padr&atilde;o (cm)<input id="petgDepth" type="number" min="0" step="0.1" value="5"></label>
+                <label>Pre&ccedil;o kg PETG (&euro;)<input id="petgKgPrice" type="number" min="0" step="0.01" value="18"></label>
+                <label>Perda PETG (%)<input id="petgWaste" type="number" min="0" step="0.1" value="10"></label>
+                <label>Produ&ccedil;&atilde;o estimada (g/h)<input id="petgGramsHour" type="number" min="1" step="1" value="75"></label>
+                <label>Fator estimativa LED<input id="petgLedFactor" type="number" min="0" step="0.05" value="1.2"></label>
+                <label>LED corrigido manualmente (m)<input id="petgLedManual" type="number" min="0" step="0.01" placeholder="Opcional"></label>
+                <label>Margem m&iacute;nima (%)<input id="marginPercent" type="number" min="1" max="95" step="0.1" value="50"></label>
+            </div>
+
+            <div style="margin-top:16px;">
+                <h3>Textos e alturas</h3>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Texto / letras</th><th>Altura (cm)</th><th>Profundidade (cm)</th><th>A&ccedil;&atilde;o</th></tr></thead>
+                        <tbody id="petgEntriesBody"></tbody>
+                    </table>
+                </div>
+                <div class="actions">
+                    <button type="button" class="btn btn-primary" id="addPetgEntryBtn">+ Adicionar texto / altura</button>
+                    <button type="button" class="btn btn-success" id="calculateBtn">Calcular produto</button>
+                    <button type="button" class="btn btn-warning" id="addEstimatedLedBtn">Adicionar LED estimado</button>
+                </div>
+                <div id="petgResult" class="summary" style="margin-top:14px;">Informe os textos, alturas e materiais para calcular.</div>
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2>Componentes adicionais</h2>
+            <p class="subtitle">Acrescente fonte, barras de alum&iacute;nio, acr&iacute;lico, fios, parafusos, estanho ou qualquer material cadastrado.</p>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>Material</th><th>Caracter&iacute;sticas</th><th>Medidas</th><th>Qtd.</th><th>Perda %</th><th>Consumo</th><th>Custo</th><th>A&ccedil;&atilde;o</th></tr></thead>
+                    <tbody id="materialsBody"></tbody>
+                </table>
+            </div>
+            <div class="actions">
+                <button type="button" class="btn btn-primary" id="addMaterialBtn">+ Novo item</button>
+            </div>
+        </section>
+
+        <section class="panel">
+            <h2>Resultado do produto</h2>
+            <div class="result-grid">
+                <div class="metric">
+                    <div class="metric-label">PETG + m&aacute;quina</div>
+                    <div class="metric-value" id="petgCost">&euro;0,00</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Componentes</div>
+                    <div class="metric-value" id="materialsCost">&euro;0,00</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Custo total</div>
+                    <div class="metric-value warn" id="totalCost">&euro;0,00</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Pre&ccedil;o sugerido</div>
+                    <div class="metric-value good" id="suggestedPrice">&euro;0,00</div>
+                </div>
+            </div>
+            <div id="message" class="message"></div>
+        </section>
+    </main>
+
+    <script>
+        let catalogoMateriais = [];
+        let materialItems = [];
+        let lastPetgResult = null;
+
+        const money = value => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(Number(value) || 0);
+        const number = id => Number.parseFloat(document.getElementById(id).value) || 0;
+
+        function showMessage(text, type = 'success') {
+            const message = document.getElementById('message');
+            message.textContent = text;
+            message.className = `message ${type}`;
+            setTimeout(() => { message.textContent = ''; }, 4200);
+        }
+
+        function resolveMaterial(materialId = '') {
+            if (materialId.startsWith('preset:')) return { id: materialId, ...MATERIAIS_PADRAO.get(materialId.replace('preset:', '')) };
+            return catalogoMateriais.find(entry => entry.id === materialId) || {};
+        }
+
+        function materialOptions(selectedId = '') {
+            const cadastrados = catalogoMateriais.map(material => `<option value="${material.id}" ${selectedId === material.id ? 'selected' : ''}>${material.nome}</option>`).join('');
+            const padroes = MATERIAIS_PADRAO.materiais.map(material => `<option value="preset:${material.key}" ${selectedId === 'preset:' + material.key ? 'selected' : ''}>${material.nome}${material.key === 'outro' ? ' / cadastrar exce&ccedil;&atilde;o' : ''}</option>`).join('');
+            return `<option value="">Selecione</option><optgroup label="Materiais cadastrados">${cadastrados || '<option disabled>Nenhum pre&ccedil;o cadastrado</option>'}</optgroup><optgroup label="Lista padr&atilde;o">${padroes}</optgroup>`;
+        }
+
+        function variantInputs(item, material) {
+            const preset = MATERIAIS_PADRAO.get(material.presetKey || String(material.id || '').replace('preset:', ''));
+            return preset.questions.map(question => {
+                const value = item.variantes && item.variantes[question.key] || question.fixed || '';
+                if (question.fixed) return `<label>${question.label}<input data-variant="${question.key}" value="${question.fixed}" readonly></label>`;
+                if (question.options.length) return `<label>${question.label}<select data-variant="${question.key}"><option value="">Selecione</option>${question.options.map(option => `<option ${option === value ? 'selected' : ''}>${option}</option>`).join('')}</select></label>`;
+                return `<label>${question.label}<input data-variant="${question.key}" value="${value}"></label>`;
+            }).join('');
+        }
+
+        function measureInputs(item, material) {
+            const formula = item.formula || material.formulaPadrao || 'unidade';
+            if (['area', 'placa', 'perimetro', 'densidade_area'].includes(formula)) return `<label>Largura (cm)<input class="item-largura" type="number" min="0" step="0.1" value="${item.larguraCm || 0}"></label><label>Altura (cm)<input class="item-altura" type="number" min="0" step="0.1" value="${item.alturaCm || 0}"></label>`;
+            if (['linear', 'barra'].includes(formula)) return `<label>Comprimento (m)<input class="item-comprimento" type="number" min="0" step="0.01" value="${item.comprimentoM || 0}"></label>`;
+            return '<span style="color:#64748b;">C&aacute;lculo por unidade</span>';
+        }
+
+        function renderPetgEntries(entries = []) {
+            const body = document.getElementById('petgEntriesBody');
+            const normalized = entries.length ? entries : [{ texto: '', alturaCm: 12, profundidadeCm: number('petgDepth') || 5 }];
+            body.innerHTML = normalized.map((entry, index) => `
+                <tr data-index="${index}">
+                    <td><input class="petg-entry-text" value="${entry.texto || ''}" placeholder="Ex: CRISTIANA FABIANA"></td>
+                    <td><input class="petg-entry-height" type="number" min="0" step="0.1" value="${entry.alturaCm || 12}"></td>
+                    <td><input class="petg-entry-depth" type="number" min="0" step="0.1" value="${entry.profundidadeCm || number('petgDepth') || 5}"></td>
+                    <td><button type="button" class="btn btn-danger petg-remove">Remover</button></td>
+                </tr>
+            `).join('');
+            body.querySelectorAll('input').forEach(input => input.addEventListener('input', calculateAll));
+            body.querySelectorAll('.petg-remove').forEach((button, index) => {
+                button.addEventListener('click', () => {
+                    const entries = petgEntriesFromForm();
+                    entries.splice(index, 1);
+                    renderPetgEntries(entries);
+                    calculateAll();
+                });
+            });
+        }
+
+        function petgEntriesFromForm() {
+            return Array.from(document.querySelectorAll('#petgEntriesBody tr')).map(row => ({
+                texto: row.querySelector('.petg-entry-text')?.value || '',
+                alturaCm: Number.parseFloat(row.querySelector('.petg-entry-height')?.value) || 0,
+                profundidadeCm: Number.parseFloat(row.querySelector('.petg-entry-depth')?.value) || number('petgDepth') || 0
+            })).filter(entry => entry.texto || entry.alturaCm || entry.profundidadeCm);
+        }
+
+        function addPetgEntry(entry = {}) {
+            renderPetgEntries([...petgEntriesFromForm(), {
+                texto: entry.texto || '',
+                alturaCm: entry.alturaCm || 12,
+                profundidadeCm: entry.profundidadeCm || number('petgDepth') || 5
+            }]);
+        }
+
+        function addMaterialItem(item = {}) {
+            materialItems.push({
+                materialId: item.materialId || '',
+                formula: item.formula || '',
+                larguraCm: item.larguraCm || 0,
+                alturaCm: item.alturaCm || 0,
+                comprimentoM: item.comprimentoM || 0,
+                quantidade: item.quantidade || 1,
+                perdaPercentual: item.perdaPercentual ?? '',
+                variantes: item.variantes || {}
+            });
+            renderMaterials();
+        }
+
+        function renderMaterials() {
+            const body = document.getElementById('materialsBody');
+            body.innerHTML = materialItems.length ? materialItems.map((item, index) => {
+                const material = resolveMaterial(item.materialId);
+                const calculo = CUSTEIO.calcular(item, material);
+                return `<tr data-index="${index}">
+                    <td><select class="item-material">${materialOptions(item.materialId)}</select></td>
+                    <td><div class="grid">${variantInputs(item, material)}</div></td>
+                    <td><div class="grid">${measureInputs(item, material)}</div></td>
+                    <td><input class="item-quantidade" type="number" min="0" step="0.01" value="${item.quantidade || 1}"></td>
+                    <td><input class="item-perda" type="number" min="0" step="0.1" placeholder="${material.perdaPercentual || 0}" value="${item.perdaPercentual ?? ''}"></td>
+                    <td>${calculo.consumo.toFixed(2)} ${calculo.unidade}</td>
+                    <td>${money(calculo.custo)}</td>
+                    <td><button type="button" class="btn btn-danger item-remove">Remover</button></td>
+                </tr>`;
+            }).join('') : '<tr><td colspan="8" class="empty">Adicione fonte, LED, barras, acr&iacute;lico ou outros componentes.</td></tr>';
+
+            body.querySelectorAll('tr[data-index]').forEach(row => {
+                const index = Number(row.dataset.index);
+                row.querySelectorAll('input, select').forEach(element => element.addEventListener('change', () => updateMaterialItem(index, row)));
+                row.querySelector('.item-remove').addEventListener('click', () => {
+                    materialItems.splice(index, 1);
+                    renderMaterials();
+                    calculateAll();
+                });
+            });
+            calculateAll();
+        }
+
+        function updateMaterialItem(index, row) {
+            const item = materialItems[index];
+            const materialId = row.querySelector('.item-material').value;
+            const previousMaterialId = item.materialId;
+            const material = resolveMaterial(materialId);
+            item.materialId = materialId;
+            item.formula = material.formulaPadrao || 'unidade';
+            item.larguraCm = Number.parseFloat(row.querySelector('.item-largura')?.value) || 0;
+            item.alturaCm = Number.parseFloat(row.querySelector('.item-altura')?.value) || 0;
+            item.comprimentoM = Number.parseFloat(row.querySelector('.item-comprimento')?.value) || 0;
+            item.quantidade = Number.parseFloat(row.querySelector('.item-quantidade').value) || 1;
+            item.perdaPercentual = row.querySelector('.item-perda').value;
+            item.variantes = Object.fromEntries(Array.from(row.querySelectorAll('[data-variant]')).map(element => [element.dataset.variant, element.value]));
+            if (previousMaterialId !== materialId) item.variantes = {};
+            renderMaterials();
+        }
+
+        function calculatePetg() {
+            const result = GESTAO.calcularLetreiroPETG({
+                entradas: petgEntriesFromForm(),
+                profundidadeCm: number('petgDepth'),
+                precoKgFilamento: number('petgKgPrice'),
+                perdaPercentual: number('petgWaste') || 10,
+                gramasPorHora: number('petgGramsHour') || 75,
+                fatorLed: number('petgLedFactor') || 1.2,
+                ledManualM: number('petgLedManual')
+            });
+            lastPetgResult = result;
+            const detalhes = result.partes.map(parte => `${parte.texto || 'Texto'}: ${parte.calculo.gramasTotal} g / ${parte.calculo.horasTotal} h`).join(' | ') || 'Nenhuma entrada identificada';
+            document.getElementById('petgResult').innerHTML = `
+                <strong>PETG:</strong> ${result.gramasTotal} g
+                | <strong>Tempo 3D:</strong> ${result.horasTotal} h
+                | <strong>LED estimado:</strong> ${result.ledFinalM} m
+                <br><strong>Entradas:</strong> ${detalhes}
+                <br><strong>Contorno base:</strong> ${result.contornoTotalM} m | fator LED x${result.fatorLed}
+                ${result.alerta ? `<br><strong>${result.alerta}</strong>` : ''}
+            `;
+            return result;
+        }
+
+        function calculateMaterialsCost() {
+            return materialItems.reduce((total, item) => total + CUSTEIO.calcular(item, resolveMaterial(item.materialId)).custo, 0);
+        }
+
+        function calculateAll() {
+            const petg = calculatePetg();
+            const materialsCost = calculateMaterialsCost();
+            const totalCost = petg.custoTotal + materialsCost;
+            const margem = Math.min(95, Math.max(1, number('marginPercent') || 50));
+            const suggested = totalCost / (1 - margem / 100);
+            document.getElementById('petgCost').textContent = money(petg.custoTotal);
+            document.getElementById('materialsCost').textContent = money(materialsCost);
+            document.getElementById('totalCost').textContent = money(totalCost);
+            document.getElementById('suggestedPrice').textContent = money(suggested);
+            return { petg, materialsCost, totalCost, suggested };
+        }
+
+        function findLedMaterialId() {
+            const cadastrado = catalogoMateriais.find(material => {
+                const nome = String(material.nome || '').toLowerCase();
+                return nome.includes('fita') && nome.includes('led');
+            });
+            if (cadastrado) return cadastrado.id;
+            return 'preset:fita_led_zigzag';
+        }
+
+        function addEstimatedLed() {
+            const petg = calculatePetg();
+            if (!petg.ledFinalM) {
+                showMessage('Informe textos e alturas antes de adicionar LED.', 'warning');
+                return;
+            }
+            addMaterialItem({
+                materialId: findLedMaterialId(),
+                formula: 'linear',
+                comprimentoM: petg.ledFinalM,
+                quantidade: 1,
+                perdaPercentual: 0,
+                variantes: { cor: 'Branco 4000K' }
+            });
+            showMessage(`LED adicionado com ${petg.ledFinalM} m. Pode corrigir a quantidade na tabela.`, 'success');
+        }
+
+        function fillPetgPriceFromCatalog() {
+            const petg = catalogoMateriais.find(material =>
+                material.presetKey === 'filamento_petg'
+                || String(material.nome || '').toLowerCase().includes('petg')
+            );
+            if (petg && Number(petg.precoCusto) > 0) {
+                document.getElementById('petgKgPrice').value = Number(petg.precoCusto).toFixed(2);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            try {
+                const response = await fetch('/api/database/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ schema: 'material', limit: 500 })
+                });
+                const data = await response.json();
+                catalogoMateriais = (data.events || []).map(event => ({ id: event.id, ...event.payload })).filter(material => material.ativo !== false);
+                fillPetgPriceFromCatalog();
+            } catch (error) {
+                console.warn('Catalogo de materiais nao disponivel:', error);
+            }
+
+            renderPetgEntries();
+            renderMaterials();
+            document.getElementById('addPetgEntryBtn').addEventListener('click', () => addPetgEntry());
+            document.getElementById('addMaterialBtn').addEventListener('click', () => addMaterialItem());
+            document.getElementById('calculateBtn').addEventListener('click', () => {
+                calculateAll();
+                showMessage('Produto calculado com sucesso.', 'success');
+            });
+            document.getElementById('addEstimatedLedBtn').addEventListener('click', addEstimatedLed);
+            ['petgDepth', 'petgKgPrice', 'petgWaste', 'petgGramsHour', 'petgLedFactor', 'petgLedManual', 'marginPercent'].forEach(id => {
+                document.getElementById(id).addEventListener('input', calculateAll);
+            });
+            calculateAll();
+        });
+    </script>
+</body>
+</html>

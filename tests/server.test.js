@@ -65,9 +65,11 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   const financialResult = await request('/core/financeiro.js');
   const fiscalQrResult = await request('/core/qr-fiscal.js');
   const managementModuleResult = await request('/core/gestao.js');
+  const menuResult = await request('/menu/menu.config.js');
   const pageResult = await request('/pages/materiais.html');
   const orderFormPageResult = await request('/pages/novopedido.html');
   const orderBudgetPageResult = await request('/pages/novoorcamento.html');
+  const calculatorPageResult = await request('/pages/calculadora.html');
   const ordersPageResult = await request('/pages/pedidos.html');
   const dashboardPageResult = await request('/pages/dashboard.html');
   const scanPageResult = await request('/scan-fatura.html');
@@ -84,9 +86,11 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.equal(financialResult.response.status, 200);
   assert.equal(fiscalQrResult.response.status, 200);
   assert.equal(managementModuleResult.response.status, 200);
+  assert.equal(menuResult.response.status, 200);
   assert.equal(pageResult.response.status, 200);
   assert.equal(orderFormPageResult.response.status, 200);
   assert.equal(orderBudgetPageResult.response.status, 200);
+  assert.equal(calculatorPageResult.response.status, 200);
   assert.equal(ordersPageResult.response.status, 200);
   assert.equal(dashboardPageResult.response.status, 200);
   assert.equal(scanPageResult.response.status, 200);
@@ -103,6 +107,8 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(financialResult.body, /faturamentoSemIva/);
   assert.match(fiscalQrResult.body, /interpretar/);
   assert.match(managementModuleResult.body, /painelGestao/);
+  assert.match(menuResult.body, /nav_calculadora/);
+  assert.match(menuResult.body, /pages\/calculadora\.html/);
   assert.match(pageResult.body, /Cadastro de Materiais/);
   assert.match(orderFormPageResult.body, /delivery-btn/);
   assert.match(orderFormPageResult.body, /product-delivered/);
@@ -111,10 +117,11 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(orderFormPageResult.body, /window\.addEventListener\('coreCommitSuccess'/);
   assert.match(orderFormPageResult.body, /setAttribute\('data-original-text', 'ATUALIZAR PEDIDO'\)/);
   assert.match(orderBudgetPageResult.body, /Letra Caixa PETG 3D/);
-  assert.match(orderBudgetPageResult.body, /Textos e alturas do mesmo trabalho/);
-  assert.match(orderBudgetPageResult.body, /applyEstimatedLedBtn/);
-  assert.match(orderBudgetPageResult.body, /Apontamento real apos impressao/);
-  assert.match(orderBudgetPageResult.body, /petgRealGrams/);
+  assert.doesNotMatch(orderBudgetPageResult.body, /Textos e alturas do mesmo trabalho/);
+  assert.match(calculatorPageResult.body, /Letras caixa impressas/);
+  assert.match(calculatorPageResult.body, /Componentes adicionais/);
+  assert.match(calculatorPageResult.body, /addEstimatedLedBtn/);
+  assert.match(calculatorPageResult.body, /Pre&ccedil;o sugerido/);
   assert.match(ordersPageResult.body, /produto-modal-entregue/);
   assert.match(ordersPageResult.body, /entrega-badge/);
   assert.doesNotMatch(dashboardPageResult.body, /Gest&atilde;o Profissional/);

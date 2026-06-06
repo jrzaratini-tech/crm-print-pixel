@@ -292,12 +292,6 @@
         .technical-table .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; min-width: 190px; }
         .technical-table label { font-size: 11px; margin: 0; }
         .technical-total { display: flex; justify-content: flex-end; gap: 15px; align-items: center; margin-top: 16px; font-weight: 700; }
-        .petg-calculator { border: 1px solid #fed7aa; background: #fff7ed; border-radius: 10px; padding: 14px; margin: 14px 0; }
-        .petg-calculator h3 { color: #c2410c; margin-bottom: 8px; }
-        .petg-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-        .petg-grid label { font-size: 12px; color: #475569; font-weight: 700; }
-        .petg-grid input { width: 100%; margin-top: 5px; padding: 9px; border: 1px solid #fdba74; border-radius: 6px; }
-        .petg-result { margin-top: 10px; color: #7c2d12; font-size: 13px; line-height: 1.5; }
         
         .iva-option-section {
             margin-top: 30px;
@@ -713,43 +707,6 @@
                 </div>
                 <button type="button" class="btn btn-secondary" id="closeTechnicalBtn">Fechar</button>
             </div>
-            <div class="petg-calculator">
-                <h3>Letreiro PETG / Impressao 3D</h3>
-                <p style="color:#9a3412; margin-bottom:10px;">Base: ELEGOO Neptune 4 Max com perfil Extra Draft 0.28: parede 0,8 mm, linha 0,42 mm, camada 0,28 mm e preenchimento 90%. Pe&ccedil;as maiores podem ser impressas em partes.</p>
-                <div class="petg-grid">
-                    <label>Profundidade / espessura (cm)<input id="petgDepth" type="number" min="0.5" step="0.1" value="5"></label>
-                    <label>Preco kg PETG (EUR)<input id="petgKgPrice" type="number" min="0" step="0.01" value="18"></label>
-                    <label>Perda (%)<input id="petgWaste" type="number" min="0" step="0.1" value="10"></label>
-                    <label>Producao estimada (g/h)<input id="petgGramsHour" type="number" min="1" step="1" value="75"></label>
-                    <label>Fator estimativa LED<input id="petgLedFactor" type="number" min="0" step="0.05" value="1.2"></label>
-                    <label>LED corrigido manualmente (m)<input id="petgLedManual" type="number" min="0" step="0.01" placeholder="Opcional"></label>
-                </div>
-                <div style="margin-top:14px;">
-                    <strong style="display:block; margin-bottom:8px;">Textos e alturas do mesmo trabalho</strong>
-                    <div class="technical-table-wrap">
-                        <table class="technical-table">
-                            <thead><tr><th>Texto / letras</th><th>Altura (cm)</th><th>Profundidade (cm)</th><th></th></tr></thead>
-                            <tbody id="petgEntriesBody"></tbody>
-                        </table>
-                    </div>
-                    <button type="button" class="materials-btn" id="addPetgEntryBtn">Adicionar texto / altura</button>
-                </div>
-                <div style="margin-top:14px; padding:12px; border:1px solid #fed7aa; border-radius:12px; background:#fff7ed;">
-                    <strong style="display:block; margin-bottom:8px;">Apontamento real apos impressao</strong>
-                    <div class="petg-grid">
-                        <label>Consumo real (g)<input id="petgRealGrams" type="number" min="0" step="0.1" placeholder="Ex: 485"></label>
-                        <label>Tempo real (h)<input id="petgRealHours" type="number" min="0" step="0.01" placeholder="Ex: 6.5"></label>
-                        <label>Observacao real<input id="petgRealNotes" placeholder="Ex: impresso em 2 partes"></label>
-                    </div>
-                    <small style="color:#9a3412;">Estes dados ficam guardados no produto para comparar previsto x realizado e refinar a estimativa com o historico.</small>
-                </div>
-                <div style="margin-top:10px; display:flex; gap:10px; flex-wrap:wrap;">
-                    <button type="button" class="materials-btn" id="calculatePetgBtn">Calcular letras PETG</button>
-                    <button type="button" class="materials-btn" id="applyPetgBtn">Aplicar custo PETG ao produto</button>
-                    <button type="button" class="materials-btn" id="applyEstimatedLedBtn">Adicionar LED estimado aos materiais</button>
-                </div>
-                <div class="petg-result" id="petgResult">Informe a palavra, altura e profundidade para calcular.</div>
-            </div>
             <div class="technical-table-wrap">
                 <table class="technical-table">
                     <thead><tr><th>O que será usado?</th><th>Características</th><th>Medidas para cálculo</th><th>Qtd.</th><th>Perda %</th><th>Consumo</th><th>Custo</th><th></th></tr></thead>
@@ -796,7 +753,6 @@
         let currentOrcamentoId = '';
         let margemMinimaOrcamento = 50;
         let catalogoMateriais = [];
-        let historicoPetgReal = [];
         let technicalProductRow = null;
         
         // Referências DOM
@@ -808,18 +764,10 @@
         const closeTechnicalBtn = document.getElementById('closeTechnicalBtn');
         const addMaterialBtn = document.getElementById('addMaterialBtn');
         const applyTechnicalBtn = document.getElementById('applyTechnicalBtn');
-        const addPetgEntryBtn = document.getElementById('addPetgEntryBtn');
-        const calculatePetgBtn = document.getElementById('calculatePetgBtn');
-        const applyPetgBtn = document.getElementById('applyPetgBtn');
-        const applyEstimatedLedBtn = document.getElementById('applyEstimatedLedBtn');
 
         closeTechnicalBtn.addEventListener('click', fecharFichaTecnica);
         addMaterialBtn.addEventListener('click', () => addTechnicalRow());
         applyTechnicalBtn.addEventListener('click', aplicarFichaTecnica);
-        addPetgEntryBtn.addEventListener('click', () => addPetgEntry());
-        calculatePetgBtn.addEventListener('click', calcularPetgTecnico);
-        applyPetgBtn.addEventListener('click', aplicarPetgAoProduto);
-        applyEstimatedLedBtn.addEventListener('click', aplicarLedEstimadoAoMateriais);
         
         // ============================================
         // FUNÇÕES ESPECÍFICAS PARA ORÇAMENTO
@@ -1125,7 +1073,6 @@
             
             productsTableBody.appendChild(row);
             row._materiais = productData && Array.isArray(productData.materiais) ? productData.materiais : [];
-            row._petg3d = productData && productData.petg3d ? productData.petg3d : null;
             
             // Adicionar event listeners
             const removeBtn = row.querySelector('.remove-btn');
@@ -1173,8 +1120,6 @@
 
         function abrirFichaTecnica(row) {
             technicalProductRow = row;
-            preencherPrecoPetgPadrao();
-            preencherPetgDaLinha(row);
             renderTechnicalRows();
             document.getElementById('technicalModal').classList.add('active');
         }
@@ -1257,193 +1202,11 @@
             return { detalhes, custoTotal: detalhes.reduce((total, detalhe) => total + detalhe.calculo.custo, 0) };
         }
 
-        function preencherPrecoPetgPadrao() {
-            const petg = catalogoMateriais.find(material =>
-                material.presetKey === 'filamento_petg'
-                || String(material.nome || '').toLowerCase().includes('petg')
-            );
-            if (petg && Number(petg.precoCusto) > 0) {
-                document.getElementById('petgKgPrice').value = Number(petg.precoCusto).toFixed(2);
-            }
-        }
-
-        function preencherPetgDaLinha(row) {
-            const petg = row._petg3d || {};
-            document.getElementById('petgDepth').value = petg.profundidadeCm || 5;
-            document.getElementById('petgWaste').value = petg.perdaPercentual ?? 10;
-            document.getElementById('petgGramsHour').value = petg.gramasPorHora || 75;
-            document.getElementById('petgLedFactor').value = petg.fatorLed || 1.2;
-            document.getElementById('petgLedManual').value = petg.ledManualM || '';
-            document.getElementById('petgRealGrams').value = petg.real?.gramasReais || '';
-            document.getElementById('petgRealHours').value = petg.real?.horasReais || '';
-            document.getElementById('petgRealNotes').value = petg.real?.observacoes || '';
-            if (petg.precoKgFilamento) document.getElementById('petgKgPrice').value = petg.precoKgFilamento;
-            renderPetgEntries(petg.entradas || (petg.palavra ? [{
-                texto: petg.palavra,
-                alturaCm: petg.alturaCm || 30,
-                profundidadeCm: petg.profundidadeCm || 5
-            }] : []));
-            document.getElementById('petgResult').textContent = petg.custoTotal
-                ? `PETG calculado: ${formatarMoeda(petg.custoTotal)} | ${petg.gramasTotal} g | ${petg.horasTotal} h`
-                : 'Informe a palavra, altura e profundidade para calcular.';
-        }
-
-        function petgEntriesFromForm() {
-            return Array.from(document.querySelectorAll('#petgEntriesBody tr')).map(row => ({
-                texto: row.querySelector('.petg-entry-text')?.value || '',
-                alturaCm: parseFloat(row.querySelector('.petg-entry-height')?.value) || 0,
-                profundidadeCm: parseFloat(row.querySelector('.petg-entry-depth')?.value) || parseFloat(document.getElementById('petgDepth').value) || 0
-            })).filter(entry => entry.texto || entry.alturaCm || entry.profundidadeCm);
-        }
-
-        function renderPetgEntries(entries = []) {
-            const body = document.getElementById('petgEntriesBody');
-            const normalized = entries.length ? entries : [{ texto: '', alturaCm: 30, profundidadeCm: parseFloat(document.getElementById('petgDepth').value) || 5 }];
-            body.innerHTML = normalized.map((entry, index) => `
-                <tr data-index="${index}">
-                    <td><input class="petg-entry-text" value="${entry.texto || entry.palavra || ''}" placeholder="Ex: CRISTIANA FABIANA"></td>
-                    <td><input class="petg-entry-height" type="number" min="0" step="0.1" value="${entry.alturaCm || 30}"></td>
-                    <td><input class="petg-entry-depth" type="number" min="0" step="0.1" value="${entry.profundidadeCm || document.getElementById('petgDepth').value || 5}"></td>
-                    <td><button type="button" class="remove-btn petg-entry-remove">X</button></td>
-                </tr>
-            `).join('');
-            body.querySelectorAll('.petg-entry-remove').forEach((button, index) => {
-                button.addEventListener('click', () => {
-                    const entries = petgEntriesFromForm();
-                    entries.splice(index, 1);
-                    renderPetgEntries(entries);
-                });
-            });
-        }
-
-        function addPetgEntry(entry = {}) {
-            renderPetgEntries([...petgEntriesFromForm(), {
-                texto: entry.texto || '',
-                alturaCm: entry.alturaCm || 30,
-                profundidadeCm: entry.profundidadeCm || parseFloat(document.getElementById('petgDepth').value) || 5
-            }]);
-        }
-
-        function petgConfigFromForm() {
-            return {
-                entradas: petgEntriesFromForm(),
-                profundidadeCm: parseFloat(document.getElementById('petgDepth').value) || 0,
-                precoKgFilamento: parseFloat(document.getElementById('petgKgPrice').value) || 0,
-                perdaPercentual: parseFloat(document.getElementById('petgWaste').value) || 10,
-                gramasPorHora: parseFloat(document.getElementById('petgGramsHour').value) || 75,
-                fatorLed: parseFloat(document.getElementById('petgLedFactor').value) || 1.2,
-                ledManualM: parseFloat(document.getElementById('petgLedManual').value) || 0,
-                historicoReal: historicoPetgReal
-            };
-        }
-
-        function petgRealFromForm() {
-            const gramasReais = parseFloat(document.getElementById('petgRealGrams').value) || 0;
-            const horasReais = parseFloat(document.getElementById('petgRealHours').value) || 0;
-            const observacoes = document.getElementById('petgRealNotes').value.trim();
-            if (!gramasReais && !horasReais && !observacoes) return null;
-            return {
-                gramasReais,
-                horasReais,
-                observacoes,
-                registradoEm: new Date().toISOString()
-            };
-        }
-
-        function calcularPetgTecnico() {
-            const config = petgConfigFromForm();
-            const result = GESTAO.calcularLetreiroPETG(config);
-            const detalhes = result.partes.map(parte => `${parte.texto || 'Texto'}: ${parte.calculo.gramasTotal} g / ${parte.calculo.horasTotal} h`).join(' | ') || 'Nenhuma entrada identificada';
-            const real = petgRealFromForm();
-            const comparativo = real
-                ? `<br><strong>Real:</strong> ${real.gramasReais || 0} g | ${real.horasReais || 0} h`
-                : '';
-            const aprendizado = result.partes[0]?.calculo?.aprendizado?.amostras
-                ? `<br><strong>Aprendizado:</strong> ${result.partes[0].calculo.aprendizado.amostras} apontamentos | material x${result.partes[0].calculo.aprendizado.fatorMaterial} | tempo x${result.partes[0].calculo.aprendizado.fatorTempo}`
-                : '';
-            document.getElementById('petgResult').innerHTML = `
-                <strong>Custo PETG:</strong> ${formatarMoeda(result.custoTotal)}
-                | <strong>Filamento:</strong> ${result.gramasTotal} g
-                | <strong>Tempo:</strong> ${result.horasTotal} h
-                | <strong>LED estimado:</strong> ${result.ledFinalM} m
-                <br><strong>Entradas:</strong> ${detalhes}
-                <br><strong>Contorno base:</strong> ${result.contornoTotalM} m | fator LED x${result.fatorLed}
-                ${comparativo}
-                ${aprendizado}
-                ${result.alerta ? `<br><strong style="color:#dc2626">${result.alerta}</strong>` : ''}
-            `;
-            return { ...result, perdaPercentual: config.perdaPercentual, real, ledManualM: config.ledManualM || 0 };
-        }
-
-        function extrairHistoricoPetgReal(eventos = []) {
-            const apontamentos = [];
-            eventos.forEach(evento => {
-                const payload = evento.payload || {};
-                const produtos = Array.isArray(payload.produtos) ? payload.produtos : Object.values(payload.produtos || {});
-                produtos.forEach(produto => {
-                    const petg = produto.petg3d || {};
-                    if (!petg.real) return;
-                    apontamentos.push({
-                        gramasEstimadas: petg.gramasBaseTotal || petg.partes?.reduce((total, parte) => total + (parte.calculo?.gramasBaseTotal || parte.calculo?.gramasTotal || 0), 0) || petg.gramasTotal,
-                        gramasReais: petg.real.gramasReais,
-                        horasEstimadas: petg.horasBaseTotal || petg.partes?.reduce((total, parte) => total + (parte.calculo?.horasBaseTotal || parte.calculo?.horasTotal || 0), 0) || petg.horasTotal,
-                        horasReais: petg.real.horasReais
-                    });
-                });
-            });
-            return apontamentos.slice(-30);
-        }
-
-        function aplicarPetgAoProduto() {
-            if (!technicalProductRow) return;
-            const result = calcularPetgTecnico();
-            technicalProductRow._petg3d = result;
-            technicalProductRow.querySelector('.custo-input').value = result.custoTotal.toFixed(2);
-            technicalProductRow.querySelector('.materials-summary').textContent = `PETG 3D | ${result.gramasTotal} g | LED ${result.ledFinalM} m | ${formatarMoeda(result.custoTotal)}`;
-            const select = technicalProductRow.querySelector('.product-select');
-            if (select && !select.value) select.value = 'Letra Caixa PETG 3D';
-            calculateTotals();
-        }
-
-        function findLedMaterialId() {
-            const cadastrado = catalogoMateriais.find(material => {
-                const nome = String(material.nome || '').toLowerCase();
-                return nome.includes('fita') && nome.includes('led');
-            });
-            if (cadastrado) return cadastrado.id;
-            return 'preset:fita_led_zigzag';
-        }
-
-        function aplicarLedEstimadoAoMateriais() {
-            if (!technicalProductRow) return;
-            const result = calcularPetgTecnico();
-            if (!result.ledFinalM) {
-                mostrarMensagem('Calcule o letreiro antes de aplicar o LED estimado.', 'warning');
-                return;
-            }
-            const materialId = findLedMaterialId();
-            technicalProductRow._materiais.push({
-                materialId,
-                formula: 'linear',
-                comprimentoM: result.ledFinalM,
-                quantidade: 1,
-                perdaPercentual: 0,
-                variantes: { cor: 'Branco 4000K' },
-                origem: 'estimativa_petg_led'
-            });
-            technicalProductRow._petg3d = result;
-            renderTechnicalRows();
-            mostrarMensagem(`LED estimado adicionado: ${result.ledFinalM} m. Pode corrigir a quantidade na tabela.`, 'success');
-        }
-
         function aplicarFichaTecnica() {
             if (!technicalProductRow) return;
             const ficha = calcularFichaOrcamento(technicalProductRow._materiais);
-            const petgCost = parseFloat(technicalProductRow._petg3d?.custoTotal || 0);
-            const custoTotal = ficha.custoTotal + petgCost;
-            technicalProductRow.querySelector('.custo-input').value = custoTotal.toFixed(2);
-            const petgLabel = petgCost > 0 ? ` + PETG ${formatarMoeda(petgCost)}` : '';
-            technicalProductRow.querySelector('.materials-summary').textContent = `${technicalProductRow._materiais.length} itens${petgLabel} | ${formatarMoeda(custoTotal)}`;
+            technicalProductRow.querySelector('.custo-input').value = ficha.custoTotal.toFixed(2);
+            technicalProductRow.querySelector('.materials-summary').textContent = `${technicalProductRow._materiais.length} itens | ${formatarMoeda(ficha.custoTotal)}`;
             calculateTotals();
             fecharFichaTecnica();
         }
@@ -1617,7 +1380,6 @@
                         valor: valor,
                         custo: custo,
                         materiais: Array.isArray(row._materiais) ? row._materiais : [],
-                        petg3d: row._petg3d || null,
                         observacoes: observacoes
                     });
                 }
@@ -1641,18 +1403,6 @@
                 catalogoMateriais = (materialsData.events || []).map(event => ({ id: event.id, ...event.payload })).filter(material => material.ativo !== false);
             } catch (error) {
                 console.warn('Catálogo de materiais não disponível:', error);
-            }
-
-            try {
-                const petgHistoryResponse = await fetch('/api/database/query', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ schema: 'orcamento', limit: 500 })
-                });
-                const petgHistoryData = await petgHistoryResponse.json();
-                historicoPetgReal = extrairHistoricoPetgReal(petgHistoryData.events || []);
-            } catch (error) {
-                console.warn('Historico PETG nao disponivel:', error);
             }
 
             try {

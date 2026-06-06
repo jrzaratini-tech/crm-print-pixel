@@ -60,6 +60,16 @@
     },
 
     {
+        id: "nav_calculadora",
+        name: "Calculadora",
+        file: "pages/calculadora.html",
+        type: "WRITE",
+        pos: 6.5,
+        hidden: false,
+        deleted: false
+    },
+
+    {
         id: "nav_orcamentos",
         name: "Orçamentos",
         file: "pages/orcamentos.html",
