@@ -111,6 +111,8 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(orderFormPageResult.body, /window\.addEventListener\('coreCommitSuccess'/);
   assert.match(orderFormPageResult.body, /setAttribute\('data-original-text', 'ATUALIZAR PEDIDO'\)/);
   assert.match(orderBudgetPageResult.body, /Letra Caixa PETG 3D/);
+  assert.match(orderBudgetPageResult.body, /Textos e alturas do mesmo trabalho/);
+  assert.match(orderBudgetPageResult.body, /applyEstimatedLedBtn/);
   assert.match(orderBudgetPageResult.body, /Apontamento real apos impressao/);
   assert.match(orderBudgetPageResult.body, /petgRealGrams/);
   assert.match(ordersPageResult.body, /produto-modal-entregue/);

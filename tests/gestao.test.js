@@ -117,6 +117,36 @@ test('ajusta PETG com apontamentos reais anteriores', () => {
   assert.ok(learned.horasTotal > base.horasTotal);
 });
 
+test('calcula letreiro PETG com multiplas alturas e LED estimado', () => {
+  const result = GESTAO.calcularLetreiroPETG({
+    entradas: [
+      { texto: 'CRISTIANA FABIANA', alturaCm: 12, profundidadeCm: 5 },
+      { texto: 'MAKEUP HAIRSTYLIST', alturaCm: 5, profundidadeCm: 5 }
+    ],
+    precoKgFilamento: 18,
+    gramasPorHora: 75,
+    fatorLed: 1.2
+  });
+
+  assert.equal(result.partes.length, 2);
+  assert.ok(result.gramasTotal > 0);
+  assert.ok(result.horasTotal > 0);
+  assert.ok(result.contornoTotalM > 0);
+  assert.ok(result.ledEstimadoM > result.contornoTotalM);
+  assert.equal(result.ledFinalM, result.ledEstimadoM);
+});
+
+test('permite corrigir manualmente a metragem de LED no letreiro PETG', () => {
+  const result = GESTAO.calcularLetreiroPETG({
+    entradas: [{ texto: 'AMOR', alturaCm: 30, profundidadeCm: 5 }],
+    precoKgFilamento: 18,
+    ledManualM: 15
+  });
+
+  assert.equal(result.ledFinalM, 15);
+  assert.notEqual(result.ledEstimadoM, result.ledFinalM);
+});
+
 test('conta letras da palavra removendo acentos e espacos', () => {
   assert.deepEqual(GESTAO.lettersFromWord('AMOR'), [
     { letter: 'A', quantidade: 1 },

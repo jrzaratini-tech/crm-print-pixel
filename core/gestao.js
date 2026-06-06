@@ -204,6 +204,81 @@
         };
     }
 
+    function calcularLetreiroPETG(config = {}) {
+        const entradas = Array.isArray(config.entradas) && config.entradas.length
+            ? config.entradas
+            : [{
+                palavra: config.palavra,
+                alturaCm: config.alturaCm,
+                profundidadeCm: config.profundidadeCm || config.espessuraCm
+            }];
+        const precoKgFilamento = config.precoKgFilamento || config.precoKg || 0;
+        const perdaPercentual = config.perdaPercentual ?? 10;
+        const gramasPorHora = config.gramasPorHora || NEPTUNE_4_MAX.gramasPorHora;
+        const historicoReal = config.historicoReal || [];
+        const partes = entradas
+            .map((entrada, index) => {
+                const calculo = calcularLetraCaixaPETG({
+                    ...config,
+                    palavra: entrada.palavra || entrada.texto || '',
+                    letras: entrada.letras,
+                    alturaCm: entrada.alturaCm,
+                    profundidadeCm: entrada.profundidadeCm || entrada.espessuraCm || config.profundidadeCm,
+                    precoKgFilamento,
+                    perdaPercentual,
+                    gramasPorHora,
+                    historicoReal
+                });
+                return {
+                    id: entrada.id || `entrada_${index + 1}`,
+                    texto: entrada.palavra || entrada.texto || '',
+                    alturaCm: calculo.alturaCm,
+                    profundidadeCm: calculo.profundidadeCm,
+                    calculo
+                };
+            })
+            .filter(parte => parte.texto || parte.calculo.detalhes.length);
+        const gramasTotal = partes.reduce((total, parte) => total + parte.calculo.gramasTotal, 0);
+        const horasTotal = partes.reduce((total, parte) => total + parte.calculo.horasTotal, 0);
+        const custoFilamento = partes.reduce((total, parte) => total + parte.calculo.custoFilamento, 0);
+        const custoMaquina = partes.reduce((total, parte) => total + parte.calculo.custoMaquina, 0);
+        const custoEnergia = partes.reduce((total, parte) => total + parte.calculo.custoEnergia, 0);
+        const contornoTotalM = partes.reduce((total, parte) => {
+            return total + parte.calculo.detalhes.reduce((soma, detalhe) => soma + ((detalhe.contornoCm * detalhe.quantidade) / 100), 0);
+        }, 0);
+        const fatorLed = Math.max(0, numero(config.fatorLed ?? 1.2));
+        const ledEstimadoM = Math.round(contornoTotalM * fatorLed * 100) / 100;
+        const ledManualM = numero(config.ledManualM);
+        const ledFinalM = ledManualM > 0 ? ledManualM : ledEstimadoM;
+
+        return {
+            tipo: 'letreiro_petg_led',
+            partes,
+            entradas: partes.map(parte => ({
+                id: parte.id,
+                texto: parte.texto,
+                alturaCm: parte.alturaCm,
+                profundidadeCm: parte.profundidadeCm,
+                gramas: parte.calculo.gramasTotal,
+                horas: parte.calculo.horasTotal
+            })),
+            gramasTotal: Math.round(gramasTotal * 100) / 100,
+            horasTotal: Math.round(horasTotal * 100) / 100,
+            custoFilamento: dinheiro(custoFilamento),
+            custoMaquina: dinheiro(custoMaquina),
+            custoEnergia: dinheiro(custoEnergia),
+            custoTotal: dinheiro(custoFilamento + custoMaquina + custoEnergia),
+            contornoTotalM: Math.round(contornoTotalM * 100) / 100,
+            fatorLed,
+            ledEstimadoM,
+            ledFinalM,
+            segmentacaoRecomendada: partes.some(parte => parte.calculo.segmentacaoRecomendada),
+            alerta: partes.some(parte => parte.calculo.segmentacaoRecomendada)
+                ? 'Uma ou mais partes podem precisar de impressao segmentada.'
+                : ''
+        };
+    }
+
     function materialMap(materiais = []) {
         return new Map(materiais.map(material => [material.id || material.key, material]));
     }
@@ -415,6 +490,7 @@
         numero,
         lettersFromWord,
         calcularLetraCaixaPETG,
+        calcularLetreiroPETG,
         calcularFichaProduto,
         resumoOrcamentoProfissional,
         roteiroPadraoProduto,
