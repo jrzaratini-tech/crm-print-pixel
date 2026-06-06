@@ -1434,6 +1434,9 @@
                             <button class="action-btn view" title="Ver detalhes" data-id="${pedido.id}">
                                 <i class="fas fa-eye"></i>
                             </button>
+                            <button class="action-btn delete" title="Excluir pedido definitivamente" data-id="${pedido.id}">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
                         </div>
                     </div>
                     
@@ -1511,10 +1514,12 @@
                 // Adicionar event listeners
                 const editBtn = card.querySelector('.action-btn.edit');
                 const viewBtn = card.querySelector('.action-btn.view');
+                const deleteBtn = card.querySelector('.action-btn.delete');
                 const statusSelect = card.querySelector('.status-select');
                 
                 editBtn.addEventListener('click', () => editarPedido(pedido.id));
                 viewBtn.addEventListener('click', () => abrirModalDetalhes(pedido));
+                deleteBtn.addEventListener('click', () => excluirPedido(pedido.id, pedido.numero || pedido.cliente || 'este pedido'));
                 statusSelect.addEventListener('change', (e) => atualizarStatusPedido(pedido.id, e.target.value, card));
                 
                 return card;
@@ -1945,6 +1950,31 @@
             // FUNÇÕES AUXILIARES
             // ============================================
             
+            async function excluirPedido(pedidoId, referencia = 'este pedido') {
+                const confirmar = confirm(`Excluir definitivamente ${referencia}?\n\nEsta ação remove o pedido do banco de dados e não pode ser desfeita.`);
+                if (!confirmar) return;
+
+                try {
+                    const response = await fetch('/api/database/delete', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ id: pedidoId, hardDelete: true })
+                    });
+
+                    if (!response.ok) {
+                        const result = await response.json().catch(() => ({}));
+                        throw new Error(result.error || 'Erro ao excluir pedido');
+                    }
+
+                    todosPedidos = todosPedidos.filter(pedido => pedido.id !== pedidoId);
+                    aplicarFiltrosEBusca();
+                    alert('Pedido excluído definitivamente.');
+                } catch (error) {
+                    console.error('Erro ao excluir pedido:', error);
+                    alert('Não foi possível excluir o pedido. Tente novamente.');
+                }
+            }
+
             function mostrarErro(mensagem) {
                 console.error('❌ Erro:', mensagem);
                 loadingState.innerHTML = `

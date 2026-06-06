@@ -67,6 +67,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   const managementModuleResult = await request('/core/gestao.js');
   const menuResult = await request('/menu/menu.config.js');
   const pageResult = await request('/pages/materiais.html');
+  const expensesPageResult = await request('/pages/despesas.html');
   const orderFormPageResult = await request('/pages/novopedido.html');
   const orderBudgetPageResult = await request('/pages/novoorcamento.html');
   const calculatorPageResult = await request('/pages/calculadora.html');
@@ -88,6 +89,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.equal(managementModuleResult.response.status, 200);
   assert.equal(menuResult.response.status, 200);
   assert.equal(pageResult.response.status, 200);
+  assert.equal(expensesPageResult.response.status, 200);
   assert.equal(orderFormPageResult.response.status, 200);
   assert.equal(orderBudgetPageResult.response.status, 200);
   assert.equal(calculatorPageResult.response.status, 200);
@@ -116,6 +118,10 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(orderFormPageResult.body, /window\.location\.href = 'pedidos\.html'/);
   assert.match(orderFormPageResult.body, /window\.addEventListener\('coreCommitSuccess'/);
   assert.match(orderFormPageResult.body, /setAttribute\('data-original-text', 'ATUALIZAR PEDIDO'\)/);
+  assert.match(ordersPageResult.body, /excluirPedido/);
+  assert.match(ordersPageResult.body, /hardDelete: true/);
+  assert.match(expensesPageResult.body, /excluirDespesa/);
+  assert.match(expensesPageResult.body, /hardDelete: true/);
   assert.match(orderBudgetPageResult.body, /Letra Caixa PETG 3D/);
   assert.doesNotMatch(orderBudgetPageResult.body, /Textos e alturas do mesmo trabalho/);
   assert.match(calculatorPageResult.body, /Letras caixa impressas/);
@@ -505,6 +511,34 @@ test('salva, consulta com filtro por id e exclui registro', async () => {
 
   const afterDelete = await post('/api/database/query', { schema: 'pedido', filters: { id: saved.body.id } });
   assert.equal(afterDelete.body.count, 0);
+});
+
+test('exclui definitivamente pedido e despesa do banco', async () => {
+  const pedido = await post('/api/database/commit', { schema: 'pedido', payload: { cliente: 'Excluir Pedido', total: 321 }, pageId: 'test' });
+  const despesa = await post('/api/database/commit', { schema: 'despesa', payload: { fornecedor: 'Excluir Despesa', valorTotal: 45 }, pageId: 'test' });
+  await db.collection('production_assignments').doc(`${pedido.body.id}__item_0`).set({ orderId: pedido.body.id, productId: 'item_0', active: true });
+  await db.collection('production_messages').doc(`msg-${pedido.body.id}`).set({ orderId: pedido.body.id, message: 'Teste' });
+  await db.collection('events').doc(`stock-${pedido.body.id}`).set({ schema: 'estoque_movimento', payload: { orderId: pedido.body.id, quantidade: -1 }, deleted: false });
+
+  const deletedPedido = await post('/api/database/delete', { id: pedido.body.id, hardDelete: true });
+  const deletedDespesa = await post('/api/database/delete', { id: despesa.body.id, hardDelete: true });
+
+  assert.equal(deletedPedido.response.status, 200);
+  assert.equal(deletedPedido.body.hardDelete, true);
+  assert.equal(deletedPedido.body.artifactsDeleted, 3);
+  assert.equal(deletedDespesa.response.status, 200);
+  assert.equal(deletedDespesa.body.hardDelete, true);
+
+  const pedidos = await post('/api/database/query', { schema: 'pedido', filters: { id: pedido.body.id } });
+  const despesas = await post('/api/database/query', { schema: 'despesa', filters: { id: despesa.body.id } });
+  const assignment = await db.collection('production_assignments').doc(`${pedido.body.id}__item_0`).get();
+  const message = await db.collection('production_messages').doc(`msg-${pedido.body.id}`).get();
+  const stock = await db.collection('events').doc(`stock-${pedido.body.id}`).get();
+  assert.equal(pedidos.body.count, 0);
+  assert.equal(despesas.body.count, 0);
+  assert.equal(assignment.exists, false);
+  assert.equal(message.exists, false);
+  assert.equal(stock.exists, false);
 });
 
 test('rejeita payload com HTML executável', async () => {

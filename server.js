@@ -475,6 +475,27 @@ async function messagesForOrder(orderId) {
     .map(sanitizeForResponse);
 }
 
+async function deleteOrderArtifacts(orderId) {
+  const assignments = await db.collection('production_assignments').get();
+  const messages = await db.collection('production_messages').get();
+  const events = await db.collection('events').get();
+  const deletes = [];
+
+  assignments.docs.forEach(doc => {
+    if (doc.data().orderId === orderId) deletes.push(db.collection('production_assignments').doc(doc.id).delete());
+  });
+  messages.docs.forEach(doc => {
+    if (doc.data().orderId === orderId) deletes.push(db.collection('production_messages').doc(doc.id).delete());
+  });
+  events.docs.forEach(doc => {
+    const data = doc.data();
+    if (data.schema === 'estoque_movimento' && data.payload?.orderId === orderId) deletes.push(db.collection('events').doc(doc.id).delete());
+  });
+
+  await Promise.all(deletes);
+  return deletes.length;
+}
+
 async function materialsCatalog() {
   const snapshot = await db.collection('events').get();
   return snapshot.docs
@@ -1314,10 +1335,19 @@ app.post('/api/database/query', async (req, res) => {
 
 app.post('/api/database/delete', async (req, res) => {
   try {
-    const { id } = req.body || {};
+    const { id, hardDelete = false } = req.body || {};
     if (!isSafeIdentifier(id)) return res.status(400).json({ error: 'ID inválido.' });
-    await db.collection('events').doc(id).update({ deleted: true, deleted_at: new Date().toISOString() });
-    res.json({ status: 'success', success: true, message: 'Evento marcado como deletado', id });
+    const docRef = db.collection('events').doc(id);
+    if (hardDelete === true) {
+      const docSnap = await docRef.get();
+      if (!docSnap.exists) return res.status(404).json({ error: 'Registro nao encontrado.' });
+      const record = docSnap.data();
+      const artifactsDeleted = record.schema === 'pedido' ? await deleteOrderArtifacts(id) : 0;
+      await docRef.delete();
+      return res.json({ status: 'success', success: true, message: 'Registro excluido definitivamente', id, hardDelete: true, artifactsDeleted });
+    }
+    await docRef.update({ deleted: true, deleted_at: new Date().toISOString() });
+    res.json({ status: 'success', success: true, message: 'Evento marcado como deletado', id, hardDelete: false });
   } catch (error) {
     console.error('Erro ao deletar:', error);
     res.status(500).json({ error: 'Não foi possível deletar o registro.' });
