@@ -52,6 +52,23 @@ async function workerPost(path, body, token) {
   return workerRequest(path, token, { method: 'POST', body: JSON.stringify(body) });
 }
 
+test('responde erros de API em JSON', async () => {
+  const missing = await request('/api/rota-inexistente');
+  assert.equal(missing.response.status, 404);
+  assert.equal(missing.response.headers.get('content-type').includes('application/json'), true);
+  assert.equal(missing.body.success, false);
+  assert.equal(missing.body.message, 'API nao encontrada.');
+
+  const invalidJson = await request('/api/expenses/despesa-teste/classify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: '{"supplierName":'
+  });
+  assert.equal(invalidJson.response.status, 400);
+  assert.equal(invalidJson.response.headers.get('content-type').includes('application/json'), true);
+  assert.equal(invalidJson.body.message, 'JSON invalido na requisicao.');
+});
+
 test('não publica arquivos internos', async () => {
   for (const path of ['/server.js', '/firebase.js', '/package.json', '/DATA/database/core.db', '/core/database.js']) {
     const { response } = await request(path);

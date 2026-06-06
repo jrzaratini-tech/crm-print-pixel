@@ -1814,6 +1814,10 @@ app.get('/api/upload/check', async (req, res) => {
   }
 });
 
+app.use('/api', (req, res) => {
+  res.status(404).json({ success: false, message: 'API nao encontrada.' });
+});
+
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/index.html', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/upload-mobile.html', (req, res) => res.sendFile(path.join(__dirname, 'upload-mobile.html')));
@@ -1827,6 +1831,13 @@ app.get('/core/financeiro.js', (req, res) => res.sendFile(path.join(__dirname, '
 app.get('/core/qr-fiscal.js', (req, res) => res.sendFile(path.join(__dirname, 'core', 'qr-fiscal.js')));
 app.get('/core/gestao.js', (req, res) => res.sendFile(path.join(__dirname, 'core', 'gestao.js')));
 app.get('/menu/menu.config.js', (req, res) => res.sendFile(path.join(__dirname, 'menu', 'menu.config.js')));
+
+app.use((error, req, res, next) => {
+  if (!req.path.startsWith('/api')) return next(error);
+  const status = error instanceof SyntaxError && 'body' in error ? 400 : 500;
+  const message = status === 400 ? 'JSON invalido na requisicao.' : 'Erro interno do servidor.';
+  res.status(status).json({ success: false, message });
+});
 
 if (require.main === module) {
   app.listen(PORT, () => console.log(`CRM PRINT PIXEL ONLINE - PORTA ${PORT}`));

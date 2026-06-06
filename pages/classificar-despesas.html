@@ -16,7 +16,17 @@
   <script>
     const CATEGORIES = ['ÁGUA','AMAZON','ALIMENTAÇÃO','ARRENDAMENTO','COMISSÃO','CONTABILIDADE','CTT','COMBUSTÍVEL','CAFÉ','DIMATUR','DAGOL','ENERGIA','FILAMENTO 3D','IMPOSTOS','LEROY MERLIN','LUZACRIL','MANUTENÇÃO','MATERIAL ESCRITORIO','MAKRO','PLOTTERZONE','POLEGADA LED','SALÁRIO','SANTANDER','TRANSPORTE','TELEFONE/INTERNET','WEDDT','OUTROS'];
     const money = v => Number(v||0).toLocaleString('pt-PT',{style:'currency',currency:'EUR'});
-    async function api(path, options={}){const r=await fetch(path,{...options,headers:{'Content-Type':'application/json',...(options.headers||{})}});const b=await r.json();if(!r.ok)throw new Error(b.message||'Erro');return b;}
+    async function api(path, options={}){
+      const r=await fetch(path,{...options,headers:{'Content-Type':'application/json',Accept:'application/json',...(options.headers||{})}});
+      const raw=await r.text();
+      let b={};
+      try{b=raw?JSON.parse(raw):{};}catch{
+        const html=raw.trim().startsWith('<');
+        throw new Error(html?'A API retornou uma pagina HTML em vez de JSON. Atualize o servidor e tente novamente.':'Resposta invalida do servidor.');
+      }
+      if(!r.ok)throw new Error(b.message||b.error||'Erro');
+      return b;
+    }
     function options(selected){return CATEGORIES.map(c=>`<option value="${c}" ${c===(selected||'')?'selected':''}>${c}</option>`).join('');}
     async function classify(id, card){
       const body={supplierName:card.querySelector('[data-name]').value,nif:card.querySelector('[data-nif]').value,category:card.querySelector('[data-category]').value,expenseType:card.querySelector('[data-type]').value,ivaDedutivel:card.querySelector('[data-iva]').value==='true',applyToSameNif:card.querySelector('[data-apply]').checked};
