@@ -189,6 +189,8 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(menuResult.body, /nav_comissoes/);
   assert.match(suppliersPageResult.body, /supplierForm/);
   assert.match(classifyExpensesPageResult.body, /expenses\/unclassified/);
+  assert.match(classifyExpensesPageResult.body, /Classificando/);
+  assert.match(classifyExpensesPageResult.body, /dataset\.nif/);
   assert.match(classifyExpensesPageResult.body, /BRICO DEPÔT/);
   assert.match(suppliersPageResult.body, /BRICO DEPÔT/);
   assert.match(commissionsPageResult.body, /sellerForm/);

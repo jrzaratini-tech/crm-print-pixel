@@ -43,6 +43,7 @@
       fillSupplier(card);
       const body={supplierName:card.querySelector('[data-name]').value,nif:card.querySelector('[data-nif]').value,category:card.querySelector('[data-category]').value,expenseType:card.querySelector('[data-type]').value,ivaDedutivel:card.querySelector('[data-iva]').value==='true',applyToSameNif:card.querySelector('[data-apply]').checked};
       const request={method:'POST',body:JSON.stringify(body)};
+      const button=card.querySelector('button');button.disabled=true;button.textContent='Classificando...';
       let result;
       try{
         result=id?await api('/api/expenses/'+encodeURIComponent(id)+'/classify',request):await api('/api/expenses/classify',request);
@@ -51,7 +52,10 @@
         else throw error;
       }
       document.getElementById('message').textContent=`${result.updatedCount} despesa(s) atualizada(s).`;
-      await load();
+      const cleanNif=String(body.nif||'').replace(/\D/g,'');
+      document.querySelectorAll('.card').forEach(item=>{if(body.applyToSameNif&&item.dataset.nif===cleanNif)item.remove();});
+      if(!body.applyToSameNif)card.remove();
+      if(!document.querySelector('.card'))document.getElementById('list').innerHTML='<div class="panel">Nenhuma despesa pendente de classificação.</div>';
     }
     async function load(){
       const supplierResult=await api('/api/suppliers');
@@ -59,7 +63,7 @@
       const result=await api('/api/expenses/unclassified');const list=document.getElementById('list');list.replaceChildren();
       if(result.autoClassifiedCount)document.getElementById('message').textContent=`${result.autoClassifiedCount} despesa(s) classificadas automaticamente pelo NIF do fornecedor.`;
       if(!result.expenses.length){list.innerHTML='<div class="panel">Nenhuma despesa pendente de classificação.</div>';return;}
-      result.expenses.forEach(exp=>{const card=document.createElement('article');card.className='card';card.innerHTML=`<h2>${exp.fornecedor||'Fornecedor não identificado'}</h2><div class="meta"><span>NIF ${exp.nifFornecedor||'sem NIF'}</span><span>${exp.numeroFatura||''}</span><span>${exp.dataCompra||exp.data||''}</span><strong>${money(exp.valorTotal)}</strong></div><div class="grid"><label>Fornecedor<input data-name value="${exp.fornecedor&& !String(exp.fornecedor).startsWith('Fornecedor NIF')?exp.fornecedor:''}"></label><label>NIF<input data-nif value="${exp.nifFornecedor||''}"></label><label>Categoria<select data-category>${options(exp.categoria)}</select></label><label>Tipo despesa<input data-type value="${exp.tipoDespesa||''}"></label><label>IVA dedutível<select data-iva><option value="true">Sim</option><option value="false">Não</option></select></label><label><input type="checkbox" data-apply checked> aplicar a antigas com este NIF</label><button class="btn">Classificar</button></div>`;card.querySelector('[data-nif]').addEventListener('input',()=>fillSupplier(card));card.querySelector('[data-nif]').addEventListener('blur',()=>fillSupplier(card));fillSupplier(card);card.querySelector('button').onclick=()=>classify(exp.id,card).catch(e=>document.getElementById('message').textContent=e.message);list.append(card);});
+      result.expenses.forEach(exp=>{const card=document.createElement('article');card.className='card';card.dataset.id=exp.id||'';card.dataset.nif=String(exp.nifFornecedor||'').replace(/\D/g,'');card.innerHTML=`<h2>${exp.fornecedor||'Fornecedor não identificado'}</h2><div class="meta"><span>NIF ${exp.nifFornecedor||'sem NIF'}</span><span>${exp.numeroFatura||''}</span><span>${exp.dataCompra||exp.data||''}</span><strong>${money(exp.valorTotal)}</strong></div><div class="grid"><label>Fornecedor<input data-name value="${exp.fornecedor&& !String(exp.fornecedor).startsWith('Fornecedor NIF')?exp.fornecedor:''}"></label><label>NIF<input data-nif value="${exp.nifFornecedor||''}"></label><label>Categoria<select data-category>${options(exp.categoria)}</select></label><label>Tipo despesa<input data-type value="${exp.tipoDespesa||''}"></label><label>IVA dedutível<select data-iva><option value="true">Sim</option><option value="false">Não</option></select></label><label><input type="checkbox" data-apply checked> aplicar a antigas com este NIF</label><button class="btn">Classificar</button></div>`;card.querySelector('[data-nif]').addEventListener('input',()=>{card.dataset.nif=String(card.querySelector('[data-nif]').value||'').replace(/\D/g,'');fillSupplier(card);});card.querySelector('[data-nif]').addEventListener('blur',()=>fillSupplier(card));fillSupplier(card);card.querySelector('button').onclick=()=>classify(exp.id,card).catch(e=>{card.querySelector('button').disabled=false;card.querySelector('button').textContent='Classificar';document.getElementById('message').textContent=e.message;});list.append(card);});
     }
     load().catch(e=>document.getElementById('message').textContent=e.message);
   </script>
