@@ -189,6 +189,8 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(menuResult.body, /nav_comissoes/);
   assert.match(suppliersPageResult.body, /supplierForm/);
   assert.match(classifyExpensesPageResult.body, /expenses\/unclassified/);
+  assert.match(classifyExpensesPageResult.body, /BRICO DEPÔT/);
+  assert.match(suppliersPageResult.body, /BRICO DEPÔT/);
   assert.match(commissionsPageResult.body, /sellerForm/);
   assert.match(sellerAppResult.body, /PrintPixel Vendedor/);
   assert.match(sellerScriptResult.body, /api\/vendedor\/session/);
@@ -623,6 +625,44 @@ test('classifica despesas por NIF mesmo sem ID na URL', async () => {
   assert.equal(updated.body.events[0].payload.fornecedor, 'Fornecedor Sem ID');
   assert.equal(updated.body.events[0].payload.categoria, 'IMPOSTOS');
   assert.equal(updated.body.events[0].payload.classificationSource, 'supplier_nif');
+});
+
+test('classificacao por NIF usa cadastro existente e remove item da fila', async () => {
+  const supplier = await post('/api/suppliers', {
+    name: 'Fornecedor Cadastro Mestre',
+    nif: '507333557',
+    category: 'BRICO DEPÔT',
+    expenseType: 'material construcao',
+    ivaDedutivel: false
+  });
+  assert.equal(supplier.response.status, 200);
+
+  const expense = await post('/api/database/commit', {
+    schema: 'despesa',
+    payload: { fornecedor: 'Fornecedor NIF 507333557', nifFornecedor: '507333557', categoria: 'OUTROS', tipoDespesa: '', valorTotal: 44 },
+    pageId: 'test'
+  });
+
+  const classified = await post(`/api/expenses/${expense.body.id}/classify`, {
+    supplierName: 'Nome digitado nao deve vencer cadastro',
+    nif: '507333557',
+    category: 'OUTROS',
+    expenseType: 'digitado',
+    ivaDedutivel: true,
+    applyToSameNif: true
+  });
+  assert.equal(classified.response.status, 200);
+
+  const updated = await post('/api/database/query', { schema: 'despesa', filters: { id: expense.body.id } });
+  const payload = updated.body.events[0].payload;
+  assert.equal(payload.fornecedor, 'Fornecedor Cadastro Mestre');
+  assert.equal(payload.categoria, 'BRICO DEPÔT');
+  assert.equal(payload.tipoDespesa, 'material construcao');
+  assert.equal(payload.ivaDedutivel, false);
+  assert.equal(payload.classificationStatus, 'classified');
+
+  const pending = await request('/api/expenses/unclassified');
+  assert.equal(pending.body.expenses.some(item => item.id === expense.body.id), false);
 });
 
 test('fila de despesas reconcilia pendencias com fornecedores ja cadastrados', async () => {

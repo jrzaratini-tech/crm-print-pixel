@@ -1261,6 +1261,12 @@ app.post('/api/suppliers/:id/delete', async (req, res) => {
 function expenseNeedsClassification(payload = {}) {
   const fornecedor = text(payload.fornecedor, 160);
   const categoria = text(payload.categoria, 80).toUpperCase();
+  if (payload.classificationStatus === 'classified'
+    && fornecedor
+    && !/^FORNECEDOR NIF/.test(fornecedor.toUpperCase())
+    && expenseSupplierNif(payload)) {
+    return false;
+  }
   return payload.classificationStatus !== 'classified'
     || !fornecedor
     || /^FORNECEDOR NIF/.test(fornecedor.toUpperCase())
@@ -1302,8 +1308,10 @@ async function saveSupplierFromClassification(body = {}, fallbackPayload = {}) {
   const existingSupplier = await supplierByNif(supplierPayload.nif);
   const supplierId = existingSupplier?.id || crypto.randomBytes(12).toString('hex');
   const now = new Date().toISOString();
-  const savedSupplier = { ...existingSupplier, ...supplierPayload, id: supplierId, createdAt: existingSupplier?.createdAt || now, updatedAt: now };
-  await db.collection('suppliers').doc(supplierId).set(savedSupplier);
+  const savedSupplier = existingSupplier
+    ? { ...existingSupplier, updatedAt: now }
+    : { ...supplierPayload, id: supplierId, createdAt: now, updatedAt: now };
+  if (!existingSupplier) await db.collection('suppliers').doc(supplierId).set(savedSupplier);
   return { savedSupplier, now };
 }
 
