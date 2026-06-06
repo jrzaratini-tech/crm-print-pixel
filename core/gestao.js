@@ -96,6 +96,22 @@
         return Object.entries(counts).map(([letter, quantidade]) => ({ letter, quantidade }));
     }
 
+    function larguraTextoLetreiroCm(textoEntrada = '', alturaCm = 0) {
+        const textoNormalizado = texto(textoEntrada)
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .toUpperCase();
+        const largura = textoNormalizado.split('').reduce((total, char) => {
+            if (char === ' ') return total + (alturaCm * 0.35);
+            if (char === 'I' || char === '1') return total + (alturaCm * 0.28);
+            if (char === 'M' || char === 'W') return total + (alturaCm * 0.95);
+            if (char === 'J' || char === 'T' || char === 'L') return total + (alturaCm * 0.48);
+            if (/[A-Z0-9]/.test(char)) return total + (alturaCm * 0.68);
+            return total;
+        }, 0);
+        return Math.round(largura * 100) / 100;
+    }
+
     function calcularFatorAprendizadoPETG(historico = [], campoPrevisto, campoReal) {
         const fatores = (Array.isArray(historico) ? historico : [])
             .map(item => {
@@ -234,6 +250,7 @@
                     texto: entrada.palavra || entrada.texto || '',
                     alturaCm: calculo.alturaCm,
                     profundidadeCm: calculo.profundidadeCm,
+                    larguraEstimadaCm: larguraTextoLetreiroCm(entrada.palavra || entrada.texto || '', calculo.alturaCm),
                     calculo
                 };
             })
@@ -250,6 +267,7 @@
         const ledEstimadoM = Math.round(contornoTotalM * fatorLed * 100) / 100;
         const ledManualM = numero(config.ledManualM);
         const ledFinalM = ledManualM > 0 ? ledManualM : ledEstimadoM;
+        const larguraEstimadaCm = partes.reduce((maior, parte) => Math.max(maior, parte.larguraEstimadaCm || 0), 0);
 
         return {
             tipo: 'letreiro_petg_led',
@@ -259,6 +277,7 @@
                 texto: parte.texto,
                 alturaCm: parte.alturaCm,
                 profundidadeCm: parte.profundidadeCm,
+                larguraEstimadaCm: parte.larguraEstimadaCm,
                 gramas: parte.calculo.gramasTotal,
                 horas: parte.calculo.horasTotal
             })),
@@ -269,6 +288,8 @@
             custoEnergia: dinheiro(custoEnergia),
             custoTotal: dinheiro(custoFilamento + custoMaquina + custoEnergia),
             contornoTotalM: Math.round(contornoTotalM * 100) / 100,
+            larguraEstimadaCm,
+            larguraEstimadaM: Math.round((larguraEstimadaCm / 100) * 100) / 100,
             fatorLed,
             ledEstimadoM,
             ledFinalM,
@@ -489,6 +510,7 @@
     return {
         numero,
         lettersFromWord,
+        larguraTextoLetreiroCm,
         calcularLetraCaixaPETG,
         calcularLetreiroPETG,
         calcularFichaProduto,

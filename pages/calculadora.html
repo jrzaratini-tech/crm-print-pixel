@@ -22,6 +22,7 @@
         .tab { border: 1px solid #c7d2fe; color: #1e3a8a; background: #eef2ff; border-radius: 999px; padding: 10px 15px; font-weight: 800; }
         .tab.active { background: #1a237e; color: white; border-color: #1a237e; }
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+        .mini-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(115px, 1fr)); gap: 8px; align-items: end; }
         label { display: block; color: #475569; font-size: 13px; font-weight: 800; }
         input, select, textarea { width: 100%; margin-top: 6px; border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; background: white; }
         input[type="number"] { text-align: right; }
@@ -36,6 +37,16 @@
         .btn:hover { filter: brightness(.95); }
         .table-wrap { overflow-x: auto; }
         table { width: 100%; border-collapse: collapse; min-width: 980px; }
+        .components-table { min-width: 1220px; table-layout: fixed; }
+        .components-table th:nth-child(1), .components-table td:nth-child(1) { width: 220px; }
+        .components-table th:nth-child(2), .components-table td:nth-child(2) { width: 250px; }
+        .components-table th:nth-child(3), .components-table td:nth-child(3) { width: 230px; }
+        .components-table th:nth-child(4), .components-table td:nth-child(4) { width: 90px; }
+        .components-table th:nth-child(5), .components-table td:nth-child(5) { width: 90px; }
+        .components-table th:nth-child(6), .components-table td:nth-child(6) { width: 120px; }
+        .components-table th:nth-child(7), .components-table td:nth-child(7) { width: 120px; }
+        .components-table th:nth-child(8), .components-table td:nth-child(8) { width: 120px; }
+        .components-table th:nth-child(9), .components-table td:nth-child(9) { width: 105px; }
         th, td { text-align: left; padding: 10px; border-bottom: 1px solid #e2e8f0; font-size: 13px; vertical-align: top; }
         th { background: #f8fafc; color: #475569; text-transform: uppercase; font-size: 12px; }
         td input, td select { padding: 8px; font-size: 13px; }
@@ -91,8 +102,6 @@
                 </div>
                 <div class="actions">
                     <button type="button" class="btn btn-primary" id="addPetgEntryBtn">+ Adicionar texto / altura</button>
-                    <button type="button" class="btn btn-success" id="calculateBtn">Calcular produto</button>
-                    <button type="button" class="btn btn-warning" id="addEstimatedLedBtn">Adicionar LED estimado</button>
                 </div>
                 <div id="petgResult" class="summary" style="margin-top:14px;">Informe os textos, alturas e materiais para calcular.</div>
             </div>
@@ -102,8 +111,8 @@
             <h2>Componentes adicionais</h2>
             <p class="subtitle">Acrescente fonte, barras de alum&iacute;nio, acr&iacute;lico, fios, parafusos, estanho ou qualquer material cadastrado.</p>
             <div class="table-wrap">
-                <table>
-                    <thead><tr><th>Material</th><th>Caracter&iacute;sticas</th><th>Medidas</th><th>Qtd.</th><th>Perda %</th><th>Consumo</th><th>Custo</th><th>A&ccedil;&atilde;o</th></tr></thead>
+                <table class="components-table">
+                    <thead><tr><th>Material</th><th>Caracter&iacute;sticas</th><th>Medidas</th><th>Qtd.</th><th>Perda %</th><th>Pre&ccedil;o un.</th><th>Consumo</th><th>Custo</th><th>A&ccedil;&atilde;o</th></tr></thead>
                     <tbody id="materialsBody"></tbody>
                 </table>
             </div>
@@ -122,6 +131,10 @@
                 <div class="metric">
                     <div class="metric-label">Componentes</div>
                     <div class="metric-value" id="materialsCost">&euro;0,00</div>
+                </div>
+                <div class="metric">
+                    <div class="metric-label">Largura estimada</div>
+                    <div class="metric-value" id="estimatedWidth">0,00 m</div>
                 </div>
                 <div class="metric">
                     <div class="metric-label">Custo total</div>
@@ -154,6 +167,22 @@
         function resolveMaterial(materialId = '') {
             if (materialId.startsWith('preset:')) return { id: materialId, ...MATERIAIS_PADRAO.get(materialId.replace('preset:', '')) };
             return catalogoMateriais.find(entry => entry.id === materialId) || {};
+        }
+
+        function precoPadraoMaterial(material = {}) {
+            if (!material.id && !material.nome && !material.key) return 0;
+            const preco = Number.parseFloat(material.precoCusto);
+            return Number.isFinite(preco) && preco > 0 ? preco : 1;
+        }
+
+        function materialComPreco(item = {}, material = {}) {
+            const precoUnitario = Number.parseFloat(item.precoUnitario);
+            return {
+                ...material,
+                precoCusto: Number.isFinite(precoUnitario) && precoUnitario > 0
+                    ? precoUnitario
+                    : precoPadraoMaterial(material)
+            };
         }
 
         function materialOptions(selectedId = '') {
@@ -215,9 +244,11 @@
                 alturaCm: entry.alturaCm || 12,
                 profundidadeCm: entry.profundidadeCm || number('petgDepth') || 5
             }]);
+            calculateAll();
         }
 
         function addMaterialItem(item = {}) {
+            const material = resolveMaterial(item.materialId || '');
             materialItems.push({
                 materialId: item.materialId || '',
                 formula: item.formula || '',
@@ -226,6 +257,7 @@
                 comprimentoM: item.comprimentoM || 0,
                 quantidade: item.quantidade || 1,
                 perdaPercentual: item.perdaPercentual ?? '',
+                precoUnitario: item.precoUnitario || precoPadraoMaterial(material),
                 variantes: item.variantes || {}
             });
             renderMaterials();
@@ -235,22 +267,28 @@
             const body = document.getElementById('materialsBody');
             body.innerHTML = materialItems.length ? materialItems.map((item, index) => {
                 const material = resolveMaterial(item.materialId);
-                const calculo = CUSTEIO.calcular(item, material);
+                if (!item.precoUnitario) item.precoUnitario = precoPadraoMaterial(material);
+                const materialPreco = materialComPreco(item, material);
+                const calculo = CUSTEIO.calcular(item, materialPreco);
                 return `<tr data-index="${index}">
                     <td><select class="item-material">${materialOptions(item.materialId)}</select></td>
-                    <td><div class="grid">${variantInputs(item, material)}</div></td>
-                    <td><div class="grid">${measureInputs(item, material)}</div></td>
+                    <td><div class="mini-grid">${variantInputs(item, material)}</div></td>
+                    <td><div class="mini-grid">${measureInputs(item, material)}</div></td>
                     <td><input class="item-quantidade" type="number" min="0" step="0.01" value="${item.quantidade || 1}"></td>
                     <td><input class="item-perda" type="number" min="0" step="0.1" placeholder="${material.perdaPercentual || 0}" value="${item.perdaPercentual ?? ''}"></td>
+                    <td><input class="item-preco" type="number" min="0" step="0.01" value="${Number(item.precoUnitario || precoPadraoMaterial(material)).toFixed(2)}"></td>
                     <td>${calculo.consumo.toFixed(2)} ${calculo.unidade}</td>
                     <td>${money(calculo.custo)}</td>
                     <td><button type="button" class="btn btn-danger item-remove">Remover</button></td>
                 </tr>`;
-            }).join('') : '<tr><td colspan="8" class="empty">Adicione fonte, LED, barras, acr&iacute;lico ou outros componentes.</td></tr>';
+            }).join('') : '<tr><td colspan="9" class="empty">Adicione fonte, LED, barras, acr&iacute;lico ou outros componentes.</td></tr>';
 
             body.querySelectorAll('tr[data-index]').forEach(row => {
                 const index = Number(row.dataset.index);
-                row.querySelectorAll('input, select').forEach(element => element.addEventListener('change', () => updateMaterialItem(index, row)));
+                row.querySelectorAll('input, select').forEach(element => {
+                    element.addEventListener('change', () => updateMaterialItem(index, row, true));
+                    element.addEventListener('input', () => updateMaterialItem(index, row, false));
+                });
                 row.querySelector('.item-remove').addEventListener('click', () => {
                     materialItems.splice(index, 1);
                     renderMaterials();
@@ -260,21 +298,25 @@
             calculateAll();
         }
 
-        function updateMaterialItem(index, row) {
+        function updateMaterialItem(index, row, shouldRender = true) {
             const item = materialItems[index];
             const materialId = row.querySelector('.item-material').value;
             const previousMaterialId = item.materialId;
+            const materialChanged = previousMaterialId !== materialId;
             const material = resolveMaterial(materialId);
             item.materialId = materialId;
             item.formula = material.formulaPadrao || 'unidade';
+            if (materialChanged) item.precoUnitario = precoPadraoMaterial(material);
             item.larguraCm = Number.parseFloat(row.querySelector('.item-largura')?.value) || 0;
             item.alturaCm = Number.parseFloat(row.querySelector('.item-altura')?.value) || 0;
             item.comprimentoM = Number.parseFloat(row.querySelector('.item-comprimento')?.value) || 0;
             item.quantidade = Number.parseFloat(row.querySelector('.item-quantidade').value) || 1;
             item.perdaPercentual = row.querySelector('.item-perda').value;
+            if (!materialChanged) item.precoUnitario = Number.parseFloat(row.querySelector('.item-preco')?.value) || precoPadraoMaterial(material);
             item.variantes = Object.fromEntries(Array.from(row.querySelectorAll('[data-variant]')).map(element => [element.dataset.variant, element.value]));
             if (previousMaterialId !== materialId) item.variantes = {};
-            renderMaterials();
+            if (shouldRender || materialChanged) renderMaterials();
+            else calculateAll();
         }
 
         function calculatePetg() {
@@ -293,6 +335,7 @@
                 <strong>PETG:</strong> ${result.gramasTotal} g
                 | <strong>Tempo 3D:</strong> ${result.horasTotal} h
                 | <strong>LED estimado:</strong> ${result.ledFinalM} m
+                | <strong>Largura aprox.:</strong> ${result.larguraEstimadaM} m
                 <br><strong>Entradas:</strong> ${detalhes}
                 <br><strong>Contorno base:</strong> ${result.contornoTotalM} m | fator LED x${result.fatorLed}
                 ${result.alerta ? `<br><strong>${result.alerta}</strong>` : ''}
@@ -301,7 +344,10 @@
         }
 
         function calculateMaterialsCost() {
-            return materialItems.reduce((total, item) => total + CUSTEIO.calcular(item, resolveMaterial(item.materialId)).custo, 0);
+            return materialItems.reduce((total, item) => {
+                const material = materialComPreco(item, resolveMaterial(item.materialId));
+                return total + CUSTEIO.calcular(item, material).custo;
+            }, 0);
         }
 
         function calculateAll() {
@@ -312,35 +358,10 @@
             const suggested = totalCost / (1 - margem / 100);
             document.getElementById('petgCost').textContent = money(petg.custoTotal);
             document.getElementById('materialsCost').textContent = money(materialsCost);
+            document.getElementById('estimatedWidth').textContent = `${petg.larguraEstimadaM.toFixed(2)} m`;
             document.getElementById('totalCost').textContent = money(totalCost);
             document.getElementById('suggestedPrice').textContent = money(suggested);
             return { petg, materialsCost, totalCost, suggested };
-        }
-
-        function findLedMaterialId() {
-            const cadastrado = catalogoMateriais.find(material => {
-                const nome = String(material.nome || '').toLowerCase();
-                return nome.includes('fita') && nome.includes('led');
-            });
-            if (cadastrado) return cadastrado.id;
-            return 'preset:fita_led_zigzag';
-        }
-
-        function addEstimatedLed() {
-            const petg = calculatePetg();
-            if (!petg.ledFinalM) {
-                showMessage('Informe textos e alturas antes de adicionar LED.', 'warning');
-                return;
-            }
-            addMaterialItem({
-                materialId: findLedMaterialId(),
-                formula: 'linear',
-                comprimentoM: petg.ledFinalM,
-                quantidade: 1,
-                perdaPercentual: 0,
-                variantes: { cor: 'Branco 4000K' }
-            });
-            showMessage(`LED adicionado com ${petg.ledFinalM} m. Pode corrigir a quantidade na tabela.`, 'success');
         }
 
         function fillPetgPriceFromCatalog() {
@@ -371,11 +392,6 @@
             renderMaterials();
             document.getElementById('addPetgEntryBtn').addEventListener('click', () => addPetgEntry());
             document.getElementById('addMaterialBtn').addEventListener('click', () => addMaterialItem());
-            document.getElementById('calculateBtn').addEventListener('click', () => {
-                calculateAll();
-                showMessage('Produto calculado com sucesso.', 'success');
-            });
-            document.getElementById('addEstimatedLedBtn').addEventListener('click', addEstimatedLed);
             ['petgDepth', 'petgKgPrice', 'petgWaste', 'petgGramsHour', 'petgLedFactor', 'petgLedManual', 'marginPercent'].forEach(id => {
                 document.getElementById(id).addEventListener('input', calculateAll);
             });

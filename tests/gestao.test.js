@@ -132,6 +132,8 @@ test('calcula letreiro PETG com multiplas alturas e LED estimado', () => {
   assert.ok(result.gramasTotal > 0);
   assert.ok(result.horasTotal > 0);
   assert.ok(result.contornoTotalM > 0);
+  assert.ok(result.larguraEstimadaM > 0);
+  assert.ok(result.entradas[0].larguraEstimadaCm > result.entradas[1].larguraEstimadaCm);
   assert.ok(result.ledEstimadoM > result.contornoTotalM);
   assert.equal(result.ledFinalM, result.ledEstimadoM);
 });

@@ -120,7 +120,10 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.doesNotMatch(orderBudgetPageResult.body, /Textos e alturas do mesmo trabalho/);
   assert.match(calculatorPageResult.body, /Letras caixa impressas/);
   assert.match(calculatorPageResult.body, /Componentes adicionais/);
-  assert.match(calculatorPageResult.body, /addEstimatedLedBtn/);
+  assert.doesNotMatch(calculatorPageResult.body, /calculateBtn/);
+  assert.doesNotMatch(calculatorPageResult.body, /addEstimatedLedBtn/);
+  assert.match(calculatorPageResult.body, /Pre&ccedil;o un\./);
+  assert.match(calculatorPageResult.body, /estimatedWidth/);
   assert.match(calculatorPageResult.body, /Pre&ccedil;o sugerido/);
   assert.match(ordersPageResult.body, /produto-modal-entregue/);
   assert.match(ordersPageResult.body, /entrega-badge/);
