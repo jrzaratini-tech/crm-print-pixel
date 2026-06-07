@@ -852,15 +852,15 @@
                     </div>
                 </div>
                 
-                <!-- Evolução Mensal -->
+                <!-- Ponto de Equilibrio 12 meses -->
                 <div class="dashboard-chart-box">
                     <div class="chart-header">
                         <div>
                             <div class="chart-title">
                                 <i class="fas fa-chart-area"></i>
-                                Evolução de Vendas
+                                Ponto de Equilíbrio
                             </div>
-                            <div class="chart-subtitle">Evolução nos últimos 6 meses</div>
+                            <div class="chart-subtitle">Faturamento bruto vs meta de equilíbrio nos últimos 12 meses</div>
                         </div>
                     </div>
                     <div class="dashboard-chart-wrapper">
@@ -1249,6 +1249,22 @@
                 const agora = new Date();
                 const mesAtual = agora.getMonth();
                 const anoAtual = agora.getFullYear();
+                const eventosHistorico = Array.isArray(todosEventosComTimestampsCorrigidos) && todosEventosComTimestampsCorrigidos.length
+                    ? todosEventosComTimestampsCorrigidos
+                    : eventos;
+                const mesesNomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+                const chaveMesDeData = data => `${data.getFullYear()}-${data.getMonth()}`;
+                const rotuloMes = data => `${mesesNomes[data.getMonth()]}/${String(data.getFullYear()).slice(-2)}`;
+                const valorVendaBrutaEvento = evento => {
+                    if (evento.schema !== 'pedido') return 0;
+                    const valor = FINANCEIRO.totalComIva(evento.payload);
+                    return Number.isFinite(valor) ? valor : 0;
+                };
+                const valorDespesaEvento = evento => {
+                    const payload = evento.payload || {};
+                    const valor = parseFloat(payload.valorTotal || payload.total || payload.valorBruto || payload.valor || 0);
+                    return Number.isFinite(valor) ? valor : 0;
+                };
                 
                 // Calcular mês anterior para comparação
                 const mesAnterior = mesAtual === 0 ? 11 : mesAtual - 1;
@@ -1498,8 +1514,6 @@
                 
                 // Gerar histórico dos últimos 6 meses (sempre dos últimos 6 meses)
                 const historicoMensal = [];
-                const mesesNomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-                
                 for (let i = 5; i >= 0; i--) {
                     const data = new Date(anoAtual, mesAtual - i, 1);
                     const mes = data.getMonth();
@@ -1513,6 +1527,25 @@
                     });
                 }
                 
+                Object.keys(meses12).forEach(chave => delete meses12[chave]);
+                eventosHistorico.forEach(evento => {
+                    if (evento.deleted) return;
+                    const dataEvento = new Date(evento.dataFiltragem || evento.created_at || evento.timestamp);
+                    if (isNaN(dataEvento.getTime())) return;
+                    const diferencaMeses = (anoAtual - dataEvento.getFullYear()) * 12 + (mesAtual - dataEvento.getMonth());
+                    if (diferencaMeses < 0 || diferencaMeses >= 12) return;
+                    const chaveMes = chaveMesDeData(dataEvento);
+                    if (!meses12[chaveMes]) meses12[chaveMes] = { vendas: 0, despesas: 0 };
+                    if (evento.schema === 'pedido') {
+                        meses12[chaveMes].vendas += valorVendaBrutaEvento(evento);
+                    } else if (evento.schema === 'despesa') {
+                        meses12[chaveMes].despesas += valorDespesaEvento(evento);
+                    }
+                });
+
+                const margemContribuicao = Math.max(1, parseFloat(configuracaoEquilibrio.margemContribuicao) || 50) / 100;
+                const metaEquilibrio = (parseFloat(configuracaoEquilibrio.custosFixos) || 0) / margemContribuicao;
+
                 // Gerar histórico dos últimos 12 meses
                 const historicoAnual = [];
                 for (let i = 11; i >= 0; i--) {
@@ -1522,14 +1555,14 @@
                     const chave = `${ano}-${mes}`;
                     
                     historicoAnual.push({
-                        mes: mesesNomes[mes],
+                        mes: rotuloMes(data),
                         vendas: meses12[chave]?.vendas || 0,
-                        despesas: meses12[chave]?.despesas || 0
+                        despesas: meses12[chave]?.despesas || 0,
+                        pontoEquilibrio: metaEquilibrio,
+                        bateuMeta: (meses12[chave]?.vendas || 0) >= metaEquilibrio
                     });
                 }
                 
-                const margemContribuicao = Math.max(1, parseFloat(configuracaoEquilibrio.margemContribuicao) || 50) / 100;
-                const metaEquilibrio = (parseFloat(configuracaoEquilibrio.custosFixos) || 0) / margemContribuicao;
                 const resumoIva = FINANCEIRO.resumoIvaTrimestral(todosEventosComTimestampsCorrigidos, agora);
 
                 return {
@@ -1813,36 +1846,34 @@
                     }
                 });
 
-                // Gráfico de Tendência Mensal (agora com vendas e despesas)
+                // Gráfico de Ponto de Equilíbrio (12 meses)
                 const trendCtx = document.getElementById('monthlyTrendChart');
                 charts.monthlyTrend = new Chart(trendCtx, {
-                    type: 'line',
+                    type: 'bar',
                     data: {
                         labels: [],
                         datasets: [
                             {
-                                label: 'Vendas',
+                                label: 'Faturamento bruto',
                                 data: [],
-                                borderColor: '#4CAF50',
-                                backgroundColor: 'rgba(76, 175, 80, 0.1)',
-                                borderWidth: 3,
-                                fill: true,
-                                tension: 0.4,
-                                pointRadius: 4,
-                                pointHoverRadius: 6,
-                                pointBackgroundColor: '#4CAF50'
+                                backgroundColor: [],
+                                borderColor: [],
+                                borderWidth: 1,
+                                borderRadius: 6,
+                                maxBarThickness: 34
                             },
                             {
-                                label: 'Despesas',
+                                type: 'line',
+                                label: 'Ponto de equilíbrio',
                                 data: [],
-                                borderColor: '#9C27B0',
-                                backgroundColor: 'rgba(156, 39, 176, 0.1)',
+                                borderColor: '#1a237e',
+                                backgroundColor: 'rgba(26, 35, 126, 0.08)',
                                 borderWidth: 3,
-                                fill: true,
-                                tension: 0.4,
-                                pointRadius: 4,
-                                pointHoverRadius: 6,
-                                pointBackgroundColor: '#9C27B0'
+                                borderDash: [8, 6],
+                                fill: false,
+                                tension: 0,
+                                pointRadius: 0,
+                                pointHoverRadius: 0
                             }
                         ]
                     },
@@ -1891,7 +1922,7 @@
                         labels: [],
                         datasets: [
                             {
-                                label: 'Faturamento',
+                                label: 'Faturamento bruto',
                                 data: [],
                                 backgroundColor: 'rgba(76, 175, 80, 0.7)',
                                 borderColor: '#4CAF50',
@@ -2022,12 +2053,16 @@
                     }
                 }
                 
-                // Atualizar gráfico de tendência mensal
+                // Atualizar gráfico de ponto de equilíbrio
                 if (charts.monthlyTrend) {
-                    const historico = dados.historicoMensal;
+                    const historico = dados.historicoAnual;
+                    const cores = historico.map(h => h.bateuMeta ? 'rgba(34, 197, 94, 0.78)' : 'rgba(239, 68, 68, 0.78)');
+                    const bordas = historico.map(h => h.bateuMeta ? '#16a34a' : '#dc2626');
                     charts.monthlyTrend.data.labels = historico.map(h => h.mes);
                     charts.monthlyTrend.data.datasets[0].data = historico.map(h => h.vendas);
-                    charts.monthlyTrend.data.datasets[1].data = historico.map(h => h.despesas);
+                    charts.monthlyTrend.data.datasets[0].backgroundColor = cores;
+                    charts.monthlyTrend.data.datasets[0].borderColor = bordas;
+                    charts.monthlyTrend.data.datasets[1].data = historico.map(h => h.pontoEquilibrio);
                     charts.monthlyTrend.update('none');
                 }
                 
