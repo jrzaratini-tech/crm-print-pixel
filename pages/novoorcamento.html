@@ -220,6 +220,19 @@
             min-height: 60px;
             resize: vertical;
         }
+
+        .products-table th:nth-child(2),
+        .products-table th:nth-child(3),
+        .products-table th:nth-child(4),
+        .products-table th:nth-child(5),
+        .products-table th:nth-child(6),
+        .products-table td:nth-child(2),
+        .products-table td:nth-child(3),
+        .products-table td:nth-child(4),
+        .products-table td:nth-child(5),
+        .products-table td:nth-child(6) {
+            display: none;
+        }
         
         .remove-btn {
             background-color: transparent;
@@ -606,11 +619,11 @@
                     <thead>
                         <tr>
                             <th>Produto</th>
-                            <th>Tamanho</th>
-                            <th>Quantidade</th>
-                            <th>Custo Unitário (€)</th>
-                            <th>Valor Unitário (€)</th>
-                            <th>Observações</th>
+                            <th class="budget-internal-col">Tamanho</th>
+                            <th class="budget-internal-col">Quantidade</th>
+                            <th class="budget-internal-col">Custo Unitário (€)</th>
+                            <th class="budget-internal-col">Valor Unitário (€)</th>
+                            <th class="budget-internal-col">Observações</th>
                             <th>Ficha técnica</th>
                             <th style="width: 50px;"></th>
                         </tr>
@@ -643,6 +656,16 @@
                     <div class="total-card">
                         <div class="total-label">Subtotal Produtos</div>
                         <div class="total-value" id="subtotalProdutos">0,00 €</div>
+                    </div>
+
+                    <div class="total-card">
+                        <div class="total-label">Desconto (€)</div>
+                        <input type="number" id="descontoOrcamento" min="0" step="0.01" value="0" style="width:100%; margin-top:8px; padding:10px; border:1px solid #cbd5e1; border-radius:8px;">
+                    </div>
+
+                    <div class="total-card">
+                        <div class="total-label">Ajuste de Preço (+/- €)</div>
+                        <input type="number" id="ajusteOrcamento" step="0.01" value="0" style="width:100%; margin-top:8px; padding:10px; border:1px solid #cbd5e1; border-radius:8px;">
                     </div>
                     
                     <div class="total-card">
@@ -689,6 +712,8 @@
                 <input type="hidden" id="orcamentoLucroEstimado" data-bind="orcamento.lucroEstimado" value="0">
                 <input type="hidden" id="orcamentoMargemEstimada" data-bind="orcamento.margemEstimada" value="0">
                 <input type="hidden" id="orcamentoPrecoMinimo" data-bind="orcamento.precoMinimo" value="0">
+                <input type="hidden" id="orcamentoDesconto" data-bind="orcamento.desconto" value="0">
+                <input type="hidden" id="orcamentoAjuste" data-bind="orcamento.ajustePreco" value="0">
             </div>
             
             <div class="form-actions">
@@ -962,6 +987,8 @@
                 document.getElementById('atendente').value = orcamento.atendente || '';
                 document.getElementById('observacoes').value = orcamento.observacoes || '';
                 document.getElementById('orcamentoId').value = orcamentoEvento.id;
+                document.getElementById('descontoOrcamento').value = orcamento.desconto || 0;
+                document.getElementById('ajusteOrcamento').value = orcamento.ajustePreco || orcamento.ajuste || 0;
                 
                 // Validade
                 if (orcamento.validadeDias) {
@@ -1090,7 +1117,7 @@
                               placeholder="Observações do produto..." rows="2">${productData ? (productData.observacoes || '') : ''}</textarea>
                 </td>
                 <td>
-                    <button type="button" class="materials-btn">Materiais</button>
+                    <button type="button" class="materials-btn">Abrir ficha tecnica</button>
                     <span class="materials-summary">${productData && productData.materiais && productData.materiais.length ? productData.materiais.length + ' itens' : 'Sem ficha'}</span>
                 </td>
                 <td>
@@ -1234,8 +1261,10 @@
         function aplicarFichaTecnica() {
             if (!technicalProductRow) return;
             const ficha = calcularFichaOrcamento(technicalProductRow._materiais);
+            const precoSugerido = ficha.custoTotal > 0 ? ficha.custoTotal / 0.30 : 0;
             technicalProductRow.querySelector('.custo-input').value = ficha.custoTotal.toFixed(2);
-            technicalProductRow.querySelector('.materials-summary').textContent = `${technicalProductRow._materiais.length} itens | ${formatarMoeda(ficha.custoTotal)}`;
+            technicalProductRow.querySelector('.valor-input').value = precoSugerido.toFixed(2);
+            technicalProductRow.querySelector('.materials-summary').textContent = `${technicalProductRow._materiais.length} itens | custo ${formatarMoeda(ficha.custoTotal)} | sugerido ${formatarMoeda(precoSugerido)}`;
             calculateTotals();
             fecharFichaTecnica();
         }
@@ -1293,7 +1322,9 @@
             });
             
             const instalacao = 0;
-            const subtotalGeral = subtotalProdutos + instalacao;
+            const desconto = Math.max(0, parseFloat(document.getElementById('descontoOrcamento')?.value) || 0);
+            const ajustePreco = parseFloat(document.getElementById('ajusteOrcamento')?.value) || 0;
+            const subtotalGeral = Math.max(0, subtotalProdutos + instalacao - desconto + ajustePreco);
             
             let iva = 0;
             if (document.getElementById('ivaSim').checked) {
@@ -1321,6 +1352,8 @@
             document.getElementById('orcamentoSubtotal').value = subtotalGeral;
             document.getElementById('orcamentoIVA').value = iva;
             document.getElementById('orcamentoTotal').value = totalFinal;
+            document.getElementById('orcamentoDesconto').value = desconto.toFixed(2);
+            document.getElementById('orcamentoAjuste').value = ajustePreco.toFixed(2);
             document.getElementById('orcamentoCustoEstimado').value = custoEstimado.toFixed(2);
             document.getElementById('orcamentoLucroEstimado').value = lucroEstimado.toFixed(2);
             document.getElementById('orcamentoMargemEstimada').value = margemEstimada.toFixed(2);
@@ -1584,6 +1617,8 @@
                     subtotal: parseFloat(document.getElementById('orcamentoSubtotal').value) || 0,
                     iva: parseFloat(document.getElementById('orcamentoIVA').value) || 0,
                     total: parseFloat(document.getElementById('orcamentoTotal').value) || 0,
+                    desconto: parseFloat(document.getElementById('orcamentoDesconto').value) || 0,
+                    ajustePreco: parseFloat(document.getElementById('orcamentoAjuste').value) || 0,
                     resumoProfissional: resumoProfissional,
                     custoPrevisto: resumoProfissional.custoPrevisto,
                     lucroPrevisto: resumoProfissional.lucroPrevisto,
@@ -1632,6 +1667,8 @@
         // Listeners para cálculo automático
         document.getElementById('ivaSim').addEventListener('change', calculateTotals);
         document.getElementById('ivaNao').addEventListener('change', calculateTotals);
+        document.getElementById('descontoOrcamento').addEventListener('input', calculateTotals);
+        document.getElementById('ajusteOrcamento').addEventListener('input', calculateTotals);
     </script>
     
     <!-- CONEXÃO COM O CORE ENGINE -->

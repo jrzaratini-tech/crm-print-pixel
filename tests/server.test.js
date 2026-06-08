@@ -160,6 +160,10 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(expensesPageResult.body, /hardDelete: true/);
   assert.match(orderBudgetPageResult.body, /Letra Caixa PETG 3D/);
   assert.match(orderBudgetPageResult.body, /loadProductCatalog/);
+  assert.match(orderBudgetPageResult.body, /descontoOrcamento/);
+  assert.match(orderBudgetPageResult.body, /ajusteOrcamento/);
+  assert.match(orderBudgetPageResult.body, /ficha\.custoTotal \/ 0\.30/);
+  assert.match(orderBudgetPageResult.body, /Abrir ficha tecnica/);
   assert.doesNotMatch(orderBudgetPageResult.body, /Textos e alturas do mesmo trabalho/);
   assert.match(calculatorPageResult.body, /Letras caixa impressas/);
   assert.match(calculatorPageResult.body, /data-calculator-tab="vinyl"/);
