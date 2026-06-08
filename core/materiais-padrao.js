@@ -23,7 +23,7 @@
             question('cor', 'Cor', coresAcabamento)
         ] },
         { key: 'pvc_expandido', nome: 'PVC expandido', categoria: 'Placa', formulaPadrao: 'placa', unidade: 'placa', questions: [
-            question('espessura', 'Espessura', ['1 mm', '2 mm', '3 mm', '5 mm', '10 mm', '15 mm']),
+            question('espessura', 'Espessura', ['1 mm', '2 mm', '3 mm', '5 mm', '10 mm', '15 mm', '19 mm']),
             question('cor', 'Cor', ['Branco', 'Preto', 'Outro'])
         ] },
         { key: 'metalon_aluminio', nome: 'Perfil metalon de alumínio', categoria: 'Perfil', formulaPadrao: 'barra', unidade: 'barra', comprimentoM: 3, questions: [

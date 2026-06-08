@@ -23,7 +23,7 @@ test('fonte pergunta tensao e potencia padronizadas', () => {
 });
 
 test('pvc e perfis usam medidas comerciais definidas', () => {
-  assert.deepEqual(MATERIAIS_PADRAO.get('pvc_expandido').questions[0].options, ['1 mm', '2 mm', '3 mm', '5 mm', '10 mm', '15 mm']);
+  assert.deepEqual(MATERIAIS_PADRAO.get('pvc_expandido').questions[0].options, ['1 mm', '2 mm', '3 mm', '5 mm', '10 mm', '15 mm', '19 mm']);
   assert.equal(MATERIAIS_PADRAO.get('metalon_aluminio').comprimentoM, 3);
   assert.equal(MATERIAIS_PADRAO.get('perfil_caixa_slim').comprimentoM, 3);
   assert.equal(MATERIAIS_PADRAO.get('perfil_caixa_luz').comprimentoM, 3);
