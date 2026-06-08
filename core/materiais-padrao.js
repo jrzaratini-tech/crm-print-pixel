@@ -16,7 +16,7 @@
         ] },
         { key: 'acrilico', nome: 'Placa de acrílico', categoria: 'Placa', formulaPadrao: 'placa', unidade: 'placa', questions: [
             question('acabamento', 'Tipo / acabamento', ['Cristal', 'Opalino', 'Colorido', 'Espelho prata', 'Espelho bronze', 'Espelho ouro']),
-            question('espessura', 'Espessura', ['2 mm', '3 mm', '4 mm', '5 mm', '8 mm', '10 mm'])
+            question('espessura', 'Espessura', ['2 mm', '3 mm', '4 mm', '5 mm', '6 mm', '8 mm', '10 mm'])
         ] },
         { key: 'acm', nome: 'Placa de ACM', categoria: 'Placa', formulaPadrao: 'placa', unidade: 'placa', questions: [
             question('espessura', 'Espessura', [], '3 mm'),
