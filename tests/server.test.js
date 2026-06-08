@@ -188,6 +188,10 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(dashboardPageResult.body, /deliveryCalendarBtn/);
   assert.match(dashboardPageResult.body, /deliveryMonthPicker/);
   assert.match(dashboardPageResult.body, /renderDeliveryCalendar/);
+  assert.match(dashboardPageResult.body, /plannerFindDate/);
+  assert.match(dashboardPageResult.body, /planejarPrazoEntrega/);
+  assert.match(dashboardPageResult.body, /holidaysForYear/);
+  assert.match(dashboardPageResult.body, /delivery-day .*weekend/);
   assert.match(dashboardPageResult.body, /rgba\(34, 197, 94/);
   assert.match(dashboardPageResult.body, /rgba\(239, 68, 68/);
   assert.match(scanPageResult.body, /Ler QR fiscal/);

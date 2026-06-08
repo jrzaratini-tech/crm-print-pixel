@@ -675,7 +675,7 @@
 
         .delivery-calendar-modal {
             width: min(1500px, 96vw);
-            max-height: 92vh;
+            height: 94vh;
             background: #ffffff;
             border-radius: 22px;
             box-shadow: var(--shadow-lg);
@@ -687,11 +687,12 @@
         .delivery-calendar-header {
             background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
             color: white;
-            padding: 22px 26px;
+            padding: 16px 22px;
             display: flex;
             justify-content: space-between;
             gap: 18px;
             align-items: center;
+            flex: 0 0 auto;
         }
 
         .delivery-calendar-title h2 {
@@ -733,18 +734,19 @@
 
         .delivery-calendar-summary {
             display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
+            grid-template-columns: repeat(6, minmax(0, 1fr));
             gap: 12px;
-            padding: 16px 22px;
+            padding: 12px 18px;
             background: #f8fafc;
             border-bottom: 1px solid #e2e8f0;
+            flex: 0 0 auto;
         }
 
         .delivery-summary-card {
             border: 1px solid #e2e8f0;
             border-radius: 14px;
             background: #fff;
-            padding: 13px 15px;
+            padding: 10px 12px;
         }
 
         .delivery-summary-card span {
@@ -760,19 +762,86 @@
             display: block;
             margin-top: 5px;
             color: var(--primary-color);
-            font-size: 24px;
+            font-size: 20px;
+        }
+
+        .delivery-planner {
+            grid-column: span 3;
+            border: 1px solid #bfdbfe;
+            background: #eff6ff;
+            border-radius: 14px;
+            padding: 10px 12px;
+        }
+
+        .delivery-planner-title {
+            color: #1e3a8a;
+            font-weight: 900;
+            font-size: 13px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        .delivery-planner-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+            align-items: end;
+        }
+
+        .delivery-planner label {
+            color: #1e3a8a;
+            font-size: 11px;
+            font-weight: 800;
+        }
+
+        .delivery-planner input {
+            width: 100%;
+            margin-top: 4px;
+            border: 1px solid #93c5fd;
+            border-radius: 8px;
+            padding: 8px;
+            background: white;
+        }
+
+        .delivery-planner button {
+            border: 0;
+            border-radius: 8px;
+            background: #2563eb;
+            color: white;
+            padding: 9px 10px;
+            font-weight: 900;
+            cursor: pointer;
+        }
+
+        .delivery-planner-result {
+            margin-top: 8px;
+            color: #1e3a8a;
+            font-size: 12px;
+            line-height: 1.35;
         }
 
         .delivery-calendar-grid {
-            padding: 18px 22px 24px;
-            overflow: auto;
+            padding: 12px 18px 16px;
+            overflow: hidden;
+            flex: 1 1 auto;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
         }
 
         .delivery-weekdays,
         .delivery-calendar-days {
             display: grid;
             grid-template-columns: repeat(7, minmax(130px, 1fr));
-            gap: 10px;
+            gap: 8px;
+        }
+
+        .delivery-calendar-days {
+            grid-template-rows: repeat(6, minmax(0, 1fr));
+            flex: 1 1 auto;
+            min-height: 0;
         }
 
         .delivery-weekday {
@@ -786,14 +855,15 @@
         }
 
         .delivery-day {
-            min-height: 150px;
+            min-height: 0;
             border: 1px solid #e2e8f0;
             border-radius: 14px;
             background: #ffffff;
-            padding: 10px;
+            padding: 7px;
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 5px;
+            overflow: hidden;
         }
 
         .delivery-day.outside {
@@ -806,6 +876,16 @@
             background: #eff6ff;
         }
 
+        .delivery-day.weekend {
+            background: #f8fafc;
+            border-color: #cbd5e1;
+        }
+
+        .delivery-day.holiday {
+            background: #fff1f2;
+            border-color: #fecdd3;
+        }
+
         .delivery-day.today {
             box-shadow: inset 0 0 0 2px #2563eb;
         }
@@ -816,6 +896,7 @@
             gap: 8px;
             font-weight: 900;
             color: #0f172a;
+            font-size: 12px;
         }
 
         .delivery-day-count {
@@ -830,23 +911,29 @@
             border-left: 4px solid #2563eb;
             background: white;
             border-radius: 10px;
-            padding: 8px;
+            padding: 6px;
             box-shadow: 0 3px 10px rgba(15, 23, 42, .06);
         }
 
         .delivery-item strong {
             display: block;
             color: #0f172a;
-            font-size: 13px;
+            font-size: 11px;
             line-height: 1.25;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .delivery-item span {
             display: block;
             color: #475569;
-            font-size: 11px;
+            font-size: 10px;
             margin-top: 3px;
             line-height: 1.3;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .delivery-item-status {
@@ -859,6 +946,26 @@
             font-size: 10px;
             font-weight: 900;
             text-transform: uppercase;
+        }
+
+        .delivery-more {
+            color: #1d4ed8;
+            background: #dbeafe;
+            border-radius: 999px;
+            padding: 4px 8px;
+            font-size: 10px;
+            font-weight: 900;
+            text-align: center;
+        }
+
+        .delivery-day-note {
+            color: #9f1239;
+            font-size: 9px;
+            font-weight: 900;
+            text-transform: uppercase;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .delivery-empty-month {
@@ -1152,6 +1259,19 @@
                 <div class="delivery-summary-card"><span>Entregas no mes</span><strong id="deliveryMonthTotal">0</strong></div>
                 <div class="delivery-summary-card"><span>Dias preenchidos</span><strong id="deliveryFilledDays">0</strong></div>
                 <div class="delivery-summary-card"><span>Pedidos sem data</span><strong id="deliveryNoDateTotal">0</strong></div>
+                <div class="delivery-planner">
+                    <div class="delivery-planner-title"><i class="fas fa-route"></i> Planejar prazo de novo servico</div>
+                    <div class="delivery-planner-grid">
+                        <label>Dias uteis de producao<input type="number" id="plannerProductionDays" min="1" max="60" value="5"></label>
+                        <label>Comecar a partir de<input type="date" id="plannerStartDate"></label>
+                        <label>Max. entregas/dia<input type="number" id="plannerDeliveryCapacity" min="1" max="20" value="2"></label>
+                        <label>Max. producao/dia<input type="number" id="plannerProductionCapacity" min="1" max="20" value="3"></label>
+                    </div>
+                    <div class="delivery-planner-grid" style="margin-top:8px; grid-template-columns: 1fr 2fr;">
+                        <button type="button" id="plannerFindDate">Encontrar janela</button>
+                        <div class="delivery-planner-result" id="plannerResult">Informe os dias uteis e clique para sugerir uma data segura.</div>
+                    </div>
+                </div>
             </div>
             <div class="delivery-calendar-grid">
                 <div class="delivery-weekdays" id="deliveryWeekdays"></div>
@@ -1188,6 +1308,12 @@
             const deliveryMonthTotal = document.getElementById('deliveryMonthTotal');
             const deliveryFilledDays = document.getElementById('deliveryFilledDays');
             const deliveryNoDateTotal = document.getElementById('deliveryNoDateTotal');
+            const plannerProductionDays = document.getElementById('plannerProductionDays');
+            const plannerStartDate = document.getElementById('plannerStartDate');
+            const plannerDeliveryCapacity = document.getElementById('plannerDeliveryCapacity');
+            const plannerProductionCapacity = document.getElementById('plannerProductionCapacity');
+            const plannerFindDate = document.getElementById('plannerFindDate');
+            const plannerResult = document.getElementById('plannerResult');
             
             // Estado do dashboard
             let isPrivate = false;
@@ -1261,6 +1387,8 @@
                     deliveryCalendarDate = new Date(year, month - 1, 1);
                     renderDeliveryCalendar();
                 });
+                plannerFindDate.addEventListener('click', planejarPrazoEntrega);
+                plannerStartDate.value = formatDateKey(new Date());
             }
             
             // Alternar modo privacidade
@@ -1313,6 +1441,85 @@
                 return Number.isNaN(date.getTime()) ? null : new Date(date.getFullYear(), date.getMonth(), date.getDate());
             }
 
+            function addDays(date, amount) {
+                return new Date(date.getFullYear(), date.getMonth(), date.getDate() + amount);
+            }
+
+            function easterSunday(year) {
+                const a = year % 19;
+                const b = Math.floor(year / 100);
+                const c = year % 100;
+                const d = Math.floor(b / 4);
+                const e = b % 4;
+                const f = Math.floor((b + 8) / 25);
+                const g = Math.floor((b - f + 1) / 3);
+                const h = (19 * a + b - d - g + 15) % 30;
+                const i = Math.floor(c / 4);
+                const k = c % 4;
+                const l = (32 + 2 * e + 2 * i - h - k) % 7;
+                const m = Math.floor((a + 11 * h + 22 * l) / 451);
+                const month = Math.floor((h + l - 7 * m + 114) / 31);
+                const day = ((h + l - 7 * m + 114) % 31) + 1;
+                return new Date(year, month - 1, day);
+            }
+
+            function holidaysForYear(year) {
+                const easter = easterSunday(year);
+                const fixed = [
+                    [0, 1, 'Ano Novo'],
+                    [3, 25, 'Dia da Liberdade'],
+                    [4, 1, 'Dia do Trabalhador'],
+                    [5, 10, 'Dia de Portugal'],
+                    [7, 15, 'Assuncao de Nossa Senhora'],
+                    [9, 5, 'Implantacao da Republica'],
+                    [10, 1, 'Todos os Santos'],
+                    [11, 1, 'Restauracao da Independencia'],
+                    [11, 8, 'Imaculada Conceicao'],
+                    [11, 25, 'Natal']
+                ];
+                const map = new Map(fixed.map(([month, day, label]) => [formatDateKey(new Date(year, month, day)), label]));
+                map.set(formatDateKey(addDays(easter, -2)), 'Sexta-feira Santa');
+                map.set(formatDateKey(easter), 'Pascoa');
+                map.set(formatDateKey(addDays(easter, 60)), 'Corpo de Deus');
+                return map;
+            }
+
+            function holidayLabel(date) {
+                return holidaysForYear(date.getFullYear()).get(formatDateKey(date)) || '';
+            }
+
+            function isBusinessDay(date) {
+                const day = date.getDay();
+                return day !== 0 && day !== 6 && !holidayLabel(date);
+            }
+
+            function nextBusinessDay(date) {
+                let cursor = new Date(date);
+                while (!isBusinessDay(cursor)) cursor = addDays(cursor, 1);
+                return cursor;
+            }
+
+            function addBusinessDays(date, amount) {
+                let cursor = new Date(date);
+                let remaining = Math.abs(amount);
+                const direction = amount >= 0 ? 1 : -1;
+                while (remaining > 0) {
+                    cursor = addDays(cursor, direction);
+                    if (isBusinessDay(cursor)) remaining--;
+                }
+                return cursor;
+            }
+
+            function businessWindow(startDate, days) {
+                const dates = [];
+                let cursor = nextBusinessDay(startDate);
+                while (dates.length < days) {
+                    if (isBusinessDay(cursor)) dates.push(new Date(cursor));
+                    cursor = addDays(cursor, 1);
+                }
+                return dates;
+            }
+
             function pedidosParaCalendario() {
                 return (todosEventosComTimestampsCorrigidos || [])
                     .filter(evento => !evento.deleted && evento.schema === 'pedido')
@@ -1327,6 +1534,7 @@
                             empresa: payload.empresa || '',
                             status: payload.status || 'pendente',
                             dataEntrega,
+                            diasProducao: Math.max(1, parseInt(payload.diasProducao || payload.prazoProducaoDias || payload.tempoProducaoDias || 1, 10) || 1),
                             produtos: produtos.map(produto => produto.nome).filter(Boolean).slice(0, 3)
                         };
                     });
@@ -1346,6 +1554,64 @@
             function alterarMesCalendario(offset) {
                 deliveryCalendarDate = new Date(deliveryCalendarDate.getFullYear(), deliveryCalendarDate.getMonth() + offset, 1);
                 renderDeliveryCalendar();
+            }
+
+            function deliveryLoadMap(pedidos) {
+                const map = new Map();
+                pedidos.forEach(pedido => {
+                    if (!pedido.dataEntrega) return;
+                    const key = formatDateKey(pedido.dataEntrega);
+                    map.set(key, (map.get(key) || 0) + 1);
+                });
+                return map;
+            }
+
+            function productionLoadMap(pedidos) {
+                const map = new Map();
+                pedidos.forEach(pedido => {
+                    if (!pedido.dataEntrega) return;
+                    const days = Math.max(1, pedido.diasProducao || 1);
+                    const start = addBusinessDays(pedido.dataEntrega, -days);
+                    businessWindow(start, days).forEach(date => {
+                        const key = formatDateKey(date);
+                        map.set(key, (map.get(key) || 0) + 1);
+                    });
+                });
+                return map;
+            }
+
+            function windowIsAvailable(windowDates, productionLoad, productionCapacity) {
+                return windowDates.every(date => (productionLoad.get(formatDateKey(date)) || 0) < productionCapacity);
+            }
+
+            function planejarPrazoEntrega() {
+                const productionDays = Math.max(1, parseInt(plannerProductionDays.value, 10) || 1);
+                const deliveryCapacity = Math.max(1, parseInt(plannerDeliveryCapacity.value, 10) || 1);
+                const productionCapacity = Math.max(1, parseInt(plannerProductionCapacity.value, 10) || 1);
+                const baseDate = parseDeliveryDate(plannerStartDate.value) || new Date();
+                const pedidos = pedidosParaCalendario();
+                const deliveries = deliveryLoadMap(pedidos);
+                const production = productionLoadMap(pedidos);
+                let cursor = nextBusinessDay(baseDate);
+
+                for (let attempt = 0; attempt < 240; attempt++) {
+                    const windowDates = businessWindow(cursor, productionDays);
+                    const deliveryDate = nextBusinessDay(addDays(windowDates[windowDates.length - 1], 1));
+                    const deliveryKey = formatDateKey(deliveryDate);
+                    const deliveryAvailable = (deliveries.get(deliveryKey) || 0) < deliveryCapacity;
+                    const productionAvailable = windowIsAvailable(windowDates, production, productionCapacity);
+
+                    if (deliveryAvailable && productionAvailable) {
+                        deliveryCalendarDate = new Date(deliveryDate.getFullYear(), deliveryDate.getMonth(), 1);
+                        renderDeliveryCalendar();
+                        plannerResult.innerHTML = `<strong>Janela sugerida:</strong> produzir de ${windowDates[0].toLocaleDateString('pt-PT')} a ${windowDates[windowDates.length - 1].toLocaleDateString('pt-PT')}. <strong>Entrega prevista:</strong> ${deliveryDate.toLocaleDateString('pt-PT')}.`;
+                        return;
+                    }
+                    cursor = addDays(cursor, 1);
+                    cursor = nextBusinessDay(cursor);
+                }
+
+                plannerResult.textContent = 'Nao encontrei uma janela livre nos proximos meses com estes limites. Aumente a capacidade diaria ou reduza o prazo.';
             }
 
             function renderDeliveryCalendar() {
@@ -1382,7 +1648,11 @@
                     const dayOrders = entregasPorDia.get(key) || [];
                     const outside = date.getMonth() !== month;
                     const today = key === todayKey;
-                    const items = dayOrders.map(pedido => `
+                    const holiday = holidayLabel(date);
+                    const weekend = date.getDay() === 0 || date.getDay() === 6;
+                    const visibleOrders = dayOrders.slice(0, 2);
+                    const hiddenCount = Math.max(0, dayOrders.length - visibleOrders.length);
+                    const items = visibleOrders.map(pedido => `
                         <div class="delivery-item" title="${escapeHtml(pedido.numero)}">
                             <strong>${escapeHtml(pedido.cliente)}</strong>
                             <span>${escapeHtml(pedido.numero)}${pedido.empresa ? ' | ' + escapeHtml(pedido.empresa) : ''}</span>
@@ -1391,12 +1661,14 @@
                         </div>
                     `).join('');
                     cells.push(`
-                        <div class="delivery-day ${outside ? 'outside' : ''} ${today ? 'today' : ''} ${dayOrders.length ? 'has-deliveries' : ''}">
+                        <div class="delivery-day ${outside ? 'outside' : ''} ${today ? 'today' : ''} ${weekend ? 'weekend' : ''} ${holiday ? 'holiday' : ''} ${dayOrders.length ? 'has-deliveries' : ''}">
                             <div class="delivery-day-number">
                                 <span>${date.getDate()}</span>
                                 ${dayOrders.length ? `<span class="delivery-day-count">${dayOrders.length}</span>` : ''}
                             </div>
+                            ${holiday ? `<div class="delivery-day-note">${escapeHtml(holiday)}</div>` : ''}
                             ${items}
+                            ${hiddenCount ? `<div class="delivery-more">+${hiddenCount} entregas</div>` : ''}
                         </div>
                     `);
                 }
