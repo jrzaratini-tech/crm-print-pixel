@@ -184,6 +184,11 @@ function money(value) {
   return Number.isFinite(parsed) ? Math.max(0, Math.round(parsed * 100) / 100) : 0;
 }
 
+function signedMoney(value) {
+  const parsed = Number.parseFloat(String(value || '0').replace(',', '.'));
+  return Number.isFinite(parsed) ? Math.round(parsed * 100) / 100 : 0;
+}
+
 function hash(value) {
   return crypto.createHash('sha256').update(String(value)).digest('hex');
 }
@@ -400,6 +405,48 @@ function sellerCommissionBase(payload = {}) {
 function sellerCommissionRate(value) {
   const parsed = money(value);
   return Math.min(10, Math.max(5, parsed || 5));
+}
+
+function quoteSubtotalFromProducts(payload = {}) {
+  const products = Array.isArray(payload.produtos) ? payload.produtos : [];
+  return products.reduce((sum, product) => sum + money(product.valor) * Math.max(1, money(product.quantidade || 1)), 0);
+}
+
+function quoteCostFromProducts(payload = {}) {
+  const products = Array.isArray(payload.produtos) ? payload.produtos : [];
+  return products.reduce((sum, product) => sum + money(product.custo) * Math.max(1, money(product.quantidade || 1)), 0);
+}
+
+function recalculateSellerQuotePayload(payload = {}, sellerExtraMarkup = payload.sellerExtraMarkup) {
+  const desconto = money(payload.desconto);
+  const ajustePreco = signedMoney(payload.ajustePreco || payload.ajuste);
+  const instalacao = money(payload.instalacao);
+  const subtotalProdutos = quoteSubtotalFromProducts(payload);
+  const baseComissao = Math.max(0, subtotalProdutos + instalacao - desconto + ajustePreco);
+  const extra = money(sellerExtraMarkup);
+  const subtotal = Math.max(0, baseComissao + extra);
+  const iva = payload.comIVA === 'nao' ? 0 : money(subtotal * 0.23);
+  const sellerRate = sellerCommissionRate(payload.sellerCommissionRate);
+  const sellerCommissionValue = payload.sellerId ? money((baseComissao * sellerRate / 100) + extra) : 0;
+  const mountingRate = money(payload.mountingCommissionRate);
+  const mountingCommissionValue = money(baseComissao * mountingRate / 100);
+  const custoMateriais = quoteCostFromProducts(payload);
+  const custoPrevisto = money(custoMateriais + sellerCommissionValue + mountingCommissionValue);
+  const lucroPrevisto = money(subtotal - custoPrevisto);
+  const margemPrevista = subtotal > 0 ? Math.round((lucroPrevisto / subtotal) * 10000) / 100 : 0;
+  return {
+    ...payload,
+    subtotal,
+    iva,
+    total: money(subtotal + iva),
+    sellerExtraMarkup: extra,
+    sellerCommissionRate: sellerRate,
+    sellerCommissionValue,
+    mountingCommissionValue,
+    custoPrevisto,
+    lucroPrevisto,
+    margemPrevista
+  };
 }
 
 async function suppliers() {
@@ -885,12 +932,89 @@ async function sellerOrders(sellerId) {
   return rows.sort((a, b) => new Date(b.paidAt || b.dataEntrega || 0) - new Date(a.paidAt || a.dataEntrega || 0));
 }
 
+async function sellerQuotes(sellerId) {
+  const snapshot = await db.collection('events').get();
+  const rows = snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }))
+    .filter(event => !event.deleted && event.schema === 'orcamento' && event.payload?.sellerId === sellerId)
+    .map(event => {
+      const payload = event.payload || {};
+      return sanitizeForResponse({
+        id: event.id,
+        codigo: payload.codigo || event.id,
+        cliente: payload.cliente || '',
+        empresa: payload.empresa || '',
+        subtotal: money(payload.subtotal),
+        iva: money(payload.iva),
+        total: money(payload.total),
+        sellerExtraMarkup: money(payload.sellerExtraMarkup),
+        commissionRate: sellerCommissionRate(payload.sellerCommissionRate),
+        commission: money(payload.sellerCommissionValue),
+        status: payload.sellerQuoteStatus || payload.status || 'sent',
+        validade: payload.validade || '',
+        produtos: Array.isArray(payload.produtos) ? payload.produtos.map(product => ({
+          nome: text(product.nome || 'Produto', 160),
+          quantidade: money(product.quantidade || 1),
+          valor: money(product.valor)
+        })) : []
+      });
+    });
+  return rows.sort((a, b) => new Date(b.validade || 0) - new Date(a.validade || 0));
+}
+
 app.get('/api/vendedor/session', requireSeller, async (req, res) => {
   try {
-    res.json({ success: true, seller: safeSellerForResponse(req.seller), sales: await sellerOrders(req.seller.id) });
+    res.json({ success: true, seller: safeSellerForResponse(req.seller), sales: await sellerOrders(req.seller.id), quotes: await sellerQuotes(req.seller.id) });
   } catch (error) {
     console.error('Erro ao carregar painel do vendedor:', error);
     res.status(500).json({ success: false, message: 'Nao foi possivel carregar suas vendas.' });
+  }
+});
+
+app.post('/api/vendedor/orcamentos/:id/valor', requireSeller, async (req, res) => {
+  try {
+    const id = String(req.params.id || '');
+    if (!isSafeIdentifier(id)) return res.status(400).json({ success: false, message: 'Orcamento invalido.' });
+    const ref = db.collection('events').doc(id);
+    const doc = await ref.get();
+    if (!doc.exists || doc.data().schema !== 'orcamento' || doc.data().deleted) return res.status(404).json({ success: false, message: 'Orcamento nao encontrado.' });
+    const current = doc.data();
+    const payload = current.payload || {};
+    if (payload.sellerId !== req.seller.id) return res.status(403).json({ success: false, message: 'Este orcamento nao pertence ao seu acesso.' });
+    if (payload.pedidoNumero) return res.status(400).json({ success: false, message: 'Orcamento ja convertido em pedido.' });
+    const updatedPayload = recalculateSellerQuotePayload(payload, req.body?.sellerExtraMarkup);
+    const now = new Date().toISOString();
+    await ref.set({ ...current, payload: updatedPayload, updated_at: now }, { merge: true });
+    res.json({ success: true, quote: sanitizeForResponse({ id, ...updatedPayload }) });
+  } catch (error) {
+    console.error('Erro ao atualizar acrescimo do vendedor:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel atualizar o valor.' });
+  }
+});
+
+app.post('/api/vendedor/orcamentos/:id/aprovar', requireSeller, async (req, res) => {
+  try {
+    const id = String(req.params.id || '');
+    if (!isSafeIdentifier(id)) return res.status(400).json({ success: false, message: 'Orcamento invalido.' });
+    const ref = db.collection('events').doc(id);
+    const doc = await ref.get();
+    if (!doc.exists || doc.data().schema !== 'orcamento' || doc.data().deleted) return res.status(404).json({ success: false, message: 'Orcamento nao encontrado.' });
+    const current = doc.data();
+    const payload = current.payload || {};
+    if (payload.sellerId !== req.seller.id) return res.status(403).json({ success: false, message: 'Este orcamento nao pertence ao seu acesso.' });
+    if (payload.pedidoNumero) return res.status(400).json({ success: false, message: 'Orcamento ja convertido em pedido.' });
+    const now = new Date().toISOString();
+    const updatedPayload = {
+      ...recalculateSellerQuotePayload(payload),
+      sellerQuoteStatus: 'approved',
+      status: payload.status === 'convertido' ? payload.status : 'aprovado',
+      approvedBySellerAt: now
+    };
+    await ref.set({ ...current, payload: updatedPayload, updated_at: now }, { merge: true });
+    res.json({ success: true, quote: sanitizeForResponse({ id, ...updatedPayload, entrada70: money(updatedPayload.total * 0.70), restante30: money(updatedPayload.total * 0.30) }) });
+  } catch (error) {
+    console.error('Erro ao aprovar orcamento pelo vendedor:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel aprovar o orcamento.' });
   }
 });
 

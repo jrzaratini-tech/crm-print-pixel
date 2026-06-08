@@ -58,6 +58,15 @@
             question('cor', 'Cor', ['Branco', 'Preto', 'Natural', 'Transparente', 'Outro']),
             question('diametro', 'Diametro', [], '1,75 mm')
         ] },
+        { key: 'router_cnc', nome: 'Router CNC', categoria: 'Maquina', formulaPadrao: 'hora', unidade: 'h', questions: [
+            question('tipo', 'Tipo', [], 'Corte / usinagem CNC')
+        ] },
+        { key: 'maquina_laser', nome: 'Maquina Laser', categoria: 'Maquina', formulaPadrao: 'hora', unidade: 'h', questions: [
+            question('tipo', 'Tipo', [], 'Corte laser')
+        ] },
+        { key: 'mao_obra_acabamento', nome: 'Mao de obra de acabamento', categoria: 'Acabamento', formulaPadrao: 'hora', unidade: 'h', questions: [
+            question('tipo', 'Tipo', ['Acabamento', 'Montagem', 'Solda', 'Pintura', 'Outro'])
+        ] },
         { key: 'adesivo', nome: 'Adesivo', categoria: 'Adesivo', formulaPadrao: 'area', unidade: 'm²', questions: [
             question('tipo', 'Tipo', ['Brilho', 'Fosco', 'Transparente', 'Impressão digital', 'Outro'])
         ] },

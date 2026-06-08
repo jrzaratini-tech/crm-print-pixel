@@ -143,6 +143,8 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(menuResult.body, /pages\/calculadora\.html/);
   assert.match(menuResult.body, /pages\/produtos\.html/);
   assert.match(pageResult.body, /Cadastro de Materiais/);
+  assert.match(pageResult.body, /Hora de maquina \/ mao de obra/);
+  assert.match(presetsResult.body, /Router CNC/);
   assert.match(productsPageResult.body, /Cadastro de Produtos/);
   assert.match(productsPageResult.body, /api\/products/);
   assert.match(orderFormPageResult.body, /delivery-btn/);
@@ -162,7 +164,10 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(orderBudgetPageResult.body, /loadProductCatalog/);
   assert.match(orderBudgetPageResult.body, /descontoOrcamento/);
   assert.match(orderBudgetPageResult.body, /ajusteOrcamento/);
-  assert.match(orderBudgetPageResult.body, /ficha\.custoTotal \/ 0\.30/);
+  assert.match(orderBudgetPageResult.body, /sellerExtraMarkup/);
+  assert.match(orderBudgetPageResult.body, /mountingCommissionRate/);
+  assert.match(orderBudgetPageResult.body, /sellerCommissionValue/);
+  assert.match(orderBudgetPageResult.body, /Math\.max\(0\.01, 1 - margemMinimaDecimal\)/);
   assert.match(orderBudgetPageResult.body, /Abrir ficha tecnica/);
   assert.doesNotMatch(orderBudgetPageResult.body, /Textos e alturas do mesmo trabalho/);
   assert.match(calculatorPageResult.body, /Letras caixa impressas/);
@@ -225,6 +230,8 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(commissionsPageResult.body, /sellerForm/);
   assert.match(sellerAppResult.body, /PrintPixel Vendedor/);
   assert.match(sellerScriptResult.body, /api\/vendedor\/session/);
+  assert.match(sellerAppResult.body, /Orçamentos enviados/);
+  assert.match(sellerScriptResult.body, /api\/vendedor\/orcamentos/);
   assert.match(productionPageResult.body, /classificationOverlay/);
   assert.match(productionPageResult.body, /workerFilter/);
   assert.match(productionPageResult.body, /Desclassificar e devolver à fila/);

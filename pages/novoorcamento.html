@@ -611,6 +611,34 @@
                     <textarea id="observacoes" name="observacoes" data-bind="orcamento.observacoes" rows="3" placeholder="Informações adicionais sobre o orçamento..."></textarea>
                 </div>
             </div>
+
+            <div class="form-section">
+                <h2 class="section-title">Comercial e comissÃµes</h2>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="sellerId">Vendedor / comercial</label>
+                        <select id="sellerId" data-bind="orcamento.sellerId">
+                            <option value="">Sem vendedor externo</option>
+                        </select>
+                        <div class="field-note">Quando selecionado, este orÃ§amento aparece no app do vendedor.</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="sellerCommissionRate">ComissÃ£o de venda (%)</label>
+                        <input type="number" id="sellerCommissionRate" min="5" max="10" step="0.1" value="5" data-bind="orcamento.sellerCommissionRate">
+                        <div class="field-note">MÃ­nimo 5% e mÃ¡ximo 10%, calculado sem IVA e sem instalaÃ§Ã£o.</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="mountingCommissionRate">ComissÃ£o de montagem (%)</label>
+                        <input type="number" id="mountingCommissionRate" min="0" max="30" step="0.1" value="0" data-bind="orcamento.mountingCommissionRate">
+                        <div class="field-note">Custo interno da montagem, separado da ficha tÃ©cnica.</div>
+                    </div>
+                    <div class="form-group">
+                        <label for="sellerExtraMarkup">AcrÃ©scimo do vendedor sem IVA (â‚¬)</label>
+                        <input type="number" id="sellerExtraMarkup" min="0" step="0.01" value="0" data-bind="orcamento.sellerExtraMarkup">
+                        <div class="field-note">O app do vendedor sÃ³ pode alterar este acrÃ©scimo.</div>
+                    </div>
+                </div>
+            </div>
             
             <div class="products-section">
                 <h2 class="section-title">Produtos</h2>
@@ -689,6 +717,11 @@
                     </div>
 
                     <div class="total-card">
+                        <div class="total-label">Comissões Previstas</div>
+                        <div class="total-value" id="comissoesEstimadas">0,00 €</div>
+                    </div>
+
+                    <div class="total-card">
                         <div class="total-label">Lucro Estimado</div>
                         <div class="total-value" id="lucroEstimado">0,00 €</div>
                     </div>
@@ -714,6 +747,8 @@
                 <input type="hidden" id="orcamentoPrecoMinimo" data-bind="orcamento.precoMinimo" value="0">
                 <input type="hidden" id="orcamentoDesconto" data-bind="orcamento.desconto" value="0">
                 <input type="hidden" id="orcamentoAjuste" data-bind="orcamento.ajustePreco" value="0">
+                <input type="hidden" id="orcamentoSellerCommissionValue" data-bind="orcamento.sellerCommissionValue" value="0">
+                <input type="hidden" id="orcamentoMountingCommissionValue" data-bind="orcamento.mountingCommissionValue" value="0">
             </div>
             
             <div class="form-actions">
@@ -778,7 +813,10 @@
         let currentOrcamentoId = '';
         let margemMinimaOrcamento = 50;
         let catalogoMateriais = [];
+        let vendedores = [];
         let technicalProductRow = null;
+        let currentSellerQuoteStatus = '';
+        let currentBudgetStatus = '';
         
         // Referências DOM
         const productsTableBody = document.getElementById('productsTableBody');
@@ -821,6 +859,21 @@
                 const selected = select.value;
                 select.innerHTML = `<option value="">Selecione um produto</option>${productOptions(selected)}`;
             });
+        }
+
+        async function loadSellers(selectedId = '') {
+            try {
+                const response = await fetch('/api/sellers');
+                if (!response.ok) throw new Error('Erro ao carregar vendedores');
+                const result = await response.json();
+                vendedores = (result.sellers || []).filter(seller => seller.active !== false);
+                const select = document.getElementById('sellerId');
+                select.innerHTML = '<option value="">Sem vendedor externo</option>' + vendedores
+                    .map(seller => `<option value="${seller.id}" ${selectedId === seller.id ? 'selected' : ''}>${seller.name}</option>`)
+                    .join('');
+            } catch (error) {
+                console.warn('Nao foi possivel carregar vendedores:', error);
+            }
         }
         
         // ============================================
@@ -975,6 +1028,8 @@
                     }, 2000);
                     return;
                 }
+                currentSellerQuoteStatus = orcamento.sellerQuoteStatus || '';
+                currentBudgetStatus = orcamento.status || '';
                 
                 // Preencher formulário
                 document.getElementById('cliente').value = orcamento.cliente || '';
@@ -989,6 +1044,10 @@
                 document.getElementById('orcamentoId').value = orcamentoEvento.id;
                 document.getElementById('descontoOrcamento').value = orcamento.desconto || 0;
                 document.getElementById('ajusteOrcamento').value = orcamento.ajustePreco || orcamento.ajuste || 0;
+                await loadSellers(orcamento.sellerId || '');
+                document.getElementById('sellerCommissionRate').value = orcamento.sellerCommissionRate || 5;
+                document.getElementById('mountingCommissionRate').value = orcamento.mountingCommissionRate || 0;
+                document.getElementById('sellerExtraMarkup').value = orcamento.sellerExtraMarkup || 0;
                 
                 // Validade
                 if (orcamento.validadeDias) {
@@ -1171,6 +1230,7 @@
             const formula = item.formula || material.formulaPadrao || 'unidade';
             if (['area', 'placa', 'perimetro', 'densidade_area'].includes(formula)) return `<label>Largura (cm)<input class="tech-largura" type="number" min="0" step="0.1" value="${item.larguraCm || 0}"></label><label>Altura (cm)<input class="tech-altura" type="number" min="0" step="0.1" value="${item.alturaCm || 0}"></label>`;
             if (['linear', 'barra'].includes(formula)) return `<label>Comprimento (m)<input class="tech-comprimento" type="number" min="0" step="0.01" value="${item.comprimentoM || 0}"></label>`;
+            if (formula === 'hora') return `<label>Horas previstas<input class="tech-horas" type="number" min="0" step="0.1" value="${item.horas || 0}"></label>`;
             return '<span style="color:#64748b;">Cálculo por unidade</span>';
         }
 
@@ -1193,6 +1253,7 @@
                 larguraCm: item.larguraCm || 0,
                 alturaCm: item.alturaCm || 0,
                 comprimentoM: item.comprimentoM || 0,
+                horas: item.horas || 0,
                 quantidade: item.quantidade || 1,
                 perdaPercentual: item.perdaPercentual ?? '',
                 variantes: item.variantes || {}
@@ -1240,6 +1301,7 @@
             item.larguraCm = parseFloat(row.querySelector('.tech-largura')?.value) || 0;
             item.alturaCm = parseFloat(row.querySelector('.tech-altura')?.value) || 0;
             item.comprimentoM = parseFloat(row.querySelector('.tech-comprimento')?.value) || 0;
+            item.horas = parseFloat(row.querySelector('.tech-horas')?.value) || 0;
             item.quantidade = parseFloat(row.querySelector('.tech-quantidade').value) || 1;
             item.perdaPercentual = row.querySelector('.tech-perda').value;
             item.variantes = Object.fromEntries(Array.from(row.querySelectorAll('[data-variant]')).map(element => [element.dataset.variant, element.value]));
@@ -1261,7 +1323,8 @@
         function aplicarFichaTecnica() {
             if (!technicalProductRow) return;
             const ficha = calcularFichaOrcamento(technicalProductRow._materiais);
-            const precoSugerido = ficha.custoTotal > 0 ? ficha.custoTotal / 0.30 : 0;
+            const margemMinimaDecimal = Math.min(99, Math.max(0, margemMinimaOrcamento)) / 100;
+            const precoSugerido = ficha.custoTotal > 0 ? ficha.custoTotal / Math.max(0.01, 1 - margemMinimaDecimal) : 0;
             technicalProductRow.querySelector('.custo-input').value = ficha.custoTotal.toFixed(2);
             technicalProductRow.querySelector('.valor-input').value = precoSugerido.toFixed(2);
             technicalProductRow.querySelector('.materials-summary').textContent = `${technicalProductRow._materiais.length} itens | custo ${formatarMoeda(ficha.custoTotal)} | sugerido ${formatarMoeda(precoSugerido)}`;
@@ -1324,7 +1387,15 @@
             const instalacao = 0;
             const desconto = Math.max(0, parseFloat(document.getElementById('descontoOrcamento')?.value) || 0);
             const ajustePreco = parseFloat(document.getElementById('ajusteOrcamento')?.value) || 0;
-            const subtotalGeral = Math.max(0, subtotalProdutos + instalacao - desconto + ajustePreco);
+            const sellerExtraMarkup = Math.max(0, parseFloat(document.getElementById('sellerExtraMarkup')?.value) || 0);
+            const baseComissao = Math.max(0, subtotalProdutos + instalacao - desconto + ajustePreco);
+            const sellerRate = Math.min(10, Math.max(5, parseFloat(document.getElementById('sellerCommissionRate')?.value) || 5));
+            const mountingRate = Math.max(0, parseFloat(document.getElementById('mountingCommissionRate')?.value) || 0);
+            const hasSeller = Boolean(document.getElementById('sellerId')?.value);
+            const sellerCommissionValue = hasSeller ? (baseComissao * sellerRate / 100) + sellerExtraMarkup : 0;
+            const mountingCommissionValue = baseComissao * mountingRate / 100;
+            const totalComissoes = sellerCommissionValue + mountingCommissionValue;
+            const subtotalGeral = Math.max(0, baseComissao + sellerExtraMarkup);
             
             let iva = 0;
             if (document.getElementById('ivaSim').checked) {
@@ -1332,17 +1403,19 @@
             }
             
             const totalFinal = subtotalGeral + iva;
-            const lucroEstimado = subtotalGeral - custoEstimado;
+            const custoGerencial = custoEstimado + totalComissoes;
+            const lucroEstimado = subtotalGeral - custoGerencial;
             const margemEstimada = subtotalGeral > 0 ? (lucroEstimado / subtotalGeral) * 100 : 0;
             const margemMinimaDecimal = Math.min(99, Math.max(0, margemMinimaOrcamento)) / 100;
-            const precoMinimo = custoEstimado / Math.max(0.01, 1 - margemMinimaDecimal);
+            const precoMinimo = custoGerencial / Math.max(0.01, 1 - margemMinimaDecimal);
             
             // Atualizar exibição
             document.getElementById('subtotalProdutos').textContent = formatarMoeda(subtotalProdutos);
             document.getElementById('totalInstalacao').textContent = formatarMoeda(instalacao);
             document.getElementById('valorIVA').textContent = formatarMoeda(iva);
             document.getElementById('totalFinal').textContent = formatarMoeda(totalFinal);
-            document.getElementById('custoEstimado').textContent = formatarMoeda(custoEstimado);
+            document.getElementById('custoEstimado').textContent = formatarMoeda(custoGerencial);
+            document.getElementById('comissoesEstimadas').textContent = formatarMoeda(totalComissoes);
             document.getElementById('lucroEstimado').textContent = formatarMoeda(lucroEstimado);
             document.getElementById('margemEstimada').textContent = margemEstimada.toFixed(1).replace('.', ',') + '%';
             document.getElementById('margemEstimada').style.color = margemEstimada < margemMinimaOrcamento ? '#ef4444' : '#10b981';
@@ -1354,10 +1427,12 @@
             document.getElementById('orcamentoTotal').value = totalFinal;
             document.getElementById('orcamentoDesconto').value = desconto.toFixed(2);
             document.getElementById('orcamentoAjuste').value = ajustePreco.toFixed(2);
-            document.getElementById('orcamentoCustoEstimado').value = custoEstimado.toFixed(2);
+            document.getElementById('orcamentoCustoEstimado').value = custoGerencial.toFixed(2);
             document.getElementById('orcamentoLucroEstimado').value = lucroEstimado.toFixed(2);
             document.getElementById('orcamentoMargemEstimada').value = margemEstimada.toFixed(2);
             document.getElementById('orcamentoPrecoMinimo').value = precoMinimo.toFixed(2);
+            document.getElementById('orcamentoSellerCommissionValue').value = sellerCommissionValue.toFixed(2);
+            document.getElementById('orcamentoMountingCommissionValue').value = mountingCommissionValue.toFixed(2);
         }
         
         function formatarMoeda(value) {
@@ -1456,6 +1531,7 @@
         
         document.addEventListener('DOMContentLoaded', async () => {
             await loadProductCatalog();
+            await loadSellers();
             try {
                 const materialsResponse = await fetch('/api/database/query', {
                     method: 'POST',
@@ -1619,15 +1695,23 @@
                     total: parseFloat(document.getElementById('orcamentoTotal').value) || 0,
                     desconto: parseFloat(document.getElementById('orcamentoDesconto').value) || 0,
                     ajustePreco: parseFloat(document.getElementById('orcamentoAjuste').value) || 0,
+                    sellerId: document.getElementById('sellerId').value,
+                    sellerName: vendedores.find(seller => seller.id === document.getElementById('sellerId').value)?.name || '',
+                    sellerCommissionRate: Math.min(10, Math.max(5, parseFloat(document.getElementById('sellerCommissionRate').value) || 5)),
+                    sellerCommissionValue: parseFloat(document.getElementById('orcamentoSellerCommissionValue').value) || 0,
+                    sellerExtraMarkup: Math.max(0, parseFloat(document.getElementById('sellerExtraMarkup').value) || 0),
+                    sellerQuoteStatus: document.getElementById('sellerId').value ? (currentSellerQuoteStatus || 'sent') : '',
+                    mountingCommissionRate: Math.max(0, parseFloat(document.getElementById('mountingCommissionRate').value) || 0),
+                    mountingCommissionValue: parseFloat(document.getElementById('orcamentoMountingCommissionValue').value) || 0,
                     resumoProfissional: resumoProfissional,
-                    custoPrevisto: resumoProfissional.custoPrevisto,
-                    lucroPrevisto: resumoProfissional.lucroPrevisto,
-                    margemPrevista: resumoProfissional.margemPrevista,
-                    precoMinimo: resumoProfissional.precoMinimo,
+                    custoPrevisto: parseFloat(document.getElementById('orcamentoCustoEstimado').value) || resumoProfissional.custoPrevisto,
+                    lucroPrevisto: parseFloat(document.getElementById('orcamentoLucroEstimado').value) || resumoProfissional.lucroPrevisto,
+                    margemPrevista: parseFloat(document.getElementById('orcamentoMargemEstimada').value) || resumoProfissional.margemPrevista,
+                    precoMinimo: parseFloat(document.getElementById('orcamentoPrecoMinimo').value) || resumoProfissional.precoMinimo,
                     precoSugerido: resumoProfissional.precoSugerido,
                     abaixoMargem: resumoProfissional.abaixoMargem,
                     comIVA: document.querySelector('input[name="ivaOption"]:checked').value,
-                    status: 'pendente', // Sempre definir como pendente ao salvar/editar
+                    status: currentBudgetStatus || 'pendente',
                     validade: validadeData,
                     validadeDias: validadeDias,
                     dataCriacao: new Date().toISOString().split('T')[0],
@@ -1669,6 +1753,10 @@
         document.getElementById('ivaNao').addEventListener('change', calculateTotals);
         document.getElementById('descontoOrcamento').addEventListener('input', calculateTotals);
         document.getElementById('ajusteOrcamento').addEventListener('input', calculateTotals);
+        document.getElementById('sellerId').addEventListener('change', calculateTotals);
+        document.getElementById('sellerCommissionRate').addEventListener('input', calculateTotals);
+        document.getElementById('mountingCommissionRate').addEventListener('input', calculateTotals);
+        document.getElementById('sellerExtraMarkup').addEventListener('input', calculateTotals);
     </script>
     
     <!-- CONEXÃO COM O CORE ENGINE -->

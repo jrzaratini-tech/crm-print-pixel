@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header class="topbar"><div><strong>PrintPixel</strong><span>App comercial</span></div><button id="logoutBtn" hidden>Sair</button></header>
+  <header class="topbar"><div><strong id="brandName">PrintPixel</strong><span>App comercial</span></div><button id="logoutBtn" hidden>Sair</button></header>
   <section class="login-shell" id="loginShell">
     <form class="login-card" id="loginForm">
       <p class="eyebrow">Acesso do vendedor</p><h1>Entrar no app</h1><p>Use o usuário e senha cadastrados no CRM.</p>
@@ -20,7 +20,8 @@
   </section>
   <main id="appShell" hidden>
     <section class="hero"><p class="eyebrow">Painel individual</p><h1 id="sellerName">Carregando...</h1><p>Acompanhe suas vendas e comissões.</p></section>
-    <section class="summary"><div><b id="openCount">0</b><span>Em aberto</span></div><div><b id="pendingValue">€0,00</b><span>A receber</span></div><div><b id="paidCount">0</b><span>Pagas</span></div></section>
+    <section class="summary"><div><b id="openQuoteCount">0</b><span>Orçamentos</span></div><div><b id="openCount">0</b><span>Vendas em aberto</span></div><div><b id="pendingValue">€0,00</b><span>A receber</span></div><div><b id="paidCount">0</b><span>Pagas</span></div></section>
+    <section class="work-section"><h2>Orçamentos enviados</h2><div class="list" id="quoteList"></div></section>
     <section class="work-section"><h2>Comissões a receber</h2><div class="list" id="pendingList"></div></section>
     <button class="history-toggle" id="historyToggle" type="button">Histórico pago</button>
     <section class="work-section" id="paidSection" hidden><h2>Comissões pagas</h2><div class="list" id="paidList"></div></section>

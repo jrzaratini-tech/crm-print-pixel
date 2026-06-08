@@ -49,6 +49,16 @@ test('calcula perfil por barra comercial', () => {
   assert.equal(result.custo, 36);
 });
 
+test('calcula hora de maquina e acabamento', () => {
+  const result = CUSTEIO.calcular(
+    { formula: 'hora', horas: 2.5, quantidade: 1 },
+    { unidade: 'h', precoCusto: 30 }
+  );
+  assert.equal(result.consumo, 2.5);
+  assert.equal(result.unidade, 'h');
+  assert.equal(result.custo, 75);
+});
+
 test('calcula fita led por contorno e módulos por densidade', () => {
   const fita = CUSTEIO.calcular(
     { formula: 'perimetro', larguraCm: 100, alturaCm: 50, quantidade: 1 },

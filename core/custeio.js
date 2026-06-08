@@ -11,6 +11,7 @@
         linear: 'Comprimento informado (m)',
         densidade_area: 'Densidade por área (un.)',
         unidade: 'Quantidade informada (un.)',
+        hora: 'Hora de maquina / mao de obra',
         placa: 'Aproveitamento por placa',
         barra: 'Aproveitamento por barra'
     };
@@ -35,6 +36,7 @@
         const area = larguraM * alturaM * quantidade;
         const perimetro = 2 * (larguraM + alturaM) * quantidade;
         const linear = numero(item.comprimentoM) * quantidade;
+        const horas = numero(item.horas) * quantidade;
         const perda = fatorPerda(item, material);
         let consumo = 0;
         let unidade = material.unidade || 'un';
@@ -53,6 +55,10 @@
         if (formula === 'linear') consumo = linear * perda;
         if (formula === 'densidade_area') consumo = Math.ceil(area * numero(material.densidadePorM2) * perda);
         if (formula === 'unidade') consumo = Math.ceil(quantidade * perda);
+        if (formula === 'hora') {
+            consumo = horas;
+            unidade = material.unidade || 'h';
+        }
         if (formula === 'placa') {
             const areaPlaca = (numero(material.larguraCm) / 100) * (numero(material.alturaCm) / 100);
             consumo = areaPlaca > 0 ? Math.ceil((area * perda) / areaPlaca) : 0;
@@ -65,7 +71,7 @@
         }
 
         const custo = consumo * precoUnitario;
-        return { formula, consumo, custo, unidade, area, perimetro, linear, precoUnitario };
+        return { formula, consumo, custo, unidade, area, perimetro, linear, horas, precoUnitario };
     }
 
     function calcularFicha(itens = [], materiais = []) {

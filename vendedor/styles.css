@@ -15,7 +15,7 @@ main { max-width:760px; margin:auto; padding:18px; }
 .hero { padding:10px 0; }
 .eyebrow { margin:0; color:var(--primary); font-size:11px; font-weight:900; text-transform:uppercase; letter-spacing:.1em; }
 h1 { margin:5px 0; font-size:26px; } h2,p { margin:4px 0; } p { color:var(--muted); line-height:1.45; }
-.summary { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin:16px 0; }
+.summary { display:grid; grid-template-columns:repeat(4,1fr); gap:9px; margin:16px 0; }
 .summary div { padding:13px; border:1px solid var(--line); border-radius:12px; background:var(--card); text-align:center; }
 .summary b,.summary span { display:block; } .summary b { font-size:22px; color:var(--primary); } .summary span { font-size:11px; color:var(--muted); }
 .work-section { margin:18px 0; } .work-section h2 { font-size:16px; }
@@ -24,9 +24,18 @@ h1 { margin:5px 0; font-size:26px; } h2,p { margin:4px 0; } p { color:var(--mute
 .history-toggle { width:100%; margin:10px 0 4px; border:1px solid var(--line); border-radius:12px; padding:12px; background:#fff; color:var(--primary); font-weight:900; }
 .sale { padding:16px; border:1px solid var(--line); border-left:5px solid var(--warn); border-radius:13px; background:var(--card); box-shadow:0 5px 16px #33415512; }
 .sale.paid { border-left-color:var(--ok); opacity:.86; }
+.sale.quote { border-left-color:var(--primary); }
+.sale.quote.approved { border-left-color:var(--ok); }
 .row { display:flex; justify-content:space-between; align-items:start; gap:10px; }
 .tag { padding:4px 8px; border-radius:999px; background:#fef3c7; color:#92400e; font-size:11px; font-weight:800; }
 .sale.paid .tag { background:#dcfce7; color:#166534; }
 .meta { display:grid; gap:5px; margin-top:10px; color:var(--muted); font-size:13px; }
+.quote-actions { display:grid; grid-template-columns:1fr auto auto; gap:8px; align-items:end; margin-top:12px; }
+.quote-actions label { display:grid; gap:5px; color:var(--muted); font-size:12px; font-weight:800; }
+.quote-actions input { width:100%; padding:10px; border:1px solid var(--line); border-radius:9px; }
+.quote-actions button { border:0; border-radius:9px; padding:10px 12px; background:var(--primary); color:#fff; font-weight:900; cursor:pointer; }
+.quote-actions button.approve-quote { background:var(--ok); }
+.quote-actions button:disabled, .quote-actions input:disabled { opacity:.55; cursor:not-allowed; }
 .notice { padding:10px; border-radius:9px; background:#fef2f2; color:#991b1b; }
-@media(max-width:560px){.summary{grid-template-columns:1fr}.row{display:block}}
+@media(max-width:700px){.summary{grid-template-columns:repeat(2,1fr)}.quote-actions{grid-template-columns:1fr}.row{display:block}}
+@media(max-width:430px){.summary{grid-template-columns:1fr}}

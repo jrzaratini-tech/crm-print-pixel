@@ -54,7 +54,7 @@
                 <label id="customNameGroup" style="display:none;">Novo nome<input id="nome" placeholder="Informe o nome do material"></label>
                 <label id="categoriaGroup">Categoria<select id="categoria">
                     <option>Placa</option><option>Adesivo</option><option>Iluminação</option><option>Perfil</option>
-                    <option>Fonte</option><option>Estrutura</option><option>Impressao 3D</option><option>Acabamento</option><option>Outros</option>
+                    <option>Fonte</option><option>Estrutura</option><option>Impressao 3D</option><option>Maquina</option><option>Acabamento</option><option>Outros</option>
                 </select></label>
                 <label id="formulaGroup">Regra padrão<select id="formulaPadrao">
                     <option value="area">Área aplicada (m²)</option>
@@ -63,11 +63,12 @@
                     <option value="perimetro">Contorno / perímetro (m)</option>
                     <option value="barra">Aproveitamento por barra</option>
                     <option value="densidade_area">Densidade por área (un./m²)</option>
+                    <option value="hora">Hora de maquina / mao de obra</option>
                     <option value="unidade">Quantidade informada (un.)</option>
                 </select></label>
                 <label id="unidadeGroup">Sistema de medida<select id="unidade">
                     <option value="m²">m²</option><option value="m">metro</option><option value="un">unidade</option>
-                    <option value="kg">kg</option><option value="placa">placa</option><option value="barra">barra</option><option value="rolo">rolo</option>
+                    <option value="kg">kg</option><option value="h">hora</option><option value="placa">placa</option><option value="barra">barra</option><option value="rolo">rolo</option>
                 </select></label>
                 <label id="precoTotalGroup"><span id="precoTotalLabel">Preço total sem IVA (€)</span><input id="precoTotal" type="number" min="0" step="0.01" value="0"></label>
                 <label id="precoCustoGroup"><span id="precoCustoLabel">Preço calculado</span><input id="precoCusto" type="number" min="0" step="0.01" value="0"></label>
@@ -140,6 +141,10 @@
             return ['fita_led_zigzag', 'fita_led_vtec', 'led_neon', 'metalon_aluminio', 'perfil_caixa_slim', 'perfil_caixa_luz'].includes(key);
         }
 
+        function isHourPreset(key) {
+            return ['router_cnc', 'maquina_laser', 'mao_obra_acabamento'].includes(key);
+        }
+
         function applyMaterialLayout() {
             const preset = MATERIAIS_PADRAO.get(presetSelect.value);
             groups.forEach(id => setVisible(id, false));
@@ -181,6 +186,11 @@
                 document.getElementById('formulaPadrao').value = 'unidade';
                 document.getElementById('unidade').value = 'kg';
                 document.getElementById('precoCustoLabel').textContent = 'Preço por kg (€)';
+            } else if (isHourPreset(preset.key)) {
+                document.getElementById('formulaPadrao').value = 'hora';
+                document.getElementById('unidade').value = 'h';
+                document.getElementById('precoCustoLabel').textContent = 'Custo por hora (€/h)';
+                document.getElementById('calcHint').textContent = 'Para máquinas e acabamento: informe o custo por hora. Na ficha técnica do produto você informa quantas horas foram previstas.';
             } else {
                 document.getElementById('formulaPadrao').value = preset.formulaPadrao;
                 document.getElementById('unidade').value = preset.unidade;
