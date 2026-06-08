@@ -30,19 +30,34 @@ h1 { margin:5px 0; font-size:26px; } h2,p { margin:4px 0; } p { color:var(--mute
 .tag { padding:4px 8px; border-radius:999px; background:#fef3c7; color:#92400e; font-size:11px; font-weight:800; }
 .sale.paid .tag { background:#dcfce7; color:#166534; }
 .meta { display:grid; gap:5px; margin-top:10px; color:var(--muted); font-size:13px; }
-.quote-detail { margin-top:12px; border:1px solid var(--line); border-radius:10px; padding:10px; background:#f8fafc; }
-.quote-detail summary { cursor:pointer; font-weight:900; color:var(--primary); }
-.quote-detail ul { list-style:none; display:grid; gap:8px; padding:0; margin:10px 0 0; }
-.quote-detail li { display:grid; gap:3px; padding:8px; border-radius:8px; background:#fff; border:1px solid #e2e8f0; }
-.quote-detail small { color:var(--muted); }
 .quote-actions { display:grid; grid-template-columns:1fr auto auto; gap:8px; align-items:end; margin-top:12px; }
 .quote-actions label { display:grid; gap:5px; color:var(--muted); font-size:12px; font-weight:800; }
 .quote-actions input { width:100%; padding:10px; border:1px solid var(--line); border-radius:9px; }
-.quote-actions button, .share-actions button { border:0; border-radius:9px; padding:10px 12px; background:var(--primary); color:#fff; font-weight:900; cursor:pointer; }
-.quote-actions button.approve-quote { background:var(--ok); }
+.quote-actions button, .proposal-actions button { border:0; border-radius:9px; padding:10px 12px; background:var(--primary); color:#fff; font-weight:900; cursor:pointer; }
+.quote-actions .view-proposal { background:#334155; }
 .quote-actions button:disabled, .quote-actions input:disabled { opacity:.55; cursor:not-allowed; }
-.share-actions { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:8px; }
-.share-actions button { background:#334155; }
+.proposal-modal { display:none; position:fixed; inset:0; z-index:5000; padding:16px; background:rgba(15,23,42,.72); overflow:auto; }
+.proposal-modal.active { display:block; }
+.proposal-sheet { max-width:880px; margin:20px auto; background:#fff; border-radius:18px; padding:24px; box-shadow:0 22px 70px #02061755; }
+.proposal-top { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; border-bottom:3px solid var(--primary); padding-bottom:18px; }
+.proposal-top h1 { color:var(--primary); margin:4px 0; }
+.proposal-close { border:1px solid var(--line); border-radius:10px; background:#fff; padding:10px 14px; color:var(--primary); font-weight:900; }
+.proposal-client { display:grid; gap:4px; margin:18px 0; padding:14px; border-radius:12px; background:#f8fafc; border:1px solid var(--line); }
+.proposal-client span { color:var(--muted); font-size:13px; }
+.proposal-table { width:100%; border-collapse:collapse; margin-top:12px; }
+.proposal-table th { background:#eef2ff; color:var(--primary); text-align:left; font-size:12px; text-transform:uppercase; }
+.proposal-table th,.proposal-table td { padding:11px; border-bottom:1px solid var(--line); vertical-align:top; }
+.proposal-table small { display:block; margin-top:4px; color:var(--muted); }
+.proposal-note { margin-top:14px; padding:12px; border-left:4px solid var(--primary); background:#f8fafc; border-radius:10px; }
+.proposal-total { display:grid; gap:8px; max-width:330px; margin:18px 0 0 auto; }
+.proposal-total div { display:flex; justify-content:space-between; gap:10px; padding:10px 12px; border-radius:10px; background:#f8fafc; }
+.proposal-total .final { background:#1a237e; color:#fff; font-size:18px; }
+.proposal-payment { margin-top:14px; padding:12px; border-radius:12px; background:#dcfce7; color:#166534; }
+.proposal-actions { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:18px; }
+.proposal-actions button:nth-child(2) { background:#15803d; }
+.proposal-actions button:nth-child(3) { background:#334155; }
+.proposal-actions button:nth-child(4) { background:#b45309; }
+.proposal-actions button:disabled { opacity:.55; cursor:not-allowed; }
 .notice { padding:10px; border-radius:9px; background:#fef2f2; color:#991b1b; }
-@media(max-width:700px){.summary{grid-template-columns:repeat(2,1fr)}.quote-actions,.share-actions{grid-template-columns:1fr}.row{display:block}}
+@media(max-width:700px){.summary{grid-template-columns:repeat(2,1fr)}.quote-actions,.proposal-actions{grid-template-columns:1fr}.row{display:block}.proposal-sheet{padding:16px}.proposal-top{display:block}.proposal-table{font-size:12px}}
 @media(max-width:430px){.summary{grid-template-columns:1fr}}

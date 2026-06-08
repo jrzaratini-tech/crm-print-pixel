@@ -35,16 +35,19 @@
     $('logoutBtn').hidden = false;
   }
 
+  function sellerName() {
+    return currentSeller?.name || 'Comercial';
+  }
+
   function quoteProposalText(quote) {
-    const sellerName = currentSeller?.name || 'Comercial';
     const lines = [
       `Proposta ${quote.codigo}`,
-      `Comercial: ${sellerName}`,
+      `Comercial: ${sellerName()}`,
       '',
-      `Cliente: ${quote.cliente || quote.empresa || ''}`,
+      quote.cliente || quote.empresa || '',
       '',
       'Itens:'
-    ];
+    ].filter((line, index) => index !== 3 || Boolean(line));
 
     (quote.produtos || []).forEach(product => {
       const quantity = Number(product.quantidade || 1) || 1;
@@ -56,8 +59,8 @@
     lines.push('', `Subtotal: ${money(quote.subtotal)}`);
     if (Number(quote.iva || 0) > 0) lines.push(`IVA: ${money(quote.iva)}`);
     lines.push(`Total: ${money(quote.total)}`);
-    if (quote.observacoes) lines.push('', `Observações: ${quote.observacoes}`);
-    lines.push('', `Proposta enviada por ${sellerName}.`);
+    if (quote.observacoes) lines.push('', `Observacoes: ${quote.observacoes}`);
+    lines.push('', `Proposta enviada por ${sellerName()}.`);
     return lines.join('\n');
   }
 
@@ -67,14 +70,108 @@
     return digits.startsWith('351') ? digits : `351${digits}`;
   }
 
+  function proposalProductsHtml(quote) {
+    const rows = (quote.produtos || []).map(product => {
+      const quantity = Number(product.quantidade || 1) || 1;
+      const unit = Number(product.valor || 0);
+      const total = unit * Math.max(1, quantity);
+      return `
+        <tr>
+          <td>
+            <strong>${escapeHtml(product.nome || 'Produto')}</strong>
+            ${product.observacoes ? `<small>${escapeHtml(product.observacoes)}</small>` : ''}
+          </td>
+          <td>${quantity}</td>
+          <td>${money(unit)}</td>
+          <td>${money(total)}</td>
+        </tr>`;
+    }).join('');
+    return rows || '<tr><td colspan="4">Nenhum produto informado.</td></tr>';
+  }
+
+  function ensureProposalModal() {
+    let modal = $('proposalModal');
+    if (modal) return modal;
+    modal = document.createElement('div');
+    modal.id = 'proposalModal';
+    modal.className = 'proposal-modal';
+    modal.innerHTML = '<div class="proposal-sheet" id="proposalSheet"></div>';
+    document.body.append(modal);
+    modal.addEventListener('click', event => {
+      if (event.target === modal) modal.classList.remove('active');
+    });
+    return modal;
+  }
+
+  function showProposal(quote) {
+    const modal = ensureProposalModal();
+    const approved = quote.status === 'approved' || quote.status === 'aprovado';
+    const entrada = Number(quote.total || 0) * 0.70;
+    const restante = Number(quote.total || 0) * 0.30;
+    $('proposalSheet').innerHTML = `
+      <div class="proposal-top">
+        <div>
+          <p class="eyebrow">Proposta comercial</p>
+          <h1>${escapeHtml(sellerName())}</h1>
+          <p>Or&ccedil;amento #${escapeHtml(quote.codigo)}</p>
+        </div>
+        <button class="proposal-close" type="button">Fechar</button>
+      </div>
+      <div class="proposal-client">
+        <strong>${escapeHtml(quote.cliente || quote.empresa || 'Contacto')}</strong>
+        ${quote.email ? `<span>${escapeHtml(quote.email)}</span>` : ''}
+        ${quote.telemovel ? `<span>${escapeHtml(quote.telemovel)}</span>` : ''}
+      </div>
+      <table class="proposal-table">
+        <thead><tr><th>Produto</th><th>Qtd.</th><th>Valor un.</th><th>Total</th></tr></thead>
+        <tbody>${proposalProductsHtml(quote)}</tbody>
+      </table>
+      ${quote.observacoes ? `<div class="proposal-note"><strong>Observa&ccedil;&atilde;o geral:</strong><p>${escapeHtml(quote.observacoes)}</p></div>` : ''}
+      <div class="proposal-total">
+        <div><span>Subtotal</span><strong>${money(quote.subtotal)}</strong></div>
+        <div><span>IVA</span><strong>${money(quote.iva)}</strong></div>
+        <div class="final"><span>Total</span><strong>${money(quote.total)}</strong></div>
+      </div>
+      ${approved ? `<div class="proposal-payment">Aguardando entrada de 70%: <strong>${money(entrada)}</strong><br>Restante na entrega: <strong>${money(restante)}</strong></div>` : ''}
+      <div class="proposal-actions">
+        <button class="copy-proposal" type="button">Copiar proposta</button>
+        <button class="whatsapp-proposal" type="button">Enviar WhatsApp</button>
+        <button class="email-proposal" type="button">Enviar email</button>
+        <button class="approve-quote" type="button" ${approved ? 'disabled' : ''}>Marcar aprovado</button>
+      </div>`;
+
+    $('proposalSheet').querySelector('.proposal-close').addEventListener('click', () => modal.classList.remove('active'));
+    $('proposalSheet').querySelector('.copy-proposal').addEventListener('click', async () => {
+      await navigator.clipboard.writeText(quoteProposalText(quote));
+      alert('Proposta copiada.');
+    });
+    $('proposalSheet').querySelector('.whatsapp-proposal').addEventListener('click', () => {
+      const phone = phoneForWhatsapp(quote.telemovel);
+      const text = encodeURIComponent(quoteProposalText(quote));
+      window.open(`https://wa.me/${phone}?text=${text}`, '_blank', 'noopener');
+    });
+    $('proposalSheet').querySelector('.email-proposal').addEventListener('click', () => {
+      const subject = encodeURIComponent(`Proposta ${quote.codigo}`);
+      const body = encodeURIComponent(quoteProposalText(quote));
+      window.location.href = `mailto:${encodeURIComponent(quote.email || '')}?subject=${subject}&body=${body}`;
+    });
+    $('proposalSheet').querySelector('.approve-quote').addEventListener('click', async () => {
+      if (!confirm('Marcar este orcamento como aprovado?')) return;
+      await api(`/api/vendedor/orcamentos/${quote.id}/aprovar`, { method: 'POST', body: JSON.stringify({}) });
+      modal.classList.remove('active');
+      await load();
+    });
+    modal.classList.add('active');
+  }
+
   function renderCard(sale, paid = false) {
     const card = document.createElement('article');
     card.className = `sale ${paid ? 'paid' : ''}`;
     card.innerHTML = `
       <div class="row"><div><h2>${escapeHtml(sale.numero)}</h2><p>${escapeHtml(sale.cliente || sale.empresa || 'Cliente')}</p></div><span class="tag">${paid ? 'Pago' : 'A receber'}</span></div>
       <div class="meta">
-        <span>Base sem IVA/instalação: ${money(sale.subtotalServicos)}</span>
-        <span>Comissão: ${money(sale.commission)} (${Number(sale.commissionRate || 0)}%)</span>
+        <span>Base sem IVA/instalacao: ${money(sale.subtotalServicos)}</span>
+        <span>Comissao: ${money(sale.commission)} (${Number(sale.commissionRate || 0)}%)</span>
         <span>${paid ? `Pago em ${new Date(sale.paidAt).toLocaleDateString('pt-PT')}` : `Entrega: ${escapeHtml(sale.dataEntrega || 'sem data')}`}</span>
       </div>`;
     return card;
@@ -84,41 +181,17 @@
     const approved = quote.status === 'approved' || quote.status === 'aprovado';
     const card = document.createElement('article');
     card.className = `sale quote ${approved ? 'approved' : ''}`;
-    const entrada = Number(quote.total || 0) * 0.70;
-    const restante = Number(quote.total || 0) * 0.30;
-    const products = (quote.produtos || []).map(product => {
-      const quantity = Number(product.quantidade || 1) || 1;
-      const total = Number(product.valor || 0) * Math.max(1, quantity);
-      return `
-        <li>
-          <strong>${escapeHtml(product.nome || 'Produto')}</strong>
-          <span>Qtd. ${quantity} | ${money(total)}</span>
-          ${product.observacoes ? `<small>${escapeHtml(product.observacoes)}</small>` : ''}
-        </li>`;
-    }).join('');
-
     card.innerHTML = `
-      <div class="row"><div><h2>${escapeHtml(quote.codigo)}</h2><p>${escapeHtml(quote.cliente || quote.empresa || 'Cliente')}</p></div><span class="tag">${approved ? 'Aprovado' : 'Enviado'}</span></div>
+      <div class="row"><div><h2>${escapeHtml(quote.codigo)}</h2><p>${escapeHtml(quote.cliente || quote.empresa || 'Contacto')}</p></div><span class="tag">${approved ? 'Aprovado' : 'Enviado'}</span></div>
       <div class="meta">
-        <span>Valor do produto: ${money(quote.subtotal)} + IVA ${money(quote.iva)} = ${money(quote.total)}</span>
-        <span>Comissão prevista: ${money(quote.commission)} (${Number(quote.commissionRate || 0)}%)</span>
-        ${Number(quote.sellerExtraMarkup || 0) > 0 ? `<span>Acréscimo na comissão: ${money(quote.sellerExtraMarkup)}</span>` : ''}
-        ${approved ? `<span>Aguardando entrada de 70%: ${money(entrada)} | Restante na entrega: ${money(restante)}</span>` : ''}
+        <span>Valor: ${money(quote.total)} ${Number(quote.iva || 0) > 0 ? `(IVA ${money(quote.iva)})` : ''}</span>
+        <span>Comissao prevista: ${money(quote.commission)} (${Number(quote.commissionRate || 0)}%)</span>
+        ${Number(quote.sellerExtraMarkup || 0) > 0 ? `<span>Acrescimo na comissao: ${money(quote.sellerExtraMarkup)}</span>` : ''}
       </div>
-      <details class="quote-detail">
-        <summary>Visualizar orçamento</summary>
-        <ul>${products || '<li>Nenhum produto informado.</li>'}</ul>
-        ${quote.observacoes ? `<p><strong>Observação geral:</strong> ${escapeHtml(quote.observacoes)}</p>` : ''}
-      </details>
       <div class="quote-actions">
-        <label>Acréscimo sem IVA (€)<input class="extra-input" type="number" min="0" step="0.01" value="${Number(quote.sellerExtraMarkup || 0).toFixed(2)}" ${approved ? 'disabled' : ''}></label>
+        <label>Acrescimo sem IVA (€)<input class="extra-input" type="number" min="0" step="0.01" value="${Number(quote.sellerExtraMarkup || 0).toFixed(2)}" ${approved ? 'disabled' : ''}></label>
         <button class="save-extra" type="button" ${approved ? 'disabled' : ''}>Atualizar valor</button>
-        <button class="approve-quote" type="button" ${approved ? 'disabled' : ''}>Marcar aprovado</button>
-      </div>
-      <div class="share-actions">
-        <button class="copy-proposal" type="button">Copiar proposta</button>
-        <button class="whatsapp-proposal" type="button">Enviar WhatsApp</button>
-        <button class="email-proposal" type="button">Enviar email</button>
+        <button class="view-proposal" type="button">Visualizar proposta</button>
       </div>`;
 
     const input = card.querySelector('.extra-input');
@@ -126,25 +199,7 @@
       await api(`/api/vendedor/orcamentos/${quote.id}/valor`, { method: 'POST', body: JSON.stringify({ sellerExtraMarkup: input.value }) });
       await load();
     });
-    card.querySelector('.approve-quote').addEventListener('click', async () => {
-      if (!confirm('Marcar este orçamento como aprovado?')) return;
-      await api(`/api/vendedor/orcamentos/${quote.id}/aprovar`, { method: 'POST', body: JSON.stringify({}) });
-      await load();
-    });
-    card.querySelector('.copy-proposal').addEventListener('click', async () => {
-      await navigator.clipboard.writeText(quoteProposalText(quote));
-      alert('Proposta copiada.');
-    });
-    card.querySelector('.whatsapp-proposal').addEventListener('click', () => {
-      const phone = phoneForWhatsapp(quote.telemovel);
-      const text = encodeURIComponent(quoteProposalText(quote));
-      window.open(`https://wa.me/${phone}?text=${text}`, '_blank', 'noopener');
-    });
-    card.querySelector('.email-proposal').addEventListener('click', () => {
-      const subject = encodeURIComponent(`Proposta ${quote.codigo}`);
-      const body = encodeURIComponent(quoteProposalText(quote));
-      window.location.href = `mailto:${encodeURIComponent(quote.email || '')}?subject=${subject}&body=${body}`;
-    });
+    card.querySelector('.view-proposal').addEventListener('click', () => showProposal(quote));
     return card;
   }
 
@@ -154,7 +209,7 @@
     if (!list.length) {
       const empty = document.createElement('div');
       empty.className = 'list-empty';
-      empty.textContent = paid ? 'Nenhuma comissão paga no histórico.' : 'Nenhuma comissão a receber.';
+      empty.textContent = paid ? 'Nenhuma comissao paga no historico.' : 'Nenhuma comissao a receber.';
       node.append(empty);
       return;
     }
@@ -177,7 +232,7 @@
     if (!quotes.length) {
       const empty = document.createElement('div');
       empty.className = 'list-empty';
-      empty.textContent = 'Nenhum orçamento enviado para você.';
+      empty.textContent = 'Nenhum orcamento enviado para voce.';
       quoteList.append(empty);
     } else {
       quotes.forEach(quote => quoteList.append(renderQuoteCard(quote)));
