@@ -160,6 +160,16 @@
     },
 
     {
+        id: "nav_produtos",
+        name: "Produtos",
+        file: "pages/produtos.html",
+        type: "WRITE",
+        pos: 12.1,
+        hidden: false,
+        deleted: false
+    },
+
+    {
         id: "nav_fornecedores",
         name: "Fornecedores",
         file: "pages/fornecedores.html",

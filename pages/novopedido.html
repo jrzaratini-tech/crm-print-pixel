@@ -1046,7 +1046,7 @@
             console.log('🚀 Sistema de pedidos inicializado v5.2.2');
             
             // Configurações iniciais
-            const produtos = [
+            let produtos = [
                 "Logo em Acrílico", "Logo Flutuante para Montra", "Neon LED", "Alto Colante",
                 "Logo 3D com LED", "Logo 3D sem LED", "Brindes", "Painel de ACM",
                 "Caixa de Luz", "Outro"
@@ -1093,6 +1093,7 @@
             const urlParams = new URLSearchParams(window.location.search);
             const editId = urlParams.get('edit');
             loadSellers();
+            loadProductCatalog();
             
             if (editId) {
                 console.log(`✏️ Modo EDIÇÃO detectado para ID: ${editId}`);
@@ -1125,6 +1126,35 @@
                 } catch (error) {
                     console.warn('Nao foi possivel carregar vendedores:', error);
                 }
+            }
+
+            async function loadProductCatalog() {
+                try {
+                    const response = await fetch('/api/products');
+                    if (!response.ok) throw new Error('Erro ao carregar produtos');
+                    const result = await response.json();
+                    const catalogProducts = (result.products || []).map(product => product.nome).filter(Boolean);
+                    if (catalogProducts.length) {
+                        produtos = catalogProducts;
+                        refreshProductSelects();
+                    }
+                } catch (error) {
+                    console.warn('Nao foi possivel carregar catalogo de produtos:', error);
+                }
+            }
+
+            function productOptions(selected = '') {
+                const options = [...produtos];
+                if (selected && !options.includes(selected)) options.unshift(selected);
+                const escapeOption = value => String(value || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+                return options.map(product => `<option value="${escapeOption(product)}" ${selected === product ? 'selected' : ''}>${escapeOption(product)}</option>`).join('');
+            }
+
+            function refreshProductSelects() {
+                document.querySelectorAll('.product-select').forEach(select => {
+                    const selected = select.value;
+                    select.innerHTML = `<option value="">Selecione um produto</option>${productOptions(selected)}`;
+                });
             }
 
             function syncSellerFields() {
@@ -1361,7 +1391,7 @@
                     <td>
                         <select class="product-select" data-bind="pedido.produtos.${index}.nome" required>
                             <option value="">Selecione um produto</option>
-                            ${produtos.map(p => `<option value="${p}" ${productData && productData.nome === p ? 'selected' : ''}>${p}</option>`).join('')}
+                            ${productOptions(productData ? productData.nome : '')}
                         </select>
                     </td>
                     <td>

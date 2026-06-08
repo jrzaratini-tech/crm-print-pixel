@@ -88,6 +88,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   const orderFormPageResult = await request('/pages/novopedido.html');
   const orderBudgetPageResult = await request('/pages/novoorcamento.html');
   const calculatorPageResult = await request('/pages/calculadora.html');
+  const productsPageResult = await request('/pages/produtos.html');
   const ordersPageResult = await request('/pages/pedidos.html');
   const dashboardPageResult = await request('/pages/dashboard.html');
   const scanPageResult = await request('/scan-fatura.html');
@@ -115,6 +116,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.equal(orderFormPageResult.response.status, 200);
   assert.equal(orderBudgetPageResult.response.status, 200);
   assert.equal(calculatorPageResult.response.status, 200);
+  assert.equal(productsPageResult.response.status, 200);
   assert.equal(ordersPageResult.response.status, 200);
   assert.equal(dashboardPageResult.response.status, 200);
   assert.equal(scanPageResult.response.status, 200);
@@ -137,9 +139,14 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(fiscalQrResult.body, /interpretar/);
   assert.match(managementModuleResult.body, /painelGestao/);
   assert.match(menuResult.body, /nav_calculadora/);
+  assert.match(menuResult.body, /nav_produtos/);
   assert.match(menuResult.body, /pages\/calculadora\.html/);
+  assert.match(menuResult.body, /pages\/produtos\.html/);
   assert.match(pageResult.body, /Cadastro de Materiais/);
+  assert.match(productsPageResult.body, /Cadastro de Produtos/);
+  assert.match(productsPageResult.body, /api\/products/);
   assert.match(orderFormPageResult.body, /delivery-btn/);
+  assert.match(orderFormPageResult.body, /loadProductCatalog/);
   assert.match(orderFormPageResult.body, /product-delivered/);
   assert.match(orderFormPageResult.body, /pedido\.produtos\.\$\{index\}\.entregue/);
   assert.match(orderFormPageResult.body, /window\.location\.href = 'pedidos\.html'/);
@@ -152,6 +159,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(expensesPageResult.body, /excluirDespesa/);
   assert.match(expensesPageResult.body, /hardDelete: true/);
   assert.match(orderBudgetPageResult.body, /Letra Caixa PETG 3D/);
+  assert.match(orderBudgetPageResult.body, /loadProductCatalog/);
   assert.doesNotMatch(orderBudgetPageResult.body, /Textos e alturas do mesmo trabalho/);
   assert.match(calculatorPageResult.body, /Letras caixa impressas/);
   assert.match(calculatorPageResult.body, /data-calculator-tab="vinyl"/);
@@ -216,6 +224,41 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(workerScriptResult.body, /etapas\/tempo/);
   assert.match(workerScriptResult.body, /Todos os processos deste trabalho foram executados/);
   assert.match(productionPageResult.body, /HISTÓRICO DA PRODUÇÃO POR ARTIGO/);
+});
+
+test('gerencia catalogo de produtos para pedidos e orcamentos', async () => {
+  const initial = await request('/api/products');
+  assert.equal(initial.response.status, 200);
+  assert.equal(initial.body.success, true);
+  assert.equal(initial.body.products.some(product => product.nome === 'Letra Caixa PETG 3D'), true);
+
+  const created = await post('/api/products', {
+    nome: 'Produto Teste Catalogo',
+    categoria: 'Letreiro',
+    descricao: 'Produto criado pelo teste'
+  });
+  assert.equal(created.response.status, 200);
+  assert.equal(created.body.success, true);
+  assert.equal(created.body.product.nome, 'Produto Teste Catalogo');
+
+  const updated = await post('/api/products', {
+    id: created.body.product.id,
+    nome: 'Produto Teste Catalogo Editado',
+    categoria: 'ACM',
+    descricao: 'Produto editado pelo teste'
+  });
+  assert.equal(updated.response.status, 200);
+  assert.equal(updated.body.product.categoria, 'ACM');
+
+  const listed = await request('/api/products');
+  assert.equal(listed.body.products.some(product => product.nome === 'Produto Teste Catalogo Editado'), true);
+
+  const deleted = await request(`/api/products/${created.body.product.id}/delete`, { method: 'POST' });
+  assert.equal(deleted.response.status, 200);
+  assert.equal(deleted.body.success, true);
+
+  const afterDelete = await request('/api/products');
+  assert.equal(afterDelete.body.products.some(product => product.id === created.body.product.id), false);
 });
 
 test('classifica OS para colaborador com login sem expor precos e permite chat privado', async () => {

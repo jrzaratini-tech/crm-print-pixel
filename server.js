@@ -35,6 +35,27 @@ const PRODUCTION_STEPS = [
   'Embalagem',
   'Instalacao'
 ];
+const DEFAULT_PRODUCTS = [
+  'Logo em Acrilico',
+  'Logo Flutuante para Montra',
+  'Neon LED',
+  'Alto Colante',
+  'Logo 3D com LED',
+  'Logo 3D sem LED',
+  'Letra Caixa PETG 3D',
+  'Adesivo vinil impresso',
+  'Adesivo vinil impresso com recorte',
+  'LED neon com base acrilico 6 mm',
+  'Lona impressa sem ilhos',
+  'Lona impressa com ilhos',
+  'Corte laser acrilico 3 mm',
+  'Painel ACM com letras em relevo',
+  'Caixa de luz face opalino',
+  'Brindes',
+  'Painel de ACM',
+  'Caixa de Luz',
+  'Outro'
+];
 
 if (IS_PRODUCTION && !AUTH_DISABLED && (!CRM_USERNAME || !CRM_PASSWORD)) {
   throw new Error('Configure CRM_USERNAME e CRM_PASSWORD antes de iniciar o CRM em produção.');
@@ -493,6 +514,59 @@ function normalizeSupplierPayload(body = {}) {
     notes: text(body.notes || body.observacoes, 500),
     active: body.active !== false
   };
+}
+
+function productSlug(value) {
+  return text(value, 120)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 80);
+}
+
+function defaultProductId(name) {
+  return `default-${productSlug(name)}`;
+}
+
+function normalizeProductPayload(body = {}) {
+  return {
+    nome: text(body.nome || body.name, 160),
+    categoria: text(body.categoria || body.category || 'Outros', 80),
+    descricao: text(body.descricao || body.description || body.observacoes, 500),
+    ativo: body.ativo !== false && body.active !== false
+  };
+}
+
+async function productCatalog(includeInactive = false) {
+  const snapshot = await db.collection('events').get();
+  const overrides = new Map();
+  snapshot.docs.forEach(doc => {
+    const data = doc.data();
+    if (data.schema !== 'produto_catalogo' || data.deleted) return;
+    overrides.set(doc.id, { id: doc.id, ...data.payload, source: String(doc.id).startsWith('default-') ? 'default' : 'custom' });
+  });
+
+  const products = DEFAULT_PRODUCTS.map(name => {
+    const id = defaultProductId(name);
+    const override = overrides.get(id);
+    overrides.delete(id);
+    return {
+      id,
+      nome: name,
+      categoria: 'Produtos',
+      descricao: '',
+      ativo: true,
+      source: 'default',
+      ...(override || {})
+    };
+  });
+
+  overrides.forEach(product => products.push({ ...product, source: product.source || 'custom' }));
+  return products
+    .filter(product => includeInactive || product.ativo !== false)
+    .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt'));
 }
 
 async function sellers(includeInactive = false) {
@@ -1255,6 +1329,71 @@ app.post('/api/suppliers/:id/delete', async (req, res) => {
   } catch (error) {
     console.error('Erro ao excluir fornecedor:', error);
     res.status(500).json({ success: false, message: 'Nao foi possivel excluir o fornecedor.' });
+  }
+});
+
+app.get('/api/products', async (req, res) => {
+  try {
+    const includeInactive = req.query.includeInactive === 'true';
+    res.json({ success: true, products: (await productCatalog(includeInactive)).map(sanitizeForResponse) });
+  } catch (error) {
+    console.error('Erro ao listar produtos:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel carregar os produtos.' });
+  }
+});
+
+app.post('/api/products', async (req, res) => {
+  try {
+    const product = normalizeProductPayload(req.body || {});
+    if (!product.nome || containsUnsafeMarkup(product)) return res.status(400).json({ success: false, message: 'Produto invalido.' });
+    const id = isSafeIdentifier(req.body?.id || '') ? req.body.id : `product-${productSlug(product.nome) || crypto.randomBytes(6).toString('hex')}`;
+    const existing = (await productCatalog(true)).find(item => item.id === id);
+    const now = new Date().toISOString();
+    const savedProduct = {
+      ...existing,
+      ...product,
+      id,
+      source: id.startsWith('default-') ? 'default' : 'custom',
+      createdAt: existing?.createdAt || now,
+      updatedAt: now
+    };
+    await db.collection('events').doc(id).set({
+      schema: 'produto_catalogo',
+      payload: savedProduct,
+      pageId: 'produtos',
+      timestamp: now,
+      created_at: existing?.createdAt || now,
+      updated_at: now,
+      deleted: false
+    }, { merge: true });
+    res.json({ success: true, product: sanitizeForResponse(savedProduct) });
+  } catch (error) {
+    console.error('Erro ao salvar produto:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel salvar o produto.' });
+  }
+});
+
+app.post('/api/products/:id/delete', async (req, res) => {
+  try {
+    const product = (await productCatalog(true)).find(item => item.id === req.params.id);
+    if (!product) return res.status(404).json({ success: false, message: 'Produto nao encontrado.' });
+    if (String(product.id).startsWith('default-')) {
+      const now = new Date().toISOString();
+      await db.collection('events').doc(product.id).set({
+        schema: 'produto_catalogo',
+        payload: { ...product, ativo: false, updatedAt: now },
+        pageId: 'produtos',
+        timestamp: now,
+        updated_at: now,
+        deleted: false
+      }, { merge: true });
+    } else {
+      await db.collection('events').doc(product.id).delete();
+    }
+    res.json({ success: true, message: 'Produto excluido do catalogo.' });
+  } catch (error) {
+    console.error('Erro ao excluir produto:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel excluir o produto.' });
   }
 });
 
