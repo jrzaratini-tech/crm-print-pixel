@@ -163,6 +163,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(orderBudgetPageResult.body, /Letra Caixa PETG 3D/);
   assert.match(orderBudgetPageResult.body, /loadProductCatalog/);
   assert.match(orderBudgetPageResult.body, /descontoOrcamento/);
+  assert.match(orderBudgetPageResult.body, /valorInstalacao/);
   assert.match(orderBudgetPageResult.body, /margemDesejadaOrcamento/);
   assert.match(orderBudgetPageResult.body, /sellerExtraMarkup/);
   assert.match(orderBudgetPageResult.body, /mountingCommissionRate/);

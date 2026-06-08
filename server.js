@@ -422,9 +422,9 @@ function recalculateSellerQuotePayload(payload = {}, sellerExtraMarkup = payload
   const ajustePreco = signedMoney(payload.ajustePreco || payload.ajuste);
   const instalacao = money(payload.instalacao);
   const subtotalProdutos = quoteSubtotalFromProducts(payload);
-  const baseComissao = Math.max(0, subtotalProdutos + instalacao - desconto + ajustePreco);
+  const baseComissao = Math.max(0, subtotalProdutos - desconto + ajustePreco);
   const extra = money(sellerExtraMarkup);
-  const subtotal = Math.max(0, baseComissao + extra);
+  const subtotal = Math.max(0, baseComissao + instalacao + extra);
   const iva = payload.comIVA === 'nao' ? 0 : money(subtotal * 0.23);
   const sellerRate = sellerCommissionRate(payload.sellerCommissionRate);
   const sellerCommissionValue = payload.sellerId ? money((baseComissao * sellerRate / 100) + extra) : 0;
