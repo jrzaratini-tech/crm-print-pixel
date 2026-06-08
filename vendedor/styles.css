@@ -62,9 +62,24 @@ h1 { margin:5px 0; font-size:26px; } h2,p { margin:4px 0; } p { color:var(--mute
 @media(max-width:430px){.summary{grid-template-columns:1fr}}
 @media print {
   body * { visibility:hidden !important; }
+  html, body { width:210mm !important; min-height:297mm !important; background:#fff !important; overflow:hidden !important; }
   .proposal-modal, .proposal-modal * { visibility:visible !important; }
   .proposal-modal { display:block !important; position:static !important; padding:0 !important; background:#fff !important; overflow:visible !important; }
-  .proposal-sheet { box-shadow:none !important; margin:0 !important; max-width:none !important; border-radius:0 !important; padding:20mm !important; }
+  .proposal-sheet { box-shadow:none !important; margin:0 !important; max-width:none !important; width:210mm !important; min-height:auto !important; border-radius:0 !important; padding:10mm 12mm !important; font-size:10.5px !important; line-height:1.2 !important; page-break-after:avoid !important; }
+  .proposal-top { padding-bottom:8px !important; border-bottom-width:2px !important; }
+  .proposal-top h1 { font-size:22px !important; margin:2px 0 !important; }
+  .proposal-client { margin:8px 0 !important; padding:8px !important; gap:2px !important; }
+  .proposal-table { margin-top:6px !important; font-size:9.5px !important; }
+  .proposal-table th,.proposal-table td { padding:5px 6px !important; }
+  .proposal-table small { margin-top:2px !important; }
+  .proposal-note { margin-top:8px !important; padding:8px !important; }
+  .proposal-note p { margin:3px 0 0 !important; }
+  .proposal-total { gap:4px !important; max-width:260px !important; margin-top:8px !important; }
+  .proposal-total div { padding:6px 8px !important; }
+  .proposal-total .final { font-size:14px !important; }
+  .proposal-signature { margin-top:14px !important; }
+  .proposal-signature strong { font-size:15px !important; min-width:190px !important; padding-top:5px !important; }
+  .proposal-top, .proposal-client, .proposal-table, .proposal-note, .proposal-total, .proposal-signature { break-inside:avoid !important; page-break-inside:avoid !important; }
   .proposal-close, .proposal-actions { display:none !important; }
   @page { size:A4; margin:0; }
 }
