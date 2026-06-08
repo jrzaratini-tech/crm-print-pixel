@@ -1184,7 +1184,10 @@
                     <td><strong>${orcamento.codigo || `ORC-${orcamento.id.substring(0, 8)}`}</strong></td>
                     <td>${orcamento.cliente || 'N/A'}</td>
                     <td>${orcamento.empresa || 'N/A'}</td>
-                    <td><strong>${formatarMoeda(orcamento.total || 0)}</strong></td>
+                    <td>
+                        <strong>${formatarMoeda(orcamento.total || 0)}</strong>
+                        ${(orcamento.sellerExtraMarkup || 0) > 0 ? `<div style="margin-top:4px; color:#b45309; font-size:12px; font-weight:700;">Acréscimo vendedor: ${formatarMoeda(orcamento.sellerExtraMarkup)}</div>` : ''}
+                    </td>
                     <td><span class="status-badge ${statusClass}">${statusText}</span></td>
                     <td>${dataValidade}</td>
                     <td>${dataFormatada}</td>
@@ -1473,6 +1476,12 @@
                         <span>${formatarMoeda(orcamento.iva || 0)}</span>
                     </div>
                     ` : ''}
+                    ${(orcamento.sellerExtraMarkup || 0) > 0 ? `
+                    <div class="total-row" style="color:#b45309;">
+                        <span>Acréscimo comissão vendedor:</span>
+                        <span>${formatarMoeda(orcamento.sellerExtraMarkup || 0)}</span>
+                    </div>
+                    ` : ''}
                     <div class="total-row final">
                         <span>TOTAL FINAL:</span>
                         <span>${formatarMoeda(orcamento.total || 0)}</span>
@@ -1538,6 +1547,12 @@
                             iva: orcamentoAtual.iva,
                             instalacao: orcamentoAtual.instalacao,
                             comIVA: orcamentoAtual.comIVA,
+                            sellerId: orcamentoAtual.sellerId || '',
+                            sellerName: orcamentoAtual.sellerName || '',
+                            sellerCommissionRate: orcamentoAtual.sellerCommissionRate || 5,
+                            sellerCommissionValue: orcamentoAtual.sellerCommissionValue || 0,
+                            sellerCommissionStatus: orcamentoAtual.sellerId ? 'pending' : '',
+                            sellerExtraMarkup: orcamentoAtual.sellerExtraMarkup || 0,
                             status: 'pendente',
                             dataEntrega: orcamentoAtual.validade || '',
                             observacoes: `Convertido do orçamento ${orcamentoAtual.codigo}\n${orcamentoAtual.observacoes || ''}`,
@@ -1696,6 +1711,12 @@
                             iva: orcamento.iva,
                             instalacao: orcamento.instalacao,
                             comIVA: orcamento.comIVA,
+                            sellerId: orcamento.sellerId || '',
+                            sellerName: orcamento.sellerName || '',
+                            sellerCommissionRate: orcamento.sellerCommissionRate || 5,
+                            sellerCommissionValue: orcamento.sellerCommissionValue || 0,
+                            sellerCommissionStatus: orcamento.sellerId ? 'pending' : '',
+                            sellerExtraMarkup: orcamento.sellerExtraMarkup || 0,
                             status: 'pendente',
                             dataEntrega: orcamento.validade || '',
                             observacoes: `Convertido do orçamento ${orcamento.codigo}\n${orcamento.observacoes || ''}`,

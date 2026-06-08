@@ -1,9 +1,12 @@
 (() => {
   'use strict';
+
   const TOKEN_KEY = 'printpixel_vendedor_token';
   let token = localStorage.getItem(TOKEN_KEY) || '';
   let sales = [];
   let quotes = [];
+  let currentSeller = null;
+
   const $ = id => document.getElementById(id);
   const money = value => Number(value || 0).toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' });
   const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -17,6 +20,7 @@
 
   function showLogin(message = '') {
     token = '';
+    currentSeller = null;
     localStorage.removeItem(TOKEN_KEY);
     $('appShell').hidden = true;
     $('logoutBtn').hidden = true;
@@ -29,6 +33,38 @@
     $('loginShell').hidden = true;
     $('appShell').hidden = false;
     $('logoutBtn').hidden = false;
+  }
+
+  function quoteProposalText(quote) {
+    const sellerName = currentSeller?.name || 'Comercial';
+    const lines = [
+      `Proposta ${quote.codigo}`,
+      `Comercial: ${sellerName}`,
+      '',
+      `Cliente: ${quote.cliente || quote.empresa || ''}`,
+      '',
+      'Itens:'
+    ];
+
+    (quote.produtos || []).forEach(product => {
+      const quantity = Number(product.quantidade || 1) || 1;
+      const total = Number(product.valor || 0) * Math.max(1, quantity);
+      lines.push(`- ${product.nome || 'Produto'} | Qtd. ${quantity} | ${money(total)}`);
+      if (product.observacoes) lines.push(`  Obs.: ${product.observacoes}`);
+    });
+
+    lines.push('', `Subtotal: ${money(quote.subtotal)}`);
+    if (Number(quote.iva || 0) > 0) lines.push(`IVA: ${money(quote.iva)}`);
+    lines.push(`Total: ${money(quote.total)}`);
+    if (quote.observacoes) lines.push('', `Observações: ${quote.observacoes}`);
+    lines.push('', `Proposta enviada por ${sellerName}.`);
+    return lines.join('\n');
+  }
+
+  function phoneForWhatsapp(value) {
+    const digits = String(value || '').replace(/\D/g, '');
+    if (!digits) return '';
+    return digits.startsWith('351') ? digits : `351${digits}`;
   }
 
   function renderCard(sale, paid = false) {
@@ -50,18 +86,41 @@
     card.className = `sale quote ${approved ? 'approved' : ''}`;
     const entrada = Number(quote.total || 0) * 0.70;
     const restante = Number(quote.total || 0) * 0.30;
+    const products = (quote.produtos || []).map(product => {
+      const quantity = Number(product.quantidade || 1) || 1;
+      const total = Number(product.valor || 0) * Math.max(1, quantity);
+      return `
+        <li>
+          <strong>${escapeHtml(product.nome || 'Produto')}</strong>
+          <span>Qtd. ${quantity} | ${money(total)}</span>
+          ${product.observacoes ? `<small>${escapeHtml(product.observacoes)}</small>` : ''}
+        </li>`;
+    }).join('');
+
     card.innerHTML = `
       <div class="row"><div><h2>${escapeHtml(quote.codigo)}</h2><p>${escapeHtml(quote.cliente || quote.empresa || 'Cliente')}</p></div><span class="tag">${approved ? 'Aprovado' : 'Enviado'}</span></div>
       <div class="meta">
         <span>Valor do produto: ${money(quote.subtotal)} + IVA ${money(quote.iva)} = ${money(quote.total)}</span>
         <span>Comissão prevista: ${money(quote.commission)} (${Number(quote.commissionRate || 0)}%)</span>
+        ${Number(quote.sellerExtraMarkup || 0) > 0 ? `<span>Acréscimo na comissão: ${money(quote.sellerExtraMarkup)}</span>` : ''}
         ${approved ? `<span>Aguardando entrada de 70%: ${money(entrada)} | Restante na entrega: ${money(restante)}</span>` : ''}
       </div>
+      <details class="quote-detail">
+        <summary>Visualizar orçamento</summary>
+        <ul>${products || '<li>Nenhum produto informado.</li>'}</ul>
+        ${quote.observacoes ? `<p><strong>Observação geral:</strong> ${escapeHtml(quote.observacoes)}</p>` : ''}
+      </details>
       <div class="quote-actions">
         <label>Acréscimo sem IVA (€)<input class="extra-input" type="number" min="0" step="0.01" value="${Number(quote.sellerExtraMarkup || 0).toFixed(2)}" ${approved ? 'disabled' : ''}></label>
         <button class="save-extra" type="button" ${approved ? 'disabled' : ''}>Atualizar valor</button>
         <button class="approve-quote" type="button" ${approved ? 'disabled' : ''}>Marcar aprovado</button>
+      </div>
+      <div class="share-actions">
+        <button class="copy-proposal" type="button">Copiar proposta</button>
+        <button class="whatsapp-proposal" type="button">Enviar WhatsApp</button>
+        <button class="email-proposal" type="button">Enviar email</button>
       </div>`;
+
     const input = card.querySelector('.extra-input');
     card.querySelector('.save-extra').addEventListener('click', async () => {
       await api(`/api/vendedor/orcamentos/${quote.id}/valor`, { method: 'POST', body: JSON.stringify({ sellerExtraMarkup: input.value }) });
@@ -71,6 +130,20 @@
       if (!confirm('Marcar este orçamento como aprovado?')) return;
       await api(`/api/vendedor/orcamentos/${quote.id}/aprovar`, { method: 'POST', body: JSON.stringify({}) });
       await load();
+    });
+    card.querySelector('.copy-proposal').addEventListener('click', async () => {
+      await navigator.clipboard.writeText(quoteProposalText(quote));
+      alert('Proposta copiada.');
+    });
+    card.querySelector('.whatsapp-proposal').addEventListener('click', () => {
+      const phone = phoneForWhatsapp(quote.telemovel);
+      const text = encodeURIComponent(quoteProposalText(quote));
+      window.open(`https://wa.me/${phone}?text=${text}`, '_blank', 'noopener');
+    });
+    card.querySelector('.email-proposal').addEventListener('click', () => {
+      const subject = encodeURIComponent(`Proposta ${quote.codigo}`);
+      const body = encodeURIComponent(quoteProposalText(quote));
+      window.location.href = `mailto:${encodeURIComponent(quote.email || '')}?subject=${subject}&body=${body}`;
     });
     return card;
   }
@@ -98,6 +171,7 @@
     $('pendingValue').textContent = money(pending.reduce((sum, item) => sum + Number(item.commission || 0), 0));
     renderList('pendingList', pending, false);
     renderList('paidList', paid, true);
+
     const quoteList = $('quoteList');
     quoteList.replaceChildren();
     if (!quotes.length) {
@@ -116,6 +190,7 @@
       localStorage.setItem(TOKEN_KEY, token);
       const result = await api('/api/vendedor/session');
       showApp();
+      currentSeller = result.seller;
       $('sellerName').textContent = result.seller.name;
       $('brandName').textContent = result.seller.name;
       sales = result.sales || [];
@@ -144,6 +219,7 @@
       $('loginNotice').textContent = error.message;
     }
   });
+
   $('logoutBtn').addEventListener('click', () => showLogin());
   $('historyToggle').addEventListener('click', () => { $('paidSection').hidden = !$('paidSection').hidden; });
   if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');

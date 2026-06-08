@@ -944,10 +944,14 @@ async function sellerQuotes(sellerId) {
         codigo: payload.codigo || event.id,
         cliente: payload.cliente || '',
         empresa: payload.empresa || '',
+        telemovel: payload.telemovel || '',
+        email: payload.email || '',
+        observacoes: payload.observacoes || '',
         subtotal: money(payload.subtotal),
         iva: money(payload.iva),
         total: money(payload.total),
         sellerExtraMarkup: money(payload.sellerExtraMarkup),
+        sellerExtraMarkupChangedAt: payload.sellerExtraMarkupChangedAt || '',
         commissionRate: sellerCommissionRate(payload.sellerCommissionRate),
         commission: money(payload.sellerCommissionValue),
         status: payload.sellerQuoteStatus || payload.status || 'sent',
@@ -955,7 +959,8 @@ async function sellerQuotes(sellerId) {
         produtos: Array.isArray(payload.produtos) ? payload.produtos.map(product => ({
           nome: text(product.nome || 'Produto', 160),
           quantidade: money(product.quantidade || 1),
-          valor: money(product.valor)
+          valor: money(product.valor),
+          observacoes: text(product.observacoes, 400)
         })) : []
       });
     });
@@ -982,8 +987,15 @@ app.post('/api/vendedor/orcamentos/:id/valor', requireSeller, async (req, res) =
     const payload = current.payload || {};
     if (payload.sellerId !== req.seller.id) return res.status(403).json({ success: false, message: 'Este orcamento nao pertence ao seu acesso.' });
     if (payload.pedidoNumero) return res.status(400).json({ success: false, message: 'Orcamento ja convertido em pedido.' });
-    const updatedPayload = recalculateSellerQuotePayload(payload, req.body?.sellerExtraMarkup);
     const now = new Date().toISOString();
+    const previousExtra = money(payload.sellerExtraMarkup);
+    const nextExtra = money(req.body?.sellerExtraMarkup);
+    const updatedPayload = recalculateSellerQuotePayload(payload, nextExtra);
+    if (nextExtra !== previousExtra) {
+      updatedPayload.sellerExtraMarkupPrevious = previousExtra;
+      updatedPayload.sellerExtraMarkupChangedAt = now;
+      updatedPayload.sellerExtraMarkupChangedBy = req.seller.name;
+    }
     await ref.set({ ...current, payload: updatedPayload, updated_at: now }, { merge: true });
     res.json({ success: true, quote: sanitizeForResponse({ id, ...updatedPayload }) });
   } catch (error) {
