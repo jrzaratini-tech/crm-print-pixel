@@ -64,12 +64,6 @@
     return lines.join('\n');
   }
 
-  function phoneForWhatsapp(value) {
-    const digits = String(value || '').replace(/\D/g, '');
-    if (!digits) return '';
-    return digits.startsWith('351') ? digits : `351${digits}`;
-  }
-
   function proposalProductsHtml(quote) {
     const rows = (quote.produtos || []).map(product => {
       const quantity = Number(product.quantidade || 1) || 1;
@@ -105,9 +99,6 @@
 
   function showProposal(quote) {
     const modal = ensureProposalModal();
-    const approved = quote.status === 'approved' || quote.status === 'aprovado';
-    const entrada = Number(quote.total || 0) * 0.70;
-    const restante = Number(quote.total || 0) * 0.30;
     $('proposalSheet').innerHTML = `
       <div class="proposal-top">
         <div>
@@ -118,6 +109,7 @@
         <button class="proposal-close" type="button">Fechar</button>
       </div>
       <div class="proposal-client">
+        <span>Contacto</span>
         <strong>${escapeHtml(quote.cliente || quote.empresa || 'Contacto')}</strong>
         ${quote.email ? `<span>${escapeHtml(quote.email)}</span>` : ''}
         ${quote.telemovel ? `<span>${escapeHtml(quote.telemovel)}</span>` : ''}
@@ -132,36 +124,22 @@
         <div><span>IVA</span><strong>${money(quote.iva)}</strong></div>
         <div class="final"><span>Total</span><strong>${money(quote.total)}</strong></div>
       </div>
-      ${approved ? `<div class="proposal-payment">Aguardando entrada de 70%: <strong>${money(entrada)}</strong><br>Restante na entrega: <strong>${money(restante)}</strong></div>` : ''}
+      <div class="proposal-signature">
+        <span>Proposta emitida por</span>
+        <strong>${escapeHtml(sellerName())}</strong>
+      </div>
       <div class="proposal-actions">
-        <button class="copy-proposal" type="button">Copiar proposta</button>
-        <button class="whatsapp-proposal" type="button">Enviar WhatsApp</button>
-        <button class="email-proposal" type="button">Enviar email</button>
-        <button class="approve-quote" type="button" ${approved ? 'disabled' : ''}>Marcar aprovado</button>
+        <button class="download-proposal" type="button">Baixar PDF</button>
       </div>`;
 
     $('proposalSheet').querySelector('.proposal-close').addEventListener('click', () => modal.classList.remove('active'));
-    $('proposalSheet').querySelector('.copy-proposal').addEventListener('click', async () => {
-      await navigator.clipboard.writeText(quoteProposalText(quote));
-      alert('Proposta copiada.');
-    });
-    $('proposalSheet').querySelector('.whatsapp-proposal').addEventListener('click', () => {
-      const phone = phoneForWhatsapp(quote.telemovel);
-      const text = encodeURIComponent(quoteProposalText(quote));
-      window.open(`https://wa.me/${phone}?text=${text}`, '_blank', 'noopener');
-    });
-    $('proposalSheet').querySelector('.email-proposal').addEventListener('click', () => {
-      const subject = encodeURIComponent(`Proposta ${quote.codigo}`);
-      const body = encodeURIComponent(quoteProposalText(quote));
-      window.location.href = `mailto:${encodeURIComponent(quote.email || '')}?subject=${subject}&body=${body}`;
-    });
-    $('proposalSheet').querySelector('.approve-quote').addEventListener('click', async () => {
-      if (!confirm('Marcar este orcamento como aprovado?')) return;
-      await api(`/api/vendedor/orcamentos/${quote.id}/aprovar`, { method: 'POST', body: JSON.stringify({}) });
-      modal.classList.remove('active');
-      await load();
-    });
+    $('proposalSheet').querySelector('.download-proposal').addEventListener('click', () => downloadProposalPdf(quote));
     modal.classList.add('active');
+  }
+
+  function downloadProposalPdf(quote) {
+    showProposal(quote);
+    setTimeout(() => window.print(), 120);
   }
 
   function renderCard(sale, paid = false) {
@@ -192,6 +170,7 @@
         <label>Acrescimo sem IVA (€)<input class="extra-input" type="number" min="0" step="0.01" value="${Number(quote.sellerExtraMarkup || 0).toFixed(2)}" ${approved ? 'disabled' : ''}></label>
         <button class="save-extra" type="button" ${approved ? 'disabled' : ''}>Atualizar valor</button>
         <button class="view-proposal" type="button">Visualizar proposta</button>
+        <button class="download-proposal-card" type="button">Baixar PDF</button>
       </div>`;
 
     const input = card.querySelector('.extra-input');
@@ -200,6 +179,7 @@
       await load();
     });
     card.querySelector('.view-proposal').addEventListener('click', () => showProposal(quote));
+    card.querySelector('.download-proposal-card').addEventListener('click', () => downloadProposalPdf(quote));
     return card;
   }
 
