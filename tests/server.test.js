@@ -185,6 +185,9 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(dashboardPageResult.body, /pontoEquilibrio/);
   assert.match(dashboardPageResult.body, /bateuMeta/);
   assert.match(dashboardPageResult.body, /Faturamento bruto/);
+  assert.match(dashboardPageResult.body, /deliveryCalendarBtn/);
+  assert.match(dashboardPageResult.body, /deliveryMonthPicker/);
+  assert.match(dashboardPageResult.body, /renderDeliveryCalendar/);
   assert.match(dashboardPageResult.body, /rgba\(34, 197, 94/);
   assert.match(dashboardPageResult.body, /rgba\(239, 68, 68/);
   assert.match(scanPageResult.body, /Ler QR fiscal/);
