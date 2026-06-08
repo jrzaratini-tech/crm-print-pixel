@@ -38,6 +38,15 @@
         const perda = fatorPerda(item, material);
         let consumo = 0;
         let unidade = material.unidade || 'un';
+        let precoUnitario = numero(material.precoCusto);
+        const precoTotal = numero(material.precoTotal || material.precoCompraTotal || material.precoUnitarioComercial);
+        const areaComercial = (numero(material.larguraCm) / 100) * (numero(material.alturaCm) / 100);
+        const comprimentoComercial = numero(material.comprimentoM);
+
+        if (['area', 'perimetro', 'linear'].includes(formula) && precoTotal > 0) {
+            if (formula === 'area' && areaComercial > 0) precoUnitario = precoTotal / areaComercial;
+            if ((formula === 'linear' || formula === 'perimetro') && comprimentoComercial > 0) precoUnitario = precoTotal / comprimentoComercial;
+        }
 
         if (formula === 'area') consumo = area * perda;
         if (formula === 'perimetro') consumo = perimetro * perda;
@@ -55,8 +64,8 @@
             unidade = 'barra';
         }
 
-        const custo = consumo * numero(material.precoCusto);
-        return { formula, consumo, custo, unidade, area, perimetro, linear };
+        const custo = consumo * precoUnitario;
+        return { formula, consumo, custo, unidade, area, perimetro, linear, precoUnitario };
     }
 
     function calcularFicha(itens = [], materiais = []) {

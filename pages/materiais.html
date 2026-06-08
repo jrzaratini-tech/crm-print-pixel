@@ -52,11 +52,11 @@
             <div class="grid">
                 <label>Material padrão<select id="presetKey"></select></label>
                 <label id="customNameGroup" style="display:none;">Novo nome<input id="nome" placeholder="Informe o nome do material"></label>
-                <label>Categoria<select id="categoria">
+                <label id="categoriaGroup">Categoria<select id="categoria">
                     <option>Placa</option><option>Adesivo</option><option>Iluminação</option><option>Perfil</option>
                     <option>Fonte</option><option>Estrutura</option><option>Impressao 3D</option><option>Acabamento</option><option>Outros</option>
                 </select></label>
-                <label>Regra padrão<select id="formulaPadrao">
+                <label id="formulaGroup">Regra padrão<select id="formulaPadrao">
                     <option value="area">Área aplicada (m²)</option>
                     <option value="placa">Aproveitamento por placa</option>
                     <option value="linear">Comprimento informado (m)</option>
@@ -65,20 +65,21 @@
                     <option value="densidade_area">Densidade por área (un./m²)</option>
                     <option value="unidade">Quantidade informada (un.)</option>
                 </select></label>
-                <label>Unidade comercial<select id="unidade">
+                <label id="unidadeGroup">Sistema de medida<select id="unidade">
                     <option value="m²">m²</option><option value="m">metro</option><option value="un">unidade</option>
                     <option value="kg">kg</option><option value="placa">placa</option><option value="barra">barra</option><option value="rolo">rolo</option>
                 </select></label>
-                <label>Preço de custo (€)<input id="precoCusto" type="number" min="0" step="0.01" value="0"></label>
-                <label>Perda padrão (%)<input id="perdaPercentual" type="number" min="0" step="0.1" value="0"></label>
-                <label>Largura da placa (cm)<input id="larguraCm" type="number" min="0" step="0.1" value="0"></label>
-                <label>Altura da placa (cm)<input id="alturaCm" type="number" min="0" step="0.1" value="0"></label>
-                <label>Comprimento da barra (m)<input id="comprimentoM" type="number" min="0" step="0.01" value="0"></label>
-                <label>Densidade de módulos (un./m²)<input id="densidadePorM2" type="number" min="0" step="0.1" value="0"></label>
+                <label id="precoTotalGroup"><span id="precoTotalLabel">Preço total sem IVA (€)</span><input id="precoTotal" type="number" min="0" step="0.01" value="0"></label>
+                <label id="precoCustoGroup"><span id="precoCustoLabel">Preço calculado</span><input id="precoCusto" type="number" min="0" step="0.01" value="0"></label>
+                <label id="perdaGroup">Perda padrão (%)<input id="perdaPercentual" type="number" min="0" step="0.1" value="0"></label>
+                <label id="larguraGroup"><span id="larguraLabel">Largura da placa (cm)</span><input id="larguraCm" type="number" min="0" step="0.1" value="0"></label>
+                <label id="alturaGroup"><span id="alturaLabel">Altura da placa (cm)</span><input id="alturaCm" type="number" min="0" step="0.1" value="0"></label>
+                <label id="comprimentoGroup"><span id="comprimentoLabel">Comprimento comercial (m)</span><input id="comprimentoM" type="number" min="0" step="0.01" value="0"></label>
+                <label id="densidadeGroup">Densidade de módulos (un./m²)<input id="densidadePorM2" type="number" min="0" step="0.1" value="0"></label>
             </div>
             <div class="grid" id="variantFields" style="margin-top:14px;"></div>
             <label style="margin-top:14px;">Observações<textarea id="observacoes" placeholder="Fornecedor, espessura, cor, aplicação ou critérios de cálculo."></textarea></label>
-            <p class="hint">Placas usam dimensões comerciais e arredondamento por aproveitamento. Barras usam comprimento comercial. Fita LED e neon podem usar comprimento informado ou perímetro. Módulos LED usam densidade configurável por m².</p>
+            <p class="hint" id="calcHint">Informe apenas os campos necessários para este material.</p>
             <div class="actions">
                 <button class="btn btn-success" id="salvarBtn">SALVAR MATERIAL</button>
             </div>
@@ -99,11 +100,12 @@
     <script src="../core/custeio.js"></script>
     <script src="../core/materiais-padrao.js"></script>
     <script>
-        const ids = ['nome', 'categoria', 'formulaPadrao', 'unidade', 'precoCusto', 'perdaPercentual', 'larguraCm', 'alturaCm', 'comprimentoM', 'densidadePorM2', 'observacoes'];
+        const ids = ['nome', 'categoria', 'formulaPadrao', 'unidade', 'precoTotal', 'precoCusto', 'perdaPercentual', 'larguraCm', 'alturaCm', 'comprimentoM', 'densidadePorM2', 'observacoes'];
         let materiais = [];
         const money = value => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(Number(value) || 0);
         const number = id => Number.parseFloat(document.getElementById(id).value) || 0;
         const presetSelect = document.getElementById('presetKey');
+        const groups = ['categoriaGroup', 'formulaGroup', 'unidadeGroup', 'precoTotalGroup', 'precoCustoGroup', 'perdaGroup', 'larguraGroup', 'alturaGroup', 'comprimentoGroup', 'densidadeGroup'];
 
         function renderPresetOptions() {
             presetSelect.innerHTML = MATERIAIS_PADRAO.materiais.map(material => `<option value="${material.key}">${material.nome}</option>`).join('');
@@ -122,6 +124,88 @@
             document.getElementById('formulaPadrao').value = preset.formulaPadrao;
             document.getElementById('unidade').value = preset.unidade;
             if (preset.comprimentoM) document.getElementById('comprimentoM').value = preset.comprimentoM;
+            applyMaterialLayout();
+            updateCalculatedPrice();
+        }
+
+        function setVisible(id, visible) {
+            document.getElementById(id).style.display = visible ? 'block' : 'none';
+        }
+
+        function isPlatePreset(key) {
+            return ['acrilico', 'acm', 'pvc_expandido'].includes(key);
+        }
+
+        function isLinearPreset(key) {
+            return ['fita_led_zigzag', 'fita_led_vtec', 'led_neon', 'metalon_aluminio', 'perfil_caixa_slim', 'perfil_caixa_luz'].includes(key);
+        }
+
+        function applyMaterialLayout() {
+            const preset = MATERIAIS_PADRAO.get(presetSelect.value);
+            groups.forEach(id => setVisible(id, false));
+            setVisible('categoriaGroup', true);
+            setVisible('unidadeGroup', true);
+            setVisible('precoCustoGroup', true);
+            document.getElementById('precoCusto').readOnly = false;
+            document.getElementById('precoCustoLabel').textContent = 'Preço de custo (€)';
+            document.getElementById('calcHint').textContent = 'Informe apenas os campos necessários para este material.';
+
+            if (isPlatePreset(preset.key)) {
+                document.getElementById('formulaPadrao').value = 'area';
+                document.getElementById('unidade').value = 'm²';
+                ['precoTotalGroup', 'perdaGroup', 'larguraGroup', 'alturaGroup'].forEach(id => setVisible(id, true));
+                document.getElementById('precoTotalLabel').textContent = 'Preço total da placa sem IVA (€)';
+                document.getElementById('precoCustoLabel').textContent = 'Preço calculado por m² (€)';
+                document.getElementById('precoCusto').readOnly = true;
+                document.getElementById('calcHint').textContent = 'Para placas: informe o preço total da placa e o tamanho comercial. O CRM calcula automaticamente o €/m² usado no orçamento.';
+            } else if (isLinearPreset(preset.key)) {
+                document.getElementById('formulaPadrao').value = 'linear';
+                document.getElementById('unidade').value = 'm';
+                ['precoTotalGroup', 'perdaGroup', 'comprimentoGroup'].forEach(id => setVisible(id, true));
+                document.getElementById('precoTotalLabel').textContent = preset.key.includes('fita') || preset.key === 'led_neon' ? 'Preço total do rolo sem IVA (€)' : 'Preço total da barra sem IVA (€)';
+                document.getElementById('comprimentoLabel').textContent = preset.key.includes('fita') || preset.key === 'led_neon' ? 'Metros no rolo' : 'Comprimento da barra (m)';
+                document.getElementById('precoCustoLabel').textContent = 'Preço calculado por metro (€)';
+                document.getElementById('precoCusto').readOnly = true;
+                document.getElementById('calcHint').textContent = 'Para rolos e barras: informe o preço total e o comprimento. O CRM calcula automaticamente o €/metro.';
+            } else if (preset.key === 'modulo_led_1w') {
+                document.getElementById('formulaPadrao').value = 'densidade_area';
+                document.getElementById('unidade').value = 'un';
+                ['perdaGroup', 'densidadeGroup'].forEach(id => setVisible(id, true));
+                document.getElementById('precoCustoLabel').textContent = 'Preço por módulo (€)';
+            } else if (preset.key === 'adesivo') {
+                document.getElementById('formulaPadrao').value = 'area';
+                document.getElementById('unidade').value = 'm²';
+                setVisible('perdaGroup', true);
+                document.getElementById('precoCustoLabel').textContent = 'Preço por m² (€)';
+            } else if (preset.key === 'filamento_petg') {
+                document.getElementById('formulaPadrao').value = 'unidade';
+                document.getElementById('unidade').value = 'kg';
+                document.getElementById('precoCustoLabel').textContent = 'Preço por kg (€)';
+            } else {
+                document.getElementById('formulaPadrao').value = preset.formulaPadrao;
+                document.getElementById('unidade').value = preset.unidade;
+                if (preset.key === 'outro') {
+                    ['formulaGroup', 'precoTotalGroup', 'perdaGroup', 'larguraGroup', 'alturaGroup', 'comprimentoGroup', 'densidadeGroup'].forEach(id => setVisible(id, true));
+                    document.getElementById('precoCustoLabel').textContent = 'Preço unitário de consumo (€)';
+                } else {
+                    document.getElementById('precoCustoLabel').textContent = 'Preço unitário (€)';
+                }
+            }
+        }
+
+        function updateCalculatedPrice() {
+            const preset = MATERIAIS_PADRAO.get(presetSelect.value);
+            const precoTotal = number('precoTotal');
+            let calculated = number('precoCusto');
+            if (isPlatePreset(preset.key)) {
+                const area = (number('larguraCm') / 100) * (number('alturaCm') / 100);
+                calculated = area > 0 && precoTotal > 0 ? precoTotal / area : 0;
+            } else if (isLinearPreset(preset.key)) {
+                calculated = number('comprimentoM') > 0 && precoTotal > 0 ? precoTotal / number('comprimentoM') : 0;
+            }
+            if ((isPlatePreset(preset.key) || isLinearPreset(preset.key)) && precoTotal > 0) {
+                document.getElementById('precoCusto').value = calculated ? calculated.toFixed(4) : '0';
+            }
         }
 
         function variantesFromForm() {
@@ -139,7 +223,7 @@
             document.getElementById('formTitle').textContent = 'Novo material';
             ids.forEach(id => {
                 const element = document.getElementById(id);
-                element.value = ['precoCusto', 'perdaPercentual', 'larguraCm', 'alturaCm', 'comprimentoM', 'densidadePorM2'].includes(id) ? '0' : '';
+                element.value = ['precoTotal', 'precoCusto', 'perdaPercentual', 'larguraCm', 'alturaCm', 'comprimentoM', 'densidadePorM2'].includes(id) ? '0' : '';
             });
             document.getElementById('categoria').value = 'Placa';
             document.getElementById('formulaPadrao').value = 'area';
@@ -158,6 +242,7 @@
                 categoria: document.getElementById('categoria').value,
                 formulaPadrao: document.getElementById('formulaPadrao').value,
                 unidade: document.getElementById('unidade').value,
+                precoTotal: number('precoTotal'),
                 precoCusto: number('precoCusto'),
                 perdaPercentual: number('perdaPercentual'),
                 larguraCm: number('larguraCm'),
@@ -218,6 +303,9 @@
 
         document.getElementById('novoBtn').addEventListener('click', resetForm);
         presetSelect.addEventListener('change', () => renderVariantFields());
+        ['precoTotal', 'larguraCm', 'alturaCm', 'comprimentoM'].forEach(id => {
+            document.getElementById(id).addEventListener('input', updateCalculatedPrice);
+        });
         document.getElementById('salvarBtn').addEventListener('click', async () => {
             const payload = formData();
             if (!payload.nome) return showMessage('Informe o nome do material.', 'error');

@@ -20,6 +20,26 @@ test('arredonda consumo de placa pelo tamanho comercial', () => {
   assert.equal(result.custo, 100);
 });
 
+test('calcula placa por metro quadrado usando preco total da chapa', () => {
+  const result = CUSTEIO.calcular(
+    { formula: 'area', larguraCm: 60, alturaCm: 40, quantidade: 1 },
+    { unidade: 'mÂ²', larguraCm: 100, alturaCm: 200, precoTotal: 50 }
+  );
+  assert.equal(result.consumo, 0.24);
+  assert.equal(result.precoUnitario, 25);
+  assert.equal(result.custo, 6);
+});
+
+test('calcula rolo por metro linear usando preco total do rolo', () => {
+  const result = CUSTEIO.calcular(
+    { formula: 'linear', comprimentoM: 7, quantidade: 1 },
+    { unidade: 'm', comprimentoM: 10, precoTotal: 30 }
+  );
+  assert.equal(result.consumo, 7);
+  assert.equal(result.precoUnitario, 3);
+  assert.equal(result.custo, 21);
+});
+
 test('calcula perfil por barra comercial', () => {
   const result = CUSTEIO.calcular(
     { formula: 'barra', comprimentoM: 7, quantidade: 1 },
