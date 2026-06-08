@@ -692,8 +692,8 @@
                     </div>
 
                     <div class="total-card">
-                        <div class="total-label">Ajuste de Preço (+/- €)</div>
-                        <input type="number" id="ajusteOrcamento" step="0.01" value="0" style="width:100%; margin-top:8px; padding:10px; border:1px solid #cbd5e1; border-radius:8px;">
+                        <div class="total-label">Margem desejada (%)</div>
+                        <input type="number" id="margemDesejadaOrcamento" min="1" max="95" step="0.1" value="50" style="width:100%; margin-top:8px; padding:10px; border:1px solid #cbd5e1; border-radius:8px;">
                     </div>
                     
                     <div class="total-card">
@@ -731,10 +731,6 @@
                         <div class="total-value" id="margemEstimada">0,0%</div>
                     </div>
 
-                    <div class="total-card">
-                        <div class="total-label">Preço Mínimo Recomendado</div>
-                        <div class="total-value" id="precoMinimo">0,00 €</div>
-                    </div>
                 </div>
                 
                 <!-- Campos ocultos para totais -->
@@ -744,9 +740,8 @@
                 <input type="hidden" id="orcamentoCustoEstimado" data-bind="orcamento.custoEstimado" value="0">
                 <input type="hidden" id="orcamentoLucroEstimado" data-bind="orcamento.lucroEstimado" value="0">
                 <input type="hidden" id="orcamentoMargemEstimada" data-bind="orcamento.margemEstimada" value="0">
-                <input type="hidden" id="orcamentoPrecoMinimo" data-bind="orcamento.precoMinimo" value="0">
                 <input type="hidden" id="orcamentoDesconto" data-bind="orcamento.desconto" value="0">
-                <input type="hidden" id="orcamentoAjuste" data-bind="orcamento.ajustePreco" value="0">
+                <input type="hidden" id="orcamentoMargemDesejada" data-bind="orcamento.margemDesejada" value="50">
                 <input type="hidden" id="orcamentoSellerCommissionValue" data-bind="orcamento.sellerCommissionValue" value="0">
                 <input type="hidden" id="orcamentoMountingCommissionValue" data-bind="orcamento.mountingCommissionValue" value="0">
             </div>
@@ -1043,7 +1038,7 @@
                 document.getElementById('observacoes').value = orcamento.observacoes || '';
                 document.getElementById('orcamentoId').value = orcamentoEvento.id;
                 document.getElementById('descontoOrcamento').value = orcamento.desconto || 0;
-                document.getElementById('ajusteOrcamento').value = orcamento.ajustePreco || orcamento.ajuste || 0;
+                document.getElementById('margemDesejadaOrcamento').value = orcamento.margemDesejada || orcamento.margemPrevista || margemMinimaOrcamento || 50;
                 await loadSellers(orcamento.sellerId || '');
                 document.getElementById('sellerCommissionRate').value = orcamento.sellerCommissionRate || 5;
                 document.getElementById('mountingCommissionRate').value = orcamento.mountingCommissionRate || 0;
@@ -1323,12 +1318,13 @@
         function aplicarFichaTecnica() {
             if (!technicalProductRow) return;
             const ficha = calcularFichaOrcamento(technicalProductRow._materiais);
-            const margemMinimaDecimal = Math.min(99, Math.max(0, margemMinimaOrcamento)) / 100;
-            const precoSugerido = ficha.custoTotal > 0 ? ficha.custoTotal / Math.max(0.01, 1 - margemMinimaDecimal) : 0;
+            const margemDesejada = Math.min(95, Math.max(1, parseFloat(document.getElementById('margemDesejadaOrcamento')?.value) || margemMinimaOrcamento || 50));
+            const margemDesejadaDecimal = margemDesejada / 100;
+            const precoPorMargem = ficha.custoTotal > 0 ? ficha.custoTotal / Math.max(0.01, 1 - margemDesejadaDecimal) : 0;
             technicalProductRow.querySelector('.custo-input').value = ficha.custoTotal.toFixed(2);
-            technicalProductRow.querySelector('.valor-input').value = precoSugerido.toFixed(2);
-            technicalProductRow.querySelector('.materials-summary').textContent = `${technicalProductRow._materiais.length} itens | custo ${formatarMoeda(ficha.custoTotal)} | sugerido ${formatarMoeda(precoSugerido)}`;
-            calculateTotals();
+            technicalProductRow.querySelector('.valor-input').value = precoPorMargem.toFixed(2);
+            technicalProductRow.querySelector('.materials-summary').textContent = `${technicalProductRow._materiais.length} itens | custo ${formatarMoeda(ficha.custoTotal)} | margem ${margemDesejada.toFixed(1).replace('.', ',')}%`;
+            calculateTotals(true);
             fecharFichaTecnica();
         }
         
@@ -1366,8 +1362,33 @@
                 productIndex = index + 1;
             });
         }
+
+        function ajustarPrecosParaMargem(custoMateriais, margemDesejada, desconto, instalacao, sellerRate, mountingRate, hasSeller, sellerExtraMarkup) {
+            const margem = Math.min(95, Math.max(1, margemDesejada)) / 100;
+            const comissaoVendedorRate = hasSeller ? sellerRate / 100 : 0;
+            const comissaoMontagemRate = mountingRate / 100;
+            const rateComissoes = comissaoVendedorRate + comissaoMontagemRate;
+            const divisor = Math.max(0.01, (1 - margem) - rateComissoes);
+            return Math.max(0, (custoMateriais + (hasSeller ? sellerExtraMarkup : 0)) / divisor + desconto - instalacao);
+        }
+
+        function distribuirSubtotalProdutos(novoSubtotal) {
+            const rows = Array.from(document.querySelectorAll('#productsTableBody tr'));
+            const bases = rows.map(row => {
+                const quantidade = Math.max(1, parseFloat(row.querySelector('.quantidade-input')?.value) || 1);
+                const valor = Math.max(0, parseFloat(row.querySelector('.valor-input')?.value) || 0);
+                return { row, quantidade, total: valor * quantidade };
+            });
+            const totalAtual = bases.reduce((total, item) => total + item.total, 0);
+            const totalQuantidade = bases.reduce((total, item) => total + item.quantidade, 0) || 1;
+            bases.forEach(item => {
+                const peso = totalAtual > 0 ? item.total / totalAtual : item.quantidade / totalQuantidade;
+                const novoTotalLinha = novoSubtotal * peso;
+                item.row.querySelector('.valor-input').value = (novoTotalLinha / item.quantidade).toFixed(2);
+            });
+        }
         
-        function calculateTotals() {
+        function calculateTotals(ajustarPorMargem = false) {
             let subtotalProdutos = 0;
             let custoEstimado = 0;
             
@@ -1386,12 +1407,18 @@
             
             const instalacao = 0;
             const desconto = Math.max(0, parseFloat(document.getElementById('descontoOrcamento')?.value) || 0);
-            const ajustePreco = parseFloat(document.getElementById('ajusteOrcamento')?.value) || 0;
             const sellerExtraMarkup = Math.max(0, parseFloat(document.getElementById('sellerExtraMarkup')?.value) || 0);
-            const baseComissao = Math.max(0, subtotalProdutos + instalacao - desconto + ajustePreco);
+            const margemDesejada = Math.min(95, Math.max(1, parseFloat(document.getElementById('margemDesejadaOrcamento')?.value) || margemMinimaOrcamento || 50));
             const sellerRate = Math.min(10, Math.max(5, parseFloat(document.getElementById('sellerCommissionRate')?.value) || 5));
             const mountingRate = Math.max(0, parseFloat(document.getElementById('mountingCommissionRate')?.value) || 0);
             const hasSeller = Boolean(document.getElementById('sellerId')?.value);
+
+            if (ajustarPorMargem && custoEstimado > 0) {
+                subtotalProdutos = ajustarPrecosParaMargem(custoEstimado, margemDesejada, desconto, instalacao, sellerRate, mountingRate, hasSeller, sellerExtraMarkup);
+                distribuirSubtotalProdutos(subtotalProdutos);
+            }
+
+            const baseComissao = Math.max(0, subtotalProdutos + instalacao - desconto);
             const sellerCommissionValue = hasSeller ? (baseComissao * sellerRate / 100) + sellerExtraMarkup : 0;
             const mountingCommissionValue = baseComissao * mountingRate / 100;
             const totalComissoes = sellerCommissionValue + mountingCommissionValue;
@@ -1406,8 +1433,6 @@
             const custoGerencial = custoEstimado + totalComissoes;
             const lucroEstimado = subtotalGeral - custoGerencial;
             const margemEstimada = subtotalGeral > 0 ? (lucroEstimado / subtotalGeral) * 100 : 0;
-            const margemMinimaDecimal = Math.min(99, Math.max(0, margemMinimaOrcamento)) / 100;
-            const precoMinimo = custoGerencial / Math.max(0.01, 1 - margemMinimaDecimal);
             
             // Atualizar exibição
             document.getElementById('subtotalProdutos').textContent = formatarMoeda(subtotalProdutos);
@@ -1418,19 +1443,17 @@
             document.getElementById('comissoesEstimadas').textContent = formatarMoeda(totalComissoes);
             document.getElementById('lucroEstimado').textContent = formatarMoeda(lucroEstimado);
             document.getElementById('margemEstimada').textContent = margemEstimada.toFixed(1).replace('.', ',') + '%';
-            document.getElementById('margemEstimada').style.color = margemEstimada < margemMinimaOrcamento ? '#ef4444' : '#10b981';
-            document.getElementById('precoMinimo').textContent = formatarMoeda(precoMinimo);
+            document.getElementById('margemEstimada').style.color = margemEstimada + 0.05 < margemDesejada ? '#ef4444' : '#10b981';
             
             // Atualizar campos ocultos
             document.getElementById('orcamentoSubtotal').value = subtotalGeral;
             document.getElementById('orcamentoIVA').value = iva;
             document.getElementById('orcamentoTotal').value = totalFinal;
             document.getElementById('orcamentoDesconto').value = desconto.toFixed(2);
-            document.getElementById('orcamentoAjuste').value = ajustePreco.toFixed(2);
+            document.getElementById('orcamentoMargemDesejada').value = margemDesejada.toFixed(2);
             document.getElementById('orcamentoCustoEstimado').value = custoGerencial.toFixed(2);
             document.getElementById('orcamentoLucroEstimado').value = lucroEstimado.toFixed(2);
             document.getElementById('orcamentoMargemEstimada').value = margemEstimada.toFixed(2);
-            document.getElementById('orcamentoPrecoMinimo').value = precoMinimo.toFixed(2);
             document.getElementById('orcamentoSellerCommissionValue').value = sellerCommissionValue.toFixed(2);
             document.getElementById('orcamentoMountingCommissionValue').value = mountingCommissionValue.toFixed(2);
         }
@@ -1694,7 +1717,7 @@
                     iva: parseFloat(document.getElementById('orcamentoIVA').value) || 0,
                     total: parseFloat(document.getElementById('orcamentoTotal').value) || 0,
                     desconto: parseFloat(document.getElementById('orcamentoDesconto').value) || 0,
-                    ajustePreco: parseFloat(document.getElementById('orcamentoAjuste').value) || 0,
+                    margemDesejada: parseFloat(document.getElementById('orcamentoMargemDesejada').value) || 50,
                     sellerId: document.getElementById('sellerId').value,
                     sellerName: vendedores.find(seller => seller.id === document.getElementById('sellerId').value)?.name || '',
                     sellerCommissionRate: Math.min(10, Math.max(5, parseFloat(document.getElementById('sellerCommissionRate').value) || 5)),
@@ -1707,9 +1730,7 @@
                     custoPrevisto: parseFloat(document.getElementById('orcamentoCustoEstimado').value) || resumoProfissional.custoPrevisto,
                     lucroPrevisto: parseFloat(document.getElementById('orcamentoLucroEstimado').value) || resumoProfissional.lucroPrevisto,
                     margemPrevista: parseFloat(document.getElementById('orcamentoMargemEstimada').value) || resumoProfissional.margemPrevista,
-                    precoMinimo: parseFloat(document.getElementById('orcamentoPrecoMinimo').value) || resumoProfissional.precoMinimo,
-                    precoSugerido: resumoProfissional.precoSugerido,
-                    abaixoMargem: resumoProfissional.abaixoMargem,
+                    abaixoMargem: false,
                     comIVA: document.querySelector('input[name="ivaOption"]:checked').value,
                     status: currentBudgetStatus || 'pendente',
                     validade: validadeData,
@@ -1752,11 +1773,11 @@
         document.getElementById('ivaSim').addEventListener('change', calculateTotals);
         document.getElementById('ivaNao').addEventListener('change', calculateTotals);
         document.getElementById('descontoOrcamento').addEventListener('input', calculateTotals);
-        document.getElementById('ajusteOrcamento').addEventListener('input', calculateTotals);
-        document.getElementById('sellerId').addEventListener('change', calculateTotals);
-        document.getElementById('sellerCommissionRate').addEventListener('input', calculateTotals);
-        document.getElementById('mountingCommissionRate').addEventListener('input', calculateTotals);
-        document.getElementById('sellerExtraMarkup').addEventListener('input', calculateTotals);
+        document.getElementById('margemDesejadaOrcamento').addEventListener('input', () => calculateTotals(true));
+        document.getElementById('sellerId').addEventListener('change', () => calculateTotals(true));
+        document.getElementById('sellerCommissionRate').addEventListener('input', () => calculateTotals(true));
+        document.getElementById('mountingCommissionRate').addEventListener('input', () => calculateTotals(true));
+        document.getElementById('sellerExtraMarkup').addEventListener('input', () => calculateTotals(true));
     </script>
     
     <!-- CONEXÃO COM O CORE ENGINE -->
