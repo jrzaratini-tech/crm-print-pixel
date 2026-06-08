@@ -785,7 +785,7 @@
 
         .delivery-planner-grid {
             display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
+            grid-template-columns: repeat(2, minmax(0, 1fr));
             gap: 8px;
             align-items: end;
         }
@@ -877,8 +877,8 @@
         }
 
         .delivery-day.weekend {
-            background: #f8fafc;
-            border-color: #cbd5e1;
+            background: #fff1f2;
+            border-color: #fecdd3;
         }
 
         .delivery-day.holiday {
@@ -888,6 +888,22 @@
 
         .delivery-day.today {
             box-shadow: inset 0 0 0 2px #2563eb;
+        }
+
+        .delivery-day.suggested-delivery {
+            background: #dcfce7;
+            border-color: #16a34a;
+            box-shadow: inset 0 0 0 2px #22c55e, 0 8px 18px rgba(34, 197, 94, .18);
+        }
+
+        .delivery-suggested-badge {
+            color: #14532d;
+            background: #bbf7d0;
+            border-radius: 999px;
+            padding: 4px 8px;
+            font-size: 10px;
+            font-weight: 900;
+            text-transform: uppercase;
         }
 
         .delivery-day-number {
@@ -1264,8 +1280,6 @@
                     <div class="delivery-planner-grid">
                         <label>Dias uteis de producao<input type="number" id="plannerProductionDays" min="1" max="60" value="5"></label>
                         <label>Comecar a partir de<input type="date" id="plannerStartDate"></label>
-                        <label>Max. entregas/dia<input type="number" id="plannerDeliveryCapacity" min="1" max="20" value="2"></label>
-                        <label>Max. producao/dia<input type="number" id="plannerProductionCapacity" min="1" max="20" value="3"></label>
                     </div>
                     <div class="delivery-planner-grid" style="margin-top:8px; grid-template-columns: 1fr 2fr;">
                         <button type="button" id="plannerFindDate">Encontrar janela</button>
@@ -1310,8 +1324,6 @@
             const deliveryNoDateTotal = document.getElementById('deliveryNoDateTotal');
             const plannerProductionDays = document.getElementById('plannerProductionDays');
             const plannerStartDate = document.getElementById('plannerStartDate');
-            const plannerDeliveryCapacity = document.getElementById('plannerDeliveryCapacity');
-            const plannerProductionCapacity = document.getElementById('plannerProductionCapacity');
             const plannerFindDate = document.getElementById('plannerFindDate');
             const plannerResult = document.getElementById('plannerResult');
             
@@ -1327,6 +1339,7 @@
             let todosEventos = [];
             let todosEventosComTimestampsCorrigidos = [];
             let deliveryCalendarDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+            let suggestedDeliveryKey = '';
             
             // ============================================
             // FUNÇÕES PRINCIPAIS - CORRIGIDAS
@@ -1580,14 +1593,12 @@
                 return map;
             }
 
-            function windowIsAvailable(windowDates, productionLoad, productionCapacity) {
-                return windowDates.every(date => (productionLoad.get(formatDateKey(date)) || 0) < productionCapacity);
+            function windowIsAvailable(windowDates, productionLoad) {
+                return windowDates.every(date => (productionLoad.get(formatDateKey(date)) || 0) === 0);
             }
 
             function planejarPrazoEntrega() {
                 const productionDays = Math.max(1, parseInt(plannerProductionDays.value, 10) || 1);
-                const deliveryCapacity = Math.max(1, parseInt(plannerDeliveryCapacity.value, 10) || 1);
-                const productionCapacity = Math.max(1, parseInt(plannerProductionCapacity.value, 10) || 1);
                 const baseDate = parseDeliveryDate(plannerStartDate.value) || new Date();
                 const pedidos = pedidosParaCalendario();
                 const deliveries = deliveryLoadMap(pedidos);
@@ -1598,20 +1609,23 @@
                     const windowDates = businessWindow(cursor, productionDays);
                     const deliveryDate = nextBusinessDay(addDays(windowDates[windowDates.length - 1], 1));
                     const deliveryKey = formatDateKey(deliveryDate);
-                    const deliveryAvailable = (deliveries.get(deliveryKey) || 0) < deliveryCapacity;
-                    const productionAvailable = windowIsAvailable(windowDates, production, productionCapacity);
+                    const deliveryAvailable = (deliveries.get(deliveryKey) || 0) === 0;
+                    const productionAvailable = windowIsAvailable(windowDates, production);
 
                     if (deliveryAvailable && productionAvailable) {
+                        suggestedDeliveryKey = deliveryKey;
                         deliveryCalendarDate = new Date(deliveryDate.getFullYear(), deliveryDate.getMonth(), 1);
                         renderDeliveryCalendar();
-                        plannerResult.innerHTML = `<strong>Janela sugerida:</strong> produzir de ${windowDates[0].toLocaleDateString('pt-PT')} a ${windowDates[windowDates.length - 1].toLocaleDateString('pt-PT')}. <strong>Entrega prevista:</strong> ${deliveryDate.toLocaleDateString('pt-PT')}.`;
+                        plannerResult.innerHTML = `<strong>Janela sugerida:</strong> produzir de ${windowDates[0].toLocaleDateString('pt-PT')} a ${windowDates[windowDates.length - 1].toLocaleDateString('pt-PT')}. <strong>Entrega prevista:</strong> ${deliveryDate.toLocaleDateString('pt-PT')}. A data foi destacada no calendario.`;
                         return;
                     }
                     cursor = addDays(cursor, 1);
                     cursor = nextBusinessDay(cursor);
                 }
 
-                plannerResult.textContent = 'Nao encontrei uma janela livre nos proximos meses com estes limites. Aumente a capacidade diaria ou reduza o prazo.';
+                suggestedDeliveryKey = '';
+                renderDeliveryCalendar();
+                plannerResult.textContent = 'Nao encontrei uma janela livre nos proximos meses considerando os trabalhos ja agendados.';
             }
 
             function renderDeliveryCalendar() {
@@ -1650,6 +1664,7 @@
                     const today = key === todayKey;
                     const holiday = holidayLabel(date);
                     const weekend = date.getDay() === 0 || date.getDay() === 6;
+                    const suggested = key === suggestedDeliveryKey;
                     const visibleOrders = dayOrders.slice(0, 2);
                     const hiddenCount = Math.max(0, dayOrders.length - visibleOrders.length);
                     const items = visibleOrders.map(pedido => `
@@ -1661,11 +1676,12 @@
                         </div>
                     `).join('');
                     cells.push(`
-                        <div class="delivery-day ${outside ? 'outside' : ''} ${today ? 'today' : ''} ${weekend ? 'weekend' : ''} ${holiday ? 'holiday' : ''} ${dayOrders.length ? 'has-deliveries' : ''}">
+                        <div class="delivery-day ${outside ? 'outside' : ''} ${today ? 'today' : ''} ${weekend ? 'weekend' : ''} ${holiday ? 'holiday' : ''} ${suggested ? 'suggested-delivery' : ''} ${dayOrders.length ? 'has-deliveries' : ''}">
                             <div class="delivery-day-number">
                                 <span>${date.getDate()}</span>
                                 ${dayOrders.length ? `<span class="delivery-day-count">${dayOrders.length}</span>` : ''}
                             </div>
+                            ${suggested ? '<div class="delivery-suggested-badge">Entrega sugerida</div>' : ''}
                             ${holiday ? `<div class="delivery-day-note">${escapeHtml(holiday)}</div>` : ''}
                             ${items}
                             ${hiddenCount ? `<div class="delivery-more">+${hiddenCount} entregas</div>` : ''}
