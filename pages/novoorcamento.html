@@ -1218,6 +1218,52 @@
             return catalogoMateriais.find(entry => entry.id === materialId) || {};
         }
 
+        function isPetgMaterial(material = {}) {
+            const key = String(material.presetKey || material.key || material.id || '').toLowerCase();
+            const nome = String(material.nome || '').toLowerCase();
+            return key.includes('filamento_petg') || nome.includes('petg');
+        }
+
+        function calcularItemTecnico(item = {}, material = {}) {
+            if (isPetgMaterial(material)) {
+                const kg = Math.max(0, parseFloat(item.quantidade) || 1);
+                const precoKg = Math.max(0, parseFloat(material.precoCusto || material.precoKg || material.precoUnitario || material.precoTotal) || 15);
+                const horas = Math.max(0, parseFloat(item.horasImpressao || item.horas) || 0);
+                const custoHora = Math.max(0, parseFloat(item.custoHoraImpressao) || 2);
+                return {
+                    formula: 'petg_impressao',
+                    consumo: kg,
+                    unidade: 'kg',
+                    custoMaterial: kg * precoKg,
+                    custoMaquina: horas * custoHora,
+                    custo: (kg * precoKg) + (horas * custoHora)
+                };
+            }
+            return CUSTEIO.calcular(item, material);
+        }
+
+        function aplicarCalculadoraPetgItem(item = {}) {
+            const texto = String(item.petgTexto || '').trim();
+            const alturaMm = parseFloat(item.petgAlturaMm) || 0;
+            const profundidadeMm = parseFloat(item.petgProfundidadeMm) || 0;
+            const larguraMm = parseFloat(item.petgLarguraMm) || 0;
+            if (!texto || !alturaMm || !profundidadeMm) return item;
+            const calculo = GESTAO.calcularLetreiroPETG({
+                entradas: [{ texto, alturaMm, profundidadeMm, larguraMm }],
+                gramasPorHora: 23.5,
+                fatorComplexidadeMaterial: 1.23,
+                fatorLed: 1.2
+            });
+            item.quantidade = Math.max(0.001, Math.round((calculo.gramasTotal / 1000) * 1000) / 1000);
+            item.horasImpressao = Math.round(calculo.horasTotal * 10) / 10;
+            item.petgCalculado = {
+                kg: item.quantidade,
+                horas: item.horasImpressao,
+                ledMm: calculo.ledFinalMm
+            };
+            return item;
+        }
+
         function variantInputs(item, material) {
             const preset = MATERIAIS_PADRAO.get(material.presetKey || String(material.id || '').replace('preset:', ''));
             return preset.questions.map(question => {
@@ -1230,6 +1276,17 @@
 
         function measureInputs(item, material) {
             const formula = item.formula || material.formulaPadrao || 'unidade';
+            if (isPetgMaterial(material)) {
+                return `
+                    <label>Texto PETG<input class="tech-petg-texto" value="${item.petgTexto || ''}" placeholder="Ex: INTENSE BISTRO"></label>
+                    <label>Altura (mm)<input class="tech-petg-altura" type="number" min="0" step="1" value="${item.petgAlturaMm || 0}"></label>
+                    <label>Profundidade (mm)<input class="tech-petg-profundidade" type="number" min="0" step="1" value="${item.petgProfundidadeMm || 0}"></label>
+                    <label>Largura horiz. (mm)<input class="tech-petg-largura" type="number" min="0" step="1" value="${item.petgLarguraMm || 0}"></label>
+                    <label>Quantidade PETG (kg)<input class="tech-petg-kg" type="number" min="0" step="0.001" value="${item.quantidade || 1}"></label>
+                    <label>Tempo impressão (h)<input class="tech-petg-horas" type="number" min="0" step="0.1" value="${item.horasImpressao || item.horas || 0}"></label>
+                    <label>Custo hora máquina (€)<input class="tech-petg-custo-hora" type="number" min="0" step="0.01" value="${item.custoHoraImpressao ?? 2}"></label>
+                `;
+            }
             if (['area', 'placa', 'perimetro', 'densidade_area'].includes(formula)) return `<label>Largura (cm)<input class="tech-largura" type="number" min="0" step="0.1" value="${item.larguraCm || 0}"></label><label>Altura (cm)<input class="tech-altura" type="number" min="0" step="0.1" value="${item.alturaCm || 0}"></label>`;
             if (['linear', 'barra'].includes(formula)) return `<label>Comprimento (m)<input class="tech-comprimento" type="number" min="0" step="0.01" value="${item.comprimentoM || 0}"></label>`;
             if (formula === 'hora') return `<label>Horas previstas<input class="tech-horas" type="number" min="0" step="0.1" value="${item.horas || 0}"></label>`;
@@ -1256,6 +1313,13 @@
                 alturaCm: item.alturaCm || 0,
                 comprimentoM: item.comprimentoM || 0,
                 horas: item.horas || 0,
+                horasImpressao: item.horasImpressao || 0,
+                custoHoraImpressao: item.custoHoraImpressao ?? 2,
+                petgTexto: item.petgTexto || '',
+                petgAlturaMm: item.petgAlturaMm || 0,
+                petgProfundidadeMm: item.petgProfundidadeMm || 0,
+                petgLarguraMm: item.petgLarguraMm || 0,
+                petgCalculado: item.petgCalculado || null,
                 quantidade: item.quantidade || 1,
                 perdaPercentual: item.perdaPercentual ?? '',
                 variantes: item.variantes || {}
@@ -1269,12 +1333,13 @@
             const items = technicalProductRow._materiais || [];
             body.innerHTML = items.length ? items.map((item, index) => {
                 const material = resolveMaterial(item.materialId);
-                const calculo = CUSTEIO.calcular(item, material);
+                const calculo = calcularItemTecnico(item, material);
+                const isPetg = isPetgMaterial(material);
                 return `<tr data-index="${index}">
                     <td><select class="tech-material">${materialOptions(item.materialId)}</select></td>
                     <td><div class="grid">${variantInputs(item, material)}</div></td>
                     <td><div class="grid">${measureInputs(item, material)}</div></td>
-                    <td><input class="tech-quantidade" type="number" min="0" step="0.01" value="${item.quantidade || 1}"></td>
+                    <td><input class="tech-quantidade" type="number" min="0" step="0.01" value="${item.quantidade || 1}" ${isPetg ? 'readonly' : ''}></td>
                     <td><input class="tech-perda" type="number" min="0" step="0.1" placeholder="${material.perdaPercentual || 0}" value="${item.perdaPercentual ?? ''}"></td>
                     <td>${calculo.consumo.toFixed(2)} ${calculo.unidade}</td>
                     <td>${formatarMoeda(calculo.custo)}</td>
@@ -1304,10 +1369,30 @@
             item.alturaCm = parseFloat(row.querySelector('.tech-altura')?.value) || 0;
             item.comprimentoM = parseFloat(row.querySelector('.tech-comprimento')?.value) || 0;
             item.horas = parseFloat(row.querySelector('.tech-horas')?.value) || 0;
+            item.petgTexto = row.querySelector('.tech-petg-texto')?.value || '';
+            item.petgAlturaMm = parseFloat(row.querySelector('.tech-petg-altura')?.value) || 0;
+            item.petgProfundidadeMm = parseFloat(row.querySelector('.tech-petg-profundidade')?.value) || 0;
+            item.petgLarguraMm = parseFloat(row.querySelector('.tech-petg-largura')?.value) || 0;
+            item.horasImpressao = parseFloat(row.querySelector('.tech-petg-horas')?.value) || 0;
+            item.custoHoraImpressao = parseFloat(row.querySelector('.tech-petg-custo-hora')?.value) || 2;
             item.quantidade = parseFloat(row.querySelector('.tech-quantidade').value) || 1;
+            if (isPetgMaterial(material)) item.quantidade = parseFloat(row.querySelector('.tech-petg-kg')?.value) || 1;
+            if (isPetgMaterial(material)) aplicarCalculadoraPetgItem(item);
             item.perdaPercentual = row.querySelector('.tech-perda').value;
             item.variantes = Object.fromEntries(Array.from(row.querySelectorAll('[data-variant]')).map(element => [element.dataset.variant, element.value]));
-            if (previousMaterialId !== materialId) item.variantes = {};
+            if (previousMaterialId !== materialId) {
+                item.variantes = {};
+                if (isPetgMaterial(material)) {
+                    item.quantidade = 1;
+                    item.horasImpressao = 0;
+                    item.custoHoraImpressao = 2;
+                    item.petgTexto = '';
+                    item.petgAlturaMm = 0;
+                    item.petgProfundidadeMm = 0;
+                    item.petgLarguraMm = 0;
+                    item.petgCalculado = null;
+                }
+            }
             renderTechnicalRows();
         }
 
@@ -1318,7 +1403,10 @@
         }
 
         function calcularFichaOrcamento(itens) {
-            const detalhes = itens.map(item => ({ ...item, calculo: CUSTEIO.calcular(item, resolveMaterial(item.materialId)) }));
+            const detalhes = itens.map(item => {
+                const material = resolveMaterial(item.materialId);
+                return { ...item, material, calculo: calcularItemTecnico(item, material) };
+            });
             return { detalhes, custoTotal: detalhes.reduce((total, detalhe) => total + detalhe.calculo.custo, 0) };
         }
 
