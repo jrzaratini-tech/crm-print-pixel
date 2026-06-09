@@ -173,6 +173,9 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(orderBudgetPageResult.body, /tech-petg-kg/);
   assert.match(orderBudgetPageResult.body, /tech-petg-horas/);
   assert.match(orderBudgetPageResult.body, /tech-petg-custo-hora/);
+  assert.match(orderBudgetPageResult.body, /petg-inline-calculator/);
+  assert.match(orderBudgetPageResult.body, /tech-petg-add-entry/);
+  assert.match(orderBudgetPageResult.body, /atualizarPreviewPetgItem/);
   assert.match(orderBudgetPageResult.body, /calcularItemTecnico/);
   assert.doesNotMatch(orderBudgetPageResult.body, /Textos e alturas do mesmo trabalho/);
   assert.match(calculatorPageResult.body, /Letras caixa impressas/);
