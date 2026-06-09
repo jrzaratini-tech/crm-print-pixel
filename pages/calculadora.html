@@ -93,7 +93,8 @@
             <input id="petgDepthMm" type="hidden" value="50">
             <input id="petgKgPrice" type="hidden" value="18">
             <input id="petgWaste" type="hidden" value="10">
-            <input id="petgGramsHour" type="hidden" value="75">
+            <input id="petgGramsHour" type="hidden" value="23.5">
+            <input id="petgComplexityFactor" type="hidden" value="1.23">
             <input id="petgLedFactor" type="hidden" value="1.2">
             <input id="petgLedManualMm" type="hidden" value="0">
             <input id="marginPercent" type="hidden" value="50">
@@ -427,6 +428,7 @@
                 precoKgFilamento: number('petgKgPrice'),
                 perdaPercentual: number('petgWaste') || 10,
                 gramasPorHora: number('petgGramsHour') || 75,
+                fatorComplexidadeMaterial: number('petgComplexityFactor') || 1,
                 fatorLed: number('petgLedFactor') || 1.2,
                 ledManualM: mmToM(number('petgLedManualMm'))
             });

@@ -136,6 +136,7 @@
         const preenchimento = Math.max(0, Math.min(1, numero(config.preenchimentoPercentual ?? (PETG_PRINT_PROFILE.densidadePreenchimento * 100)) / 100));
         const areaFaceCoeficiente = Math.max(0, numero(config.areaFaceCoeficiente ?? 0.42));
         const perda = Math.max(0, numero(config.perdaPercentual ?? 10)) / 100;
+        const fatorComplexidadeMaterial = Math.max(0.1, numero(config.fatorComplexidadeMaterial ?? 1));
         const precoKg = dinheiro(config.precoKgFilamento || config.precoKg || 0);
         const gramasPorHora = Math.max(1, numero(config.gramasPorHora || NEPTUNE_4_MAX.gramasPorHora));
         const custoHoraImpressora = Math.max(0, numero(config.custoHoraImpressora ?? NEPTUNE_4_MAX.custoHoraImpressora));
@@ -156,7 +157,7 @@
                 const areaFaceCm2 = Math.pow(alturaCm, 2) * areaFaceCoeficiente;
                 const volumeFaceCm3 = areaFaceCm2 * topoBaseCm * preenchimento;
                 const volumeCm3 = (volumeParedeCm3 + volumeFaceCm3) * quantidade;
-                const gramas = volumeCm3 * PETG_DENSITY_G_CM3 * (1 + perda);
+                const gramas = volumeCm3 * PETG_DENSITY_G_CM3 * (1 + perda) * fatorComplexidadeMaterial;
                 const horas = gramas / gramasPorHora;
                 return {
                     letter,
@@ -196,6 +197,7 @@
             espessuraTopoBaseMm: topoBaseMm,
             preenchimentoPercentual: Math.round(preenchimento * 10000) / 100,
             areaFaceCoeficiente,
+            fatorComplexidadeMaterial,
             alturaCm,
             profundidadeCm,
             precoKgFilamento: precoKg,
@@ -231,6 +233,7 @@
         const precoKgFilamento = config.precoKgFilamento || config.precoKg || 0;
         const perdaPercentual = config.perdaPercentual ?? 10;
         const gramasPorHora = config.gramasPorHora || NEPTUNE_4_MAX.gramasPorHora;
+        const fatorComplexidadeMaterial = config.fatorComplexidadeMaterial ?? 1;
         const historicoReal = config.historicoReal || [];
         const partes = entradas
             .map((entrada, index) => {
@@ -242,6 +245,7 @@
                     profundidadeCm: entrada.profundidadeCm || entrada.espessuraCm || (numero(entrada.profundidadeMm) / 10) || config.profundidadeCm || (numero(config.profundidadeMm) / 10),
                     precoKgFilamento,
                     perdaPercentual,
+                    fatorComplexidadeMaterial,
                     gramasPorHora,
                     historicoReal
                 });

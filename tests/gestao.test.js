@@ -165,6 +165,20 @@ test('usa largura horizontal informada para ajustar PETG tempo e LED', () => {
   assert.equal(ajustado.entradas[0].fatorLargura, 1.5);
 });
 
+test('calibra letreiro artistico PETG com largura real de arte', () => {
+  const result = GESTAO.calcularLetreiroPETG({
+    entradas: [{ texto: 'INTENSE BISTRO', alturaMm: 150, profundidadeMm: 20, larguraMm: 1400 }],
+    precoKgFilamento: 18,
+    gramasPorHora: 23.5,
+    fatorComplexidadeMaterial: 1.23,
+    fatorLed: 1.2
+  });
+
+  assert.ok(result.gramasTotal >= 450 && result.gramasTotal <= 490);
+  assert.ok(result.horasTotal >= 19 && result.horasTotal <= 21);
+  assert.equal(Math.round(result.ledFinalMm), 10790);
+});
+
 test('conta letras da palavra removendo acentos e espacos', () => {
   assert.deepEqual(GESTAO.lettersFromWord('AMOR'), [
     { letter: 'A', quantidade: 1 },
