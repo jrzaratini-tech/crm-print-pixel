@@ -33,6 +33,9 @@
         .empty { padding: 28px; color: #64748b; text-align: center; }
         .message { margin-top: 12px; font-weight: 700; }
         .success { color: #059669; } .error { color: #dc2626; }
+        .supplier-panel { margin-top: 14px; padding: 14px; border: 1px solid #bfdbfe; border-radius: 10px; background: #eff6ff; }
+        .supplier-panel h3 { margin: 0 0 8px; color: #1e40af; }
+        .supplier-panel .hint { margin-top: 8px; }
         @media (max-width: 700px) { body { padding: 14px; } .header { display: block; } .header .btn { margin-top: 14px; width: 100%; } }
     </style>
 </head>
@@ -79,6 +82,14 @@
                 <label id="densidadeGroup">Densidade de módulos (un./m²)<input id="densidadePorM2" type="number" min="0" step="0.1" value="0"></label>
             </div>
             <div class="grid" id="variantFields" style="margin-top:14px;"></div>
+            <div class="supplier-panel" id="supplierTablePanel" style="display:none;">
+                <h3>Tabela do fornecedor</h3>
+                <div class="grid">
+                    <label>Opcao comercial<select id="supplierTableOption"></select></label>
+                    <label style="display:flex; align-items:end;"><button class="btn btn-primary" type="button" id="registerSupplierTableBtn">CADASTRAR TABELA COMPLETA</button></label>
+                </div>
+                <p class="hint" id="supplierTableHint">Ao selecionar uma opcao, o CRM preenche tamanho da placa, preco total sem IVA e calcula o custo por m2.</p>
+            </div>
             <label style="margin-top:14px;">Observações<textarea id="observacoes" placeholder="Fornecedor, espessura, cor, aplicação ou critérios de cálculo."></textarea></label>
             <p class="hint" id="calcHint">Informe apenas os campos necessários para este material.</p>
             <div class="actions">
@@ -112,7 +123,7 @@
             presetSelect.innerHTML = MATERIAIS_PADRAO.materiais.map(material => `<option value="${material.key}">${material.nome}</option>`).join('');
         }
 
-        function renderVariantFields(variantes = {}) {
+        function renderVariantFields(variantes = {}, autoApplySupplier = true) {
             const preset = MATERIAIS_PADRAO.get(presetSelect.value);
             document.getElementById('customNameGroup').style.display = preset.key === 'outro' ? 'block' : 'none';
             document.getElementById('variantFields').innerHTML = preset.questions.map(item => {
@@ -127,6 +138,10 @@
             if (preset.comprimentoM) document.getElementById('comprimentoM').value = preset.comprimentoM;
             applyMaterialLayout();
             updateCalculatedPrice();
+            document.querySelectorAll('#variantFields [data-variant]').forEach(element => {
+                element.addEventListener('change', renderSupplierTableOptions);
+            });
+            renderSupplierTableOptions(autoApplySupplier);
         }
 
         function setVisible(id, visible) {
@@ -135,6 +150,49 @@
 
         function isPlatePreset(key) {
             return ['acrilico', 'acm', 'pvc_expandido'].includes(key);
+        }
+
+        function supplierTableEntriesForPreset(key = presetSelect.value) {
+            return MATERIAIS_PADRAO.tabelaFornecedor ? MATERIAIS_PADRAO.tabelaFornecedor(key) : [];
+        }
+
+        function supplierEntryLabel(entry) {
+            return `${entry.acabamento} | ${entry.espessura} | ${entry.larguraMm} x ${entry.alturaMm} mm | ${money(entry.precoTotal)}`;
+        }
+
+        function supplierEntryKey(entry) {
+            return [entry.presetKey, entry.acabamento, entry.espessura, entry.larguraMm, entry.alturaMm, entry.precoTotal].join('|');
+        }
+
+        function selectedSupplierEntries() {
+            const variantes = variantesFromForm();
+            return supplierTableEntriesForPreset().filter(entry => {
+                if (entry.acabamento && variantes.acabamento && entry.acabamento !== variantes.acabamento) return false;
+                if (entry.acabamento && variantes.cor && entry.acabamento !== variantes.cor) return false;
+                if (entry.espessura && variantes.espessura && entry.espessura !== variantes.espessura) return false;
+                return true;
+            });
+        }
+
+        function applySupplierEntry(entry) {
+            if (!entry) return;
+            document.getElementById('precoTotal').value = Number(entry.precoTotal || 0).toFixed(2);
+            document.getElementById('larguraCm').value = ((Number(entry.larguraMm) || 0) / 10).toFixed(1);
+            document.getElementById('alturaCm').value = ((Number(entry.alturaMm) || 0) / 10).toFixed(1);
+            document.getElementById('observacoes').value = entry.descricao || document.getElementById('observacoes').value;
+            updateCalculatedPrice();
+        }
+
+        function renderSupplierTableOptions(autoApply = true) {
+            const panel = document.getElementById('supplierTablePanel');
+            const select = document.getElementById('supplierTableOption');
+            const entries = selectedSupplierEntries();
+            panel.style.display = supplierTableEntriesForPreset().length ? 'block' : 'none';
+            if (!supplierTableEntriesForPreset().length) return;
+            select.innerHTML = entries.length
+                ? entries.map(entry => `<option value="${supplierEntryKey(entry)}">${supplierEntryLabel(entry)}</option>`).join('')
+                : '<option value="">Nenhuma opcao para a selecao atual</option>';
+            if (entries.length && autoApply) applySupplierEntry(entries[0]);
         }
 
         function isLinearPreset(key) {
@@ -264,6 +322,63 @@
             };
         }
 
+        function materialFromSupplierEntry(entry) {
+            const preset = MATERIAIS_PADRAO.get(entry.presetKey);
+            const variantes = {
+                espessura: entry.espessura,
+                tamanho: `${entry.larguraMm} x ${entry.alturaMm} mm`
+            };
+            if (entry.presetKey === 'acrilico') variantes.acabamento = entry.acabamento;
+            if (entry.presetKey === 'pvc_expandido') variantes.cor = entry.acabamento;
+            const larguraCm = (Number(entry.larguraMm) || 0) / 10;
+            const alturaCm = (Number(entry.alturaMm) || 0) / 10;
+            const areaM2 = (larguraCm / 100) * (alturaCm / 100);
+            return {
+                presetKey: entry.presetKey,
+                nome: `${preset.nome} - ${MATERIAIS_PADRAO.labelVariantes(variantes)}`,
+                variantes,
+                categoria: preset.categoria,
+                formulaPadrao: 'area',
+                unidade: 'm²',
+                precoTotal: Number(entry.precoTotal) || 0,
+                precoCusto: areaM2 > 0 ? (Number(entry.precoTotal) || 0) / areaM2 : 0,
+                perdaPercentual: 0,
+                larguraCm,
+                alturaCm,
+                comprimentoM: 0,
+                densidadePorM2: 0,
+                observacoes: entry.descricao,
+                ativo: true
+            };
+        }
+
+        function isSameSupplierMaterial(material, payload) {
+            const variantes = material.variantes || {};
+            const target = payload.variantes || {};
+            return material.presetKey === payload.presetKey
+                && variantes.acabamento === target.acabamento
+                && variantes.cor === target.cor
+                && variantes.espessura === target.espessura
+                && variantes.tamanho === target.tamanho;
+        }
+
+        async function registerSupplierTable() {
+            const entries = supplierTableEntriesForPreset();
+            if (!entries.length) return showMessage('Nao existe tabela de fornecedor para esta familia.', 'error');
+            const novos = entries.map(materialFromSupplierEntry).filter(payload => !materiais.some(material => isSameSupplierMaterial(material, payload)));
+            if (!novos.length) return showMessage('Esta tabela ja esta cadastrada.', 'success');
+            for (const payload of novos) {
+                const response = await fetch('/api/database/commit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ schema: 'material', payload, pageId: 'materiais' })
+                });
+                if (!response.ok) throw new Error('Falha ao cadastrar tabela do fornecedor.');
+            }
+            showMessage(`${novos.length} materiais cadastrados pela tabela do fornecedor.`);
+            await load();
+        }
+
         function parametros(material) {
             const values = [];
             if (material.larguraCm && material.alturaCm) values.push(`${material.larguraCm} x ${material.alturaCm} cm`);
@@ -300,7 +415,7 @@
             document.getElementById('formTitle').textContent = 'Editar material';
             ids.forEach(field => { document.getElementById(field).value = material[field] ?? ''; });
             presetSelect.value = material.presetKey || 'outro';
-            renderVariantFields(material.variantes || {});
+            renderVariantFields(material.variantes || {}, false);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         };
 
@@ -315,6 +430,16 @@
         presetSelect.addEventListener('change', () => renderVariantFields());
         ['precoTotal', 'larguraCm', 'alturaCm', 'comprimentoM'].forEach(id => {
             document.getElementById(id).addEventListener('input', updateCalculatedPrice);
+        });
+        document.getElementById('supplierTableOption').addEventListener('change', event => {
+            const entry = selectedSupplierEntries().find(item => supplierEntryKey(item) === event.target.value);
+            applySupplierEntry(entry);
+        });
+        document.getElementById('registerSupplierTableBtn').addEventListener('click', () => {
+            registerSupplierTable().catch(error => {
+                console.error('Erro ao cadastrar tabela do fornecedor:', error);
+                showMessage(error.message || 'Nao foi possivel cadastrar a tabela do fornecedor.', 'error');
+            });
         });
         document.getElementById('salvarBtn').addEventListener('click', async () => {
             const payload = formData();

@@ -172,7 +172,6 @@
                 </select></label>
                 <label>Acréscimo folhas (€/m²)<input id="vinylSheetExtra" type="number" min="0" step="0.01" value="5"></label>
             </div>
-            <div class="summary" id="vinylSummary">Informe os dados do rótulo para calcular.</div>
         </section>
 
         <section class="panel calculator-section" data-calculator-section="vinyl" hidden>
@@ -191,7 +190,7 @@
                     <div class="metric-value" id="vinylAppliedPrice">€0,00/m²</div>
                 </div>
                 <div class="metric">
-                    <div class="metric-label">Custo total</div>
+                    <div class="metric-label">Custo total sem IVA</div>
                     <div class="metric-value good" id="vinylTotalCost">€0,00</div>
                 </div>
                 <div class="metric">
@@ -466,14 +465,6 @@
             document.getElementById('vinylAppliedPrice').textContent = `${money(appliedPrice)}/m²`;
             document.getElementById('vinylTotalCost').textContent = money(totalCost);
             document.getElementById('vinylUnitCost').textContent = money(unitCost);
-            document.getElementById('vinylSummary').innerHTML = `
-                <strong>Formato:</strong> ${formatMm(larguraMm)} x ${formatMm(alturaMm)}
-                | <strong>Quantidade:</strong> ${quantidade} un.
-                | <strong>${finishText}</strong>
-                <br><strong>Base:</strong> ${money(basePrice)}/m²
-                | <strong>Preço aplicado:</strong> ${money(appliedPrice)}/m²
-                | <strong>Total:</strong> ${money(totalCost)}
-            `;
             return { areaUnitMm2, areaTotalMm2, appliedPrice, totalCost, unitCost };
         }
 

@@ -173,12 +173,12 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(orderBudgetPageResult.body, /tech-petg-kg/);
   assert.match(orderBudgetPageResult.body, /tech-petg-horas/);
   assert.match(orderBudgetPageResult.body, /tech-petg-custo-hora/);
-  assert.match(orderBudgetPageResult.body, /tech-petg-open-calculator/);
-  assert.match(orderBudgetPageResult.body, /petgCalculatorModal/);
-  assert.match(orderBudgetPageResult.body, /petgCalculatorBody/);
-  assert.match(orderBudgetPageResult.body, /petg-inline-calculator/);
-  assert.match(orderBudgetPageResult.body, /tech-petg-add-entry/);
-  assert.match(orderBudgetPageResult.body, /atualizarPreviewPetgItem/);
+  assert.doesNotMatch(orderBudgetPageResult.body, /tech-petg-open-calculator/);
+  assert.doesNotMatch(orderBudgetPageResult.body, /petgCalculatorModal/);
+  assert.doesNotMatch(orderBudgetPageResult.body, /petgCalculatorBody/);
+  assert.doesNotMatch(orderBudgetPageResult.body, /petg-inline-calculator/);
+  assert.doesNotMatch(orderBudgetPageResult.body, /tech-petg-add-entry/);
+  assert.doesNotMatch(orderBudgetPageResult.body, /atualizarPreviewPetgItem/);
   assert.match(orderBudgetPageResult.body, /calcularItemTecnico/);
   assert.doesNotMatch(orderBudgetPageResult.body, /Textos e alturas do mesmo trabalho/);
   assert.match(calculatorPageResult.body, /Letras caixa impressas/);
@@ -197,6 +197,9 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(calculatorPageResult.body, /value="35"/);
   assert.match(calculatorPageResult.body, /value="sheets"/);
   assert.match(calculatorPageResult.body, /value="5"/);
+  assert.doesNotMatch(calculatorPageResult.body, /vinylSummary/);
+  assert.match(pageResult.body, /supplierTableOption/);
+  assert.match(pageResult.body, /registerSupplierTableBtn/);
   assert.match(calculatorPageResult.body, /Novo item cadastrado/);
   assert.match(calculatorPageResult.body, /Preço unitário/);
   assert.doesNotMatch(calculatorPageResult.body, /Altura \(cm\)/);
