@@ -828,18 +828,10 @@
         const closeTechnicalBtn = document.getElementById('closeTechnicalBtn');
         const addMaterialBtn = document.getElementById('addMaterialBtn');
         const applyTechnicalBtn = document.getElementById('applyTechnicalBtn');
-        const closePetgCalculatorBtn = document.getElementById('closePetgCalculatorBtn');
-        const savePetgCalculatorBtn = document.getElementById('savePetgCalculatorBtn');
 
         closeTechnicalBtn.addEventListener('click', fecharFichaTecnica);
         addMaterialBtn.addEventListener('click', () => addTechnicalRow());
         applyTechnicalBtn.addEventListener('click', aplicarFichaTecnica);
-        closePetgCalculatorBtn.addEventListener('click', fecharCalculadoraPetg);
-        savePetgCalculatorBtn.addEventListener('click', () => {
-            salvarEntradasPetgPopup();
-            fecharCalculadoraPetg();
-            renderTechnicalRows();
-        });
 
         async function loadProductCatalog() {
             try {

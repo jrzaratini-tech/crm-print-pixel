@@ -176,6 +176,8 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.doesNotMatch(orderBudgetPageResult.body, /tech-petg-open-calculator/);
   assert.doesNotMatch(orderBudgetPageResult.body, /petgCalculatorModal/);
   assert.doesNotMatch(orderBudgetPageResult.body, /petgCalculatorBody/);
+  assert.doesNotMatch(orderBudgetPageResult.body, /closePetgCalculatorBtn/);
+  assert.doesNotMatch(orderBudgetPageResult.body, /savePetgCalculatorBtn/);
   assert.doesNotMatch(orderBudgetPageResult.body, /petg-inline-calculator/);
   assert.doesNotMatch(orderBudgetPageResult.body, /tech-petg-add-entry/);
   assert.doesNotMatch(orderBudgetPageResult.body, /atualizarPreviewPetgItem/);
