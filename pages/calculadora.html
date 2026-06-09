@@ -26,7 +26,7 @@
         .calculator-tab.active small { color: #dbeafe; }
         .calculator-section[hidden] { display: none !important; }
         .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(178px, 1fr)); gap: 14px; }
-        .entry-grid { display: grid; grid-template-columns: minmax(260px, 2fr) minmax(145px, 1fr) minmax(145px, 1fr) auto; gap: 12px; align-items: end; }
+        .entry-grid { display: grid; grid-template-columns: minmax(260px, 2fr) minmax(135px, 1fr) minmax(145px, 1fr) minmax(175px, 1fr) auto; gap: 12px; align-items: end; }
         .component-grid { display: grid; grid-template-columns: minmax(230px, 1.2fr) minmax(230px, 1fr) minmax(230px, 1fr) minmax(190px, .8fr) minmax(160px, .7fr) auto; gap: 14px; align-items: end; }
         .inline-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 9px; align-items: end; }
         label { display: block; color: #334a69; font-size: 12px; font-weight: 900; letter-spacing: .01em; }
@@ -90,15 +90,13 @@
                     <p class="subtitle">Todas as medidas desta tela são em milímetros. Use várias linhas quando o mesmo letreiro tiver letras grandes, pequenas ou símbolos.</p>
                 </div>
             </div>
-            <div class="grid">
-                <label>Profundidade padrão (mm)<input id="petgDepthMm" type="number" min="0" step="1" value="50"></label>
-                <label>Preço kg PETG (€)<input id="petgKgPrice" type="number" min="0" step="0.01" value="18"></label>
-                <label>Perda PETG (%)<input id="petgWaste" type="number" min="0" step="0.1" value="10"></label>
-                <label>Produção estimada (g/h)<input id="petgGramsHour" type="number" min="1" step="1" value="75"></label>
-                <label>Fator estimativa LED<input id="petgLedFactor" type="number" min="0" step="0.05" value="1.2"></label>
-                <label>LED corrigido manualmente (mm)<input id="petgLedManualMm" type="number" min="0" step="1" placeholder="Opcional"></label>
-                <label>Margem mínima (%)<input id="marginPercent" type="number" min="1" max="95" step="0.1" value="50"></label>
-            </div>
+            <input id="petgDepthMm" type="hidden" value="50">
+            <input id="petgKgPrice" type="hidden" value="18">
+            <input id="petgWaste" type="hidden" value="10">
+            <input id="petgGramsHour" type="hidden" value="75">
+            <input id="petgLedFactor" type="hidden" value="1.2">
+            <input id="petgLedManualMm" type="hidden" value="0">
+            <input id="marginPercent" type="hidden" value="50">
 
             <div style="margin-top:18px;">
                 <h3>Textos e alturas</h3>
@@ -106,7 +104,24 @@
                 <div class="actions">
                     <button type="button" class="btn btn-primary" id="addPetgEntryBtn">+ Adicionar texto / altura</button>
                 </div>
-                <div id="petgResult" class="summary">Informe os textos, alturas e componentes para calcular.</div>
+                <div class="result-grid" style="margin-top:16px;">
+                    <div class="metric">
+                        <div class="metric-label">PETG kg</div>
+                        <div class="metric-value" id="petgTotalKg">0,000 kg</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Total de textos</div>
+                        <div class="metric-value" id="petgTextCount">0</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Tempo total de impressão</div>
+                        <div class="metric-value" id="petgPrintTime">0 h</div>
+                    </div>
+                    <div class="metric">
+                        <div class="metric-label">Quantidade de LED</div>
+                        <div class="metric-value" id="petgLedAmount">0 mm</div>
+                    </div>
+                </div>
             </div>
         </section>
 
@@ -127,23 +142,11 @@
             <h2>Resultado do produto</h2>
             <div class="result-grid">
                 <div class="metric">
-                    <div class="metric-label">PETG + máquina</div>
-                    <div class="metric-value" id="petgCost">€0,00</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-label">Componentes</div>
-                    <div class="metric-value" id="materialsCost">€0,00</div>
-                </div>
-                <div class="metric">
-                    <div class="metric-label">Largura estimada</div>
-                    <div class="metric-value" id="estimatedWidth">0 mm</div>
-                </div>
-                <div class="metric">
                     <div class="metric-label">Custo total</div>
                     <div class="metric-value warn" id="totalCost">€0,00</div>
                 </div>
                 <div class="metric">
-                    <div class="metric-label">Preço sugerido</div>
+                    <div class="metric-label">Preço sugerido com 50% de margem</div>
                     <div class="metric-value good" id="suggestedPrice">€0,00</div>
                 </div>
             </div>
@@ -293,6 +296,7 @@
                         <label>Texto / letras<input class="petg-entry-text" value="${entry.texto || ''}" placeholder="Ex: CRISTIANA FABIANA"></label>
                         <label>Altura (mm)<input class="petg-entry-height-mm" type="number" min="0" step="1" value="${entry.alturaMm || 120}"></label>
                         <label>Profundidade (mm)<input class="petg-entry-depth-mm" type="number" min="0" step="1" value="${entry.profundidadeMm || number('petgDepthMm') || 50}"></label>
+                        <label>Largura horizontal (mm)<input class="petg-entry-width-mm" type="number" min="0" step="1" value="${entry.larguraMm || ''}" placeholder="Opcional"></label>
                         <button type="button" class="btn btn-danger petg-remove">Remover</button>
                     </div>
                 </div>
@@ -312,7 +316,8 @@
             return Array.from(document.querySelectorAll('#petgEntriesBody .entry-row')).map(row => ({
                 texto: row.querySelector('.petg-entry-text')?.value || '',
                 alturaMm: Number.parseFloat(row.querySelector('.petg-entry-height-mm')?.value) || 0,
-                profundidadeMm: Number.parseFloat(row.querySelector('.petg-entry-depth-mm')?.value) || number('petgDepthMm') || 0
+                profundidadeMm: Number.parseFloat(row.querySelector('.petg-entry-depth-mm')?.value) || number('petgDepthMm') || 0,
+                larguraMm: Number.parseFloat(row.querySelector('.petg-entry-width-mm')?.value) || 0
             })).filter(entry => entry.texto || entry.alturaMm || entry.profundidadeMm);
         }
 
@@ -320,7 +325,8 @@
             renderPetgEntries([...petgEntriesFromForm(), {
                 texto: entry.texto || '',
                 alturaMm: entry.alturaMm || 120,
-                profundidadeMm: entry.profundidadeMm || number('petgDepthMm') || 50
+                profundidadeMm: entry.profundidadeMm || number('petgDepthMm') || 50,
+                larguraMm: entry.larguraMm || 0
             }]);
             calculateAll();
         }
@@ -424,16 +430,10 @@
                 fatorLed: number('petgLedFactor') || 1.2,
                 ledManualM: mmToM(number('petgLedManualMm'))
             });
-            const detalhes = result.entradas.map(entry => `${entry.texto || 'Texto'}: ${formatMm(entry.larguraEstimadaMm)} largura | ${entry.gramas} g | ${entry.horas} h`).join(' | ') || 'Nenhuma entrada identificada';
-            document.getElementById('petgResult').innerHTML = `
-                <strong>PETG:</strong> ${result.gramasTotal} g
-                | <strong>Tempo 3D:</strong> ${result.horasTotal} h
-                | <strong>LED estimado:</strong> ${formatMm(result.ledFinalMm)}
-                | <strong>Largura aprox.:</strong> ${formatMm(result.larguraEstimadaMm)}
-                <br><strong>Entradas:</strong> ${detalhes}
-                <br><strong>Contorno base:</strong> ${formatMm(result.contornoTotalMm)} | fator LED x${result.fatorLed}
-                ${result.alerta ? `<br><strong>${result.alerta}</strong>` : ''}
-            `;
+            document.getElementById('petgTotalKg').textContent = `${(result.gramasTotal / 1000).toFixed(3).replace('.', ',')} kg`;
+            document.getElementById('petgTextCount').textContent = result.entradas.length;
+            document.getElementById('petgPrintTime').textContent = `${result.horasTotal.toFixed(1).replace('.', ',')} h`;
+            document.getElementById('petgLedAmount').textContent = formatMm(result.ledFinalMm);
             return result;
         }
 
@@ -481,9 +481,6 @@
             const totalCost = petg.custoTotal + materialsCost;
             const margem = Math.min(95, Math.max(1, number('marginPercent') || 50));
             const suggested = totalCost / (1 - margem / 100);
-            document.getElementById('petgCost').textContent = money(petg.custoTotal);
-            document.getElementById('materialsCost').textContent = money(materialsCost);
-            document.getElementById('estimatedWidth').textContent = formatMm(petg.larguraEstimadaMm);
             document.getElementById('totalCost').textContent = money(totalCost);
             document.getElementById('suggestedPrice').textContent = money(suggested);
             calculateVinyl();

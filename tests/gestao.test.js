@@ -149,6 +149,22 @@ test('permite corrigir manualmente a metragem de LED no letreiro PETG', () => {
   assert.notEqual(result.ledEstimadoM, result.ledFinalM);
 });
 
+test('usa largura horizontal informada para ajustar PETG tempo e LED', () => {
+  const base = GESTAO.calcularLetreiroPETG({
+    entradas: [{ texto: 'AMOR', alturaMm: 300, profundidadeMm: 50 }],
+    precoKgFilamento: 18
+  });
+  const ajustado = GESTAO.calcularLetreiroPETG({
+    entradas: [{ texto: 'AMOR', alturaMm: 300, profundidadeMm: 50, larguraMm: base.larguraEstimadaMm * 1.5 }],
+    precoKgFilamento: 18
+  });
+
+  assert.ok(ajustado.gramasTotal > base.gramasTotal);
+  assert.ok(ajustado.horasTotal > base.horasTotal);
+  assert.ok(ajustado.ledFinalM > base.ledFinalM);
+  assert.equal(ajustado.entradas[0].fatorLargura, 1.5);
+});
+
 test('conta letras da palavra removendo acentos e espacos', () => {
   assert.deepEqual(GESTAO.lettersFromWord('AMOR'), [
     { letter: 'A', quantidade: 1 },

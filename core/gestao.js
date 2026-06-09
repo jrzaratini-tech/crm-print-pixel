@@ -245,16 +245,36 @@
                     gramasPorHora,
                     historicoReal
                 });
+                const larguraCalculadaCm = larguraTextoLetreiroCm(entrada.palavra || entrada.texto || '', calculo.alturaCm);
+                const larguraInformadaCm = numero(entrada.larguraCm) || (numero(entrada.larguraMm) / 10);
+                const fatorLargura = larguraInformadaCm > 0 && larguraCalculadaCm > 0 ? larguraInformadaCm / larguraCalculadaCm : 1;
+                const calculoAjustado = fatorLargura === 1 ? calculo : {
+                    ...calculo,
+                    detalhes: calculo.detalhes.map(detalhe => ({
+                        ...detalhe,
+                        contornoCm: Math.round(detalhe.contornoCm * fatorLargura * 100) / 100
+                    })),
+                    gramasBaseTotal: Math.round(calculo.gramasBaseTotal * fatorLargura * 100) / 100,
+                    horasBaseTotal: Math.round(calculo.horasBaseTotal * fatorLargura * 100) / 100,
+                    gramasTotal: Math.round(calculo.gramasTotal * fatorLargura * 100) / 100,
+                    horasTotal: Math.round(calculo.horasTotal * fatorLargura * 100) / 100,
+                    custoFilamento: dinheiro(calculo.custoFilamento * fatorLargura),
+                    custoMaquina: dinheiro(calculo.custoMaquina * fatorLargura),
+                    custoEnergia: dinheiro(calculo.custoEnergia * fatorLargura),
+                    custoTotal: dinheiro(calculo.custoTotal * fatorLargura)
+                };
                 return {
                     id: entrada.id || `entrada_${index + 1}`,
-                texto: entrada.palavra || entrada.texto || '',
-                alturaCm: calculo.alturaCm,
-                alturaMm: Math.round(calculo.alturaCm * 10 * 100) / 100,
-                profundidadeCm: calculo.profundidadeCm,
-                profundidadeMm: Math.round(calculo.profundidadeCm * 10 * 100) / 100,
-                larguraEstimadaCm: larguraTextoLetreiroCm(entrada.palavra || entrada.texto || '', calculo.alturaCm),
-                calculo
-            };
+                    texto: entrada.palavra || entrada.texto || '',
+                    alturaCm: calculoAjustado.alturaCm,
+                    alturaMm: Math.round(calculoAjustado.alturaCm * 10 * 100) / 100,
+                    profundidadeCm: calculoAjustado.profundidadeCm,
+                    profundidadeMm: Math.round(calculoAjustado.profundidadeCm * 10 * 100) / 100,
+                    larguraEstimadaCm: larguraInformadaCm > 0 ? larguraInformadaCm : larguraCalculadaCm,
+                    larguraCalculadaCm,
+                    fatorLargura,
+                    calculo: calculoAjustado
+                };
             })
             .filter(parte => parte.texto || parte.calculo.detalhes.length);
         const gramasTotal = partes.reduce((total, parte) => total + parte.calculo.gramasTotal, 0);
@@ -283,6 +303,9 @@
                 profundidadeMm: parte.profundidadeMm,
                 larguraEstimadaCm: parte.larguraEstimadaCm,
                 larguraEstimadaMm: Math.round((parte.larguraEstimadaCm * 10) * 100) / 100,
+                larguraCalculadaCm: parte.larguraCalculadaCm,
+                larguraCalculadaMm: Math.round((parte.larguraCalculadaCm * 10) * 100) / 100,
+                fatorLargura: Math.round(parte.fatorLargura * 1000) / 1000,
                 gramas: parte.calculo.gramasTotal,
                 horas: parte.calculo.horasTotal
             })),

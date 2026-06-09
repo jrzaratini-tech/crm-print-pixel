@@ -176,7 +176,11 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(calculatorPageResult.body, /Componentes adicionais/);
   assert.doesNotMatch(calculatorPageResult.body, /calculateBtn/);
   assert.doesNotMatch(calculatorPageResult.body, /addEstimatedLedBtn/);
-  assert.match(calculatorPageResult.body, /Profundidade padrão \(mm\)/);
+  assert.doesNotMatch(calculatorPageResult.body, /Profundidade padrão \(mm\)/);
+  assert.match(calculatorPageResult.body, /petgTotalKg/);
+  assert.match(calculatorPageResult.body, /petgTextCount/);
+  assert.match(calculatorPageResult.body, /petgPrintTime/);
+  assert.match(calculatorPageResult.body, /petgLedAmount/);
   assert.match(calculatorPageResult.body, /id="vinylWidthMm"/);
   assert.match(calculatorPageResult.body, /id="vinylHeightMm"/);
   assert.match(calculatorPageResult.body, /id="vinylQuantity"/);
@@ -186,7 +190,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(calculatorPageResult.body, /Novo item cadastrado/);
   assert.match(calculatorPageResult.body, /Preço unitário/);
   assert.doesNotMatch(calculatorPageResult.body, /Altura \(cm\)/);
-  assert.match(calculatorPageResult.body, /estimatedWidth/);
+  assert.match(calculatorPageResult.body, /petg-entry-width-mm/);
   assert.match(calculatorPageResult.body, /Preço sugerido/);
   assert.match(ordersPageResult.body, /produto-modal-entregue/);
   assert.match(ordersPageResult.body, /entrega-badge/);
