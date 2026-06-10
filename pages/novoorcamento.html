@@ -873,10 +873,10 @@
             row.dataset.itemType = 'produto_loja';
             row.dataset.productId = product.id;
             row.querySelector('.valor-input').value = (parseFloat(product.precoVenda) || 0).toFixed(2);
-            row.querySelector('.custo-input').value = (parseFloat(product.custoUnitario) || 0).toFixed(2);
+            row.querySelector('.custo-input').value = ((parseFloat(product.precoVenda) || 0) * 0.5).toFixed(2);
             row.querySelector('.tamanho-input').value = product.sku || '';
             row.querySelector('.obs-input').value = product.descricao || 'Produto loja - preco fixo sem IVA';
-            row.querySelector('.materials-summary').textContent = 'Preco fixo - sem recalculo de margem';
+            row.querySelector('.materials-summary').textContent = 'Preco fixo - margem loja 50%';
             calculateTotals();
         }
 
@@ -1210,8 +1210,8 @@
                               placeholder="Observações do produto..." rows="2">${productData ? (productData.observacoes || '') : ''}</textarea>
                 </td>
                 <td>
-                    <button type="button" class="materials-btn" ${isStoreProduct ? 'disabled' : ''}>Abrir ficha tecnica</button>
-                    <span class="materials-summary">${isStoreProduct ? 'Preco fixo - sem recalculo de margem' : (productData && productData.materiais && productData.materiais.length ? productData.materiais.length + ' itens' : 'Sem ficha')}</span>
+                    ${isStoreProduct ? '' : '<button type="button" class="materials-btn">Abrir ficha tecnica</button>'}
+                    <span class="materials-summary">${isStoreProduct ? 'Preco fixo - margem loja 50%' : (productData && productData.materiais && productData.materiais.length ? productData.materiais.length + ' itens' : 'Sem ficha')}</span>
                 </td>
                 <td>
                     <button type="button" class="remove-btn" title="Remover produto">
@@ -1235,9 +1235,9 @@
             valorInput.addEventListener('input', calculateTotals);
             custoInput.addEventListener('input', calculateTotals);
             quantidadeInput.addEventListener('input', calculateTotals);
-            materialsBtn.addEventListener('click', () => {
-                if (row.dataset.itemType !== 'produto_loja') abrirFichaTecnica(row);
-            });
+            if (materialsBtn) {
+                materialsBtn.addEventListener('click', () => abrirFichaTecnica(row));
+            }
             if (isStoreProduct) {
                 productSelect.addEventListener('change', () => applyStoreProductToRow(row, productSelect.value));
                 applyStoreProductToRow(row, storeProductId);
@@ -1259,7 +1259,7 @@
                 tamanho: productData?.tamanho || storeProducts[0].sku || '',
                 quantidade: productData?.quantidade || 1,
                 valor: productData?.valor ?? storeProducts[0].precoVenda,
-                custo: productData?.custo ?? storeProducts[0].custoUnitario,
+                custo: productData?.custo ?? ((parseFloat(storeProducts[0].precoVenda) || 0) * 0.5),
                 observacoes: productData?.observacoes || storeProducts[0].descricao || 'Produto loja - preco fixo sem IVA'
             });
         }
@@ -1504,6 +1504,7 @@
             let custoEstimado = 0;
             let subtotalLoja = 0;
             let custoLoja = 0;
+            let subtotalFabricacao = 0;
             let custoFabricacao = 0;
             const fabricationRows = [];
             
@@ -1520,8 +1521,9 @@
                 custoEstimado += custo * quantidade;
                 if (row.dataset.itemType === 'produto_loja') {
                     subtotalLoja += valor * quantidade;
-                    custoLoja += custo * quantidade;
+                    custoLoja += (valor * 0.5) * quantidade;
                 } else {
+                    subtotalFabricacao += valor * quantidade;
                     custoFabricacao += custo * quantidade;
                     fabricationRows.push(row);
                 }
@@ -1536,9 +1538,10 @@
             const hasSeller = Boolean(document.getElementById('sellerId')?.value);
 
             if (ajustarPorMargem && custoFabricacao > 0) {
-                const subtotalFabricacao = ajustarPrecosParaMargem(custoFabricacao, margemDesejada, desconto, instalacao, sellerRate, mountingRate, hasSeller, sellerExtraMarkup);
-                distribuirSubtotalProdutos(subtotalFabricacao, fabricationRows);
-                subtotalProdutos = subtotalFabricacao + subtotalLoja;
+                const novoSubtotalFabricacao = ajustarPrecosParaMargem(custoFabricacao, margemDesejada, desconto, instalacao, sellerRate, mountingRate, hasSeller, sellerExtraMarkup);
+                distribuirSubtotalProdutos(novoSubtotalFabricacao, fabricationRows);
+                subtotalFabricacao = novoSubtotalFabricacao;
+                subtotalProdutos = novoSubtotalFabricacao + subtotalLoja;
                 custoEstimado = custoFabricacao + custoLoja;
             }
 
@@ -1556,7 +1559,11 @@
             const totalFinal = subtotalGeral + iva;
             const custoGerencial = custoEstimado + totalComissoes;
             const lucroEstimado = subtotalGeral - custoGerencial;
-            const margemEstimada = subtotalGeral > 0 ? (lucroEstimado / subtotalGeral) * 100 : 0;
+            const pesoFabricacaoComissao = baseComissao > 0 ? Math.max(0, subtotalFabricacao - desconto) / baseComissao : 0;
+            const comissoesFabricacao = totalComissoes * pesoFabricacaoComissao;
+            const baseMargemFabricacao = Math.max(0, subtotalFabricacao - desconto + instalacao + sellerExtraMarkup);
+            const lucroFabricacao = baseMargemFabricacao - custoFabricacao - comissoesFabricacao;
+            const margemEstimada = baseMargemFabricacao > 0 ? (lucroFabricacao / baseMargemFabricacao) * 100 : (subtotalLoja > 0 ? 50 : 0);
             
             // Atualizar exibição
             document.getElementById('subtotalProdutos').textContent = formatarMoeda(subtotalProdutos);
@@ -1656,7 +1663,7 @@
                 const tamanho = row.querySelector('.tamanho-input').value;
                 const quantidade = parseInt(row.querySelector('.quantidade-input').value) || 1;
                 const valor = parseFloat(row.querySelector('.valor-input').value) || 0;
-                const custo = parseFloat(row.querySelector('.custo-input').value) || 0;
+                const custo = isStoreProduct ? valor * 0.5 : (parseFloat(row.querySelector('.custo-input').value) || 0);
                 const observacoes = row.querySelector('.obs-input').value;
                 
                 if (nome) {

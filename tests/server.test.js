@@ -174,7 +174,8 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(orderBudgetPageResult.body, /addStoreProductBtn/);
   assert.match(orderBudgetPageResult.body, /produto_loja/);
   assert.match(orderBudgetPageResult.body, /data-store-product/);
-  assert.match(orderBudgetPageResult.body, /Preco fixo - sem recalculo de margem/);
+  assert.match(orderBudgetPageResult.body, /Preco fixo - margem loja 50%/);
+  assert.match(orderBudgetPageResult.body, /valor \* 0\.5/);
   assert.match(orderBudgetPageResult.body, /ajustarPrecosParaMargem/);
   assert.match(orderBudgetPageResult.body, /Abrir ficha tecnica/);
   assert.match(orderBudgetPageResult.body, /tech-petg-kg/);
