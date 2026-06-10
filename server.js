@@ -578,10 +578,15 @@ function defaultProductId(name) {
 }
 
 function normalizeProductPayload(body = {}) {
+  const tipoProduto = ['loja', 'fabricacao'].includes(body.tipoProduto || body.type) ? (body.tipoProduto || body.type) : 'fabricacao';
   return {
     nome: text(body.nome || body.name, 160),
     categoria: text(body.categoria || body.category || 'Outros', 80),
     descricao: text(body.descricao || body.description || body.observacoes, 500),
+    tipoProduto,
+    precoVenda: money(body.precoVenda || body.price || body.valor),
+    custoUnitario: money(body.custoUnitario || body.cost || body.custo),
+    sku: text(body.sku || body.codigo, 80),
     ativo: body.ativo !== false && body.active !== false
   };
 }
@@ -604,6 +609,10 @@ async function productCatalog(includeInactive = false) {
       nome: name,
       categoria: 'Produtos',
       descricao: '',
+      tipoProduto: 'fabricacao',
+      precoVenda: 0,
+      custoUnitario: 0,
+      sku: '',
       ativo: true,
       source: 'default',
       ...(override || {})

@@ -147,6 +147,9 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(presetsResult.body, /Router CNC/);
   assert.match(productsPageResult.body, /Cadastro de Produtos/);
   assert.match(productsPageResult.body, /api\/products/);
+  assert.match(productsPageResult.body, /tipoProduto/);
+  assert.match(productsPageResult.body, /precoVenda/);
+  assert.match(productsPageResult.body, /Produto loja \/ preco fixo/);
   assert.match(orderFormPageResult.body, /delivery-btn/);
   assert.match(orderFormPageResult.body, /loadProductCatalog/);
   assert.match(orderFormPageResult.body, /product-delivered/);
@@ -168,6 +171,10 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(orderBudgetPageResult.body, /sellerExtraMarkup/);
   assert.match(orderBudgetPageResult.body, /mountingCommissionRate/);
   assert.match(orderBudgetPageResult.body, /sellerCommissionValue/);
+  assert.match(orderBudgetPageResult.body, /addStoreProductBtn/);
+  assert.match(orderBudgetPageResult.body, /produto_loja/);
+  assert.match(orderBudgetPageResult.body, /data-store-product/);
+  assert.match(orderBudgetPageResult.body, /Preco fixo - sem recalculo de margem/);
   assert.match(orderBudgetPageResult.body, /ajustarPrecosParaMargem/);
   assert.match(orderBudgetPageResult.body, /Abrir ficha tecnica/);
   assert.match(orderBudgetPageResult.body, /tech-petg-kg/);
@@ -294,12 +301,37 @@ test('gerencia catalogo de produtos para pedidos e orcamentos', async () => {
   const listed = await request('/api/products');
   assert.equal(listed.body.products.some(product => product.nome === 'Produto Teste Catalogo Editado'), true);
 
+  const storeProduct = await post('/api/products', {
+    nome: 'Produto Loja Teste',
+    categoria: 'Produtos',
+    descricao: 'Produto com preco final',
+    tipoProduto: 'loja',
+    precoVenda: 123.45,
+    custoUnitario: 70,
+    sku: 'LOJA-001'
+  });
+  assert.equal(storeProduct.response.status, 200);
+  assert.equal(storeProduct.body.product.tipoProduto, 'loja');
+  assert.equal(storeProduct.body.product.precoVenda, 123.45);
+  assert.equal(storeProduct.body.product.custoUnitario, 70);
+  assert.equal(storeProduct.body.product.sku, 'LOJA-001');
+
+  const listedWithStore = await request('/api/products');
+  const savedStoreProduct = listedWithStore.body.products.find(product => product.id === storeProduct.body.product.id);
+  assert.equal(savedStoreProduct.nome, 'Produto Loja Teste');
+  assert.equal(savedStoreProduct.tipoProduto, 'loja');
+
   const deleted = await request(`/api/products/${created.body.product.id}/delete`, { method: 'POST' });
   assert.equal(deleted.response.status, 200);
   assert.equal(deleted.body.success, true);
 
+  const deletedStore = await request(`/api/products/${storeProduct.body.product.id}/delete`, { method: 'POST' });
+  assert.equal(deletedStore.response.status, 200);
+  assert.equal(deletedStore.body.success, true);
+
   const afterDelete = await request('/api/products');
   assert.equal(afterDelete.body.products.some(product => product.id === created.body.product.id), false);
+  assert.equal(afterDelete.body.products.some(product => product.id === storeProduct.body.product.id), false);
 });
 
 test('classifica OS para colaborador com login sem expor precos e permite chat privado', async () => {

@@ -26,6 +26,7 @@
         .col-3 { grid-column: span 3; }
         .col-4 { grid-column: span 4; }
         .col-5 { grid-column: span 5; }
+        .col-2 { grid-column: span 2; }
         .col-12 { grid-column: span 12; }
         .actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
         .toolbar { display: flex; justify-content: space-between; gap: 14px; align-items: center; margin-bottom: 14px; }
@@ -69,6 +70,12 @@
                 <label class="col-5">Nome do produto
                     <input id="nome" maxlength="160" placeholder="Ex: Letra caixa impressa em PETG">
                 </label>
+                <label class="col-3">Tipo
+                    <select id="tipoProduto">
+                        <option value="fabricacao">Produto de fabricacao</option>
+                        <option value="loja">Produto loja / preco fixo</option>
+                    </select>
+                </label>
                 <label class="col-3">Categoria
                     <select id="categoria">
                         <option>Letreiro</option>
@@ -88,6 +95,15 @@
                         <option value="true">Ativo no catalogo</option>
                         <option value="false">Inativo</option>
                     </select>
+                </label>
+                <label class="col-2">Preco venda sem IVA
+                    <input id="precoVenda" type="number" min="0" step="0.01" placeholder="0.00">
+                </label>
+                <label class="col-2">Custo unitario
+                    <input id="custoUnitario" type="number" min="0" step="0.01" placeholder="0.00">
+                </label>
+                <label class="col-2">SKU / codigo
+                    <input id="sku" maxlength="80" placeholder="Opcional">
                 </label>
                 <label class="col-12">Descricao interna
                     <textarea id="descricao" maxlength="500" placeholder="Notas comerciais, uso ideal ou detalhes para a equipe."></textarea>
@@ -111,7 +127,7 @@
             <div class="table-wrap">
                 <table>
                     <thead>
-                        <tr><th>Produto</th><th>Categoria</th><th>Descricao</th><th>Acoes</th></tr>
+                        <tr><th>Produto</th><th>Tipo</th><th>Categoria</th><th>Preco sem IVA</th><th>Descricao</th><th>Acoes</th></tr>
                     </thead>
                     <tbody id="productsBody"></tbody>
                 </table>
@@ -121,7 +137,8 @@
 
     <script>
         let products = [];
-        const fields = ['nome', 'categoria', 'descricao', 'ativo'];
+        const fields = ['nome', 'tipoProduto', 'categoria', 'precoVenda', 'custoUnitario', 'sku', 'descricao', 'ativo'];
+        const money = value => Number(value || 0).toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' });
 
         function escapeHtml(value) {
             return String(value || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
@@ -137,7 +154,11 @@
             document.getElementById('productId').value = '';
             document.getElementById('formTitle').textContent = 'Novo produto';
             document.getElementById('nome').value = '';
+            document.getElementById('tipoProduto').value = 'fabricacao';
             document.getElementById('categoria').value = 'Produtos';
+            document.getElementById('precoVenda').value = '';
+            document.getElementById('custoUnitario').value = '';
+            document.getElementById('sku').value = '';
             document.getElementById('descricao').value = '';
             document.getElementById('ativo').value = 'true';
             document.getElementById('nome').focus();
@@ -147,7 +168,11 @@
             return {
                 id: document.getElementById('productId').value,
                 nome: document.getElementById('nome').value.trim(),
+                tipoProduto: document.getElementById('tipoProduto').value,
                 categoria: document.getElementById('categoria').value,
+                precoVenda: parseFloat(document.getElementById('precoVenda').value) || 0,
+                custoUnitario: parseFloat(document.getElementById('custoUnitario').value) || 0,
+                sku: document.getElementById('sku').value.trim(),
                 descricao: document.getElementById('descricao').value.trim(),
                 ativo: document.getElementById('ativo').value === 'true'
             };
@@ -161,16 +186,18 @@
                 <tr>
                     <td>
                         <strong>${escapeHtml(product.nome)}</strong>
-                        <div class="source">${product.source === 'default' ? 'Produto padrao do CRM' : 'Produto criado no cadastro'}</div>
+                        <div class="source">${product.source === 'default' ? 'Produto padrao do CRM' : 'Produto criado no cadastro'}${product.sku ? ' · SKU ' + escapeHtml(product.sku) : ''}</div>
                     </td>
+                    <td><span class="tag">${product.tipoProduto === 'loja' ? 'Produto loja' : 'Fabricacao'}</span></td>
                     <td><span class="tag">${escapeHtml(product.categoria || 'Produtos')}</span></td>
+                    <td>${product.tipoProduto === 'loja' ? money(product.precoVenda) : '-'}</td>
                     <td>${escapeHtml(product.descricao || '-')}</td>
                     <td><div class="row-actions">
                         <button class="btn btn-primary" onclick="editProduct('${escapeHtml(product.id)}')">Editar</button>
                         <button class="btn btn-danger" onclick="deleteProduct('${escapeHtml(product.id)}')">Excluir</button>
                     </div></td>
                 </tr>
-            `).join('') : '<tr><td colspan="4" class="empty">Nenhum produto encontrado.</td></tr>';
+            `).join('') : '<tr><td colspan="6" class="empty">Nenhum produto encontrado.</td></tr>';
         }
 
         async function loadProducts() {
@@ -187,7 +214,8 @@
             document.getElementById('productId').value = product.id;
             document.getElementById('formTitle').textContent = 'Editar produto';
             fields.forEach(field => {
-                document.getElementById(field).value = field === 'ativo' ? String(product.ativo !== false) : (product[field] || '');
+                const fallback = field === 'tipoProduto' ? 'fabricacao' : (['precoVenda', 'custoUnitario'].includes(field) ? 0 : '');
+                document.getElementById(field).value = field === 'ativo' ? String(product.ativo !== false) : (product[field] ?? fallback);
             });
             window.scrollTo({ top: 0, behavior: 'smooth' });
         };

@@ -670,6 +670,9 @@
                 <button type="button" class="add-product-btn" id="addProductBtn">
                     <span>+</span> ADICIONAR PRODUTO
                 </button>
+                <button type="button" class="add-product-btn" id="addStoreProductBtn">
+                    <span>+</span> ADICIONAR PRODUTO LOJA
+                </button>
             </div>
             
             <div class="totals-section">
@@ -810,6 +813,7 @@
         ];
         
         let productIndex = 0;
+        let productCatalog = [];
         let isEditMode = false;
         let currentOrcamentoId = '';
         let margemMinimaOrcamento = 50;
@@ -822,6 +826,7 @@
         // Referências DOM
         const productsTableBody = document.getElementById('productsTableBody');
         const addProductBtn = document.getElementById('addProductBtn');
+        const addStoreProductBtn = document.getElementById('addStoreProductBtn');
         const cancelBtn = document.getElementById('cancelBtn');
         const saveBtn = document.getElementById('saveBtn');
         const codigoInput = document.getElementById('codigo');
@@ -838,9 +843,10 @@
                 const response = await fetch('/api/products');
                 if (!response.ok) throw new Error('Erro ao carregar produtos');
                 const result = await response.json();
-                const catalogProducts = (result.products || []).map(product => product.nome).filter(Boolean);
-                if (catalogProducts.length) {
-                    produtos = catalogProducts;
+                productCatalog = result.products || [];
+                const fabricationProducts = productCatalog.filter(product => product.tipoProduto !== 'loja').map(product => product.nome).filter(Boolean);
+                if (fabricationProducts.length) {
+                    produtos = fabricationProducts;
                     refreshProductSelects();
                 }
             } catch (error) {
@@ -855,8 +861,28 @@
             return options.map(product => `<option value="${escapeOption(product)}" ${selected === product ? 'selected' : ''}>${escapeOption(product)}</option>`).join('');
         }
 
+        function storeProductOptions(selectedId = '') {
+            const escapeOption = value => String(value || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+            const storeProducts = productCatalog.filter(product => product.tipoProduto === 'loja' && product.ativo !== false);
+            return storeProducts.map(product => `<option value="${escapeOption(product.id)}" ${selectedId === product.id ? 'selected' : ''}>${escapeOption(product.nome)} - ${formatarMoeda(product.precoVenda || 0)} sem IVA</option>`).join('');
+        }
+
+        function applyStoreProductToRow(row, productId) {
+            const product = productCatalog.find(item => item.id === productId);
+            if (!product) return;
+            row.dataset.itemType = 'produto_loja';
+            row.dataset.productId = product.id;
+            row.querySelector('.valor-input').value = (parseFloat(product.precoVenda) || 0).toFixed(2);
+            row.querySelector('.custo-input').value = (parseFloat(product.custoUnitario) || 0).toFixed(2);
+            row.querySelector('.tamanho-input').value = product.sku || '';
+            row.querySelector('.obs-input').value = product.descricao || 'Produto loja - preco fixo sem IVA';
+            row.querySelector('.materials-summary').textContent = 'Preco fixo - sem recalculo de margem';
+            calculateTotals();
+        }
+
         function refreshProductSelects() {
             document.querySelectorAll('.product-select').forEach(select => {
+                if (select.dataset.storeProduct === 'true') return;
                 const selected = select.value;
                 select.innerHTML = `<option value="">Selecione um produto</option>${productOptions(selected)}`;
             });
@@ -1149,17 +1175,23 @@
         function addProductRow(productData = null) {
             const row = document.createElement('tr');
             const index = productIndex++;
+            const isStoreProduct = productData && productData.tipoItem === 'produto_loja';
+            const storeProductId = isStoreProduct
+                ? (productData.productId || productCatalog.find(product => product.nome === productData.nome)?.id || '')
+                : '';
+            row.dataset.itemType = isStoreProduct ? 'produto_loja' : 'fabricacao';
+            row.dataset.productId = storeProductId;
             
             row.innerHTML = `
                 <td>
-                    <select class="product-select" data-bind="orcamento.produtos.${index}.nome" required>
+                    <select class="product-select" data-bind="orcamento.produtos.${index}.nome" ${isStoreProduct ? 'data-store-product="true"' : ''} required>
                         <option value="">Selecione um produto</option>
-                        ${productOptions(productData ? productData.nome : '')}
+                        ${isStoreProduct ? storeProductOptions(storeProductId) : productOptions(productData ? productData.nome : '')}
                     </select>
                 </td>
                 <td>
                     <input type="text" class="tamanho-input" data-bind="orcamento.produtos.${index}.tamanho" 
-                           placeholder="Ex: 30x40cm" value="${productData ? (productData.tamanho || '') : ''}">
+                           placeholder="Ex: 30x40cm" value="${productData ? (productData.tamanho || '') : ''}" ${isStoreProduct ? 'readonly' : ''}>
                 </td>
                 <td>
                     <input type="number" class="quantidade-input" data-bind="orcamento.produtos.${index}.quantidade" 
@@ -1167,19 +1199,19 @@
                 </td>
                 <td>
                     <input type="number" class="custo-input" data-bind="orcamento.produtos.${index}.custo"
-                           min="0" step="0.01" value="${productData ? (productData.custo || '0.00') : '0.00'}">
+                           min="0" step="0.01" value="${productData ? (productData.custo || '0.00') : '0.00'}" ${isStoreProduct ? 'readonly' : ''}>
                 </td>
                 <td>
                     <input type="number" class="valor-input" data-bind="orcamento.produtos.${index}.valor" 
-                           min="0" step="0.01" value="${productData ? (productData.valor || '0.00') : '0.00'}" required>
+                           min="0" step="0.01" value="${productData ? (productData.valor || '0.00') : '0.00'}" ${isStoreProduct ? 'readonly' : ''} required>
                 </td>
                 <td>
                     <textarea class="obs-input" data-bind="orcamento.produtos.${index}.observacoes" 
                               placeholder="Observações do produto..." rows="2">${productData ? (productData.observacoes || '') : ''}</textarea>
                 </td>
                 <td>
-                    <button type="button" class="materials-btn">Abrir ficha tecnica</button>
-                    <span class="materials-summary">${productData && productData.materiais && productData.materiais.length ? productData.materiais.length + ' itens' : 'Sem ficha'}</span>
+                    <button type="button" class="materials-btn" ${isStoreProduct ? 'disabled' : ''}>Abrir ficha tecnica</button>
+                    <span class="materials-summary">${isStoreProduct ? 'Preco fixo - sem recalculo de margem' : (productData && productData.materiais && productData.materiais.length ? productData.materiais.length + ' itens' : 'Sem ficha')}</span>
                 </td>
                 <td>
                     <button type="button" class="remove-btn" title="Remover produto">
@@ -1197,14 +1229,39 @@
             const custoInput = row.querySelector('.custo-input');
             const quantidadeInput = row.querySelector('.quantidade-input');
             const materialsBtn = row.querySelector('.materials-btn');
+            const productSelect = row.querySelector('.product-select');
             
             removeBtn.addEventListener('click', () => removeProductRow(row));
             valorInput.addEventListener('input', calculateTotals);
             custoInput.addEventListener('input', calculateTotals);
             quantidadeInput.addEventListener('input', calculateTotals);
-            materialsBtn.addEventListener('click', () => abrirFichaTecnica(row));
+            materialsBtn.addEventListener('click', () => {
+                if (row.dataset.itemType !== 'produto_loja') abrirFichaTecnica(row);
+            });
+            if (isStoreProduct) {
+                productSelect.addEventListener('change', () => applyStoreProductToRow(row, productSelect.value));
+                applyStoreProductToRow(row, storeProductId);
+            }
             
             return row;
+        }
+
+        function addStoreProductRow(productData = null) {
+            const storeProducts = productCatalog.filter(product => product.tipoProduto === 'loja' && product.ativo !== false);
+            if (!storeProducts.length) {
+                mostrarMensagem('Cadastre produtos loja com preco fixo antes de adicionar ao orcamento.', 'warning');
+                return null;
+            }
+            return addProductRow({
+                tipoItem: 'produto_loja',
+                productId: productData?.productId || storeProducts[0].id,
+                nome: productData?.nome || storeProducts[0].nome,
+                tamanho: productData?.tamanho || storeProducts[0].sku || '',
+                quantidade: productData?.quantidade || 1,
+                valor: productData?.valor ?? storeProducts[0].precoVenda,
+                custo: productData?.custo ?? storeProducts[0].custoUnitario,
+                observacoes: productData?.observacoes || storeProducts[0].descricao || 'Produto loja - preco fixo sem IVA'
+            });
         }
 
         function materialOptions(selectedId = '') {
@@ -1426,8 +1483,8 @@
             return Math.max(0, (custoMateriais + (hasSeller ? sellerExtraMarkup : 0)) / divisor + desconto);
         }
 
-        function distribuirSubtotalProdutos(novoSubtotal) {
-            const rows = Array.from(document.querySelectorAll('#productsTableBody tr'));
+        function distribuirSubtotalProdutos(novoSubtotal, targetRows = null) {
+            const rows = targetRows || Array.from(document.querySelectorAll('#productsTableBody tr'));
             const bases = rows.map(row => {
                 const quantidade = Math.max(1, parseFloat(row.querySelector('.quantidade-input')?.value) || 1);
                 const valor = Math.max(0, parseFloat(row.querySelector('.valor-input')?.value) || 0);
@@ -1445,6 +1502,10 @@
         function calculateTotals(ajustarPorMargem = false) {
             let subtotalProdutos = 0;
             let custoEstimado = 0;
+            let subtotalLoja = 0;
+            let custoLoja = 0;
+            let custoFabricacao = 0;
+            const fabricationRows = [];
             
             document.querySelectorAll('#productsTableBody tr').forEach(row => {
                 const valorInput = row.querySelector('.valor-input');
@@ -1457,6 +1518,13 @@
                 
                 subtotalProdutos += valor * quantidade;
                 custoEstimado += custo * quantidade;
+                if (row.dataset.itemType === 'produto_loja') {
+                    subtotalLoja += valor * quantidade;
+                    custoLoja += custo * quantidade;
+                } else {
+                    custoFabricacao += custo * quantidade;
+                    fabricationRows.push(row);
+                }
             });
             
             const instalacao = Math.max(0, parseFloat(document.getElementById('valorInstalacao')?.value) || 0);
@@ -1467,9 +1535,11 @@
             const mountingRate = Math.max(0, parseFloat(document.getElementById('mountingCommissionRate')?.value) || 0);
             const hasSeller = Boolean(document.getElementById('sellerId')?.value);
 
-            if (ajustarPorMargem && custoEstimado > 0) {
-                subtotalProdutos = ajustarPrecosParaMargem(custoEstimado, margemDesejada, desconto, instalacao, sellerRate, mountingRate, hasSeller, sellerExtraMarkup);
-                distribuirSubtotalProdutos(subtotalProdutos);
+            if (ajustarPorMargem && custoFabricacao > 0) {
+                const subtotalFabricacao = ajustarPrecosParaMargem(custoFabricacao, margemDesejada, desconto, instalacao, sellerRate, mountingRate, hasSeller, sellerExtraMarkup);
+                distribuirSubtotalProdutos(subtotalFabricacao, fabricationRows);
+                subtotalProdutos = subtotalFabricacao + subtotalLoja;
+                custoEstimado = custoFabricacao + custoLoja;
             }
 
             const baseComissao = Math.max(0, subtotalProdutos - desconto);
@@ -1579,7 +1649,10 @@
             const produtosArray = [];
             
             document.querySelectorAll('#productsTableBody tr').forEach((row, index) => {
-                const nome = row.querySelector('.product-select').value;
+                const isStoreProduct = row.dataset.itemType === 'produto_loja';
+                const selectedValue = row.querySelector('.product-select').value;
+                const storeProduct = isStoreProduct ? productCatalog.find(product => product.id === selectedValue) : null;
+                const nome = isStoreProduct ? (storeProduct?.nome || selectedValue) : selectedValue;
                 const tamanho = row.querySelector('.tamanho-input').value;
                 const quantidade = parseInt(row.querySelector('.quantidade-input').value) || 1;
                 const valor = parseFloat(row.querySelector('.valor-input').value) || 0;
@@ -1593,7 +1666,9 @@
                         quantidade: quantidade,
                         valor: valor,
                         custo: custo,
-                        materiais: Array.isArray(row._materiais) ? row._materiais : [],
+                        tipoItem: isStoreProduct ? 'produto_loja' : 'fabricacao',
+                        productId: isStoreProduct ? selectedValue : '',
+                        materiais: isStoreProduct ? [] : (Array.isArray(row._materiais) ? row._materiais : []),
                         observacoes: observacoes
                     });
                 }
@@ -1682,6 +1757,11 @@
         
         addProductBtn.addEventListener('click', () => {
             addProductRow();
+            calculateTotals();
+        });
+
+        addStoreProductBtn.addEventListener('click', () => {
+            addStoreProductRow();
             calculateTotals();
         });
         
