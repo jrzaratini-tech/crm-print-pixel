@@ -193,6 +193,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.doesNotMatch(orderBudgetPageResult.body, /Textos e alturas do mesmo trabalho/);
   assert.match(calculatorPageResult.body, /Letras caixa impressas/);
   assert.match(calculatorPageResult.body, /data-calculator-tab="vinyl"/);
+  assert.match(calculatorPageResult.body, /data-calculator-tab="partial-vat"/);
   assert.match(calculatorPageResult.body, /Componentes adicionais/);
   assert.doesNotMatch(calculatorPageResult.body, /calculateBtn/);
   assert.doesNotMatch(calculatorPageResult.body, /addEstimatedLedBtn/);
@@ -207,6 +208,12 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(calculatorPageResult.body, /value="35"/);
   assert.match(calculatorPageResult.body, /value="sheets"/);
   assert.match(calculatorPageResult.body, /value="5"/);
+  assert.match(calculatorPageResult.body, /id="partialVatTotal"/);
+  assert.match(calculatorPageResult.body, /id="partialVatRate"/);
+  assert.match(calculatorPageResult.body, /id="partialVatDepositPercent"/);
+  assert.match(calculatorPageResult.body, /id="partialVatInvoicePercent"/);
+  assert.match(calculatorPageResult.body, /partialVatPayNow/);
+  assert.match(calculatorPageResult.body, /calculatePartialVat/);
   assert.doesNotMatch(calculatorPageResult.body, /vinylSummary/);
   assert.match(pageResult.body, /supplierTableOption/);
   assert.match(pageResult.body, /registerSupplierTableBtn/);

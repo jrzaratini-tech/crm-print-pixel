@@ -80,6 +80,10 @@
                     Rótulo em vinil
                     <small>Etiquetas em rolo ou separadas em folhas</small>
                 </button>
+                <button type="button" class="calculator-tab" data-calculator-tab="partial-vat">
+                    Entrada e IVA parcial
+                    <small>Entrada, fatura parcial e IVA do momento</small>
+                </button>
             </div>
         </div>
 
@@ -197,6 +201,38 @@
                     <div class="metric-label">Preço unitário</div>
                     <div class="metric-value" id="vinylUnitCost">€0,00</div>
                 </div>
+            </div>
+        </section>
+
+        <section class="panel calculator-section" data-calculator-section="partial-vat" hidden>
+            <div class="panel-head">
+                <div>
+                    <h2>Entrada e IVA parcial</h2>
+                    <p class="subtitle">Use quando o cliente paga uma entrada, mas voce quer faturar apenas uma parte agora. O IVA entra somente sobre a parte faturada.</p>
+                </div>
+            </div>
+            <div class="grid">
+                <label>Valor total sem IVA (€)<input id="partialVatTotal" type="number" min="0" step="0.01" value="100"></label>
+                <label>Taxa de IVA (%)<input id="partialVatRate" type="number" min="0" step="0.01" value="23"></label>
+                <label>Entrada que o cliente paga (%)<input id="partialVatDepositPercent" type="number" min="0" step="0.01" value="70"></label>
+                <label>Parte faturada agora (%)<input id="partialVatInvoicePercent" type="number" min="0" step="0.01" value="30"></label>
+            </div>
+        </section>
+
+        <section class="panel calculator-section" data-calculator-section="partial-vat" hidden>
+            <h2>Resultado da entrada</h2>
+            <div id="partialVatAlert" class="message"></div>
+            <div class="result-grid">
+                <div class="metric"><div class="metric-label">Total a pagar agora</div><div class="metric-value good" id="partialVatPayNow">€0,00</div></div>
+                <div class="metric"><div class="metric-label">Total do trabalho sem IVA</div><div class="metric-value" id="partialVatWorkNet">€0,00</div></div>
+                <div class="metric"><div class="metric-label">Total com IVA aplicado agora</div><div class="metric-value" id="partialVatWorkWithCurrentVat">€0,00</div></div>
+                <div class="metric"><div class="metric-label">Entrada combinada sem IVA</div><div class="metric-value" id="partialVatDepositNet">€0,00</div></div>
+                <div class="metric"><div class="metric-label">Faturar agora sem IVA</div><div class="metric-value" id="partialVatInvoiceNet">€0,00</div></div>
+                <div class="metric"><div class="metric-label">IVA da fatura atual</div><div class="metric-value warn" id="partialVatAmount">€0,00</div></div>
+                <div class="metric"><div class="metric-label">Fatura atual com IVA</div><div class="metric-value" id="partialVatInvoiceGross">€0,00</div></div>
+                <div class="metric"><div class="metric-label">Entrada fora desta fatura</div><div class="metric-value" id="partialVatOutsideInvoice">€0,00</div></div>
+                <div class="metric"><div class="metric-label">Servico ainda nao faturado</div><div class="metric-value warn" id="partialVatNotInvoiced">€0,00</div></div>
+                <div class="metric"><div class="metric-label">Ainda a receber depois da entrada</div><div class="metric-value warn" id="partialVatRemaining">€0,00</div></div>
             </div>
         </section>
     </main>
@@ -468,6 +504,68 @@
             return { areaUnitMm2, areaTotalMm2, appliedPrice, totalCost, unitCost };
         }
 
+        function setPartialVatResult(id, value) {
+            document.getElementById(id).textContent = money(value);
+        }
+
+        function calculatePartialVat() {
+            const valorTotal = number('partialVatTotal');
+            const iva = number('partialVatRate');
+            const percentualEntrada = number('partialVatDepositPercent');
+            const percentualFaturar = number('partialVatInvoicePercent');
+            const alert = document.getElementById('partialVatAlert');
+
+            if (valorTotal <= 0 || iva < 0 || percentualEntrada < 0 || percentualFaturar < 0) {
+                alert.textContent = 'Preencha valores validos para calcular.';
+                alert.className = 'message warning';
+                ['partialVatPayNow', 'partialVatWorkNet', 'partialVatWorkWithCurrentVat', 'partialVatDepositNet', 'partialVatInvoiceNet', 'partialVatAmount', 'partialVatInvoiceGross', 'partialVatOutsideInvoice', 'partialVatNotInvoiced', 'partialVatRemaining'].forEach(id => setPartialVatResult(id, 0));
+                return null;
+            }
+
+            const taxaIva = iva / 100;
+            const valorEntrada = valorTotal * (percentualEntrada / 100);
+            const valorFaturadoSemIva = valorTotal * (percentualFaturar / 100);
+            const valorIva = valorFaturadoSemIva * taxaIva;
+            const valorFaturadoComIva = valorFaturadoSemIva + valorIva;
+            const totalAPagarAgora = valorEntrada + valorIva;
+            const totalTrabalhoComIvaAplicadoAgora = valorTotal + valorIva;
+            const valorRecebidoForaDaFatura = valorEntrada - valorFaturadoSemIva;
+            const valorServicoAindaNaoFaturado = valorTotal - valorFaturadoSemIva;
+            const valorAindaAReceber = valorTotal - valorEntrada;
+
+            if (valorEntrada < valorFaturadoSemIva) {
+                alert.textContent = 'Atencao: a entrada e menor que o valor sem IVA que sera faturado agora.';
+                alert.className = 'message error';
+            } else {
+                alert.textContent = 'IVA aplicado apenas sobre a parte faturada agora.';
+                alert.className = 'message success';
+            }
+
+            setPartialVatResult('partialVatPayNow', totalAPagarAgora);
+            setPartialVatResult('partialVatWorkNet', valorTotal);
+            setPartialVatResult('partialVatWorkWithCurrentVat', totalTrabalhoComIvaAplicadoAgora);
+            setPartialVatResult('partialVatDepositNet', valorEntrada);
+            setPartialVatResult('partialVatInvoiceNet', valorFaturadoSemIva);
+            setPartialVatResult('partialVatAmount', valorIva);
+            setPartialVatResult('partialVatInvoiceGross', valorFaturadoComIva);
+            setPartialVatResult('partialVatOutsideInvoice', valorRecebidoForaDaFatura);
+            setPartialVatResult('partialVatNotInvoiced', valorServicoAindaNaoFaturado);
+            setPartialVatResult('partialVatRemaining', valorAindaAReceber);
+
+            return {
+                totalAPagarAgora,
+                valorTotal,
+                totalTrabalhoComIvaAplicadoAgora,
+                valorEntrada,
+                valorFaturadoSemIva,
+                valorIva,
+                valorFaturadoComIva,
+                valorRecebidoForaDaFatura,
+                valorServicoAindaNaoFaturado,
+                valorAindaAReceber
+            };
+        }
+
         function calculateAll() {
             const petg = calculatePetg();
             const materialsCost = calculateMaterialsCost();
@@ -477,6 +575,7 @@
             document.getElementById('totalCost').textContent = money(totalCost);
             document.getElementById('suggestedPrice').textContent = money(suggested);
             calculateVinyl();
+            calculatePartialVat();
         }
 
         function fillPetgPriceFromCatalog() {
@@ -514,6 +613,10 @@
                 document.getElementById(id).addEventListener('input', calculateAll);
             });
             ['vinylWidthMm', 'vinylHeightMm', 'vinylQuantity', 'vinylBasePrice', 'vinylFinish', 'vinylSheetExtra'].forEach(id => {
+                document.getElementById(id).addEventListener('input', calculateAll);
+                document.getElementById(id).addEventListener('change', calculateAll);
+            });
+            ['partialVatTotal', 'partialVatRate', 'partialVatDepositPercent', 'partialVatInvoicePercent'].forEach(id => {
                 document.getElementById(id).addEventListener('input', calculateAll);
                 document.getElementById(id).addEventListener('change', calculateAll);
             });
