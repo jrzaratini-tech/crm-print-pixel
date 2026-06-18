@@ -14,6 +14,14 @@
         textarea { width: 100%; min-height: 115px; padding: 12px; border: 1px solid #cbd5e1; border-radius: 10px; resize: vertical; }
         button { width: 100%; margin-top: 12px; padding: 14px; border: 0; border-radius: 10px; color: #fff; background: #2563eb; cursor: pointer; font-weight: 700; }
         button.secondary { background: #475569; }
+        .choice { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 18px 0; }
+        .choice button { min-height: 92px; margin: 0; padding: 12px; background: #eff6ff; color: #1e3a8a; border: 2px solid #bfdbfe; }
+        .choice button.personal { background: #fff7ed; color: #9a3412; border-color: #fdba74; }
+        .choice button.selected { border-color: #172554; box-shadow: 0 0 0 3px rgba(23,37,84,.12); }
+        .choice strong, .choice span { display: block; }
+        .choice span { margin-top: 5px; font-size: 12px; line-height: 1.35; }
+        .selected-mode { margin: 12px 0; padding: 11px; border-radius: 9px; background: #dbeafe; color: #1e3a8a; font-weight: 700; }
+        .selected-mode.personal { background: #ffedd5; color: #9a3412; }
         button:disabled { cursor: wait; opacity: .65; }
         .status { margin-top: 16px; padding: 12px; border-radius: 10px; background: #eff6ff; color: #1d4ed8; }
         .status.success { background: #ecfdf5; color: #047857; }
@@ -23,13 +31,21 @@
 <body>
     <main>
         <h1>Ler QR fiscal da fatura</h1>
-        <p>Aponte a câmera para o QR Code impresso na fatura. Os dados serão enviados para revisão no CRM antes de qualquer lançamento.</p>
-        <video id="camera" playsinline muted></video>
-        <button id="openCamera">Abrir câmera</button>
-        <button id="stopCamera" class="secondary" hidden>Parar câmera</button>
-        <p>Também pode colar manualmente o conteúdo bruto do QR fiscal:</p>
-        <textarea id="rawQr" placeholder="A:...*B:...*F:...*G:..."></textarea>
-        <button id="sendQr">Enviar para revisão</button>
+        <p>Antes da leitura, informe se a compra pertence à empresa ou se foi um gasto pessoal.</p>
+        <div class="choice">
+            <button type="button" data-expense-mode="normal"><strong>Despesa da empresa</strong><span>Usar os dados fiscais da nota</span></button>
+            <button type="button" class="personal" data-expense-mode="SALÁRIO"><strong>Gasto pessoal</strong><span>Lançar o total pago como SALÁRIO</span></button>
+        </div>
+        <input type="hidden" id="expenseMode" value="">
+        <div id="scanTools" hidden>
+            <div class="selected-mode" id="selectedMode"></div>
+            <video id="camera" playsinline muted></video>
+            <button id="openCamera">Abrir câmera</button>
+            <button id="stopCamera" class="secondary" hidden>Parar câmera</button>
+            <p>Também pode colar manualmente o conteúdo bruto do QR fiscal:</p>
+            <textarea id="rawQr" placeholder="A:...*B:...*F:...*G:..."></textarea>
+            <button id="sendQr">Enviar para revisão</button>
+        </div>
         <div class="status" id="status">Sessão pronta para leitura.</div>
     </main>
     <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
@@ -41,6 +57,9 @@
         const openCamera = document.getElementById('openCamera');
         const stopCameraButton = document.getElementById('stopCamera');
         const sendQr = document.getElementById('sendQr');
+        const expenseMode = document.getElementById('expenseMode');
+        const scanTools = document.getElementById('scanTools');
+        const selectedMode = document.getElementById('selectedMode');
         let stream = null;
         let scanTimer = null;
         let scanFrame = null;
@@ -48,6 +67,18 @@
         function status(message, type = '') {
             statusBox.textContent = message;
             statusBox.className = `status ${type}`;
+        }
+
+        function chooseExpenseMode(mode) {
+            expenseMode.value = mode;
+            document.querySelectorAll('[data-expense-mode]').forEach(button => {
+                button.classList.toggle('selected', button.dataset.expenseMode === mode);
+            });
+            scanTools.hidden = false;
+            selectedMode.className = `selected-mode ${mode === 'SALÁRIO' ? 'personal' : ''}`;
+            selectedMode.textContent = mode === 'SALÁRIO'
+                ? 'Gasto pessoal: será usado o total da nota, incluindo IVA, na categoria SALÁRIO.'
+                : 'Despesa da empresa: os dados fiscais da nota serão considerados.';
         }
 
         function stopScanner() {
@@ -63,6 +94,7 @@
 
         async function send(rawValue) {
             const value = String(rawValue || '').trim();
+            if (!expenseMode.value) return status('Escolha primeiro se é despesa da empresa ou gasto pessoal.', 'error');
             if (!token || !value) return status('Link ou conteúdo do QR inválido.', 'error');
             stopScanner();
             sendQr.disabled = true;
@@ -72,7 +104,7 @@
                 const response = await fetch('/api/importacao-fiscal/receber', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ token, rawQr: value })
+                    body: JSON.stringify({ token, rawQr: value, expenseMode: expenseMode.value })
                 });
                 const result = await response.json();
                 if (!response.ok) throw new Error(result.message || 'Não foi possível enviar a fatura.');
@@ -102,6 +134,7 @@
         }
 
         async function startScanner() {
+            if (!expenseMode.value) return status('Escolha primeiro se é despesa da empresa ou gasto pessoal.', 'error');
             try {
                 stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
                 camera.srcObject = stream;
@@ -126,6 +159,9 @@
         openCamera.addEventListener('click', startScanner);
         stopCameraButton.addEventListener('click', stopScanner);
         sendQr.addEventListener('click', () => send(rawQr.value));
+        document.querySelectorAll('[data-expense-mode]').forEach(button => {
+            button.addEventListener('click', () => chooseExpenseMode(button.dataset.expenseMode));
+        });
         if (!token) status('Link inválido. Gere um novo QR Code no CRM.', 'error');
     </script>
 </body>

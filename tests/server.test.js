@@ -245,6 +245,9 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(dashboardPageResult.body, /rgba\(239, 68, 68/);
   assert.match(scanPageResult.body, /Ler QR fiscal/);
   assert.match(mobilePageResult.body, /PrintPixel Fiscal/);
+  assert.match(mobilePageResult.body, /Despesa da empresa/);
+  assert.match(mobilePageResult.body, /Gasto pessoal/);
+  assert.match(scanPageResult.body, /Lançar o total pago como SALÁRIO/);
   assert.match(mobilePageResult.body, /vendor\/jsQR\.js/);
   assert.match(workerAppResult.body, /PrintPixel Produ/);
   assert.match(workerAppResult.body, /Entrar no app/);
@@ -1075,6 +1078,25 @@ test('recebe QR fiscal por sessão temporária para revisão no CRM', async () =
   assert.equal(check.body.status, 'uploaded');
   assert.equal(check.body.documento.valorBruto, 100);
   assert.equal(check.body.documento.valorIVA, 23);
+});
+
+test('leitor fiscal do CRM pergunta e transforma gasto pessoal em salario pelo total com IVA', async () => {
+  const session = await post('/api/importacao-fiscal/session', {});
+  const received = await post('/api/importacao-fiscal/receber', {
+    token: session.body.token,
+    expenseMode: 'SALÁRIO',
+    rawQr: 'A:501234568*B:500000000*D:FT*F:20260618*G:FT PESSOAL/1*O:123.00*N:23.00'
+  });
+  assert.equal(received.response.status, 200);
+
+  const check = await request(`/api/importacao-fiscal/check?token=${session.body.token}`);
+  assert.equal(check.body.documento.salaryOnly, true);
+  assert.equal(check.body.documento.categoria, 'SALÁRIO');
+  assert.equal(check.body.documento.valorTotal, 123);
+  assert.equal(check.body.documento.valorBruto, 123);
+  assert.equal(check.body.documento.valorIVA, 0);
+  assert.equal(check.body.documento.nifEmitente, '');
+  assert.equal(check.body.documento.nifAdquirente, '');
 });
 
 test('bloqueia importação fiscal duplicada', async () => {

@@ -37,7 +37,19 @@
     stopCamera();
     screens.forEach(screen => $(`${screen}Screen`).classList.toggle('active', screen === name));
     $('bottomNav').hidden = !token;
+    if (name === 'scan') setScanExpenseMode('');
     if (name === 'list' || name === 'home') loadDocuments();
+  }
+  function setScanExpenseMode(mode) {
+    $('scanExpenseMode').value = mode;
+    document.querySelectorAll('[data-scan-expense-mode]').forEach(button => {
+      button.classList.toggle('selected', button.dataset.scanExpenseMode === mode);
+    });
+    $('scanTools').hidden = !mode;
+    $('selectedScanMode').className = `selected-mode ${mode === 'SALÁRIO' ? 'personal' : ''}`;
+    $('selectedScanMode').textContent = mode === 'SALÁRIO'
+      ? 'Gasto pessoal: o total pago será lançado como SALÁRIO.'
+      : mode === 'normal' ? 'Despesa da empresa: os dados fiscais serão considerados.' : '';
   }
   function statusLabel(status) {
     return status === 'approved' ? 'Lançada' : status === 'rejected' ? 'Rejeitada' : 'Processando';
@@ -83,6 +95,7 @@
     if (notify) toast('Acesso removido deste celular.');
   }
   async function submitScannedQr(rawQr) {
+    if (!$('scanExpenseMode').value) return toast('Escolha primeiro se é despesa da empresa ou gasto pessoal.');
     stopCamera();
     try {
       const result = await api('/api/mobile/documents', { method: 'POST', body: JSON.stringify({ rawQr, expenseMode: $('scanExpenseMode').value }) });
@@ -94,6 +107,7 @@
     show('home');
   }
   async function startCamera() {
+    if (!$('scanExpenseMode').value) return toast('Escolha primeiro se é despesa da empresa ou gasto pessoal.');
     try {
       stopCamera();
       stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false });
@@ -152,7 +166,7 @@
     tick();
   }
   async function initialize() {
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').then(registration => registration.update());
     if (!token) return show('login');
     try {
       const config = await api('/api/mobile/config');
@@ -185,7 +199,7 @@
       event.target.reset();
       $('tipoDocumento').value = 'FT';
       $('valorIVA').value = '0';
-      $('manualExpenseMode').value = 'normal';
+      $('manualExpenseMode').value = '';
       $('manualExpenseMode').dispatchEvent(new Event('change'));
       $('rawQr').value = '';
       toast(result.message);
@@ -206,6 +220,11 @@
     if (salary) $('valorIVA').value = '0';
   });
   document.addEventListener('click', event => {
+    const expenseMode = event.target.closest('[data-scan-expense-mode]')?.dataset.scanExpenseMode;
+    if (expenseMode) {
+      setScanExpenseMode(expenseMode);
+      return;
+    }
     const go = event.target.closest('[data-go]')?.dataset.go;
     if (go) show(go);
   });

@@ -1378,9 +1378,19 @@ app.post('/api/importacao-fiscal/receber', async (req, res) => {
     }
     if (session.status !== 'waiting') return res.status(409).json({ success: false, message: 'Esta sessão já foi utilizada.' });
 
+    const salaryOnly = text(req.body?.expenseMode, 80).toUpperCase().replace('SALARIO', 'SALÁRIO') === 'SALÁRIO';
     const documento = QR_FISCAL.interpretar(rawQr);
-    const erros = QR_FISCAL.validar(documento, CRM_COMPANY_NIF);
+    const erros = QR_FISCAL.validar(documento, salaryOnly ? '' : CRM_COMPANY_NIF);
     if (erros.length) return res.status(400).json({ success: false, message: erros.join(' ') });
+    if (salaryOnly) {
+      documento.salaryOnly = true;
+      documento.categoria = 'SALÁRIO';
+      documento.valorBruto = documento.valorTotal;
+      documento.valorIVA = 0;
+      documento.nifEmitente = '';
+      documento.nifAdquirente = '';
+      documento.tipoDocumento = 'SALÁRIO';
+    }
     if (await findDuplicateExpense(documento)) {
       return res.status(409).json({ success: false, message: 'Esta fatura já está cadastrada no CRM.' });
     }

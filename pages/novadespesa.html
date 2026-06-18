@@ -798,6 +798,7 @@
             <input type="hidden" id="despesaQrFiscal" data-bind="despesa.qrFiscal" value="">
             <input type="hidden" id="despesaNifAdquirente" data-bind="despesa.nifAdquirente" value="">
             <input type="hidden" id="despesaTipoDocumento" data-bind="despesa.tipoDocumento" value="">
+            <input type="hidden" id="despesaSalaryOnly" data-bind="despesa.salaryOnly" value="false">
             
             <div class="form-actions">
                 <button type="button" class="btn-cancel" id="cancelBtn">CANCELAR</button>
@@ -1040,19 +1041,23 @@
             }
 
             function preencherComQrFiscal(documento) {
-                document.getElementById('nifFornecedor').value = documento.nifEmitente || '';
+                const salaryOnly = documento.salaryOnly === true || documento.salaryOnly === 'true';
+                document.getElementById('nifFornecedor').value = salaryOnly ? '' : (documento.nifEmitente || '');
                 document.getElementById('numeroFatura').value = documento.numeroFatura || '';
                 document.getElementById('dataCompra').value = documento.dataCompra || '';
-                document.getElementById('fornecedor').value ||= `Fornecedor NIF ${documento.nifEmitente || ''}`;
-                document.getElementById('descricao').value ||= `Fatura ${documento.numeroFatura || ''}`.trim();
-                valorBrutoInput.value = documento.valorBruto || 0;
+                document.getElementById('fornecedor').value = salaryOnly ? 'Salário / gasto pessoal' : (document.getElementById('fornecedor').value || `Fornecedor NIF ${documento.nifEmitente || ''}`);
+                document.getElementById('descricao').value = salaryOnly ? 'Gasto pessoal lançado como salário' : (document.getElementById('descricao').value || `Fatura ${documento.numeroFatura || ''}`.trim());
+                categoriaSelect.value = salaryOnly ? 'SALÁRIO' : categoriaSelect.value;
+                valorBrutoInput.value = salaryOnly ? (documento.valorTotal || 0) : (documento.valorBruto || 0);
                 valorTotalHidden.value = documento.valorTotal || 0;
-                valorIVAHidden.value = documento.valorIVA || 0;
-                ivaSimRadio.checked = Number(documento.valorIVA || 0) > 0;
+                valorIVAHidden.value = salaryOnly ? 0 : (documento.valorIVA || 0);
+                ivaSimRadio.checked = !salaryOnly && Number(documento.valorIVA || 0) > 0;
                 ivaNaoRadio.checked = !ivaSimRadio.checked;
+                document.getElementById('ivaDedutivel').checked = !salaryOnly;
+                document.getElementById('despesaSalaryOnly').value = salaryOnly ? 'true' : 'false';
                 origemLancamentoHidden.value = 'qr_fiscal';
                 qrFiscalHidden.value = documento.rawQr || '';
-                nifAdquirenteHidden.value = documento.nifAdquirente || '';
+                nifAdquirenteHidden.value = salaryOnly ? '' : (documento.nifAdquirente || '');
                 tipoDocumentoHidden.value = documento.tipoDocumento || '';
                 calcularTotais();
                 showMessage('Fatura lida pelo QR fiscal. Revise os campos e confirme o lançamento.', 'success');
