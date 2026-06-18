@@ -85,7 +85,7 @@
   async function submitScannedQr(rawQr) {
     stopCamera();
     try {
-      const result = await api('/api/mobile/documents', { method: 'POST', body: JSON.stringify({ rawQr }) });
+      const result = await api('/api/mobile/documents', { method: 'POST', body: JSON.stringify({ rawQr, expenseMode: $('scanExpenseMode').value }) });
       alert(result.message);
     } catch (error) {
       alert(error.message);
@@ -178,18 +178,32 @@
   $('documentForm').addEventListener('submit', async event => {
     event.preventDefault();
     const body = Object.fromEntries(['nifEmitente', 'nomeEmitente', 'nifAdquirente', 'tipoDocumento', 'numeroFatura', 'dataCompra', 'valorTotal', 'valorIVA', 'observacoes'].map(id => [id, $(id).value]));
+    body.expenseMode = $('manualExpenseMode').value;
     body.rawQr = $('rawQr').value;
     try {
       const result = await api('/api/mobile/documents', { method: 'POST', body: JSON.stringify(body) });
       event.target.reset();
       $('tipoDocumento').value = 'FT';
       $('valorIVA').value = '0';
+      $('manualExpenseMode').value = 'normal';
+      $('manualExpenseMode').dispatchEvent(new Event('change'));
       $('rawQr').value = '';
       toast(result.message);
       show('home');
     } catch (error) {
       toast(error.message);
     }
+  });
+  $('manualExpenseMode').addEventListener('change', () => {
+    const salary = $('manualExpenseMode').value === 'SALÁRIO';
+    ['nifEmitente', 'numeroFatura'].forEach(id => {
+      $(id).required = !salary;
+      $(id).disabled = salary;
+    });
+    $('nifAdquirente').disabled = salary;
+    $('nomeEmitente').disabled = salary;
+    $('valorIVA').disabled = salary;
+    if (salary) $('valorIVA').value = '0';
   });
   document.addEventListener('click', event => {
     const go = event.target.closest('[data-go]')?.dataset.go;

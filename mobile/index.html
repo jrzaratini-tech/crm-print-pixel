@@ -36,6 +36,7 @@
 
     <section class="screen" id="scanScreen">
       <div class="screen-title"><button class="back" data-go="home">‹</button><div><h1>Ler QR fiscal</h1><p>Aponte para o QR Code da fatura.</p></div><button class="link stop" id="stopCamera" hidden>Parar</button></div>
+      <label class="card">Tipo de despesa<select id="scanExpenseMode"><option value="normal">Despesa normal</option><option value="SALÁRIO">Salário — considerar apenas o valor</option></select></label>
       <div class="scanner card"><video id="camera" playsinline muted></video><canvas id="canvas" hidden></canvas><div class="scan-frame"></div><div class="scan-hint" id="scanHint">Aguardando abertura da câmera</div></div>
       <button class="primary" id="startCamera">Abrir câmera</button>
       <label class="card paste">Ou cole o texto do QR<textarea id="rawQr" rows="4" placeholder="A:...*B:...*D:FT..."></textarea><button class="secondary" id="useRawQr" type="button">Usar texto</button></label>
@@ -44,6 +45,7 @@
     <section class="screen" id="entryScreen">
       <div class="screen-title"><button class="back" data-go="home">‹</button><div><h1>Lançamento manual</h1><p>Use somente quando não houver QR Code.</p></div></div>
       <form class="card form" id="documentForm">
+        <label>Tipo de despesa<select id="manualExpenseMode"><option value="normal">Despesa normal</option><option value="SALÁRIO">Salário — considerar apenas o valor</option></select></label>
         <label>NIF emitente<input id="nifEmitente" inputmode="numeric" maxlength="9" required></label>
         <label>Nome do emitente<input id="nomeEmitente" maxlength="160" placeholder="Opcional"></label>
         <label>NIF adquirente<input id="nifAdquirente" inputmode="numeric" maxlength="9"></label>

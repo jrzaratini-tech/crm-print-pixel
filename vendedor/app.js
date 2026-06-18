@@ -5,6 +5,8 @@
   let token = localStorage.getItem(TOKEN_KEY) || '';
   let sales = [];
   let quotes = [];
+  let debts = [];
+  let balance = {};
   let currentSeller = null;
 
   const $ = id => document.getElementById(id);
@@ -201,11 +203,28 @@
     const paid = sales.filter(item => item.paymentStatus === 'paid');
     const openQuotes = quotes.filter(item => item.status !== 'approved' && item.status !== 'aprovado');
     $('openQuoteCount').textContent = openQuotes.length;
-    $('openCount').textContent = pending.length;
-    $('paidCount').textContent = paid.length;
     $('pendingValue').textContent = money(pending.reduce((sum, item) => sum + Number(item.commission || 0), 0));
+    $('debtValue').textContent = money(balance.debtDue);
+    $('netValue').textContent = money(balance.net);
+    $('netValue').classList.toggle('negative', Number(balance.net) < 0);
     renderList('pendingList', pending, false);
     renderList('paidList', paid, true);
+
+    const debtList = $('debtList');
+    debtList.replaceChildren();
+    if (!debts.length) {
+      const empty = document.createElement('div');
+      empty.className = 'list-empty';
+      empty.textContent = 'Nenhuma compra com saldo em aberto.';
+      debtList.append(empty);
+    } else {
+      debts.forEach(debt => {
+        const card = document.createElement('article');
+        card.className = 'sale debt';
+        card.innerHTML = `<div class="row"><div><h2>${escapeHtml(debt.numero)}</h2><p>Compra própria</p></div><span class="tag">A pagar</span></div><div class="meta"><span>Total: ${money(debt.total)}</span><span>Já pago: ${money(debt.paid)}</span><strong>Dívida: ${money(debt.debt)}</strong></div>`;
+        debtList.append(card);
+      });
+    }
 
     const quoteList = $('quoteList');
     quoteList.replaceChildren();
@@ -230,6 +249,8 @@
       $('brandName').textContent = result.seller.name;
       sales = result.sales || [];
       quotes = result.quotes || [];
+      debts = result.debts || [];
+      balance = result.balance || {};
       render();
     } catch (error) {
       showLogin(error.message);

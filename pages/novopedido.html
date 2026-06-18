@@ -818,6 +818,15 @@
                         <input type="hidden" id="sellerCommissionValue" data-bind="pedido.sellerCommissionValue" value="0">
                         <input type="hidden" id="sellerCommissionStatus" data-bind="pedido.sellerCommissionStatus" value="pending">
                     </div>
+
+                    <div class="form-group">
+                        <label for="buyerSellerId">Compra feita por vendedor</label>
+                        <select id="buyerSellerId" name="buyerSellerId" data-bind="pedido.buyerSellerId">
+                            <option value="">Cliente normal</option>
+                        </select>
+                        <input type="hidden" id="buyerSellerName" data-bind="pedido.buyerSellerName" value="">
+                        <small>Quando o próprio vendedor compra, o saldo em aberto aparece como dívida.</small>
+                    </div>
                     
                     <div class="form-group">
                         <label class="required">Status do Pedido</label>
@@ -854,6 +863,7 @@
                             <th>Tamanho</th>
                             <th>Quantidade</th>
                             <th>Valor Unitário (€)</th>
+                            <th>IVA</th>
                             <th>Observações</th>
                             <th style="width: 150px;">Ações</th>
                         </tr>
@@ -919,11 +929,11 @@
                 <div class="iva-option-group">
                     <div class="iva-option">
                         <input type="radio" id="ivaSim" name="ivaOption" value="sim" data-bind="pedido.comIVA" checked>
-                        <label for="ivaSim">Com IVA (23%)</label>
+                        <label for="ivaSim">IVA padrão / instalação (23%)</label>
                     </div>
                     <div class="iva-option">
                         <input type="radio" id="ivaNao" name="ivaOption" value="nao" data-bind="pedido.comIVA">
-                        <label for="ivaNao">Isento de IVA</label>
+                        <label for="ivaNao">Padrão isento</label>
                     </div>
                 </div>
                 
@@ -1067,6 +1077,8 @@
             const valorInstalacaoInput = document.getElementById('valorInstalacao');
             const dataFechamentoInput = document.getElementById('dataFechamento');
             const sellerSelect = document.getElementById('sellerId');
+            const buyerSellerSelect = document.getElementById('buyerSellerId');
+            const buyerSellerNameInput = document.getElementById('buyerSellerName');
             const sellerNameInput = document.getElementById('sellerName');
             const sellerCommissionRateInput = document.getElementById('sellerCommissionRate');
             const sellerCommissionValueInput = document.getElementById('sellerCommissionValue');
@@ -1114,15 +1126,20 @@
                     const result = await response.json();
                     sellersCache = (result.sellers || []).filter(seller => seller.active !== false);
                     const current = sellerSelect.value;
+                    const currentBuyer = buyerSellerSelect.dataset.currentValue || buyerSellerSelect.value;
                     sellerSelect.innerHTML = '<option value="">Sem vendedor externo</option>';
+                    buyerSellerSelect.innerHTML = '<option value="">Cliente normal</option>';
                     sellersCache.forEach(seller => {
                         const option = document.createElement('option');
                         option.value = seller.id;
                         option.textContent = seller.name;
                         sellerSelect.appendChild(option);
+                        buyerSellerSelect.appendChild(option.cloneNode(true));
                     });
                     if (current) sellerSelect.value = current;
+                    if (currentBuyer) buyerSellerSelect.value = currentBuyer;
                     syncSellerFields();
+                    syncBuyerSellerFields();
                 } catch (error) {
                     console.warn('Nao foi possivel carregar vendedores:', error);
                 }
@@ -1170,6 +1187,11 @@
                 sellerCommissionValueInput.value = seller ? (productsSubtotal * rate / 100).toFixed(2) : '0';
                 if (!sellerSelect.value) sellerCommissionStatusInput.value = '';
                 else if (!sellerCommissionStatusInput.value) sellerCommissionStatusInput.value = 'pending';
+            }
+
+            function syncBuyerSellerFields() {
+                const seller = sellersCache.find(item => item.id === buyerSellerSelect.value);
+                buyerSellerNameInput.value = seller ? seller.name : '';
             }
 
             function setupNewPedido() {
@@ -1253,6 +1275,9 @@
                     document.getElementById('sellerCommissionRate').value = pedido.sellerCommissionRate || '5';
                     document.getElementById('sellerCommissionValue').value = pedido.sellerCommissionValue || '0';
                     document.getElementById('sellerCommissionStatus').value = pedido.sellerCommissionStatus || (pedido.sellerId ? 'pending' : '');
+                    buyerSellerSelect.dataset.currentValue = pedido.buyerSellerId || '';
+                    buyerSellerSelect.value = pedido.buyerSellerId || '';
+                    buyerSellerNameInput.value = pedido.buyerSellerName || '';
                     document.getElementById('observacoes').value = pedido.observacoes || '';
                     
                     // Status
@@ -1407,6 +1432,12 @@
                                min="0" step="0.01" value="${productData ? (productData.valor || '0.00') : '0.00'}" required>
                     </td>
                     <td>
+                        <select class="item-iva-select" data-bind="pedido.produtos.${index}.comIVA" aria-label="IVA do item">
+                            <option value="sim" ${(productData?.comIVA || document.querySelector('input[name="ivaOption"]:checked')?.value || 'sim') === 'sim' ? 'selected' : ''}>23%</option>
+                            <option value="nao" ${(productData?.comIVA || document.querySelector('input[name="ivaOption"]:checked')?.value || 'sim') === 'nao' ? 'selected' : ''}>Isento</option>
+                        </select>
+                    </td>
+                    <td>
                         <textarea class="obs-input" data-bind="pedido.produtos.${index}.observacoes" 
                                   placeholder="Observações do produto..." rows="2">${productData ? (productData.observacoes || '') : ''}</textarea>
                     </td>
@@ -1434,11 +1465,13 @@
                 const deliveryBtn = row.querySelector('.delivery-btn');
                 const valorInput = row.querySelector('.valor-input');
                 const quantidadeInput = row.querySelector('.quantidade-input');
+                const itemIvaSelect = row.querySelector('.item-iva-select');
                 
                 removeBtn.addEventListener('click', () => removeProductRow(row));
                 deliveryBtn.addEventListener('click', () => toggleProductDelivered(row));
                 valorInput.addEventListener('input', calculateTotals);
                 quantidadeInput.addEventListener('input', calculateTotals);
+                itemIvaSelect.addEventListener('change', calculateTotals);
                 
                 return row;
             }
@@ -1475,6 +1508,7 @@
                     const tamanho = row.querySelector('.tamanho-input');
                     const quantidade = row.querySelector('.quantidade-input');
                     const valor = row.querySelector('.valor-input');
+                    const comIVA = row.querySelector('.item-iva-select');
                     const obs = row.querySelector('.obs-input');
                     const entregue = row.querySelector('.delivered-input');
                     
@@ -1482,6 +1516,7 @@
                     if (tamanho) tamanho.setAttribute('data-bind', `pedido.produtos.${index}.tamanho`);
                     if (quantidade) quantidade.setAttribute('data-bind', `pedido.produtos.${index}.quantidade`);
                     if (valor) valor.setAttribute('data-bind', `pedido.produtos.${index}.valor`);
+                    if (comIVA) comIVA.setAttribute('data-bind', `pedido.produtos.${index}.comIVA`);
                     if (obs) obs.setAttribute('data-bind', `pedido.produtos.${index}.observacoes`);
                     if (entregue) entregue.setAttribute('data-bind', `pedido.produtos.${index}.entregue`);
                     
@@ -1691,6 +1726,7 @@
             
             function calculateTotals() {
                 let subtotalProdutos = 0;
+                let iva = 0;
                 
                 // Calcular subtotal dos produtos
                 document.querySelectorAll('#productsTableBody tr').forEach(row => {
@@ -1700,7 +1736,11 @@
                     const valor = parseFloat(valorInput.value) || 0;
                     const quantidade = parseInt(quantidadeInput.value) || 0;
                     
-                    subtotalProdutos += valor * quantidade;
+                    const subtotalItem = valor * quantidade;
+                    subtotalProdutos += subtotalItem;
+                    if (row.querySelector('.item-iva-select')?.value !== 'nao') {
+                        iva += subtotalItem * 0.23;
+                    }
                 });
                 
                 // Calcular valor de instalação
@@ -1709,11 +1749,9 @@
                 // Calcular subtotal geral
                 const subtotalGeral = subtotalProdutos + instalacao;
                 
-                // Calcular IVA
                 const ivaSimRadio = document.getElementById('ivaSim');
-                let iva = 0;
                 if (ivaSimRadio.checked) {
-                    iva = subtotalGeral * 0.23;
+                    iva += instalacao * 0.23;
                 }
                 
                 // Calcular total final
@@ -2022,6 +2060,7 @@
             document.getElementById('ivaNao').addEventListener('change', calculateTotals);
             valorInstalacaoInput.addEventListener('input', calculateTotals);
             sellerSelect.addEventListener('change', calculateTotals);
+            buyerSellerSelect.addEventListener('change', syncBuyerSellerFields);
             sellerCommissionRateInput.addEventListener('input', calculateTotals);
             
             // Configurar listener para evento do engine.js

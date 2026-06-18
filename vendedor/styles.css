@@ -24,6 +24,8 @@ h1 { margin:5px 0; font-size:26px; } h2,p { margin:4px 0; } p { color:var(--mute
 .history-toggle { width:100%; margin:10px 0 4px; border:1px solid var(--line); border-radius:12px; padding:12px; background:#fff; color:var(--primary); font-weight:900; }
 .sale { padding:16px; border:1px solid var(--line); border-left:5px solid var(--warn); border-radius:13px; background:var(--card); box-shadow:0 5px 16px #33415512; }
 .sale.paid { border-left-color:var(--ok); opacity:.86; }
+.sale.debt { border-left-color:#b91c1c; }
+.summary b.negative { color:#b91c1c; }
 .sale.quote { border-left-color:var(--primary); }
 .sale.quote.approved { border-left-color:var(--ok); }
 .row { display:flex; justify-content:space-between; align-items:start; gap:10px; }

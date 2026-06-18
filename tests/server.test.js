@@ -159,6 +159,8 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(orderFormPageResult.body, /setAttribute\('data-original-text', 'ATUALIZAR PEDIDO'\)/);
   assert.match(orderFormPageResult.body, /sellerCommissionRate/);
   assert.match(orderFormPageResult.body, /sellerCommissionValue/);
+  assert.match(orderFormPageResult.body, /item-iva-select/);
+  assert.match(orderFormPageResult.body, /buyerSellerId/);
   assert.match(ordersPageResult.body, /excluirPedido/);
   assert.match(ordersPageResult.body, /hardDelete: true/);
   assert.match(expensesPageResult.body, /excluirDespesa/);
@@ -620,6 +622,24 @@ test('ativa celular e lanca compra manual automaticamente', async () => {
   assert.equal(saved.body.events[0].payload.valorBruto, 200);
 });
 
+test('modo salario ignora NIF e IVA da nota e registra somente o valor', async () => {
+  const login = await post('/api/mobile/login', { deviceName: 'Celular salario', accessKey: 'dev-mobile-key' });
+  const sent = await mobilePost('/api/mobile/documents', {
+    expenseMode: 'SALÁRIO',
+    rawQr: 'A:501111111*B:502222222*D:FT*F:20260618*G:FT SALARIO/1*O:750.00*N:140.24'
+  }, login.body.token);
+  assert.equal(sent.response.status, 200);
+
+  const saved = await post('/api/database/query', { schema: 'despesa', filters: { id: sent.body.eventId } });
+  const payload = saved.body.events[0].payload;
+  assert.equal(payload.categoria, 'SALÁRIO');
+  assert.equal(payload.valorTotal, 750);
+  assert.equal(payload.valorBruto, 750);
+  assert.equal(payload.valorIVA, 0);
+  assert.equal(payload.nifFornecedor, '');
+  assert.equal(payload.classificationStatus, 'classified');
+});
+
 test('lanca QR fiscal automaticamente e bloqueia nova leitura duplicada', async () => {
   const login = await post('/api/mobile/login', { deviceName: 'Celular QR', accessKey: 'dev-mobile-key' });
   const body = { rawQr: 'A:504567890*B:509876543*D:FT*F:20260602*G:FT MOBILE/QR1*O:123.00*N:23.00' };
@@ -919,6 +939,48 @@ test('cadastra vendedor, calcula comissao sem IVA e instalacao e exibe no app', 
   assert.equal(paid.response.status, 200);
   const afterPay = await workerRequest('/api/vendedor/session', login.body.token);
   assert.equal(afterPay.body.sales[0].paymentStatus, 'paid');
+});
+
+test('calcula saldo liquido entre comissoes e divida de compras do vendedor', async () => {
+  const seller = await post('/api/sellers', { name: 'Vendedor Devedor', username: 'vendedor.devedor', password: 'senha-segura-devedor' });
+  const commissionOrder = await post('/api/database/commit', {
+    schema: 'pedido',
+    pageId: 'test',
+    payload: {
+      numero: 'PED-COMISSAO-SALDO',
+      produtos: [{ nome: 'Venda', quantidade: 1, valor: 1000, comIVA: 'sim' }],
+      subtotal: 1000,
+      total: 1230,
+      sellerId: seller.body.seller.id,
+      sellerCommissionRate: 10
+    }
+  });
+  assert.equal(commissionOrder.response.status, 200);
+
+  const purchaseOrder = await post('/api/database/commit', {
+    schema: 'pedido',
+    pageId: 'test',
+    payload: {
+      numero: 'PED-COMPRA-VENDEDOR',
+      produtos: [{ nome: 'Compra', quantidade: 1, valor: 200 }],
+      subtotal: 200,
+      total: 200,
+      buyerSellerId: seller.body.seller.id,
+      pagamentos: [{ valor: 100, status: 'pago' }]
+    }
+  });
+  assert.equal(purchaseOrder.response.status, 200);
+
+  const balances = await request('/api/sales/commissions');
+  const balance = balances.body.balances.find(item => item.sellerId === seller.body.seller.id);
+  assert.equal(balance.commissionsDue, 100);
+  assert.equal(balance.debtDue, 100);
+  assert.equal(balance.net, 0);
+
+  const login = await post('/api/vendedor/login', { username: 'vendedor.devedor', password: 'senha-segura-devedor' });
+  const session = await workerRequest('/api/vendedor/session', login.body.token);
+  assert.equal(session.body.debts[0].debt, 100);
+  assert.equal(session.body.balance.net, 0);
 });
 
 test('rejeita uso do app movel sem dispositivo ativado', async () => {

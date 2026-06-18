@@ -205,6 +205,8 @@ function mobileDocumentFingerprint(documento) {
 
 function normalizeMobileDocument(body = {}) {
   const parsedQr = body.rawQr ? QR_FISCAL.interpretar(body.rawQr) : {};
+  const salaryOnly = text(body.expenseMode || body.categoria, 80).toUpperCase().replace('SALARIO', 'SALÁRIO') === 'SALÁRIO';
+  const today = new Date().toISOString().slice(0, 10);
   const documento = {
     rawQr: text(parsedQr.rawQr || body.rawQr, 4000),
     entryType: body.entryType === 'income' ? 'income' : 'expense',
@@ -217,14 +219,26 @@ function normalizeMobileDocument(body = {}) {
     valorTotal: money(parsedQr.valorTotal || body.valorTotal),
     valorIVA: money(parsedQr.valorIVA || body.valorIVA),
     valorBruto: money(parsedQr.valorBruto || body.valorBruto),
-    categoria: text(body.categoria || 'OUTROS', 80),
+    categoria: salaryOnly ? 'SALÁRIO' : text(body.categoria || 'OUTROS', 80),
     formaPagamento: text(body.formaPagamento || 'outro', 80),
-    observacoes: text(body.observacoes, 500)
+    observacoes: text(body.observacoes, 500),
+    salaryOnly
   };
+  if (salaryOnly) {
+    documento.entryType = 'expense';
+    documento.nifEmitente = '';
+    documento.nifAdquirente = '';
+    documento.nomeEmitente = '';
+    documento.tipoDocumento = 'SALÁRIO';
+    documento.dataCompra = documento.dataCompra || today;
+    documento.numeroFatura = documento.numeroFatura || `SALARIO-${documento.dataCompra}-${hash(documento.rawQr || `${documento.valorTotal}-${Date.now()}`).slice(0, 8)}`;
+    documento.valorIVA = 0;
+    documento.valorBruto = documento.valorTotal;
+  }
   if (!documento.valorBruto && documento.valorTotal) {
     documento.valorBruto = Math.max(0, Math.round((documento.valorTotal - documento.valorIVA) * 100) / 100);
   }
-  if (CRM_COMPANY_NIF) {
+  if (CRM_COMPANY_NIF && !salaryOnly) {
     if (documento.nifEmitente === CRM_COMPANY_NIF) documento.entryType = 'income';
     else if (documento.nifAdquirente === CRM_COMPANY_NIF) documento.entryType = 'expense';
   }
@@ -233,6 +247,11 @@ function normalizeMobileDocument(body = {}) {
 
 function validateMobileDocument(documento) {
   const errors = [];
+  if (documento.salaryOnly) {
+    if (!(documento.valorTotal > 0)) errors.push('Total da despesa de salario invalido.');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(documento.dataCompra)) errors.push('Data da despesa invalida.');
+    return errors;
+  }
   if (!/^\d{9}$/.test(documento.nifEmitente)) errors.push('NIF do emitente invalido.');
   if (!documento.numeroFatura) errors.push('Numero da fatura ausente.');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(documento.dataCompra)) errors.push('Data da fatura invalida.');
@@ -313,7 +332,29 @@ async function launchMobileDocument(item, fingerprint, now = new Date().toISOStr
         origemLancamento: item.source,
         observacoes: item.observacoes
       }
-    : {
+    : item.salaryOnly ? {
+        fornecedor: 'Salário',
+        nifFornecedor: '',
+        numeroFatura: item.numeroFatura,
+        tipoDocumento: 'SALÁRIO',
+        dataCompra: item.dataCompra,
+        dataVencimento: item.dataCompra,
+        descricao: item.observacoes || 'Despesa de salário',
+        categoria: 'SALÁRIO',
+        tipoDespesa: 'salario',
+        formaPagamento: item.formaPagamento,
+        valorBruto: item.valorTotal,
+        valorIVA: 0,
+        valorTotal: item.valorTotal,
+        comIVA: 'nao',
+        ivaDedutivel: false,
+        statusPagamento: 'pago',
+        origemLancamento: item.source,
+        classificationStatus: 'classified',
+        classificationSource: 'salary_override',
+        salaryOnly: true,
+        observacoes: item.observacoes
+      } : {
         fornecedor: supplier?.name || item.nomeEmitente || `Fornecedor NIF ${item.nifEmitente}`,
         nifFornecedor: item.nifEmitente,
         nifAdquirente: item.nifAdquirente,
@@ -941,6 +982,47 @@ async function sellerOrders(sellerId) {
   return rows.sort((a, b) => new Date(b.paidAt || b.dataEntrega || 0) - new Date(a.paidAt || a.dataEntrega || 0));
 }
 
+function paidOrderTotal(payload = {}) {
+  const payments = Array.isArray(payload.pagamentos) ? payload.pagamentos : [];
+  if (payments.length) {
+    return money(payments
+      .filter(payment => payment.status === 'pago')
+      .reduce((sum, payment) => sum + money(payment.valor), 0));
+  }
+  return money(payload.totalPago);
+}
+
+async function sellerDebts(sellerId) {
+  const snapshot = await db.collection('events').get();
+  return snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }))
+    .filter(event => !event.deleted && event.schema === 'pedido' && event.payload?.buyerSellerId === sellerId)
+    .map(event => {
+      const payload = event.payload || {};
+      const total = money(payload.total);
+      const paid = paidOrderTotal(payload);
+      return sanitizeForResponse({
+        id: event.id,
+        numero: payload.numero || event.id,
+        total,
+        paid,
+        debt: money(Math.max(0, total - paid)),
+        status: total - paid <= 0.009 ? 'paid' : paid > 0 ? 'partial' : 'pending',
+        dataEntrega: payload.dataEntrega || ''
+      });
+    })
+    .filter(item => item.debt > 0)
+    .sort((a, b) => new Date(b.dataEntrega || 0) - new Date(a.dataEntrega || 0));
+}
+
+function sellerBalanceSummary(sales = [], debts = []) {
+  const commissionsDue = money(sales
+    .filter(item => item.paymentStatus !== 'paid')
+    .reduce((sum, item) => sum + money(item.commission), 0));
+  const debtDue = money(debts.reduce((sum, item) => sum + money(item.debt), 0));
+  return { commissionsDue, debtDue, net: Math.round((commissionsDue - debtDue) * 100) / 100 };
+}
+
 async function sellerQuotes(sellerId) {
   const snapshot = await db.collection('events').get();
   const rows = snapshot.docs
@@ -978,7 +1060,9 @@ async function sellerQuotes(sellerId) {
 
 app.get('/api/vendedor/session', requireSeller, async (req, res) => {
   try {
-    res.json({ success: true, seller: safeSellerForResponse(req.seller), sales: await sellerOrders(req.seller.id), quotes: await sellerQuotes(req.seller.id) });
+    const sales = await sellerOrders(req.seller.id);
+    const debts = await sellerDebts(req.seller.id);
+    res.json({ success: true, seller: safeSellerForResponse(req.seller), sales, debts, balance: sellerBalanceSummary(sales, debts), quotes: await sellerQuotes(req.seller.id) });
   } catch (error) {
     console.error('Erro ao carregar painel do vendedor:', error);
     res.status(500).json({ success: false, message: 'Nao foi possivel carregar suas vendas.' });
@@ -1543,6 +1627,7 @@ app.post('/api/products/:id/delete', async (req, res) => {
 });
 
 function expenseNeedsClassification(payload = {}) {
+  if (payload.salaryOnly || text(payload.categoria, 80).toUpperCase() === 'SALÁRIO') return false;
   const fornecedor = text(payload.fornecedor, 160);
   const categoria = text(payload.categoria, 80).toUpperCase();
   if (payload.supplierId && expenseSupplierNif(payload) && fornecedor && !/^FORNECEDOR NIF/.test(fornecedor.toUpperCase())) {
@@ -1708,7 +1793,12 @@ app.get('/api/sales/commissions', async (req, res) => {
       const commission = money(payload.sellerCommissionValue || base * rate / 100);
       return sanitizeForResponse({ id: event.id, orderId: event.id, numero: payload.numero, cliente: payload.cliente, sellerId: payload.sellerId, sellerName: seller?.name || payload.sellerName || 'Vendedor', base, rate, commission, status: payload.sellerCommissionStatus === 'paid' ? 'paid' : 'pending', paidAt: payload.sellerCommissionPaidAt || '' });
     });
-  res.json({ success: true, sellers: allSellers.map(safeSellerForResponse), commissions });
+  const balances = await Promise.all(allSellers.map(async seller => {
+    const sales = await sellerOrders(seller.id);
+    const debts = await sellerDebts(seller.id);
+    return sanitizeForResponse({ sellerId: seller.id, sellerName: seller.name, debts, ...sellerBalanceSummary(sales, debts) });
+  }));
+  res.json({ success: true, sellers: allSellers.map(safeSellerForResponse), commissions, balances });
 });
 
 app.post('/api/sales/commissions/:id/payment', async (req, res) => {

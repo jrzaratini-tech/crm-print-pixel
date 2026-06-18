@@ -1,4 +1,4 @@
-const CACHE_NAME = 'printpixel-vendedor-v1';
+const CACHE_NAME = 'printpixel-vendedor-v2';
 const ASSETS = ['/vendedor/', '/vendedor/index.html', '/vendedor/styles.css', '/vendedor/app.js', '/vendedor/manifest.json'];
 
 self.addEventListener('install', event => {
