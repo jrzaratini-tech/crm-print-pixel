@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const { after, before, test } = require('node:test');
 const { app } = require('../server.js');
 const { db } = require('../firebase.js');
+const ROTULOS = require('../core/rotulos.js');
 
 let server;
 let baseUrl;
@@ -106,6 +107,9 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   const sellerScriptResult = await request('/vendedor/app.js');
   const workerStylesResult = await request('/colaborador/styles.css');
   const workerScriptResult = await request('/colaborador/app.js');
+  const labelsAdminPageResult = await request('/pages/rotulos.html');
+  const labelsPortalResult = await request('/rotulos/');
+  const labelsPreviewResult = await request('/rotulos/previews/proteico-grande.webp');
   assert.equal(moduleResult.response.status, 200);
   assert.equal(presetsResult.response.status, 200);
   assert.equal(financialResult.response.status, 200);
@@ -135,6 +139,9 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.equal(sellerScriptResult.response.status, 200);
   assert.equal(workerStylesResult.response.status, 200);
   assert.equal(workerScriptResult.response.status, 200);
+  assert.equal(labelsAdminPageResult.response.status, 200);
+  assert.equal(labelsPortalResult.response.status, 200);
+  assert.equal(labelsPreviewResult.response.status, 200);
   assert.match(moduleResult.body, /calcularFicha/);
   assert.match(presetsResult.body, /Fonte de alimentação/);
   assert.match(financialResult.body, /faturamentoSemIva/);
@@ -145,6 +152,11 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(menuResult.body, /nav_faturacao/);
   assert.match(menuResult.body, /pages\/calculadora\.html/);
   assert.match(menuResult.body, /pages\/produtos\.html/);
+  assert.match(menuResult.body, /pages\/rotulos\.html/);
+  assert.match(labelsAdminPageResult.body, /Portal de Rótulos/);
+  assert.match(labelsAdminPageResult.body, /api\/rotulos\/orders/);
+  assert.match(labelsPortalResult.body, /Pedidos de rótulos/);
+  assert.match(labelsPortalResult.body, /api\/rotulos\/public\/orders/);
   assert.match(pageResult.body, /Cadastro de Materiais/);
   assert.match(pageResult.body, /Hora de maquina \/ mao de obra/);
   assert.match(presetsResult.body, /Router CNC/);
@@ -1185,6 +1197,69 @@ test('bloqueia importação fiscal duplicada', async () => {
     rawQr: 'A:501234567*B:509876543*D:FT*F:20260602*G:FT 2026/21*O:123.00*N:23.00'
   });
   assert.equal(received.response.status, 409);
+});
+
+test('gera EPS de rótulos com nome variável e preserva CutContour', () => {
+  for (const template of ROTULOS.LABEL_TEMPLATES) {
+    const eps = ROTULOS.generateLabelEps(template.id, 'Bacalhau à Brás com legumes');
+    assert.equal(Buffer.isBuffer(eps), true);
+    assert.equal(eps.includes(Buffer.from('CutContour', 'latin1')), true);
+    assert.equal(eps.includes(Buffer.from('Bacalhau', 'latin1')), true);
+    assert.equal(eps.readUInt32LE(0), 0xc6d3d0c5);
+    assert.equal(eps.readUInt32LE(20), eps.readUInt32LE(4) + eps.readUInt32LE(8));
+  }
+});
+
+test('portal de rótulos cria cliente, pedido, pagamento e EPS', async () => {
+  const prices = Object.fromEntries(ROTULOS.LABEL_TEMPLATES.map(template => [template.id, 0.5]));
+  const createdCustomer = await post('/api/rotulos/customers', {
+    name: 'Cliente Rótulos Teste',
+    email: 'rotulos@example.com',
+    phone: '910000000',
+    defaultTaxMode: 'iva',
+    prices
+  });
+  assert.equal(createdCustomer.response.status, 201);
+  assert.ok(createdCustomer.body.customer.accessToken);
+
+  const token = createdCustomer.body.customer.accessToken;
+  const session = await request(`/api/rotulos/public/session?token=${encodeURIComponent(token)}`);
+  assert.equal(session.response.status, 200);
+  assert.equal(session.body.customer.name, 'Cliente Rótulos Teste');
+  assert.equal(session.body.templates.length, 6);
+
+  const createdOrder = await post('/api/rotulos/public/orders', {
+    token,
+    items: [
+      { templateId: 'proteico-grande', mealName: 'Frango à portuguesa', quantity: 100, taxMode: 'iva' },
+      { templateId: 'vegetariano-pequeno', mealName: 'Caril de legumes', quantity: 50, taxMode: 'isento' }
+    ]
+  });
+  assert.equal(createdOrder.response.status, 201);
+  assert.equal(createdOrder.body.order.subtotal, 75);
+  assert.equal(createdOrder.body.order.iva, 11.5);
+  assert.equal(createdOrder.body.order.total, 86.5);
+
+  const orderId = createdOrder.body.order.id;
+  const epsResponse = await fetch(`${baseUrl}/api/rotulos/orders/${orderId}/items/0/eps`);
+  const eps = Buffer.from(await epsResponse.arrayBuffer());
+  assert.equal(epsResponse.status, 200);
+  assert.match(epsResponse.headers.get('content-disposition'), /100un\.eps/);
+  assert.equal(eps.includes(Buffer.from('CutContour', 'latin1')), true);
+  assert.equal(eps.includes(Buffer.from('Frango', 'latin1')), true);
+
+  const payment = await post(`/api/rotulos/orders/${orderId}/payments`, { value: 40, method: 'mbway' });
+  assert.equal(payment.response.status, 200);
+  assert.equal(payment.body.totalPago, 40);
+  assert.equal(payment.body.saldoPendente, 46.5);
+
+  const status = await post(`/api/rotulos/orders/${orderId}/status`, { status: 'processamento' });
+  assert.equal(status.response.status, 200);
+  const refreshed = await request(`/api/rotulos/public/session?token=${encodeURIComponent(token)}`);
+  const order = refreshed.body.orders.find(item => item.id === orderId);
+  assert.equal(order.status, 'processamento');
+  assert.equal(order.totalPago, 40);
+  assert.equal(order.saldoPendente, 46.5);
 });
 
 test('estatísticas respondem sem exigir índice composto do Firestore', async () => {

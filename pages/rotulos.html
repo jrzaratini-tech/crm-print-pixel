@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <script src="../core/security.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Portal de Rótulos - PrintPixel</title>
+  <style>
+    :root{--blue:#1a237e;--bg:#f5f7fb;--card:#fff;--line:#dfe4ec;--text:#172033;--muted:#687386;--green:#137a50;--red:#b32929}
+    *{box-sizing:border-box}body{margin:0;padding:22px;background:var(--bg);color:var(--text);font:14px/1.45 Inter,Segoe UI,system-ui,sans-serif}.wrap{max-width:1380px;margin:auto}
+    h1,h2,h3,p{margin-top:0}.subtitle,.muted{color:var(--muted)}.top{display:flex;justify-content:space-between;align-items:center;gap:14px;margin-bottom:18px}.tabs{display:flex;gap:8px;margin-bottom:16px}
+    button,.btn{border:0;border-radius:9px;padding:10px 13px;background:var(--blue);color:#fff;font-weight:750;cursor:pointer;text-decoration:none;display:inline-block}.secondary{background:#e7eaf2;color:#26366f}.danger{background:var(--red)}
+    .tab{background:#e6e9f0;color:#34405b}.tab.active{background:var(--blue);color:#fff}.panel,.card{background:var(--card);border:1px solid var(--line);border-radius:15px;box-shadow:0 5px 22px #16213a0a}.panel{padding:18px;margin-bottom:16px}
+    .form-grid{display:grid;grid-template-columns:2fr 1.4fr 1fr 1fr;gap:10px}label{display:grid;gap:5px;font-weight:700}input,select{width:100%;border:1px solid #cfd5df;border-radius:9px;padding:10px;font:inherit}
+    .prices{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:14px 0}.prices label{font-size:12px}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}.card{padding:16px}.actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}.url{word-break:break-all;background:#f5f6f8;border-radius:8px;padding:9px;font-size:12px;color:#44506a;margin-top:10px}
+    .order{margin-bottom:13px}.order-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.items{width:100%;border-collapse:collapse;margin-top:12px}.items th,.items td{border-bottom:1px solid var(--line);padding:9px;text-align:left}.money{font-weight:800}.summary{display:flex;gap:20px;justify-content:flex-end;margin-top:12px}.summary small{display:block;color:var(--muted)}
+    .badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#e7eefb;color:#274e89;font-size:12px;font-weight:800}.hidden{display:none}.message{margin:10px 0;padding:10px;border-radius:9px;background:#ddf3e8;color:#176143;font-weight:700}.message.error{background:#f9dddd;color:#8b2727}
+    @media(max-width:900px){.grid{grid-template-columns:1fr 1fr}.form-grid,.prices{grid-template-columns:1fr 1fr}}@media(max-width:620px){body{padding:12px}.top,.order-head{display:block}.grid,.form-grid,.prices{grid-template-columns:1fr}.items{display:block;overflow:auto}.summary{justify-content:flex-start;flex-wrap:wrap}}
+  </style>
+</head>
+<body data-page-id="rotulos" data-page-type="WRITE">
+  <main class="wrap">
+    <div class="top"><div><h1>Portal de Rótulos</h1><p class="subtitle">Clientes, pedidos semanais, pagamentos e ficheiros EPS prontos para a Roland.</p></div><button id="refresh">Atualizar</button></div>
+    <div id="message"></div>
+    <div class="tabs"><button class="tab active" data-tab="orders">Pedidos</button><button class="tab" data-tab="customers">Clientes e links</button></div>
+    <section id="ordersTab"><div id="orders"></div></section>
+    <section id="customersTab" class="hidden">
+      <form class="panel" id="customerForm">
+        <h2>Nova cliente</h2>
+        <div class="form-grid">
+          <label>Nome<input id="customerName" required maxlength="160"></label>
+          <label>Email<input id="customerEmail" type="email" maxlength="160"></label>
+          <label>Telemóvel<input id="customerPhone" maxlength="60"></label>
+          <label>Faturação padrão<select id="defaultTax"><option value="iva">IVA 23%</option><option value="isento">Isento</option></select></label>
+        </div>
+        <h3 style="margin-top:16px">Preço líquido por unidade</h3>
+        <div class="prices" id="priceFields"></div>
+        <button type="submit">Criar cliente e link</button>
+      </form>
+      <div class="grid" id="customers"></div>
+    </section>
+  </main>
+  <script>
+    const state={customers:[],templates:[],orders:[]};
+    const euro=value=>new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR'}).format(Number(value)||0);
+    const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+    const message=(text,error=false)=>document.getElementById('message').innerHTML=text?`<div class="message ${error?'error':''}">${esc(text)}</div>`:'';
+    async function api(path,options={}){
+      const response=await fetch(path,{...options,headers:{'Content-Type':'application/json',...(options.headers||{})}});
+      const body=await response.json();if(!response.ok)throw new Error(body.message||'Operação sem sucesso.');return body;
+    }
+    const portalUrl=token=>`${location.origin}/rotulos/?token=${encodeURIComponent(token)}`;
+    function renderPriceFields(){
+      document.getElementById('priceFields').innerHTML=state.templates.map(template=>`<label>${esc(template.category)} · ${esc(template.size)}<input type="number" min="0" step="0.01" value="0" data-price="${template.id}"></label>`).join('');
+    }
+    function renderCustomers(){
+      document.getElementById('customers').innerHTML=state.customers.length?state.customers.map(customer=>{
+        const url=customer.accessToken?portalUrl(customer.accessToken):'Link indisponível — gere um novo.';
+        return `<article class="card"><span class="badge">${customer.active?'Ativa':'Desativada'}</span><h3 style="margin-top:9px">${esc(customer.name)}</h3><div class="muted">${esc(customer.email||'')} ${esc(customer.phone||'')}</div><div class="url">${esc(url)}</div><div class="actions"><button data-copy="${customer.id}">Copiar link</button><button class="secondary" data-edit="${customer.id}">Editar preços</button><button class="secondary" data-regenerate="${customer.id}">Novo link</button><button class="${customer.active?'danger':'secondary'}" data-toggle="${customer.id}">${customer.active?'Desativar':'Ativar'}</button></div></article>`;
+      }).join(''):'<div class="panel muted">Nenhuma cliente cadastrada.</div>';
+      document.querySelectorAll('[data-copy]').forEach(button=>button.onclick=async()=>{const c=state.customers.find(x=>x.id===button.dataset.copy);if(!c.accessToken)return message('Gere um novo link para esta cliente.',true);await navigator.clipboard.writeText(portalUrl(c.accessToken));message('Link copiado.')});
+      document.querySelectorAll('[data-regenerate]').forEach(button=>button.onclick=()=>regenerateLink(button.dataset.regenerate));
+      document.querySelectorAll('[data-toggle]').forEach(button=>button.onclick=()=>toggleCustomer(button.dataset.toggle));
+      document.querySelectorAll('[data-edit]').forEach(button=>button.onclick=()=>editCustomer(button.dataset.edit));
+    }
+    function renderOrders(){
+      document.getElementById('orders').innerHTML=state.orders.length?state.orders.map(order=>`
+        <article class="panel order">
+          <div class="order-head"><div><span class="badge">${esc(order.numero)}</span><h2 style="margin:8px 0 3px">${esc(order.customer)}</h2><div class="muted">${new Date(order.data+'T12:00:00').toLocaleDateString('pt-PT')}</div></div><label>Estado<select data-status="${order.id}">${['pendente','processamento','concluido','entregue','cancelado'].map(status=>`<option value="${status}" ${order.status===status?'selected':''}>${status}</option>`).join('')}</select></label></div>
+          <table class="items"><thead><tr><th>Rótulo</th><th>Modelo</th><th>Qtd.</th><th>IVA</th><th>Total</th><th>Produção</th></tr></thead><tbody>${(order.produtos||[]).map((item,index)=>`<tr><td><strong>${esc(item.nome)}</strong></td><td>${esc(item.categoriaRotulo||'')} ${esc(item.tamanho||'')}</td><td>${item.quantidade}</td><td>${item.comIVA==='sim'?'23%':'Isento'}</td><td>${euro(item.total)}</td><td><a class="btn" href="/api/rotulos/orders/${encodeURIComponent(order.id)}/items/${index}/eps">EPS · ${item.quantidade} un.</a></td></tr>`).join('')}</tbody></table>
+          <div class="summary"><div><small>Total</small><span class="money">${euro(order.total)}</span></div><div><small>Pago</small><span class="money">${euro(order.totalPago)}</span></div><div><small>Em falta</small><span class="money">${euro(order.saldoPendente)}</span></div><button data-payment="${order.id}">Registar pagamento</button></div>
+        </article>`).join(''):'<div class="panel muted">Ainda não existem pedidos feitos pelo portal.</div>';
+      document.querySelectorAll('[data-status]').forEach(select=>select.onchange=()=>updateStatus(select.dataset.status,select.value));
+      document.querySelectorAll('[data-payment]').forEach(button=>button.onclick=()=>addPayment(button.dataset.payment));
+    }
+    async function load(){
+      try{
+        const [customers,orders]=await Promise.all([api('/api/rotulos/customers'),api('/api/rotulos/orders')]);
+        state.customers=customers.customers;state.templates=customers.templates;state.orders=orders.orders;
+        renderPriceFields();renderCustomers();renderOrders();message('');
+      }catch(error){message(error.message,true)}
+    }
+    async function updateStatus(id,status){try{await api(`/api/rotulos/orders/${id}/status`,{method:'POST',body:JSON.stringify({status})});message('Estado atualizado.');await load()}catch(error){message(error.message,true)}}
+    async function addPayment(id){
+      const order=state.orders.find(item=>item.id===id);const suggested=Number(order?.saldoPendente||0).toFixed(2);
+      const value=prompt('Valor recebido:',suggested);if(value===null)return;
+      const method=prompt('Forma de pagamento (transferencia, mbway, dinheiro…):','transferencia');if(method===null)return;
+      try{await api(`/api/rotulos/orders/${id}/payments`,{method:'POST',body:JSON.stringify({value,method})});message('Pagamento registado.');await load()}catch(error){message(error.message,true)}
+    }
+    async function regenerateLink(id){
+      if(!confirm('O link anterior deixará de funcionar. Gerar um novo?'))return;
+      try{const result=await api(`/api/rotulos/customers/${id}/regenerate-link`,{method:'POST',body:'{}'});await navigator.clipboard.writeText(portalUrl(result.accessToken));message('Novo link criado e copiado.');await load()}catch(error){message(error.message,true)}
+    }
+    async function toggleCustomer(id){
+      const customer=state.customers.find(item=>item.id===id);
+      try{await api(`/api/rotulos/customers/${id}`,{method:'POST',body:JSON.stringify({active:!customer.active,defaultTaxMode:customer.defaultTaxMode})});message('Cliente atualizada.');await load()}catch(error){message(error.message,true)}
+    }
+    async function editCustomer(id){
+      const customer=state.customers.find(item=>item.id===id);const prices={};
+      for(const template of state.templates){const value=prompt(`Preço líquido/unidade — ${template.category} ${template.size}:`,Number(customer.prices?.[template.id]||0).toFixed(2));if(value===null)return;prices[template.id]=value}
+      const tax=prompt('Faturação padrão: escreva "iva" ou "isento"',customer.defaultTaxMode);if(tax===null)return;
+      try{await api(`/api/rotulos/customers/${id}`,{method:'POST',body:JSON.stringify({prices,defaultTaxMode:tax==='isento'?'isento':'iva',active:customer.active})});message('Preços atualizados.');await load()}catch(error){message(error.message,true)}
+    }
+    document.getElementById('customerForm').onsubmit=async event=>{
+      event.preventDefault();const prices={};document.querySelectorAll('[data-price]').forEach(input=>prices[input.dataset.price]=input.value);
+      try{
+        const result=await api('/api/rotulos/customers',{method:'POST',body:JSON.stringify({name:document.getElementById('customerName').value,email:document.getElementById('customerEmail').value,phone:document.getElementById('customerPhone').value,defaultTaxMode:document.getElementById('defaultTax').value,prices})});
+        const url=portalUrl(result.customer.accessToken);await navigator.clipboard.writeText(url);event.target.reset();message('Cliente criada. O link foi copiado.');await load();
+      }catch(error){message(error.message,true)}
+    };
+    document.querySelectorAll('[data-tab]').forEach(tab=>tab.onclick=()=>{
+      document.querySelectorAll('[data-tab]').forEach(item=>item.classList.toggle('active',item===tab));
+      document.getElementById('ordersTab').classList.toggle('hidden',tab.dataset.tab!=='orders');document.getElementById('customersTab').classList.toggle('hidden',tab.dataset.tab!=='customers');
+    });
+    document.getElementById('refresh').onclick=load;load();
+  </script>
+</body>
+</html>

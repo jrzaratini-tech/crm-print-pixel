@@ -200,6 +200,16 @@
     },
 
     {
+        id: "nav_rotulos",
+        name: "Rótulos",
+        file: "pages/rotulos.html",
+        type: "WRITE",
+        pos: 12.6,
+        hidden: false,
+        deleted: false
+    },
+
+    {
         id: "nav_links",
         name: "Links",
         file: "pages/links.html",

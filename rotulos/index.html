@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#17352b">
+  <title>Pedidos de Rótulos</title>
+  <style>
+    :root{--green:#17352b;--green2:#2f6b56;--cream:#f7f4ed;--card:#fff;--line:#dedbd2;--text:#1d2925;--muted:#6c7772;--red:#a6342b}
+    *{box-sizing:border-box}body{margin:0;background:var(--cream);color:var(--text);font:15px/1.45 Inter,Segoe UI,system-ui,sans-serif}
+    header{background:linear-gradient(135deg,var(--green),#254f41);color:#fff;padding:24px 18px}
+    .wrap{width:min(1120px,calc(100% - 28px));margin:auto}.header-row{display:flex;justify-content:space-between;align-items:center;gap:16px}
+    h1,h2,h3,p{margin-top:0}.eyebrow{letter-spacing:.12em;text-transform:uppercase;font-size:11px;opacity:.72}.customer{font-weight:700}
+    nav{display:flex;gap:8px;margin:22px 0}.tab,.btn{border:0;border-radius:10px;padding:11px 15px;font-weight:750;cursor:pointer}
+    .tab{background:#e8e4da;color:var(--text)}.tab.active,.btn{background:var(--green);color:#fff}.btn.secondary{background:#e8ece9;color:var(--green)}.btn.danger{background:var(--red)}
+    .panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:20px;box-shadow:0 8px 28px #17352b0b;margin-bottom:18px}
+    .templates{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.template{border:2px solid transparent;border-radius:16px;background:#f8f7f3;padding:12px;cursor:pointer;transition:.18s}
+    .template:hover{transform:translateY(-2px)}.template.selected{border-color:var(--green2);background:#edf5f1}.template img{width:100%;height:210px;object-fit:contain;border-radius:10px;background:#fff}
+    .template strong,.template small{display:block}.template small{color:var(--muted);margin-top:3px}
+    .form-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px}label{display:grid;gap:6px;font-weight:700;color:#34423d}
+    input,select,textarea{width:100%;border:1px solid #cfcfc8;border-radius:10px;padding:12px;background:#fff;font:inherit}textarea{min-height:80px;resize:vertical}
+    .cart-row,.order{border:1px solid var(--line);border-radius:13px;padding:14px;margin-top:10px}.cart-row{display:grid;grid-template-columns:1fr auto;gap:12px}.muted{color:var(--muted)}.money{font-weight:800}
+    .summary{display:flex;justify-content:flex-end;gap:24px;flex-wrap:wrap;margin:18px 0}.summary div{min-width:110px}.summary small{display:block;color:var(--muted)}
+    .order-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.status{display:inline-block;border-radius:999px;padding:5px 9px;background:#fff2c9;color:#745800;font-size:12px;font-weight:800}
+    .status.concluido,.status.entregue{background:#dcf4e7;color:#17603f}.status.processamento{background:#ddebfa;color:#235b8d}.status.cancelado{background:#f8dddd;color:#8d2828}
+    .order-items{margin:10px 0 0;padding-left:18px}.hidden{display:none!important}.empty{text-align:center;color:var(--muted);padding:28px}.message{padding:12px;border-radius:10px;margin:12px 0;background:#e8f4ee;color:#175b3d;font-weight:700}.message.error{background:#f9e2df;color:#8e2c24}
+    @media(max-width:800px){.templates{grid-template-columns:repeat(2,minmax(0,1fr))}.form-grid{grid-template-columns:1fr 1fr}.form-grid label:first-child{grid-column:1/-1}}
+    @media(max-width:520px){header{padding:19px 8px}.wrap{width:min(100% - 18px,1120px)}.templates{grid-template-columns:1fr 1fr;gap:8px}.template{padding:7px}.template img{height:145px}.panel{padding:14px}.form-grid{grid-template-columns:1fr}.form-grid label:first-child{grid-column:auto}.cart-row{grid-template-columns:1fr}.order-head{display:block}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap header-row">
+      <div><div class="eyebrow">Print Pixel</div><h1>Pedidos de rótulos</h1><div class="customer" id="customerName">A carregar…</div></div>
+      <div><small>Saldo em aberto</small><div class="money" id="openBalance">0,00 €</div></div>
+    </div>
+  </header>
+  <main class="wrap">
+    <nav><button class="tab active" data-view="new">Novo pedido</button><button class="tab" data-view="history">Os meus pedidos</button></nav>
+    <div id="message"></div>
+    <section id="newView">
+      <div class="panel">
+        <h2>1. Escolha o modelo</h2>
+        <div class="templates" id="templates"></div>
+      </div>
+      <div class="panel">
+        <h2>2. Preencha o rótulo</h2>
+        <div class="form-grid">
+          <label>Nome da marmita<input id="mealName" maxlength="60" placeholder="Ex.: Frango com batata-doce"></label>
+          <label>Quantidade<input id="quantity" type="number" min="1" max="100000" value="50"></label>
+          <label>Faturação<select id="taxMode"><option value="iva">IVA 23%</option><option value="isento">Isento</option></select></label>
+        </div>
+        <label style="margin-top:12px">Observações<textarea id="itemNotes" maxlength="300" placeholder="Opcional"></textarea></label>
+        <button class="btn" id="addItem" style="margin-top:14px">Adicionar ao pedido</button>
+      </div>
+      <div class="panel">
+        <h2>3. Confirmar pedido</h2>
+        <div id="cart"><div class="empty">Ainda não adicionou nenhum rótulo.</div></div>
+        <div class="summary">
+          <div><small>Subtotal</small><span class="money" id="subtotal">0,00 €</span></div>
+          <div><small>IVA</small><span class="money" id="vat">0,00 €</span></div>
+          <div><small>Total</small><span class="money" id="total">0,00 €</span></div>
+        </div>
+        <label>Observação geral<textarea id="orderNotes" maxlength="500" placeholder="Data pretendida, instruções de entrega…"></textarea></label>
+        <button class="btn" id="submitOrder" style="margin-top:14px">Enviar pedido</button>
+      </div>
+    </section>
+    <section id="historyView" class="hidden">
+      <div class="panel"><h2>Histórico e pagamentos</h2><div id="orders"></div></div>
+    </section>
+  </main>
+  <script>
+    const token = new URLSearchParams(location.search).get('token') || '';
+    const state = { customer: null, templates: [], orders: [], cart: [], selectedTemplate: null };
+    const euro = value => new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR'}).format(Number(value)||0);
+    const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+    const showMessage = (text, error=false) => {
+      const box=document.getElementById('message');
+      box.innerHTML=text?`<div class="message ${error?'error':''}">${escapeHtml(text)}</div>`:'';
+      if(text) scrollTo({top:0,behavior:'smooth'});
+    };
+    async function api(path, options={}) {
+      const response=await fetch(path,{...options,headers:{'Content-Type':'application/json',...(options.headers||{})}});
+      const body=await response.json();
+      if(!response.ok) throw new Error(body.message||'Não foi possível concluir a operação.');
+      return body;
+    }
+    function renderTemplates(){
+      document.getElementById('templates').innerHTML=state.templates.map(template=>`
+        <article class="template ${state.selectedTemplate?.id===template.id?'selected':''}" data-template="${template.id}">
+          <img src="${template.preview}" alt="${escapeHtml(template.category+' '+template.size)}">
+          <strong>${escapeHtml(template.category)} · ${escapeHtml(template.size)}</strong>
+          <small>${escapeHtml(template.dimensions)} · ${euro(state.customer.prices?.[template.id]||0)}/un.</small>
+        </article>`).join('');
+      document.querySelectorAll('[data-template]').forEach(card=>card.addEventListener('click',()=>{
+        state.selectedTemplate=state.templates.find(template=>template.id===card.dataset.template);
+        renderTemplates();
+        document.getElementById('mealName').focus();
+      }));
+    }
+    function cartTotals(){
+      return state.cart.reduce((totals,item)=>{
+        const price=Number(state.customer.prices?.[item.templateId]||0);
+        const net=price*item.quantity;
+        const vat=item.taxMode==='iva'?net*.23:0;
+        totals.subtotal+=net;totals.vat+=vat;totals.total+=net+vat;return totals;
+      },{subtotal:0,vat:0,total:0});
+    }
+    function renderCart(){
+      const cart=document.getElementById('cart');
+      cart.innerHTML=state.cart.length?state.cart.map((item,index)=>{
+        const template=state.templates.find(entry=>entry.id===item.templateId);
+        const price=Number(state.customer.prices?.[item.templateId]||0);
+        const total=price*item.quantity*(item.taxMode==='iva'?1.23:1);
+        return `<div class="cart-row"><div><strong>${escapeHtml(item.mealName)}</strong><div class="muted">${escapeHtml(template.category)} · ${escapeHtml(template.size)} · ${item.quantity} un. · ${item.taxMode==='iva'?'IVA 23%':'Isento'}</div><div class="money">${euro(total)}</div></div><button class="btn danger" data-remove="${index}">Remover</button></div>`;
+      }).join(''):'<div class="empty">Ainda não adicionou nenhum rótulo.</div>';
+      document.querySelectorAll('[data-remove]').forEach(button=>button.addEventListener('click',()=>{state.cart.splice(Number(button.dataset.remove),1);renderCart()}));
+      const totals=cartTotals();document.getElementById('subtotal').textContent=euro(totals.subtotal);document.getElementById('vat').textContent=euro(totals.vat);document.getElementById('total').textContent=euro(totals.total);
+    }
+    function renderOrders(){
+      document.getElementById('orders').innerHTML=state.orders.length?state.orders.map(order=>`
+        <article class="order">
+          <div class="order-head"><div><strong>${escapeHtml(order.numero)}</strong><div class="muted">${new Date(order.data+'T12:00:00').toLocaleDateString('pt-PT')}</div></div><span class="status ${escapeHtml(order.status)}">${escapeHtml(order.status)}</span></div>
+          <ul class="order-items">${order.produtos.map(item=>`<li>${escapeHtml(item.nome)} — ${escapeHtml(item.modeloRotulo)} — ${item.quantidade} un.</li>`).join('')}</ul>
+          <div class="summary"><div><small>Total</small><span class="money">${euro(order.total)}</span></div><div><small>Pago</small><span class="money">${euro(order.totalPago)}</span></div><div><small>Em falta</small><span class="money">${euro(order.saldoPendente)}</span></div></div>
+        </article>`).join(''):'<div class="empty">Ainda não existem pedidos.</div>';
+      document.getElementById('openBalance').textContent=euro(state.orders.reduce((sum,order)=>sum+Number(order.saldoPendente||0),0));
+    }
+    document.getElementById('addItem').addEventListener('click',()=>{
+      const mealName=document.getElementById('mealName').value.trim();
+      const quantity=Number.parseInt(document.getElementById('quantity').value,10);
+      if(!state.selectedTemplate) return showMessage('Escolha primeiro um modelo.',true);
+      if(!mealName||!quantity||quantity<1) return showMessage('Indique o nome da marmita e a quantidade.',true);
+      state.cart.push({templateId:state.selectedTemplate.id,mealName,quantity,taxMode:document.getElementById('taxMode').value,notes:document.getElementById('itemNotes').value.trim()});
+      document.getElementById('mealName').value='';document.getElementById('itemNotes').value='';showMessage('Rótulo adicionado ao pedido.');renderCart();
+    });
+    document.getElementById('submitOrder').addEventListener('click',async()=>{
+      if(!state.cart.length) return showMessage('Adicione pelo menos um rótulo.',true);
+      const button=document.getElementById('submitOrder');button.disabled=true;button.textContent='A enviar…';
+      try{
+        const result=await api('/api/rotulos/public/orders',{method:'POST',body:JSON.stringify({token,items:state.cart,notes:document.getElementById('orderNotes').value.trim()})});
+        state.orders.unshift(result.order);state.cart=[];document.getElementById('orderNotes').value='';renderCart();renderOrders();showMessage(`Pedido ${result.order.numero} enviado com sucesso.`);
+      }catch(error){showMessage(error.message,true)}finally{button.disabled=false;button.textContent='Enviar pedido'}
+    });
+    document.querySelectorAll('[data-view]').forEach(tab=>tab.addEventListener('click',()=>{
+      document.querySelectorAll('[data-view]').forEach(item=>item.classList.toggle('active',item===tab));
+      document.getElementById('newView').classList.toggle('hidden',tab.dataset.view!=='new');
+      document.getElementById('historyView').classList.toggle('hidden',tab.dataset.view!=='history');
+    }));
+    (async()=>{
+      try{
+        if(!token) throw new Error('Este link não possui uma chave de acesso.');
+        const result=await api(`/api/rotulos/public/session?token=${encodeURIComponent(token)}`);
+        Object.assign(state,result);state.selectedTemplate=state.templates[0]||null;
+        document.getElementById('customerName').textContent=state.customer.name;document.getElementById('taxMode').value=state.customer.defaultTaxMode;
+        renderTemplates();renderCart();renderOrders();
+      }catch(error){document.getElementById('newView').classList.add('hidden');showMessage(error.message,true)}
+    })();
+  </script>
+</body>
+</html>

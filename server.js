@@ -5,6 +5,7 @@ const path = require('path');
 const { db } = require('./firebase.js');
 const QR_FISCAL = require('./core/qr-fiscal.js');
 const GESTAO = require('./core/gestao.js');
+const ROTULOS = require('./core/rotulos.js');
 const {
   MoloniClient,
   buildDocumentPreview,
@@ -200,6 +201,73 @@ function money(value) {
 function signedMoney(value) {
   const parsed = Number.parseFloat(String(value || '0').replace(',', '.'));
   return Number.isFinite(parsed) ? Math.round(parsed * 100) / 100 : 0;
+}
+
+function hashLabelToken(token) {
+  return crypto.createHash('sha256').update(String(token || '')).digest('hex');
+}
+
+function labelCustomerPublic(customer) {
+  return sanitizeForResponse({
+    id: customer.id,
+    name: customer.name,
+    email: customer.email || '',
+    phone: customer.phone || '',
+    active: customer.active !== false,
+    defaultTaxMode: customer.defaultTaxMode === 'isento' ? 'isento' : 'iva',
+    prices: customer.prices || {}
+  });
+}
+
+async function allLabelCustomers() {
+  const snapshot = await db.collection('label_customers').get();
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
+async function labelCustomerByToken(token) {
+  if (!isSafeIdentifier(token, 160)) return null;
+  const tokenHash = hashLabelToken(token);
+  return (await allLabelCustomers()).find(customer => customer.tokenHash === tokenHash && customer.active !== false) || null;
+}
+
+function labelPaymentTotal(payload) {
+  const payments = Array.isArray(payload.pagamentos) ? payload.pagamentos : [];
+  return money(payments
+    .filter(payment => payment.status === 'pago')
+    .reduce((sum, payment) => sum + money(payment.valor), 0));
+}
+
+function labelOrderPublic(id, payload) {
+  const total = money(payload.total);
+  const totalPago = labelPaymentTotal(payload);
+  return sanitizeForResponse({
+    id,
+    numero: payload.numero,
+    data: payload.data,
+    status: payload.status || 'pendente',
+    produtos: Array.isArray(payload.produtos) ? payload.produtos.map(product => ({
+      nome: product.nome,
+      modeloRotulo: product.modeloRotulo,
+      tamanho: product.tamanho,
+      quantidade: product.quantidade,
+      comIVA: product.comIVA,
+      valor: product.valor,
+      total: product.total
+    })) : [],
+    subtotal: money(payload.subtotal),
+    iva: money(payload.iva),
+    total,
+    totalPago,
+    saldoPendente: money(Math.max(0, total - totalPago))
+  });
+}
+
+async function labelOrdersForCustomer(customerId) {
+  const snapshot = await db.collection('events').get();
+  return snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }))
+    .filter(event => !event.deleted && event.schema === 'pedido' && event.payload?.source === 'rotulos' && event.payload?.labelCustomerId === customerId)
+    .sort((a, b) => new Date(b.timestamp || b.created_at || 0) - new Date(a.timestamp || a.created_at || 0));
 }
 
 const MOLONI_CONFIG_DOC = db.collection('integrations').doc('moloni');
@@ -1127,6 +1195,114 @@ app.get('/scan-fatura.html', (req, res) => res.sendFile(path.join(__dirname, 'sc
 app.use('/mobile', express.static(path.join(__dirname, 'mobile'), { index: 'index.html', fallthrough: false }));
 app.use('/colaborador', express.static(path.join(__dirname, 'colaborador'), { index: 'index.html', fallthrough: false }));
 app.use('/vendedor', express.static(path.join(__dirname, 'vendedor'), { index: 'index.html', fallthrough: false }));
+app.use('/rotulos', express.static(path.join(__dirname, 'rotulos'), { index: 'index.html', fallthrough: false }));
+
+app.get('/api/rotulos/public/session', async (req, res) => {
+  try {
+    const token = String(req.query.token || '');
+    const customer = await labelCustomerByToken(token);
+    if (!customer) return res.status(401).json({ success: false, message: 'Link inválido ou desativado.' });
+    const orders = await labelOrdersForCustomer(customer.id);
+    res.json({
+      success: true,
+      customer: labelCustomerPublic(customer),
+      templates: ROTULOS.publicTemplates(),
+      orders: orders.map(order => labelOrderPublic(order.id, order.payload))
+    });
+  } catch (error) {
+    console.error('Erro ao abrir portal de rótulos:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível abrir o portal de rótulos.' });
+  }
+});
+
+app.post('/api/rotulos/public/orders', requestRateLimit({ windowMs: 15 * 60 * 1000, max: 30 }), async (req, res) => {
+  try {
+    if (containsUnsafeMarkup(req.body)) {
+      return res.status(400).json({ success: false, message: 'O pedido contém conteúdo não permitido.' });
+    }
+    const token = String(req.body?.token || '');
+    const customer = await labelCustomerByToken(token);
+    if (!customer) return res.status(401).json({ success: false, message: 'Link inválido ou desativado.' });
+
+    const requestedItems = Array.isArray(req.body?.items) ? req.body.items : [];
+    if (!requestedItems.length || requestedItems.length > 30) {
+      return res.status(400).json({ success: false, message: 'Adicione entre 1 e 30 rótulos ao pedido.' });
+    }
+
+    const products = requestedItems.map((requestedItem, index) => {
+      const template = ROTULOS.templateById(text(requestedItem.templateId, 80));
+      const mealName = text(requestedItem.mealName, 60).replace(/\s+/g, ' ');
+      const quantity = Math.min(100000, Math.max(1, Number.parseInt(requestedItem.quantity, 10) || 0));
+      const taxMode = requestedItem.taxMode === 'isento' ? 'isento' : 'iva';
+      if (!template || !mealName) throw new Error(`Preencha corretamente o rótulo ${index + 1}.`);
+
+      const unitPrice = money(customer.prices?.[template.id]);
+      const net = money(unitPrice * quantity);
+      const itemVat = taxMode === 'iva' ? money(net * 0.23) : 0;
+      return {
+        id: `rotulo_${index}_${crypto.randomBytes(4).toString('hex')}`,
+        nome: mealName,
+        produto: `${template.category} ${template.size}`,
+        modeloRotulo: template.id,
+        categoriaRotulo: template.category,
+        tamanho: template.dimensions,
+        quantidade: quantity,
+        valor: unitPrice,
+        comIVA: taxMode === 'iva' ? 'sim' : 'nao',
+        valorIVA: itemVat,
+        subtotal: net,
+        total: money(net + itemVat),
+        observacoes: text(requestedItem.notes, 300),
+        entregue: false
+      };
+    });
+
+    const subtotal = money(products.reduce((sum, product) => sum + product.subtotal, 0));
+    const iva = money(products.reduce((sum, product) => sum + product.valorIVA, 0));
+    const total = money(subtotal + iva);
+    const now = new Date();
+    const number = `ROT-${now.toISOString().slice(0, 10).replace(/-/g, '')}-${crypto.randomBytes(2).toString('hex').toUpperCase()}`;
+    const payload = {
+      numero: number,
+      source: 'rotulos',
+      labelCustomerId: customer.id,
+      cliente: customer.name,
+      email: customer.email || '',
+      telemovel: customer.phone || '',
+      data: now.toISOString().slice(0, 10),
+      status: 'pendente',
+      produtos: products,
+      pagamentos: [],
+      subtotal,
+      iva,
+      valorIVA: iva,
+      total,
+      totalPago: 0,
+      saldoPendente: total,
+      comIVA: products.some(product => product.comIVA === 'sim') ? 'sim' : 'nao',
+      observacoes: text(req.body?.notes, 500),
+      createdBy: 'portal-rotulos'
+    };
+    const event = {
+      schema: 'pedido',
+      payload,
+      pageId: 'portal-rotulos',
+      timestamp: now.toISOString(),
+      created_at: now.toISOString(),
+      updated_at: now.toISOString(),
+      deleted: false
+    };
+    const ref = await db.collection('events').add(event);
+    res.status(201).json({ success: true, order: labelOrderPublic(ref.id, payload) });
+  } catch (error) {
+    const isInputError = /Preencha corretamente/.test(error.message);
+    if (!isInputError) console.error('Erro ao criar pedido de rótulos:', error);
+    res.status(isInputError ? 400 : 500).json({
+      success: false,
+      message: isInputError ? error.message : 'Não foi possível enviar o pedido.'
+    });
+  }
+});
 
 app.post('/api/colaborador/login', requestRateLimit({ windowMs: 15 * 60 * 1000, max: 30 }), async (req, res) => {
   try {
@@ -1661,6 +1837,255 @@ app.get('/api/moloni/oauth/callback', async (req, res) => {
 });
 
 app.use(requireAuth);
+
+app.get('/api/rotulos/customers', async (req, res) => {
+  try {
+    const customers = (await allLabelCustomers()).map(customer => {
+      let accessToken = '';
+      try {
+        accessToken = decryptMoloniTokens(customer.encryptedAccessToken)?.token || '';
+      } catch {
+        accessToken = '';
+      }
+      return sanitizeForResponse({
+        id: customer.id,
+        name: customer.name,
+        email: customer.email || '',
+        phone: customer.phone || '',
+        active: customer.active !== false,
+        defaultTaxMode: customer.defaultTaxMode === 'isento' ? 'isento' : 'iva',
+        prices: customer.prices || {},
+        accessToken,
+        createdAt: customer.createdAt || ''
+      });
+    });
+    res.json({ success: true, customers, templates: ROTULOS.publicTemplates() });
+  } catch (error) {
+    console.error('Erro ao listar clientes de rótulos:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível carregar os clientes.' });
+  }
+});
+
+app.post('/api/rotulos/customers', async (req, res) => {
+  try {
+    if (containsUnsafeMarkup(req.body)) {
+      return res.status(400).json({ success: false, message: 'O cadastro contém conteúdo não permitido.' });
+    }
+    const name = text(req.body?.name, 160);
+    if (!name) return res.status(400).json({ success: false, message: 'Indique o nome da cliente.' });
+    const token = crypto.randomBytes(36).toString('base64url');
+    const prices = {};
+    ROTULOS.LABEL_TEMPLATES.forEach(template => {
+      prices[template.id] = money(req.body?.prices?.[template.id]);
+    });
+    const now = new Date().toISOString();
+    const customer = {
+      name,
+      email: text(req.body?.email, 160),
+      phone: text(req.body?.phone, 60),
+      defaultTaxMode: req.body?.defaultTaxMode === 'isento' ? 'isento' : 'iva',
+      prices,
+      active: true,
+      tokenHash: hashLabelToken(token),
+      encryptedAccessToken: encryptMoloniTokens({ token }),
+      createdAt: now,
+      updatedAt: now
+    };
+    const ref = await db.collection('label_customers').add(customer);
+    res.status(201).json({
+      success: true,
+      customer: sanitizeForResponse({
+        id: ref.id,
+        name: customer.name,
+        email: customer.email,
+        phone: customer.phone,
+        active: true,
+        defaultTaxMode: customer.defaultTaxMode,
+        prices,
+        accessToken: token
+      })
+    });
+  } catch (error) {
+    console.error('Erro ao criar cliente de rótulos:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível criar a cliente.' });
+  }
+});
+
+app.post('/api/rotulos/customers/:id', async (req, res) => {
+  try {
+    if (containsUnsafeMarkup(req.body)) {
+      return res.status(400).json({ success: false, message: 'O cadastro contém conteúdo não permitido.' });
+    }
+    const id = String(req.params.id || '');
+    if (!isSafeIdentifier(id)) return res.status(400).json({ success: false, message: 'Cliente inválida.' });
+    const ref = db.collection('label_customers').doc(id);
+    const snapshot = await ref.get();
+    if (!snapshot.exists) return res.status(404).json({ success: false, message: 'Cliente não encontrada.' });
+    const current = snapshot.data();
+    const prices = { ...(current.prices || {}) };
+    ROTULOS.LABEL_TEMPLATES.forEach(template => {
+      if (Object.prototype.hasOwnProperty.call(req.body?.prices || {}, template.id)) {
+        prices[template.id] = money(req.body.prices[template.id]);
+      }
+    });
+    const updated = {
+      ...current,
+      name: text(req.body?.name || current.name, 160),
+      email: text(req.body?.email ?? current.email, 160),
+      phone: text(req.body?.phone ?? current.phone, 60),
+      defaultTaxMode: req.body?.defaultTaxMode === 'isento' ? 'isento' : 'iva',
+      active: req.body?.active !== false,
+      prices,
+      updatedAt: new Date().toISOString()
+    };
+    await ref.set(updated);
+    res.json({ success: true, customer: labelCustomerPublic({ id, ...updated }) });
+  } catch (error) {
+    console.error('Erro ao atualizar cliente de rótulos:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível atualizar a cliente.' });
+  }
+});
+
+app.post('/api/rotulos/customers/:id/regenerate-link', async (req, res) => {
+  try {
+    const id = String(req.params.id || '');
+    if (!isSafeIdentifier(id)) return res.status(400).json({ success: false, message: 'Cliente inválida.' });
+    const ref = db.collection('label_customers').doc(id);
+    const snapshot = await ref.get();
+    if (!snapshot.exists) return res.status(404).json({ success: false, message: 'Cliente não encontrada.' });
+    const token = crypto.randomBytes(36).toString('base64url');
+    await ref.set({
+      ...snapshot.data(),
+      tokenHash: hashLabelToken(token),
+      encryptedAccessToken: encryptMoloniTokens({ token }),
+      updatedAt: new Date().toISOString()
+    });
+    res.json({ success: true, accessToken: token });
+  } catch (error) {
+    console.error('Erro ao gerar novo link de rótulos:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível gerar um novo link.' });
+  }
+});
+
+app.get('/api/rotulos/orders', async (req, res) => {
+  try {
+    const customers = await allLabelCustomers();
+    const customerMap = new Map(customers.map(customer => [customer.id, customer]));
+    const snapshot = await db.collection('events').get();
+    const orders = snapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() }))
+      .filter(event => !event.deleted && event.schema === 'pedido' && event.payload?.source === 'rotulos')
+      .sort((a, b) => new Date(b.timestamp || b.created_at || 0) - new Date(a.timestamp || a.created_at || 0))
+      .map(event => {
+        const payload = event.payload || {};
+        const totalPago = labelPaymentTotal(payload);
+        return sanitizeForResponse({
+          id: event.id,
+          ...payload,
+          customer: customerMap.get(payload.labelCustomerId)?.name || payload.cliente || '',
+          totalPago,
+          saldoPendente: money(Math.max(0, money(payload.total) - totalPago))
+        });
+      });
+    res.json({ success: true, orders, templates: ROTULOS.publicTemplates() });
+  } catch (error) {
+    console.error('Erro ao listar pedidos de rótulos:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível carregar os pedidos.' });
+  }
+});
+
+app.post('/api/rotulos/orders/:id/status', async (req, res) => {
+  try {
+    const id = String(req.params.id || '');
+    const allowed = ['pendente', 'processamento', 'concluido', 'entregue', 'cancelado'];
+    const status = text(req.body?.status, 40);
+    if (!isSafeIdentifier(id) || !allowed.includes(status)) {
+      return res.status(400).json({ success: false, message: 'Pedido ou estado inválido.' });
+    }
+    const ref = db.collection('events').doc(id);
+    const snapshot = await ref.get();
+    if (!snapshot.exists || snapshot.data().payload?.source !== 'rotulos') {
+      return res.status(404).json({ success: false, message: 'Pedido não encontrado.' });
+    }
+    const current = snapshot.data();
+    await ref.set({
+      ...current,
+      payload: { ...current.payload, status },
+      timestamp: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    });
+    res.json({ success: true, status });
+  } catch (error) {
+    console.error('Erro ao atualizar pedido de rótulos:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível atualizar o pedido.' });
+  }
+});
+
+app.post('/api/rotulos/orders/:id/payments', async (req, res) => {
+  try {
+    const id = String(req.params.id || '');
+    const value = money(req.body?.value);
+    if (!isSafeIdentifier(id) || value <= 0) {
+      return res.status(400).json({ success: false, message: 'Pedido e valor de pagamento são obrigatórios.' });
+    }
+    const ref = db.collection('events').doc(id);
+    const snapshot = await ref.get();
+    if (!snapshot.exists || snapshot.data().payload?.source !== 'rotulos') {
+      return res.status(404).json({ success: false, message: 'Pedido não encontrado.' });
+    }
+    const current = snapshot.data();
+    const payments = Array.isArray(current.payload.pagamentos) ? [...current.payload.pagamentos] : [];
+    payments.push({
+      id: `payment_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+      tipo: 'parcela',
+      data: text(req.body?.date, 20) || new Date().toISOString().slice(0, 10),
+      valor: value,
+      formaPagamento: text(req.body?.method, 60) || 'transferencia',
+      status: 'pago',
+      observacoes: text(req.body?.notes, 300)
+    });
+    const totalPago = money(payments.reduce((sum, payment) => sum + (payment.status === 'pago' ? money(payment.valor) : 0), 0));
+    const payload = {
+      ...current.payload,
+      pagamentos: payments,
+      totalPago,
+      saldoPendente: money(Math.max(0, money(current.payload.total) - totalPago))
+    };
+    await ref.set({ ...current, payload, timestamp: new Date().toISOString(), updated_at: new Date().toISOString() });
+    res.json({ success: true, totalPago, saldoPendente: payload.saldoPendente });
+  } catch (error) {
+    console.error('Erro ao registar pagamento de rótulos:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível registar o pagamento.' });
+  }
+});
+
+app.get('/api/rotulos/orders/:id/items/:itemIndex/eps', async (req, res) => {
+  try {
+    const id = String(req.params.id || '');
+    const itemIndex = Number.parseInt(req.params.itemIndex, 10);
+    if (!isSafeIdentifier(id) || !Number.isInteger(itemIndex) || itemIndex < 0) {
+      return res.status(400).json({ success: false, message: 'Ficheiro inválido.' });
+    }
+    const snapshot = await db.collection('events').doc(id).get();
+    const payload = snapshot.exists ? snapshot.data().payload : null;
+    const item = payload?.source === 'rotulos' && Array.isArray(payload.produtos) ? payload.produtos[itemIndex] : null;
+    if (!item) return res.status(404).json({ success: false, message: 'Rótulo não encontrado.' });
+
+    const eps = ROTULOS.generateLabelEps(item.modeloRotulo, item.nome);
+    const template = ROTULOS.templateById(item.modeloRotulo);
+    const filename = `${ROTULOS.safeFilename(template?.category)}-${ROTULOS.safeFilename(template?.size)}-${ROTULOS.safeFilename(item.nome)}-${item.quantidade}un.eps`;
+    res.set({
+      'Content-Type': 'application/postscript',
+      'Content-Disposition': `attachment; filename="${filename}"`,
+      'Content-Length': String(eps.length),
+      'Cache-Control': 'no-store'
+    });
+    res.send(eps);
+  } catch (error) {
+    console.error('Erro ao gerar EPS:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível gerar o EPS.' });
+  }
+});
 
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
