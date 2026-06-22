@@ -2234,8 +2234,7 @@ app.get('/api/rotulos/orders/:id/items/:itemIndex/eps', async (req, res) => {
     if (!item) return res.status(404).json({ success: false, message: 'Rótulo não encontrado.' });
 
     const eps = ROTULOS.generateLabelEps(item.modeloRotulo, item.nome);
-    const template = ROTULOS.templateById(item.modeloRotulo);
-    const filename = `${ROTULOS.safeFilename(template?.category)}-${ROTULOS.safeFilename(template?.size)}-${ROTULOS.safeFilename(item.nome)}-${item.quantidade}un.eps`;
+    const filename = `${item.quantidade}un-${ROTULOS.safeFilename(item.nome)}.eps`;
     res.set({
       'Content-Type': 'application/postscript',
       'Content-Disposition': `attachment; filename="${filename}"`,

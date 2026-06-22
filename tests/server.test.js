@@ -1277,7 +1277,7 @@ test('portal de rótulos cria cliente, pedido, pagamento e EPS', async () => {
   const epsResponse = await fetch(`${baseUrl}/api/rotulos/orders/${orderId}/items/0/eps`);
   const eps = Buffer.from(await epsResponse.arrayBuffer());
   assert.equal(epsResponse.status, 200);
-  assert.match(epsResponse.headers.get('content-disposition'), /90un\.eps/);
+  assert.match(epsResponse.headers.get('content-disposition'), /filename="90un-Frango-a-portuguesa\.eps"/);
   assert.equal(eps.includes(Buffer.from('CutContour', 'latin1')), true);
   assert.equal(eps.includes(Buffer.from('%%LabelText: Frango a portuguesa', 'latin1')), true);
 
