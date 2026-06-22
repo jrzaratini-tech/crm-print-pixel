@@ -3,6 +3,7 @@ const { after, before, test } = require('node:test');
 const { app } = require('../server.js');
 const { db } = require('../firebase.js');
 const ROTULOS = require('../core/rotulos.js');
+const FINANCEIRO = require('../core/financeiro.js');
 
 let server;
 let baseUrl;
@@ -1235,6 +1236,30 @@ test('portal de rótulos cria cliente, pedido, pagamento e EPS', async () => {
   assert.equal(session.response.status, 200);
   assert.equal(session.body.customer.name, 'Cliente Rótulos Teste');
   assert.equal(session.body.templates.length, 6);
+  const platformFee = session.body.orders.find(item => item.recordType === 'platform_fee');
+  assert.ok(platformFee);
+  assert.equal(platformFee.total, 15);
+  assert.equal(platformFee.canHide, false);
+
+  const platformFeeDoc = await db.collection('events').doc(platformFee.id).get();
+  assert.equal(FINANCEIRO.faturamentoSemIva(platformFeeDoc.data().payload), 12.2);
+  const earlyHideFee = await post(`/api/rotulos/public/records/${platformFee.id}/hide`, { token });
+  assert.equal(earlyHideFee.response.status, 400);
+
+  const paidFee = await post(`/api/rotulos/orders/${platformFee.id}/payments`, { value: 15, method: 'transferencia' });
+  assert.equal(paidFee.response.status, 200);
+  const paidSession = await request(`/api/rotulos/public/session?token=${encodeURIComponent(token)}`);
+  assert.equal(paidSession.body.orders.find(item => item.id === platformFee.id).canHide, true);
+  const hiddenFee = await post(`/api/rotulos/public/records/${platformFee.id}/hide`, { token });
+  assert.equal(hiddenFee.response.status, 200);
+  const hiddenSession = await request(`/api/rotulos/public/session?token=${encodeURIComponent(token)}`);
+  assert.equal(hiddenSession.body.orders.some(item => item.id === platformFee.id), false);
+  const adminBeforeDelete = await request('/api/rotulos/orders');
+  assert.equal(adminBeforeDelete.body.orders.some(item => item.id === platformFee.id), true);
+  const deletedFee = await post(`/api/rotulos/records/${platformFee.id}/delete`, {});
+  assert.equal(deletedFee.response.status, 200);
+  const adminAfterDelete = await request('/api/rotulos/orders');
+  assert.equal(adminAfterDelete.body.orders.some(item => item.id === platformFee.id), false);
 
   const createdOrder = await post('/api/rotulos/public/orders', {
     token,
@@ -1268,6 +1293,16 @@ test('portal de rótulos cria cliente, pedido, pagamento e EPS', async () => {
   assert.equal(order.status, 'processamento');
   assert.equal(order.totalPago, 40);
   assert.equal(order.saldoPendente, 37.85);
+  const earlyHideOrder = await post(`/api/rotulos/public/records/${orderId}/hide`, { token });
+  assert.equal(earlyHideOrder.response.status, 400);
+  const finalPayment = await post(`/api/rotulos/orders/${orderId}/payments`, { value: 37.85, method: 'mbway' });
+  assert.equal(finalPayment.response.status, 200);
+  const hiddenOrder = await post(`/api/rotulos/public/records/${orderId}/hide`, { token });
+  assert.equal(hiddenOrder.response.status, 200);
+  const afterOrderHide = await request(`/api/rotulos/public/session?token=${encodeURIComponent(token)}`);
+  assert.equal(afterOrderHide.body.orders.some(item => item.id === orderId), false);
+  const adminKeepsHiddenOrder = await request('/api/rotulos/orders');
+  assert.equal(adminKeepsHiddenOrder.body.orders.some(item => item.id === orderId), true);
 
   const invalidQuantity = await post('/api/rotulos/public/orders', {
     token,

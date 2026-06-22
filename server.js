@@ -32,6 +32,7 @@ const MAX_UPLOAD_BYTES = 500 * 1024;
 const UPLOAD_TTL_MS = 15 * 60 * 1000;
 const MOBILE_DEVICE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 const PRODUCTION_SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+const LABEL_PLATFORM_MONTHLY_FEE = 15;
 const PRODUCTION_STEPS = [
   'Arte / projeto',
   'Modelagem',
@@ -179,7 +180,7 @@ app.use(cors({
   allowedHeaders: ['Authorization', 'Content-Type']
 }));
 app.use(express.json({ limit: '1mb' }));
-app.use('/api', requestRateLimit({ windowMs: 60 * 1000, max: 180 }));
+app.use('/api', requestRateLimit({ windowMs: 60 * 1000, max: 240 }));
 
 function mobileSessionExpired(session) {
   return !session || Date.now() > new Date(session.expiresAt || 0).getTime();
@@ -240,10 +241,14 @@ function labelPaymentTotal(payload) {
 function labelOrderPublic(id, payload) {
   const total = money(payload.total);
   const totalPago = labelPaymentTotal(payload);
+  const paid = total > 0 && totalPago >= total - 0.009;
   return sanitizeForResponse({
     id,
     numero: payload.numero,
     data: payload.data,
+    recordType: payload.recordType || 'label_order',
+    billingMonth: payload.billingMonth || '',
+    title: payload.recordType === 'platform_fee' ? 'Plano mensal da plataforma' : 'Pedido de rótulos',
     status: payload.status || 'pendente',
     produtos: Array.isArray(payload.produtos) ? payload.produtos.map(product => ({
       nome: product.nome,
@@ -258,7 +263,9 @@ function labelOrderPublic(id, payload) {
     iva: money(payload.iva),
     total,
     totalPago,
-    saldoPendente: money(Math.max(0, total - totalPago))
+    saldoPendente: money(Math.max(0, total - totalPago)),
+    paid,
+    canHide: paid
   });
 }
 
@@ -266,8 +273,99 @@ async function labelOrdersForCustomer(customerId) {
   const snapshot = await db.collection('events').get();
   return snapshot.docs
     .map(doc => ({ id: doc.id, ...doc.data() }))
-    .filter(event => !event.deleted && event.schema === 'pedido' && event.payload?.source === 'rotulos' && event.payload?.labelCustomerId === customerId)
+    .filter(event => !event.deleted
+      && event.schema === 'pedido'
+      && event.payload?.source === 'rotulos'
+      && event.payload?.labelCustomerId === customerId
+      && event.payload?.hiddenFromCustomer !== true)
     .sort((a, b) => new Date(b.timestamp || b.created_at || 0) - new Date(a.timestamp || a.created_at || 0));
+}
+
+function labelBillingMonth(reference = new Date()) {
+  const date = reference instanceof Date ? reference : new Date(reference);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function labelBillingMonthName(month) {
+  const [year, monthNumber] = String(month).split('-').map(Number);
+  return new Intl.DateTimeFormat('pt-PT', { month: 'long', year: 'numeric' })
+    .format(new Date(year, monthNumber - 1, 1));
+}
+
+function labelPlatformFeeId(customerId, month) {
+  return `label-fee-${hash(`${customerId}|${month}`).slice(0, 32)}`;
+}
+
+async function ensureLabelPlatformFee(customer, reference = new Date()) {
+  if (!customer || customer.active === false) return null;
+  const month = labelBillingMonth(reference);
+  const id = labelPlatformFeeId(customer.id, month);
+  const suppression = await db.collection('label_fee_suppressions').doc(id).get();
+  if (suppression.exists) return null;
+
+  const ref = db.collection('events').doc(id);
+  const existing = await ref.get();
+  if (existing.exists) return { id, ...existing.data() };
+
+  const withVat = customer.defaultTaxMode !== 'isento';
+  const total = LABEL_PLATFORM_MONTHLY_FEE;
+  const subtotal = withVat ? money(total / 1.23) : total;
+  const iva = money(total - subtotal);
+  const now = new Date();
+  const monthName = labelBillingMonthName(month);
+  const payload = {
+    numero: `PLAT-${month.replace('-', '')}-${String(customer.id).slice(-6).toUpperCase()}`,
+    source: 'rotulos',
+    recordType: 'platform_fee',
+    billingMonth: month,
+    labelCustomerId: customer.id,
+    cliente: customer.name,
+    email: customer.email || '',
+    telemovel: customer.phone || '',
+    data: now.toISOString().slice(0, 10),
+    dataPedido: now.toISOString().slice(0, 10),
+    status: 'pendente',
+    produtos: [{
+      id: `platform_${month}`,
+      nome: `Plano mensal da plataforma — ${monthName}`,
+      produto: 'Plano mensal da plataforma',
+      modeloRotulo: '',
+      categoriaRotulo: 'Plataforma',
+      tamanho: 'Mensal',
+      quantidade: 1,
+      valor: subtotal,
+      comIVA: withVat ? 'sim' : 'nao',
+      valorIVA: iva,
+      subtotal,
+      total,
+      entregue: true
+    }],
+    pagamentos: [],
+    subtotal,
+    iva,
+    valorIVA: iva,
+    total,
+    totalPago: 0,
+    saldoPendente: total,
+    comIVA: withVat ? 'sim' : 'nao',
+    observacoes: `Mensalidade da plataforma referente a ${monthName}.`,
+    createdBy: 'monthly-platform-fee'
+  };
+  const event = {
+    schema: 'pedido',
+    payload,
+    pageId: 'portal-rotulos',
+    timestamp: now.toISOString(),
+    created_at: now.toISOString(),
+    updated_at: now.toISOString(),
+    deleted: false
+  };
+  await ref.set(event);
+  return { id, ...event };
+}
+
+async function ensureAllLabelPlatformFees(customers) {
+  await Promise.all((customers || []).filter(customer => customer.active !== false).map(customer => ensureLabelPlatformFee(customer)));
 }
 
 const MOLONI_CONFIG_DOC = db.collection('integrations').doc('moloni');
@@ -1202,6 +1300,7 @@ app.get('/api/rotulos/public/session', async (req, res) => {
     const token = String(req.query.token || '');
     const customer = await labelCustomerByToken(token);
     if (!customer) return res.status(401).json({ success: false, message: 'Link inválido ou desativado.' });
+    await ensureLabelPlatformFee(customer);
     const orders = await labelOrdersForCustomer(customer.id);
     res.json({
       success: true,
@@ -1272,6 +1371,8 @@ app.post('/api/rotulos/public/orders', requestRateLimit({ windowMs: 15 * 60 * 10
       email: customer.email || '',
       telemovel: customer.phone || '',
       data: now.toISOString().slice(0, 10),
+      dataPedido: now.toISOString().slice(0, 10),
+      recordType: 'label_order',
       status: 'pendente',
       produtos: products,
       pagamentos: [],
@@ -1303,6 +1404,37 @@ app.post('/api/rotulos/public/orders', requestRateLimit({ windowMs: 15 * 60 * 10
       success: false,
       message: isInputError ? error.message : 'Não foi possível enviar o pedido.'
     });
+  }
+});
+
+app.post('/api/rotulos/public/records/:id/hide', async (req, res) => {
+  try {
+    const token = String(req.body?.token || '');
+    const customer = await labelCustomerByToken(token);
+    const id = String(req.params.id || '');
+    if (!customer) return res.status(401).json({ success: false, message: 'Link inválido ou desativado.' });
+    if (!isSafeIdentifier(id)) return res.status(400).json({ success: false, message: 'Registo inválido.' });
+
+    const ref = db.collection('events').doc(id);
+    const snapshot = await ref.get();
+    const event = snapshot.exists ? snapshot.data() : null;
+    if (!event || event.deleted || event.schema !== 'pedido' || event.payload?.source !== 'rotulos' || event.payload?.labelCustomerId !== customer.id) {
+      return res.status(404).json({ success: false, message: 'Registo não encontrado.' });
+    }
+    const total = money(event.payload.total);
+    const totalPaid = labelPaymentTotal(event.payload);
+    if (total <= 0 || totalPaid < total - 0.009) {
+      return res.status(400).json({ success: false, message: 'Só é possível remover do histórico depois de estar totalmente pago.' });
+    }
+    await ref.set({
+      ...event,
+      payload: { ...event.payload, hiddenFromCustomer: true, hiddenFromCustomerAt: new Date().toISOString() },
+      updated_at: new Date().toISOString()
+    });
+    res.json({ success: true, message: 'Registo removido do seu histórico.' });
+  } catch (error) {
+    console.error('Erro ao ocultar registo no portal de rótulos:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível remover o registo do histórico.' });
   }
 });
 
@@ -1972,6 +2104,7 @@ app.post('/api/rotulos/customers/:id/regenerate-link', async (req, res) => {
 app.get('/api/rotulos/orders', async (req, res) => {
   try {
     const customers = await allLabelCustomers();
+    await ensureAllLabelPlatformFees(customers);
     const customerMap = new Map(customers.map(customer => [customer.id, customer]));
     const snapshot = await db.collection('events').get();
     const orders = snapshot.docs
@@ -1984,6 +2117,7 @@ app.get('/api/rotulos/orders', async (req, res) => {
         return sanitizeForResponse({
           id: event.id,
           ...payload,
+          recordType: payload.recordType || 'label_order',
           customer: customerMap.get(payload.labelCustomerId)?.name || payload.cliente || '',
           totalPago,
           saldoPendente: money(Math.max(0, money(payload.total) - totalPago))
@@ -1993,6 +2127,32 @@ app.get('/api/rotulos/orders', async (req, res) => {
   } catch (error) {
     console.error('Erro ao listar pedidos de rótulos:', error);
     res.status(500).json({ success: false, message: 'Não foi possível carregar os pedidos.' });
+  }
+});
+
+app.post('/api/rotulos/records/:id/delete', async (req, res) => {
+  try {
+    const id = String(req.params.id || '');
+    if (!isSafeIdentifier(id)) return res.status(400).json({ success: false, message: 'Registo inválido.' });
+    const ref = db.collection('events').doc(id);
+    const snapshot = await ref.get();
+    const event = snapshot.exists ? snapshot.data() : null;
+    if (!event || event.schema !== 'pedido' || event.payload?.source !== 'rotulos') {
+      return res.status(404).json({ success: false, message: 'Registo não encontrado.' });
+    }
+    if (event.payload?.recordType === 'platform_fee') {
+      await db.collection('label_fee_suppressions').doc(id).set({
+        customerId: event.payload.labelCustomerId,
+        billingMonth: event.payload.billingMonth,
+        deletedAt: new Date().toISOString()
+      });
+    }
+    const artifactsDeleted = await deleteOrderArtifacts(id);
+    await ref.delete();
+    res.json({ success: true, hardDelete: true, artifactsDeleted });
+  } catch (error) {
+    console.error('Erro ao excluir registo de rótulos:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível excluir definitivamente o registo.' });
   }
 });
 

@@ -21,7 +21,8 @@
     input,select,textarea{width:100%;border:1px solid #cfcfc8;border-radius:10px;padding:12px;background:#fff;font:inherit}textarea{min-height:80px;resize:vertical}
     .cart-row,.order{border:1px solid var(--line);border-radius:13px;padding:14px;margin-top:10px}.cart-row{display:grid;grid-template-columns:1fr auto;gap:12px}.muted{color:var(--muted)}.money{font-weight:800}
     .summary{display:flex;justify-content:flex-end;gap:24px;flex-wrap:wrap;margin:18px 0}.summary div{min-width:110px}.summary small{display:block;color:var(--muted)}
-    .order-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.status{display:inline-block;border-radius:999px;padding:5px 9px;background:#fff2c9;color:#745800;font-size:12px;font-weight:800}
+    .order-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.order-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.status{display:inline-block;border-radius:999px;padding:5px 9px;background:#fff2c9;color:#745800;font-size:12px;font-weight:800}
+    .plan{border-left:5px solid var(--green2);background:linear-gradient(90deg,#f1f8f4,#fff 38%)}.plan-name{color:var(--green2);font-weight:850}
     .status.concluido,.status.entregue{background:#dcf4e7;color:#17603f}.status.processamento{background:#ddebfa;color:#235b8d}.status.cancelado{background:#f8dddd;color:#8d2828}
     .order-items{margin:10px 0 0;padding-left:18px}.hidden{display:none!important}.empty{text-align:center;color:var(--muted);padding:28px}.message{padding:12px;border-radius:10px;margin:12px 0;background:#e8f4ee;color:#175b3d;font-weight:700}.message.error{background:#f9e2df;color:#8e2c24}
     @media(max-width:800px){.templates{grid-template-columns:repeat(2,minmax(0,1fr))}.form-grid{grid-template-columns:1fr 1fr}.form-grid label:first-child{grid-column:1/-1}}
@@ -118,12 +119,20 @@
     }
     function renderOrders(){
       document.getElementById('orders').innerHTML=state.orders.length?state.orders.map(order=>`
-        <article class="order">
-          <div class="order-head"><div><strong>${escapeHtml(order.numero)}</strong><div class="muted">${new Date(order.data+'T12:00:00').toLocaleDateString('pt-PT')}</div></div><span class="status ${escapeHtml(order.status)}">${escapeHtml(order.status)}</span></div>
-          <ul class="order-items">${order.produtos.map(item=>`<li>${escapeHtml(item.nome)} — ${escapeHtml(item.modeloRotulo)} — ${item.quantidade} un.</li>`).join('')}</ul>
+        <article class="order ${order.recordType==='platform_fee'?'plan':''}">
+          <div class="order-head"><div><div class="${order.recordType==='platform_fee'?'plan-name':''}">${escapeHtml(order.title)}</div><strong>${escapeHtml(order.numero)}</strong><div class="muted">${new Date(order.data+'T12:00:00').toLocaleDateString('pt-PT')}</div></div><div class="order-actions"><span class="status ${escapeHtml(order.status)}">${order.paid?'pago':escapeHtml(order.status)}</span>${order.canHide?`<button class="btn secondary" data-hide="${order.id}">Remover do histórico</button>`:''}</div></div>
+          <ul class="order-items">${order.produtos.map(item=>`<li>${escapeHtml(item.nome)}${order.recordType==='platform_fee'?'':` — ${escapeHtml(item.modeloRotulo)} — ${item.quantidade} un.`}</li>`).join('')}</ul>
           <div class="summary"><div><small>Total</small><span class="money">${euro(order.total)}</span></div><div><small>Pago</small><span class="money">${euro(order.totalPago)}</span></div><div><small>Em falta</small><span class="money">${euro(order.saldoPendente)}</span></div></div>
         </article>`).join(''):'<div class="empty">Ainda não existem pedidos.</div>';
+      document.querySelectorAll('[data-hide]').forEach(button=>button.addEventListener('click',()=>hideRecord(button.dataset.hide)));
       document.getElementById('openBalance').textContent=euro(state.orders.reduce((sum,order)=>sum+Number(order.saldoPendente||0),0));
+    }
+    async function hideRecord(id){
+      if(!confirm('Remover este registo do seu histórico? Esta ação não elimina o documento da Print Pixel.')) return;
+      try{
+        await api(`/api/rotulos/public/records/${encodeURIComponent(id)}/hide`,{method:'POST',body:JSON.stringify({token})});
+        state.orders=state.orders.filter(order=>order.id!==id);renderOrders();showMessage('Registo removido do seu histórico.');
+      }catch(error){showMessage(error.message,true)}
     }
     document.getElementById('addItem').addEventListener('click',()=>{
       const mealName=document.getElementById('mealName').value.trim();
