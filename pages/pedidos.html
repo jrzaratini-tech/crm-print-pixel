@@ -1428,6 +1428,9 @@
                             </div>
                         </div>
                         <div class="pedido-actions">
+                            <button class="action-btn invoice" title="Faturar pedido" data-id="${pedido.id}">
+                                <i class="fas fa-file-invoice-dollar"></i>
+                            </button>
                             <button class="action-btn edit" title="Editar pedido" data-id="${pedido.id}">
                                 <i class="fas fa-edit"></i>
                             </button>
@@ -1512,11 +1515,15 @@
                 `;
                 
                 // Adicionar event listeners
+                const invoiceBtn = card.querySelector('.action-btn.invoice');
                 const editBtn = card.querySelector('.action-btn.edit');
                 const viewBtn = card.querySelector('.action-btn.view');
                 const deleteBtn = card.querySelector('.action-btn.delete');
                 const statusSelect = card.querySelector('.status-select');
                 
+                invoiceBtn.addEventListener('click', () => {
+                    window.location.href = `faturacao.html?orderId=${encodeURIComponent(pedido.id)}`;
+                });
                 editBtn.addEventListener('click', () => editarPedido(pedido.id));
                 viewBtn.addEventListener('click', () => abrirModalDetalhes(pedido));
                 deleteBtn.addEventListener('click', () => excluirPedido(pedido.id, pedido.numero || pedido.cliente || 'este pedido'));

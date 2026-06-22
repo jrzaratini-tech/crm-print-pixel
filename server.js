@@ -5,6 +5,13 @@ const path = require('path');
 const { db } = require('./firebase.js');
 const QR_FISCAL = require('./core/qr-fiscal.js');
 const GESTAO = require('./core/gestao.js');
+const {
+  MoloniClient,
+  buildDocumentPreview,
+  cleanText: moloniText,
+  oauthAuthorizationUrl,
+  roundMoney: moloniMoney
+} = require('./core/moloni.js');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -14,6 +21,11 @@ const CRM_USERNAME = process.env.CRM_USERNAME || '';
 const CRM_PASSWORD = process.env.CRM_PASSWORD || '';
 const CRM_COMPANY_NIF = String(process.env.CRM_COMPANY_NIF || '').replace(/\D/g, '');
 const CRM_MOBILE_ACCESS_KEY = process.env.CRM_MOBILE_ACCESS_KEY || (!IS_PRODUCTION ? 'dev-mobile-key' : '');
+const MOLONI_MODE = process.env.MOLONI_MODE === 'live' ? 'live' : 'mock';
+const MOLONI_CLIENT_ID = process.env.MOLONI_CLIENT_ID || '';
+const MOLONI_CLIENT_SECRET = process.env.MOLONI_CLIENT_SECRET || '';
+const MOLONI_REDIRECT_URI = process.env.MOLONI_REDIRECT_URI || '';
+const MOLONI_ENCRYPTION_KEY = process.env.MOLONI_ENCRYPTION_KEY || CRM_PASSWORD || 'development-only-moloni-key';
 const MAX_QUERY_LIMIT = 500;
 const MAX_UPLOAD_BYTES = 500 * 1024;
 const UPLOAD_TTL_MS = 15 * 60 * 1000;
@@ -158,7 +170,8 @@ app.use((req, res, next) => {
 });
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    const localDevelopmentOrigin = !IS_PRODUCTION && /^https?:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.test(origin || '');
+    if (!origin || localDevelopmentOrigin || allowedOrigins.includes(origin)) return callback(null, true);
     return callback(new Error('Origem não autorizada pelo CORS.'));
   },
   methods: ['GET', 'POST'],
@@ -187,6 +200,216 @@ function money(value) {
 function signedMoney(value) {
   const parsed = Number.parseFloat(String(value || '0').replace(',', '.'));
   return Number.isFinite(parsed) ? Math.round(parsed * 100) / 100 : 0;
+}
+
+const MOLONI_CONFIG_DOC = db.collection('integrations').doc('moloni');
+
+function moloniCryptoKey() {
+  return crypto.createHash('sha256').update(MOLONI_ENCRYPTION_KEY).digest();
+}
+
+function encryptMoloniTokens(tokens) {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', moloniCryptoKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(JSON.stringify(tokens), 'utf8'), cipher.final()]);
+  return {
+    iv: iv.toString('base64'),
+    tag: cipher.getAuthTag().toString('base64'),
+    data: encrypted.toString('base64')
+  };
+}
+
+function decryptMoloniTokens(encrypted) {
+  if (!encrypted?.iv || !encrypted?.tag || !encrypted?.data) return null;
+  const decipher = crypto.createDecipheriv('aes-256-gcm', moloniCryptoKey(), Buffer.from(encrypted.iv, 'base64'));
+  decipher.setAuthTag(Buffer.from(encrypted.tag, 'base64'));
+  return JSON.parse(Buffer.concat([
+    decipher.update(Buffer.from(encrypted.data, 'base64')),
+    decipher.final()
+  ]).toString('utf8'));
+}
+
+function signMoloniState(payload) {
+  const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url');
+  const signature = crypto.createHmac('sha256', moloniCryptoKey()).update(encoded).digest('base64url');
+  return `${encoded}.${signature}`;
+}
+
+function verifyMoloniState(state) {
+  const [encoded, signature] = String(state || '').split('.');
+  if (!encoded || !signature) return null;
+  const expected = crypto.createHmac('sha256', moloniCryptoKey()).update(encoded).digest('base64url');
+  if (!safeEqual(signature, expected)) return null;
+  const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'));
+  return Date.now() - Number(payload.createdAt || 0) < 10 * 60 * 1000 ? payload : null;
+}
+
+async function moloniConfig() {
+  const snapshot = await MOLONI_CONFIG_DOC.get();
+  return snapshot.exists ? snapshot.data() : {};
+}
+
+async function saveMoloniConfig(updates) {
+  const saved = { ...updates, updatedAt: new Date().toISOString() };
+  await MOLONI_CONFIG_DOC.set(saved, { merge: true });
+  return { ...(await moloniConfig()) };
+}
+
+async function exchangeMoloniGrant(params) {
+  const url = new URL('https://api.moloni.pt/v1/grant/');
+  Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
+  const response = await fetch(url);
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || body.error) throw new Error(body.error_description || 'Falha na autenticacao Moloni.');
+  return body;
+}
+
+async function moloniAccessToken() {
+  const config = await moloniConfig();
+  const tokens = decryptMoloniTokens(config.tokens);
+  if (!tokens?.access_token) throw new Error('A conta Moloni ainda nao esta ligada.');
+  const expiresAt = Number(tokens.expires_at || 0);
+  if (expiresAt > Date.now() + 60 * 1000) return tokens.access_token;
+  if (!tokens.refresh_token) throw new Error('A autorizacao Moloni expirou. Volte a ligar a conta.');
+
+  const refreshed = await exchangeMoloniGrant({
+    grant_type: 'refresh_token',
+    client_id: MOLONI_CLIENT_ID,
+    client_secret: MOLONI_CLIENT_SECRET,
+    refresh_token: tokens.refresh_token
+  });
+  const nextTokens = {
+    ...refreshed,
+    expires_at: Date.now() + Number(refreshed.expires_in || 3600) * 1000
+  };
+  await saveMoloniConfig({ tokens: encryptMoloniTokens(nextTokens), connectedAt: new Date().toISOString() });
+  return nextTokens.access_token;
+}
+
+async function moloniOrder(orderId) {
+  const snapshot = await db.collection('events').doc(String(orderId || '')).get();
+  if (!snapshot.exists || snapshot.data()?.schema !== 'pedido' || snapshot.data()?.deleted) return null;
+  return { id: String(orderId), ...snapshot.data().payload };
+}
+
+async function moloniDocuments() {
+  const snapshot = await db.collection('moloni_documents').get();
+  return snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }))
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+}
+
+function moloniPublicStatus(config = {}) {
+  const connected = Boolean(config.tokens);
+  return {
+    mode: MOLONI_MODE,
+    connected,
+    readyForLive: MOLONI_MODE === 'live' && connected && Boolean(config.companyId),
+    credentialsConfigured: Boolean(MOLONI_CLIENT_ID && MOLONI_CLIENT_SECRET && MOLONI_REDIRECT_URI),
+    companyId: config.companyId || '',
+    settings: config.settings || {},
+    updatedAt: config.updatedAt || ''
+  };
+}
+
+function moloniEndpointFor(type) {
+  return {
+    invoice: 'invoices/insert',
+    invoice_receipt: 'invoiceReceipts/insert',
+    receipt: 'receipts/insert'
+  }[type];
+}
+
+function moloniPaymentMethodId(settings, method) {
+  const normalized = String(method || '').trim().toLowerCase();
+  const mappings = settings.paymentMethods || {};
+  return Number(mappings[normalized] || mappings.outro || settings.defaultPaymentMethodId || 0);
+}
+
+function moloniSalesPayload(preview, config, status) {
+  const settings = config.settings || {};
+  const documentSetId = preview.type === 'invoice'
+    ? settings.invoiceDocumentSetId
+    : settings.invoiceReceiptDocumentSetId;
+  const products = preview.products.map(product => ({
+    product_id: Number(settings.defaultProductId),
+    name: product.name,
+    summary: product.summary,
+    qty: product.qty,
+    price: product.price,
+    order: product.order,
+    taxes: product.vatIncluded && Number(settings.standardTaxId)
+      ? [{ tax_id: Number(settings.standardTaxId), order: 1, cumulative: 0 }]
+      : [],
+    ...(!product.vatIncluded ? { exemption_reason: settings.exemptionReason || 'M99' } : {})
+  }));
+  const payload = {
+    company_id: Number(config.companyId),
+    date: preview.issueDate,
+    expiration_date: preview.issueDate,
+    document_set_id: Number(documentSetId),
+    customer_id: Number(preview.moloniCustomerId),
+    our_reference: preview.reference,
+    your_reference: preview.order.number,
+    products,
+    notes: `Pedido CRM ${preview.order.number}`,
+    status: status === 'closed' ? 1 : 0
+  };
+  if (preview.type === 'invoice_receipt') {
+    payload.payments = preview.payments.map(payment => ({
+      payment_method_id: moloniPaymentMethodId(settings, payment.method),
+      date: payment.date || preview.issueDate,
+      value: payment.value,
+      notes: payment.notes || ''
+    }));
+  }
+  return payload;
+}
+
+function moloniReceiptPayload(preview, config, invoiceDocumentId, status) {
+  const settings = config.settings || {};
+  return {
+    company_id: Number(config.companyId),
+    date: preview.issueDate,
+    document_set_id: Number(settings.receiptDocumentSetId),
+    customer_id: Number(preview.moloniCustomerId),
+    net_value: preview.receiptValue,
+    associated_documents: [{ associated_id: Number(invoiceDocumentId), value: preview.receiptValue }],
+    payments: [{
+      payment_method_id: moloniPaymentMethodId(settings, preview.payment?.method),
+      date: preview.payment?.date || preview.issueDate,
+      value: preview.receiptValue,
+      notes: preview.payment?.notes || ''
+    }],
+    notes: `Pagamento do pedido CRM ${preview.order.number}`,
+    status: status === 'closed' ? 1 : 0
+  };
+}
+
+async function ensureMoloniCustomer(client, preview, config) {
+  const vat = preview.order.vat;
+  if (vat) {
+    const matches = await client.call('customers/getByVat', {
+      company_id: Number(config.companyId),
+      vat
+    }).catch(() => []);
+    const customer = Array.isArray(matches) ? matches[0] : matches;
+    if (customer?.customer_id) return customer.customer_id;
+  }
+  const created = await client.call('customers/insert', {
+    company_id: Number(config.companyId),
+    name: preview.order.company || preview.order.customer,
+    vat: vat || '999999990',
+    address: preview.order.address,
+    city: '',
+    zip_code: '',
+    country_id: 1,
+    phone: preview.order.phone,
+    language_id: 1,
+    maturity_date_id: 0,
+    payment_method_id: Number(config.settings?.defaultPaymentMethodId || 0)
+  });
+  return created.customer_id;
 }
 
 function hash(value) {
@@ -1408,9 +1631,298 @@ app.post('/api/importacao-fiscal/receber', async (req, res) => {
   }
 });
 
+app.get('/api/moloni/oauth/callback', async (req, res) => {
+  try {
+    const state = verifyMoloniState(req.query.state);
+    if (!state || !req.query.code) return res.status(400).send('Autorizacao Moloni invalida ou expirada.');
+    if (!MOLONI_CLIENT_ID || !MOLONI_CLIENT_SECRET || !MOLONI_REDIRECT_URI) {
+      return res.status(503).send('Credenciais Moloni nao configuradas no servidor.');
+    }
+    const granted = await exchangeMoloniGrant({
+      grant_type: 'authorization_code',
+      client_id: MOLONI_CLIENT_ID,
+      redirect_uri: MOLONI_REDIRECT_URI,
+      client_secret: MOLONI_CLIENT_SECRET,
+      code: String(req.query.code)
+    });
+    const tokens = {
+      ...granted,
+      expires_at: Date.now() + Number(granted.expires_in || 3600) * 1000
+    };
+    await saveMoloniConfig({
+      tokens: encryptMoloniTokens(tokens),
+      connectedAt: new Date().toISOString()
+    });
+    res.redirect('/pages/faturacao.html?moloni=connected');
+  } catch (error) {
+    console.error('Erro no callback Moloni:', error);
+    res.status(502).send('Nao foi possivel concluir a ligacao ao Moloni.');
+  }
+});
+
 app.use(requireAuth);
 
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+
+app.get('/api/moloni/status', async (req, res) => {
+  try {
+    res.json({ success: true, ...moloniPublicStatus(await moloniConfig()) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Nao foi possivel consultar a configuracao Moloni.' });
+  }
+});
+
+app.get('/api/moloni/oauth/start', async (req, res) => {
+  if (!MOLONI_CLIENT_ID || !MOLONI_CLIENT_SECRET || !MOLONI_REDIRECT_URI) {
+    return res.status(503).json({
+      success: false,
+      message: 'Configure MOLONI_CLIENT_ID, MOLONI_CLIENT_SECRET e MOLONI_REDIRECT_URI.'
+    });
+  }
+  const state = signMoloniState({ createdAt: Date.now(), nonce: crypto.randomBytes(12).toString('hex') });
+  res.json({
+    success: true,
+    authorizationUrl: oauthAuthorizationUrl({
+      clientId: MOLONI_CLIENT_ID,
+      redirectUri: MOLONI_REDIRECT_URI,
+      state
+    })
+  });
+});
+
+app.post('/api/moloni/disconnect', async (req, res) => {
+  await saveMoloniConfig({ tokens: null, connectedAt: null });
+  res.json({ success: true });
+});
+
+app.post('/api/moloni/settings', async (req, res) => {
+  try {
+    const settings = req.body?.settings || {};
+    const normalized = {
+      invoiceDocumentSetId: Number(settings.invoiceDocumentSetId || 0),
+      invoiceReceiptDocumentSetId: Number(settings.invoiceReceiptDocumentSetId || 0),
+      receiptDocumentSetId: Number(settings.receiptDocumentSetId || 0),
+      defaultProductId: Number(settings.defaultProductId || 0),
+      standardTaxId: Number(settings.standardTaxId || 0),
+      defaultPaymentMethodId: Number(settings.defaultPaymentMethodId || 0),
+      exemptionReason: text(settings.exemptionReason || 'M99', 20),
+      paymentMethods: Object.fromEntries(
+        Object.entries(settings.paymentMethods || {}).map(([key, value]) => [text(key, 80).toLowerCase(), Number(value || 0)])
+      )
+    };
+    const companyId = Number(req.body?.companyId || 0);
+    if (MOLONI_MODE === 'live' && !(companyId > 0)) {
+      return res.status(400).json({ success: false, message: 'Selecione a empresa Moloni.' });
+    }
+    const config = await saveMoloniConfig({ companyId, settings: normalized });
+    res.json({ success: true, ...moloniPublicStatus(config) });
+  } catch (error) {
+    res.status(400).json({ success: false, message: 'Configuracao Moloni invalida.' });
+  }
+});
+
+app.get('/api/moloni/options', async (req, res) => {
+  try {
+    if (MOLONI_MODE !== 'live') {
+      return res.json({
+        success: true,
+        mock: true,
+        companies: [{ company_id: 1, name: 'Empresa de teste Moloni' }],
+        documentSets: [
+          { document_set_id: 101, name: 'FT Teste', document_type: 'invoice' },
+          { document_set_id: 102, name: 'FR Teste', document_type: 'invoice_receipt' },
+          { document_set_id: 103, name: 'RC Teste', document_type: 'receipt' }
+        ],
+        taxes: [{ tax_id: 23, name: 'IVA 23%' }],
+        paymentMethods: [{ payment_method_id: 1, name: 'Transferencia / teste' }],
+        products: [{ product_id: 1, name: 'Servico PrintPixel / teste' }]
+      });
+    }
+    const accessToken = await moloniAccessToken();
+    const client = new MoloniClient({ accessToken });
+    const config = await moloniConfig();
+    const companies = await client.call('companies/getAll');
+    const companyId = Number(config.companyId || companies?.[0]?.company_id || 0);
+    const common = { company_id: companyId, qty: 50, offset: 0 };
+    const [documentSets, taxes, paymentMethods, products] = await Promise.all([
+      client.call('documentSets/getAll', common),
+      client.call('taxes/getAll', common),
+      client.call('paymentMethods/getAll', common),
+      client.call('products/getAll', common)
+    ]);
+    res.json({ success: true, companies, documentSets, taxes, paymentMethods, products });
+  } catch (error) {
+    res.status(502).json({ success: false, message: error.message || 'Falha ao sincronizar opcoes do Moloni.' });
+  }
+});
+
+app.get('/api/moloni/documents', async (req, res) => {
+  try {
+    const documents = await moloniDocuments();
+    const orderId = text(req.query.orderId, 160);
+    res.json({
+      success: true,
+      documents: (orderId ? documents.filter(document => document.orderId === orderId) : documents).map(sanitizeForResponse)
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Nao foi possivel carregar os documentos fiscais.' });
+  }
+});
+
+app.post('/api/moloni/documents/preview', async (req, res) => {
+  try {
+    const order = await moloniOrder(req.body?.orderId);
+    if (!order) return res.status(404).json({ success: false, message: 'Pedido nao encontrado.' });
+    const preview = buildDocumentPreview({
+      order,
+      type: req.body?.type,
+      paymentId: req.body?.paymentId,
+      amount: req.body?.amount,
+      issueDate: req.body?.issueDate
+    });
+    const documents = await moloniDocuments();
+    if (preview.type === 'receipt') {
+      const invoice = documents.find(document =>
+        document.orderId === order.id && document.type === 'invoice' && document.state !== 'error'
+      );
+      if (!invoice) preview.errors.push('Emita primeiro a fatura deste pedido.');
+      const receipted = documents
+        .filter(document => document.orderId === order.id && document.type === 'receipt' && document.state !== 'error')
+        .reduce((sum, document) => sum + moloniMoney(document.value), 0);
+      if (preview.receiptValue > Math.max(0, preview.totals.total - receipted)) {
+        preview.errors.push('O recibo ultrapassa o saldo ainda nao conciliado.');
+      }
+      preview.valid = preview.errors.length === 0;
+      preview.invoiceDocumentId = invoice?.moloniDocumentId || '';
+    }
+    res.json({ success: true, preview: sanitizeForResponse(preview) });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message || 'Nao foi possivel preparar o documento.' });
+  }
+});
+
+app.post('/api/moloni/documents', async (req, res) => {
+  let documentRef;
+  try {
+    const order = await moloniOrder(req.body?.orderId);
+    if (!order) return res.status(404).json({ success: false, message: 'Pedido nao encontrado.' });
+    const status = req.body?.status === 'closed' ? 'closed' : 'draft';
+    const preview = buildDocumentPreview({
+      order,
+      type: req.body?.type,
+      paymentId: req.body?.paymentId,
+      amount: req.body?.amount,
+      issueDate: req.body?.issueDate
+    });
+    const documents = await moloniDocuments();
+    let invoice = null;
+    if (preview.type === 'receipt') {
+      invoice = documents.find(document =>
+        document.orderId === order.id && document.type === 'invoice' && document.state !== 'error'
+      );
+      if (!invoice) preview.errors.push('Emita primeiro a fatura deste pedido.');
+      const receipted = documents
+        .filter(document => document.orderId === order.id && document.type === 'receipt' && document.state !== 'error')
+        .reduce((sum, document) => sum + moloniMoney(document.value), 0);
+      if (preview.receiptValue > Math.max(0, preview.totals.total - receipted)) {
+        preview.errors.push('O recibo ultrapassa o saldo ainda nao conciliado.');
+      }
+    } else {
+      const existingSale = documents.find(document =>
+        document.orderId === order.id
+        && ['invoice', 'invoice_receipt'].includes(document.type)
+        && document.state !== 'error'
+      );
+      if (existingSale) preview.errors.push(`O pedido ja possui ${existingSale.label || 'um documento de venda'}.`);
+    }
+    if (preview.errors.length) {
+      return res.status(400).json({ success: false, message: preview.errors.join(' '), errors: preview.errors });
+    }
+
+    const id = crypto.createHash('sha256').update(preview.idempotencyKey).digest('hex').slice(0, 32);
+    documentRef = db.collection('moloni_documents').doc(id);
+    const existing = await documentRef.get();
+    if (existing.exists && existing.data()?.state !== 'error') {
+      return res.status(409).json({ success: false, message: 'Este documento ja foi criado.', document: existing.data() });
+    }
+
+    const pending = {
+      orderId: order.id,
+      orderNumber: order.numero || '',
+      customer: order.cliente || '',
+      type: preview.type,
+      label: preview.label,
+      requestedStatus: status,
+      state: 'processing',
+      value: preview.type === 'receipt' ? preview.receiptValue : preview.totals.total,
+      paymentId: preview.payment?.id || '',
+      mode: MOLONI_MODE,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    await documentRef.set(pending);
+
+    let result;
+    if (MOLONI_MODE === 'mock') {
+      result = {
+        valid: 1,
+        document_id: `MOCK-${Date.now()}`,
+        document_number: `${preview.label.toUpperCase().replace(/[^A-Z]/g, '')}-TESTE-${String(Date.now()).slice(-6)}`
+      };
+    } else {
+      const config = await moloniConfig();
+      if (!config.companyId) throw new Error('Configure a empresa e as series Moloni antes de emitir.');
+      const client = new MoloniClient({ accessToken: await moloniAccessToken() });
+      preview.moloniCustomerId = await ensureMoloniCustomer(client, preview, config);
+      const payload = preview.type === 'receipt'
+        ? moloniReceiptPayload(preview, config, invoice.moloniDocumentId, status)
+        : moloniSalesPayload(preview, config, status);
+      result = await client.call(moloniEndpointFor(preview.type), payload);
+    }
+
+    const completed = {
+      ...pending,
+      state: status,
+      moloniDocumentId: result.document_id,
+      number: result.document_number || '',
+      response: result,
+      updatedAt: new Date().toISOString()
+    };
+    await documentRef.set(completed);
+    res.status(201).json({ success: true, document: sanitizeForResponse({ id, ...completed }) });
+  } catch (error) {
+    console.error('Erro ao emitir documento Moloni:', error);
+    if (documentRef) {
+      await documentRef.set({
+        state: 'error',
+        error: text(error.message, 500),
+        updatedAt: new Date().toISOString()
+      }, { merge: true }).catch(() => {});
+    }
+    res.status(502).json({ success: false, message: error.message || 'Nao foi possivel emitir o documento.' });
+  }
+});
+
+app.get('/api/moloni/documents/:id/pdf', async (req, res) => {
+  try {
+    const snapshot = await db.collection('moloni_documents').doc(String(req.params.id || '')).get();
+    if (!snapshot.exists) return res.status(404).json({ success: false, message: 'Documento nao encontrado.' });
+    const document = snapshot.data();
+    if (document.mode === 'mock') {
+      return res.status(409).json({ success: false, message: 'Documentos de teste nao possuem PDF fiscal.' });
+    }
+    const config = await moloniConfig();
+    const client = new MoloniClient({ accessToken: await moloniAccessToken() });
+    const result = await client.call('documents/getPDFLink', {
+      company_id: Number(config.companyId),
+      document_id: Number(document.moloniDocumentId),
+      signed: 1
+    });
+    res.json({ success: true, url: result.url || result.link || result });
+  } catch (error) {
+    res.status(502).json({ success: false, message: error.message || 'Nao foi possivel obter o PDF.' });
+  }
+});
 
 async function productionWorkers() {
   const snapshot = await db.collection('production_workers').get();

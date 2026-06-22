@@ -120,6 +120,16 @@
     },
 
     {
+        id: "nav_faturacao",
+        name: "Faturação",
+        file: "pages/faturacao.html",
+        type: "WRITE",
+        pos: 8.2,
+        hidden: false,
+        deleted: false
+    },
+
+    {
         id: "nav_gestao",
         name: "Gestão",
         file: "pages/painel-financeiro.html",

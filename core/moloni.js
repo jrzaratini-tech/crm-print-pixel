@@ -1,0 +1,202 @@
+'use strict';
+
+const MOLONI_API_BASE = 'https://api.moloni.pt/v1';
+const MOLONI_OAUTH_URL = 'https://www.moloni.pt/ac/root/oauth/';
+
+function roundMoney(value) {
+  const parsed = Number.parseFloat(String(value || 0).replace(',', '.'));
+  return Number.isFinite(parsed) ? Math.round(parsed * 100) / 100 : 0;
+}
+
+function cleanText(value, maxLength = 255) {
+  return String(value || '').trim().slice(0, maxLength);
+}
+
+function normalizeDocumentType(value) {
+  const type = cleanText(value, 40);
+  if (!['invoice', 'invoice_receipt', 'receipt'].includes(type)) {
+    throw new Error('Tipo de documento Moloni invalido.');
+  }
+  return type;
+}
+
+function paidPayments(order = {}) {
+  return (Array.isArray(order.pagamentos) ? order.pagamentos : [])
+    .filter(payment => payment && payment.status === 'pago')
+    .map((payment, index) => ({
+      id: cleanText(payment.id || `payment-${index + 1}`, 120),
+      type: cleanText(payment.tipo || 'pagamento', 40),
+      date: cleanText(payment.data || payment.date || new Date().toISOString().slice(0, 10), 10),
+      value: roundMoney(payment.valor),
+      method: cleanText(payment.formaPagamento || 'outro', 80),
+      notes: cleanText(payment.observacoes, 300)
+    }))
+    .filter(payment => payment.value > 0);
+}
+
+function orderTotals(order = {}) {
+  const total = roundMoney(order.total);
+  const paid = roundMoney(paidPayments(order).reduce((sum, payment) => sum + payment.value, 0));
+  return {
+    total,
+    paid,
+    outstanding: Math.max(0, roundMoney(total - paid))
+  };
+}
+
+function selectPayment(order, paymentId) {
+  const payments = paidPayments(order);
+  if (!paymentId) return payments[payments.length - 1] || null;
+  return payments.find(payment => payment.id === paymentId) || null;
+}
+
+function validateFiscalOrder(order = {}) {
+  const errors = [];
+  if (!cleanText(order.cliente)) errors.push('Nome do cliente em falta.');
+  const nif = cleanText(order.nif).replace(/\D/g, '');
+  if (nif && !/^\d{9}$/.test(nif)) errors.push('O NIF deve ter 9 digitos.');
+  if (!Array.isArray(order.produtos) || !order.produtos.length) errors.push('O pedido nao tem produtos.');
+  if (!(roundMoney(order.total) > 0)) errors.push('O total do pedido deve ser superior a zero.');
+  return errors;
+}
+
+function documentLabel(type) {
+  return {
+    invoice: 'Fatura',
+    invoice_receipt: 'Fatura-Recibo',
+    receipt: 'Recibo'
+  }[type] || type;
+}
+
+function buildDocumentPreview({ order, type, paymentId, amount, issueDate }) {
+  const documentType = normalizeDocumentType(type);
+  const errors = validateFiscalOrder(order);
+  const totals = orderTotals(order);
+  const payments = paidPayments(order);
+  const payment = selectPayment(order, paymentId);
+  const requestedAmount = roundMoney(amount);
+  const date = cleanText(issueDate || new Date().toISOString().slice(0, 10), 10);
+
+  if (documentType === 'receipt' && !payment && !(requestedAmount > 0)) {
+    errors.push('Selecione um pagamento ou indique o valor do recibo.');
+  }
+  if (documentType === 'invoice_receipt' && totals.paid < totals.total) {
+    errors.push('A Fatura-Recibo exige que o pedido esteja totalmente pago.');
+  }
+  if (documentType === 'invoice_receipt' && totals.paid > totals.total) {
+    errors.push('Os pagamentos registados ultrapassam o total do pedido.');
+  }
+
+  const receiptValue = documentType === 'receipt'
+    ? Math.min(totals.total, requestedAmount || payment?.value || 0)
+    : documentType === 'invoice_receipt' ? totals.total : 0;
+
+  const products = (Array.isArray(order.produtos) ? order.produtos : []).map((product, index) => ({
+    order: index + 1,
+    name: cleanText(product.nome || 'Produto', 160),
+    summary: cleanText([product.tamanho, product.observacoes].filter(Boolean).join(' - '), 250),
+    qty: Math.max(0.01, roundMoney(product.quantidade || 1)),
+    price: roundMoney(product.valor),
+    vatIncluded: product.comIVA !== 'nao'
+  }));
+
+  const installation = roundMoney(order.instalacao);
+  if (installation > 0) {
+    products.push({
+      order: products.length + 1,
+      name: 'Instalacao / deslocacao',
+      summary: '',
+      qty: 1,
+      price: installation,
+      vatIncluded: order.comIVA !== 'nao'
+    });
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    type: documentType,
+    label: documentLabel(documentType),
+    issueDate: date,
+    order: {
+      id: cleanText(order.id, 160),
+      number: cleanText(order.numero, 80),
+      customer: cleanText(order.cliente, 160),
+      company: cleanText(order.empresa, 160),
+      vat: cleanText(order.nif).replace(/\D/g, ''),
+      address: cleanText(order.morada, 250),
+      phone: cleanText(order.telemovel, 50)
+    },
+    products,
+    totals,
+    payments,
+    payment,
+    receiptValue,
+    reference: `CRM-${cleanText(order.numero || order.id, 80)}`,
+    idempotencyKey: [
+      cleanText(order.id, 160),
+      documentType,
+      documentType === 'receipt' ? cleanText(payment?.id || receiptValue, 120) : 'sale'
+    ].join(':')
+  };
+}
+
+function flattenForm(value, prefix = '', output = new URLSearchParams()) {
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => flattenForm(item, `${prefix}[${index}]`, output));
+  } else if (value && typeof value === 'object') {
+    Object.entries(value).forEach(([key, nested]) => {
+      flattenForm(nested, prefix ? `${prefix}[${key}]` : key, output);
+    });
+  } else if (value !== undefined && value !== null) {
+    output.append(prefix, String(value));
+  }
+  return output;
+}
+
+function oauthAuthorizationUrl({ clientId, redirectUri, state }) {
+  const url = new URL(MOLONI_OAUTH_URL);
+  url.searchParams.set('response_type', 'code');
+  url.searchParams.set('client_id', clientId);
+  url.searchParams.set('redirect_uri', redirectUri);
+  url.searchParams.set('state', state);
+  return url.toString();
+}
+
+class MoloniClient {
+  constructor({ accessToken, fetchImpl = fetch }) {
+    this.accessToken = accessToken;
+    this.fetchImpl = fetchImpl;
+  }
+
+  async call(endpoint, payload = {}) {
+    const url = new URL(`${MOLONI_API_BASE}/${endpoint.replace(/^\/+/, '')}/`);
+    url.searchParams.set('access_token', this.accessToken);
+    const response = await this.fetchImpl(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: flattenForm(payload)
+    });
+    const body = await response.json().catch(() => ({}));
+    if (!response.ok || body?.error || body?.valid === 0) {
+      const error = new Error(body?.error_description || body?.message || 'Erro devolvido pela API Moloni.');
+      error.status = response.status;
+      error.details = body;
+      throw error;
+    }
+    return body;
+  }
+}
+
+module.exports = {
+  MOLONI_API_BASE,
+  MoloniClient,
+  buildDocumentPreview,
+  cleanText,
+  documentLabel,
+  flattenForm,
+  oauthAuthorizationUrl,
+  orderTotals,
+  paidPayments,
+  roundMoney
+};

@@ -90,6 +90,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   const calculatorPageResult = await request('/pages/calculadora.html');
   const productsPageResult = await request('/pages/produtos.html');
   const ordersPageResult = await request('/pages/pedidos.html');
+  const billingPageResult = await request('/pages/faturacao.html');
   const dashboardPageResult = await request('/pages/dashboard.html');
   const scanPageResult = await request('/scan-fatura.html');
   const mobilePageResult = await request('/mobile/');
@@ -118,6 +119,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.equal(calculatorPageResult.response.status, 200);
   assert.equal(productsPageResult.response.status, 200);
   assert.equal(ordersPageResult.response.status, 200);
+  assert.equal(billingPageResult.response.status, 200);
   assert.equal(dashboardPageResult.response.status, 200);
   assert.equal(scanPageResult.response.status, 200);
   assert.equal(mobilePageResult.response.status, 200);
@@ -140,6 +142,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(managementModuleResult.body, /painelGestao/);
   assert.match(menuResult.body, /nav_calculadora/);
   assert.match(menuResult.body, /nav_produtos/);
+  assert.match(menuResult.body, /nav_faturacao/);
   assert.match(menuResult.body, /pages\/calculadora\.html/);
   assert.match(menuResult.body, /pages\/produtos\.html/);
   assert.match(pageResult.body, /Cadastro de Materiais/);
@@ -162,6 +165,10 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(orderFormPageResult.body, /item-iva-select/);
   assert.match(orderFormPageResult.body, /buyerSellerId/);
   assert.match(ordersPageResult.body, /excluirPedido/);
+  assert.match(ordersPageResult.body, /faturacao\.html\?orderId=/);
+  assert.match(billingPageResult.body, /Faturação Moloni/);
+  assert.match(billingPageResult.body, /api\/moloni\/documents\/preview/);
+  assert.match(billingPageResult.body, /Modo de teste/);
   assert.match(ordersPageResult.body, /hardDelete: true/);
   assert.match(expensesPageResult.body, /excluirDespesa/);
   assert.match(expensesPageResult.body, /hardDelete: true/);
@@ -623,6 +630,68 @@ test('ativa celular e lanca compra manual automaticamente', async () => {
   assert.ok(inbox.body.documents.some(item => item.numeroFatura === 'FT MOBILE/1' && item.status === 'approved'));
   const saved = await post('/api/database/query', { schema: 'despesa', filters: { id: sent.body.eventId } });
   assert.equal(saved.body.events[0].payload.valorBruto, 200);
+});
+
+test('executa faturacao Moloni simulada com validacao e bloqueio de duplicados', async () => {
+  const createdOrder = await post('/api/database/commit', {
+    schema: 'pedido',
+    pageId: 'test-moloni',
+    payload: {
+      numero: 'PED-MOLONI-1',
+      cliente: 'Cliente Fiscal',
+      empresa: 'Cliente Fiscal Lda',
+      nif: '123456789',
+      total: 123,
+      produtos: [{ nome: 'Letreiro teste', quantidade: 1, valor: 123, comIVA: 'sim' }],
+      pagamentos: [{ id: 'pag-moloni-1', status: 'pago', valor: 50, data: '2026-06-22', formaPagamento: 'transferencia' }]
+    }
+  });
+  assert.equal(createdOrder.response.status, 200);
+
+  const status = await request('/api/moloni/status');
+  assert.equal(status.response.status, 200);
+  assert.equal(status.body.mode, 'mock');
+
+  const preview = await post('/api/moloni/documents/preview', {
+    orderId: createdOrder.body.id,
+    type: 'invoice',
+    issueDate: '2026-06-22'
+  });
+  assert.equal(preview.response.status, 200);
+  assert.equal(preview.body.preview.valid, true);
+
+  const invoice = await post('/api/moloni/documents', {
+    orderId: createdOrder.body.id,
+    type: 'invoice',
+    issueDate: '2026-06-22',
+    status: 'draft'
+  });
+  assert.equal(invoice.response.status, 201);
+  assert.equal(invoice.body.document.mode, 'mock');
+  assert.equal(invoice.body.document.state, 'draft');
+
+  const duplicate = await post('/api/moloni/documents', {
+    orderId: createdOrder.body.id,
+    type: 'invoice',
+    issueDate: '2026-06-22',
+    status: 'draft'
+  });
+  assert.equal(duplicate.response.status, 400);
+  assert.match(duplicate.body.message, /ja possui/);
+
+  const receipt = await post('/api/moloni/documents', {
+    orderId: createdOrder.body.id,
+    type: 'receipt',
+    paymentId: 'pag-moloni-1',
+    issueDate: '2026-06-22',
+    status: 'closed'
+  });
+  assert.equal(receipt.response.status, 201);
+  assert.equal(receipt.body.document.value, 50);
+
+  const listed = await request(`/api/moloni/documents?orderId=${createdOrder.body.id}`);
+  assert.equal(listed.response.status, 200);
+  assert.equal(listed.body.documents.length, 2);
 });
 
 test('modo salario ignora NIF e IVA da nota e registra somente o valor', async () => {

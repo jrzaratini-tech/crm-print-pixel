@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Faturação Moloni</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --success: #059669;
+      --warning: #d97706;
+      --danger: #dc2626;
+      --ink: #172033;
+      --muted: #65718a;
+      --line: #dfe5ef;
+      --surface: #fff;
+      --background: #f4f7fb;
+      --radius: 14px;
+      --shadow: 0 12px 35px rgba(31, 46, 85, .09);
+    }
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { margin: 0; padding: 28px; background: var(--background); color: var(--ink); font: 14px/1.5 Inter, system-ui, sans-serif; }
+    button, input, select { font: inherit; }
+    .page { max-width: 1450px; margin: auto; }
+    .hero { display: flex; justify-content: space-between; gap: 24px; align-items: center; margin-bottom: 22px; }
+    h1, h2, h3, p { margin-top: 0; }
+    h1 { margin-bottom: 5px; font-size: 30px; }
+    .muted { color: var(--muted); }
+    .badge { display: inline-flex; align-items: center; gap: 7px; padding: 7px 11px; border-radius: 999px; font-weight: 700; font-size: 12px; }
+    .badge.mock { background: #fff7ed; color: #9a3412; }
+    .badge.live { background: #ecfdf5; color: #047857; }
+    .badge.error { background: #fef2f2; color: #b91c1c; }
+    .toolbar, .card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+    .toolbar { padding: 14px; display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+    .btn { border: 0; border-radius: 10px; padding: 10px 14px; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
+    .btn.primary { background: var(--primary); color: white; }
+    .btn.primary:hover { background: var(--primary-dark); }
+    .btn.secondary { background: #eef2ff; color: #3730a3; }
+    .btn.neutral { background: #eef2f7; color: #344054; }
+    .btn.danger { background: #fef2f2; color: var(--danger); }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+    .layout { display: grid; grid-template-columns: minmax(310px, .85fr) minmax(460px, 1.25fr); gap: 20px; align-items: start; }
+    .card { padding: 20px; margin-bottom: 20px; }
+    .card-title { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 16px; }
+    .card-title h2 { font-size: 18px; margin: 0; }
+    .field { margin-bottom: 14px; }
+    label { display: block; font-weight: 700; margin-bottom: 6px; }
+    input, select { width: 100%; border: 1px solid #cfd7e5; border-radius: 9px; padding: 10px 11px; background: white; color: var(--ink); }
+    input:focus, select:focus { outline: 3px solid rgba(37, 99, 235, .12); border-color: var(--primary); }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .order-list { display: grid; gap: 9px; max-height: 610px; overflow: auto; padding-right: 4px; }
+    .order { border: 1px solid var(--line); border-radius: 11px; padding: 13px; cursor: pointer; background: #fff; }
+    .order:hover, .order.active { border-color: #80a5ff; background: #f5f8ff; }
+    .order-top, .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .order strong { font-size: 15px; }
+    .money { font-weight: 800; white-space: nowrap; }
+    .tiny { font-size: 12px; color: var(--muted); }
+    .summary { border: 1px solid var(--line); border-radius: 11px; overflow: hidden; margin-bottom: 16px; }
+    .summary .row { padding: 10px 12px; border-bottom: 1px solid var(--line); }
+    .summary .row:last-child { border-bottom: 0; background: #f8fafc; }
+    .summary .total { font-size: 17px; font-weight: 800; }
+    .notice { padding: 12px 14px; border-radius: 10px; margin: 12px 0; }
+    .notice.info { background: #eff6ff; color: #1e40af; }
+    .notice.warning { background: #fff7ed; color: #9a3412; }
+    .notice.success { background: #ecfdf5; color: #047857; }
+    .notice.error { background: #fef2f2; color: #b91c1c; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 11px 9px; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+    .status { font-size: 11px; text-transform: uppercase; font-weight: 800; padding: 4px 7px; border-radius: 999px; background: #eef2f7; }
+    .status.closed { background: #dcfce7; color: #166534; }
+    .status.draft { background: #e0e7ff; color: #3730a3; }
+    .status.error { background: #fee2e2; color: #991b1b; }
+    dialog { width: min(760px, calc(100% - 32px)); border: 0; border-radius: 16px; padding: 0; box-shadow: 0 30px 80px rgba(15, 23, 42, .3); }
+    dialog::backdrop { background: rgba(15, 23, 42, .55); }
+    .dialog-body { padding: 24px; }
+    .dialog-head { display: flex; justify-content: space-between; gap: 16px; align-items: center; margin-bottom: 16px; }
+    .close { border: 0; background: #eef2f7; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; }
+    .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .full { grid-column: 1 / -1; }
+    .empty { padding: 30px 10px; text-align: center; color: var(--muted); }
+    @media (max-width: 950px) { body { padding: 16px; } .layout { grid-template-columns: 1fr; } .hero { align-items: flex-start; flex-direction: column; } }
+    @media (max-width: 620px) { .two, .settings-grid { grid-template-columns: 1fr; } .full { grid-column: auto; } th:nth-child(3), td:nth-child(3) { display: none; } }
+  </style>
+</head>
+<body data-page-id="faturacao" data-page-type="READ">
+  <main class="page">
+    <header class="hero">
+      <div>
+        <h1><i class="fa-solid fa-file-invoice-dollar"></i> Faturação Moloni</h1>
+        <p class="muted">Emissão fiscal ligada aos pedidos e respetivos pagamentos.</p>
+      </div>
+      <div id="modeBadge" class="badge mock"><i class="fa-solid fa-flask"></i> A verificar...</div>
+    </header>
+
+    <div class="toolbar">
+      <button class="btn secondary" id="connectBtn"><i class="fa-solid fa-link"></i> Ligar Moloni</button>
+      <button class="btn neutral" id="settingsBtn"><i class="fa-solid fa-gear"></i> Configuração</button>
+      <button class="btn neutral" id="refreshBtn"><i class="fa-solid fa-rotate"></i> Atualizar</button>
+      <button class="btn danger" id="disconnectBtn" hidden><i class="fa-solid fa-link-slash"></i> Desligar</button>
+    </div>
+
+    <div id="globalMessage"></div>
+
+    <section class="layout">
+      <div>
+        <article class="card">
+          <div class="card-title">
+            <h2>Pedidos</h2>
+            <span class="tiny" id="orderCount">0</span>
+          </div>
+          <div class="field">
+            <input id="search" type="search" placeholder="Pesquisar cliente, NIF ou pedido">
+          </div>
+          <div class="order-list" id="orderList"><div class="empty">A carregar pedidos...</div></div>
+        </article>
+      </div>
+
+      <div>
+        <article class="card" id="issueCard">
+          <div class="card-title"><h2>Emitir documento</h2></div>
+          <div id="selectedEmpty" class="empty">Selecione um pedido para preparar a faturação.</div>
+          <div id="issueForm" hidden>
+            <div class="row" style="margin-bottom:14px">
+              <div>
+                <strong id="selectedCustomer"></strong>
+                <div class="tiny" id="selectedMeta"></div>
+              </div>
+              <span class="money" id="selectedTotal"></span>
+            </div>
+            <div class="summary" id="orderSummary"></div>
+            <div class="two">
+              <div class="field">
+                <label for="documentType">Documento</label>
+                <select id="documentType">
+                  <option value="invoice">Fatura</option>
+                  <option value="invoice_receipt">Fatura-Recibo</option>
+                  <option value="receipt">Recibo parcial/final</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="issueDate">Data de emissão</label>
+                <input id="issueDate" type="date">
+              </div>
+            </div>
+            <div class="field" id="paymentField" hidden>
+              <label for="paymentId">Pagamento a conciliar</label>
+              <select id="paymentId"></select>
+            </div>
+            <div id="previewBox"></div>
+            <div class="actions">
+              <button class="btn neutral" id="previewBtn"><i class="fa-solid fa-eye"></i> Validar</button>
+              <button class="btn secondary" id="draftBtn"><i class="fa-solid fa-file-circle-plus"></i> Criar rascunho</button>
+              <button class="btn primary" id="closeBtn"><i class="fa-solid fa-stamp"></i> Emitir e fechar</button>
+            </div>
+          </div>
+        </article>
+
+        <article class="card">
+          <div class="card-title">
+            <h2>Documentos emitidos</h2>
+            <span class="tiny" id="documentCount">0</span>
+          </div>
+          <div style="overflow:auto">
+            <table>
+              <thead><tr><th>Documento</th><th>Pedido / cliente</th><th>Valor</th><th>Estado</th><th></th></tr></thead>
+              <tbody id="documentRows"><tr><td colspan="5" class="empty">Sem documentos.</td></tr></tbody>
+            </table>
+          </div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="settingsDialog">
+    <div class="dialog-body">
+      <div class="dialog-head">
+        <div><h2>Configuração Moloni</h2><p class="muted">Os IDs são obtidos da conta quando a API estiver disponível.</p></div>
+        <button class="close" id="closeSettings" aria-label="Fechar">&times;</button>
+      </div>
+      <div class="settings-grid">
+        <div class="field full"><label for="companyId">Empresa</label><select id="companyId"></select></div>
+        <div class="field"><label for="invoiceSet">Série de Faturas</label><select id="invoiceSet"></select></div>
+        <div class="field"><label for="invoiceReceiptSet">Série de Faturas-Recibo</label><select id="invoiceReceiptSet"></select></div>
+        <div class="field"><label for="receiptSet">Série de Recibos</label><select id="receiptSet"></select></div>
+        <div class="field"><label for="defaultProduct">Artigo genérico</label><select id="defaultProduct"></select></div>
+        <div class="field"><label for="standardTax">IVA normal</label><select id="standardTax"></select></div>
+        <div class="field"><label for="defaultPayment">Pagamento predefinido</label><select id="defaultPayment"></select></div>
+        <div class="field full">
+          <label for="paymentMap">Mapeamento de pagamentos</label>
+          <input id="paymentMap" placeholder="multibanco:1, transferência:2, dinheiro:3">
+          <div class="tiny">Use “nome usado no CRM:id Moloni”, separado por vírgulas.</div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn neutral" id="syncOptionsBtn"><i class="fa-solid fa-arrows-rotate"></i> Sincronizar opções</button>
+        <button class="btn primary" id="saveSettingsBtn"><i class="fa-solid fa-floppy-disk"></i> Guardar</button>
+      </div>
+    </div>
+  </dialog>
+
+  <script>
+    (() => {
+      const state = { status: null, orders: [], documents: [], selected: null, preview: null, options: null };
+      const $ = id => document.getElementById(id);
+      const money = value => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(Number(value || 0));
+      const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[char]);
+      const today = new Date().toISOString().slice(0, 10);
+      $('issueDate').value = today;
+
+      async function api(path, options = {}) {
+        const response = await fetch(path, {
+          ...options,
+          headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(body.message || 'O pedido ao servidor falhou.');
+        return body;
+      }
+
+      function message(text, type = 'info') {
+        $('globalMessage').innerHTML = text ? `<div class="notice ${type}">${escapeHtml(text)}</div>` : '';
+      }
+
+      async function loadStatus() {
+        state.status = await api('/api/moloni/status');
+        const mock = state.status.mode === 'mock';
+        $('modeBadge').className = `badge ${mock ? 'mock' : state.status.connected ? 'live' : 'error'}`;
+        $('modeBadge').innerHTML = mock
+          ? '<i class="fa-solid fa-flask"></i> Modo de teste — não emite documentos reais'
+          : state.status.connected
+            ? '<i class="fa-solid fa-circle-check"></i> Moloni ligado'
+            : '<i class="fa-solid fa-triangle-exclamation"></i> Moloni por ligar';
+        $('connectBtn').hidden = mock || state.status.connected;
+        $('disconnectBtn').hidden = !state.status.connected;
+        if (mock) message('Pode testar todo o fluxo. Os documentos criados ficam identificados como MOCK e não chegam à Autoridade Tributária.', 'warning');
+      }
+
+      async function loadOrders() {
+        const result = await api('/api/database/query', {
+          method: 'POST',
+          body: JSON.stringify({ schema: 'pedido', filters: {}, limit: 500 })
+        });
+        state.orders = (result.events || []).map(event => ({ id: event.id, ...(event.payload || {}) }))
+          .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+        renderOrders();
+        const requestedId = new URLSearchParams(location.search).get('orderId');
+        if (requestedId) selectOrder(requestedId);
+      }
+
+      function paidTotal(order) {
+        return (order.pagamentos || []).filter(payment => payment.status === 'pago')
+          .reduce((sum, payment) => sum + Number(payment.valor || 0), 0);
+      }
+
+      function renderOrders() {
+        const query = $('search').value.trim().toLowerCase();
+        const orders = state.orders.filter(order => [order.numero, order.cliente, order.empresa, order.nif]
+          .some(value => String(value || '').toLowerCase().includes(query)));
+        $('orderCount').textContent = `${orders.length} pedidos`;
+        $('orderList').innerHTML = orders.length ? orders.map(order => {
+          const paid = paidTotal(order);
+          return `<div class="order ${state.selected?.id === order.id ? 'active' : ''}" data-order-id="${escapeHtml(order.id)}">
+            <div class="order-top"><strong>${escapeHtml(order.numero || 'Sem número')}</strong><span class="money">${money(order.total)}</span></div>
+            <div>${escapeHtml(order.cliente || 'Cliente não indicado')}</div>
+            <div class="tiny">${escapeHtml(order.nif || 'Sem NIF')} · pago ${money(paid)} · saldo ${money(Math.max(0, Number(order.total || 0) - paid))}</div>
+          </div>`;
+        }).join('') : '<div class="empty">Nenhum pedido encontrado.</div>';
+        $('orderList').querySelectorAll('[data-order-id]').forEach(element => {
+          element.addEventListener('click', () => selectOrder(element.dataset.orderId));
+        });
+      }
+
+      function selectOrder(id) {
+        state.selected = state.orders.find(order => order.id === id) || null;
+        state.preview = null;
+        renderOrders();
+        renderSelected();
+        renderDocuments();
+      }
+
+      function renderSelected() {
+        const order = state.selected;
+        $('selectedEmpty').hidden = Boolean(order);
+        $('issueForm').hidden = !order;
+        if (!order) return;
+        const paid = paidTotal(order);
+        const outstanding = Math.max(0, Number(order.total || 0) - paid);
+        $('selectedCustomer').textContent = order.cliente || 'Cliente sem nome';
+        $('selectedMeta').textContent = `Pedido ${order.numero || '-'} · NIF ${order.nif || 'não indicado'}`;
+        $('selectedTotal').textContent = money(order.total);
+        $('orderSummary').innerHTML = `
+          <div class="row"><span>Total do pedido</span><strong>${money(order.total)}</strong></div>
+          <div class="row"><span>Pagamentos recebidos</span><strong>${money(paid)}</strong></div>
+          <div class="row total"><span>Saldo pendente</span><span>${money(outstanding)}</span></div>`;
+        const payments = (order.pagamentos || []).filter(payment => payment.status === 'pago');
+        $('paymentId').innerHTML = payments.length ? payments.map((payment, index) =>
+          `<option value="${escapeHtml(payment.id || `payment-${index + 1}`)}">${escapeHtml(payment.data || '')} · ${money(payment.valor)} · ${escapeHtml(payment.formaPagamento || 'outro')}</option>`
+        ).join('') : '<option value="">Sem pagamentos registados</option>';
+        updateDocumentFields();
+        $('previewBox').innerHTML = '';
+      }
+
+      function updateDocumentFields() {
+        $('paymentField').hidden = $('documentType').value !== 'receipt';
+      }
+
+      async function previewDocument() {
+        if (!state.selected) return;
+        const result = await api('/api/moloni/documents/preview', {
+          method: 'POST',
+          body: JSON.stringify({
+            orderId: state.selected.id,
+            type: $('documentType').value,
+            paymentId: $('paymentId').value,
+            issueDate: $('issueDate').value
+          })
+        });
+        state.preview = result.preview;
+        const preview = result.preview;
+        $('previewBox').innerHTML = preview.valid
+          ? `<div class="notice success"><strong>${escapeHtml(preview.label)} pronta.</strong> Valor: ${money(preview.type === 'receipt' ? preview.receiptValue : preview.totals.total)}. ${preview.products.length} linha(s).</div>`
+          : `<div class="notice error">${preview.errors.map(escapeHtml).join('<br>')}</div>`;
+        return preview;
+      }
+
+      async function issueDocument(status) {
+        const preview = await previewDocument();
+        if (!preview?.valid) return;
+        if (status === 'closed' && !confirm(`Vai fechar ${preview.label} no valor de ${money(preview.type === 'receipt' ? preview.receiptValue : preview.totals.total)}. Um documento fiscal fechado não pode ser editado. Continuar?`)) return;
+        const button = status === 'closed' ? $('closeBtn') : $('draftBtn');
+        button.disabled = true;
+        try {
+          const result = await api('/api/moloni/documents', {
+            method: 'POST',
+            body: JSON.stringify({
+              orderId: state.selected.id,
+              type: $('documentType').value,
+              paymentId: $('paymentId').value,
+              issueDate: $('issueDate').value,
+              status
+            })
+          });
+          message(`${result.document.label} criada com sucesso em ${result.document.mode === 'mock' ? 'modo de teste' : 'Moloni'}.`, 'success');
+          await loadDocuments();
+        } catch (error) {
+          message(error.message, 'error');
+        } finally {
+          button.disabled = false;
+        }
+      }
+
+      async function loadDocuments() {
+        state.documents = (await api('/api/moloni/documents')).documents || [];
+        renderDocuments();
+      }
+
+      function renderDocuments() {
+        const selectedId = state.selected?.id;
+        const documents = selectedId ? state.documents.filter(document => document.orderId === selectedId) : state.documents;
+        $('documentCount').textContent = `${documents.length} documentos`;
+        $('documentRows').innerHTML = documents.length ? documents.map(document => `
+          <tr>
+            <td><strong>${escapeHtml(document.number || document.label)}</strong><div class="tiny">${escapeHtml(document.label)} · ${escapeHtml(document.mode)}</div></td>
+            <td>${escapeHtml(document.orderNumber || '-')}<div class="tiny">${escapeHtml(document.customer || '')}</div></td>
+            <td class="money">${money(document.value)}</td>
+            <td><span class="status ${escapeHtml(document.state)}">${escapeHtml(document.state)}</span></td>
+            <td>${document.mode === 'live' && document.state === 'closed' ? `<button class="btn neutral pdf-btn" data-id="${escapeHtml(document.id)}"><i class="fa-solid fa-file-pdf"></i></button>` : ''}</td>
+          </tr>`).join('') : '<tr><td colspan="5" class="empty">Sem documentos para mostrar.</td></tr>';
+        $('documentRows').querySelectorAll('.pdf-btn').forEach(button => button.addEventListener('click', () => openPdf(button.dataset.id)));
+      }
+
+      async function openPdf(id) {
+        try {
+          const result = await api(`/api/moloni/documents/${encodeURIComponent(id)}/pdf`);
+          window.open(result.url, '_blank', 'noopener');
+        } catch (error) { message(error.message, 'error'); }
+      }
+
+      function selectOptions(element, items, valueKey, labelKey, selected) {
+        element.innerHTML = '<option value="">Selecione...</option>' + (items || []).map(item =>
+          `<option value="${escapeHtml(item[valueKey])}" ${String(item[valueKey]) === String(selected || '') ? 'selected' : ''}>${escapeHtml(item[labelKey] || item.name || item[valueKey])}</option>`
+        ).join('');
+      }
+
+      function paymentMapToText(map = {}) {
+        return Object.entries(map).map(([name, id]) => `${name}:${id}`).join(', ');
+      }
+
+      function parsePaymentMap(value) {
+        return Object.fromEntries(String(value || '').split(',').map(part => part.trim()).filter(Boolean).map(part => {
+          const separator = part.lastIndexOf(':');
+          return [part.slice(0, separator).trim().toLowerCase(), Number(part.slice(separator + 1))];
+        }).filter(([name, id]) => name && id > 0));
+      }
+
+      async function syncOptions() {
+        state.options = await api('/api/moloni/options');
+        const settings = state.status?.settings || {};
+        selectOptions($('companyId'), state.options.companies, 'company_id', 'name', state.status?.companyId);
+        selectOptions($('invoiceSet'), state.options.documentSets, 'document_set_id', 'name', settings.invoiceDocumentSetId);
+        selectOptions($('invoiceReceiptSet'), state.options.documentSets, 'document_set_id', 'name', settings.invoiceReceiptDocumentSetId);
+        selectOptions($('receiptSet'), state.options.documentSets, 'document_set_id', 'name', settings.receiptDocumentSetId);
+        selectOptions($('defaultProduct'), state.options.products, 'product_id', 'name', settings.defaultProductId);
+        selectOptions($('standardTax'), state.options.taxes, 'tax_id', 'name', settings.standardTaxId);
+        selectOptions($('defaultPayment'), state.options.paymentMethods, 'payment_method_id', 'name', settings.defaultPaymentMethodId);
+        $('paymentMap').value = paymentMapToText(settings.paymentMethods);
+      }
+
+      async function openSettings() {
+        $('settingsDialog').showModal();
+        try { await syncOptions(); } catch (error) { message(error.message, 'error'); }
+      }
+
+      async function saveSettings() {
+        const body = {
+          companyId: Number($('companyId').value || 0),
+          settings: {
+            invoiceDocumentSetId: Number($('invoiceSet').value || 0),
+            invoiceReceiptDocumentSetId: Number($('invoiceReceiptSet').value || 0),
+            receiptDocumentSetId: Number($('receiptSet').value || 0),
+            defaultProductId: Number($('defaultProduct').value || 0),
+            standardTaxId: Number($('standardTax').value || 0),
+            defaultPaymentMethodId: Number($('defaultPayment').value || 0),
+            exemptionReason: 'M99',
+            paymentMethods: parsePaymentMap($('paymentMap').value)
+          }
+        };
+        state.status = await api('/api/moloni/settings', { method: 'POST', body: JSON.stringify(body) });
+        $('settingsDialog').close();
+        message('Configuração Moloni guardada.', 'success');
+        await loadStatus();
+      }
+
+      async function connect() {
+        try {
+          const result = await api('/api/moloni/oauth/start');
+          window.top.location.href = result.authorizationUrl;
+        } catch (error) { message(error.message, 'error'); }
+      }
+
+      async function disconnect() {
+        if (!confirm('Desligar a conta Moloni deste CRM? Os documentos já emitidos não serão apagados.')) return;
+        await api('/api/moloni/disconnect', { method: 'POST', body: '{}' });
+        await loadStatus();
+      }
+
+      async function refresh() {
+        message('');
+        await Promise.all([loadStatus(), loadOrders(), loadDocuments()]);
+      }
+
+      $('search').addEventListener('input', renderOrders);
+      $('documentType').addEventListener('change', () => { updateDocumentFields(); $('previewBox').innerHTML = ''; });
+      $('paymentId').addEventListener('change', () => $('previewBox').innerHTML = '');
+      $('previewBtn').addEventListener('click', () => previewDocument().catch(error => message(error.message, 'error')));
+      $('draftBtn').addEventListener('click', () => issueDocument('draft'));
+      $('closeBtn').addEventListener('click', () => issueDocument('closed'));
+      $('settingsBtn').addEventListener('click', openSettings);
+      $('closeSettings').addEventListener('click', () => $('settingsDialog').close());
+      $('syncOptionsBtn').addEventListener('click', () => syncOptions().catch(error => message(error.message, 'error')));
+      $('saveSettingsBtn').addEventListener('click', () => saveSettings().catch(error => message(error.message, 'error')));
+      $('connectBtn').addEventListener('click', connect);
+      $('disconnectBtn').addEventListener('click', () => disconnect().catch(error => message(error.message, 'error')));
+      $('refreshBtn').addEventListener('click', () => refresh().catch(error => message(error.message, 'error')));
+
+      refresh().catch(error => message(error.message, 'error'));
+    })();
+  </script>
+</body>
+</html>
