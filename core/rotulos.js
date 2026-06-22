@@ -1,7 +1,10 @@
 const fs = require('fs');
 const path = require('path');
+const opentype = require('opentype.js');
 
 const TEMPLATE_ROOT = path.join(__dirname, '..', 'assets', 'rotulos', 'templates');
+const LABEL_FONT_PATH = path.join(__dirname, '..', 'assets', 'fonts', 'Arimo-Variable.ttf');
+const LABEL_FONT = opentype.loadSync(LABEL_FONT_PATH);
 
 const LABEL_TEMPLATES = [
   {
@@ -86,25 +89,53 @@ function publicTemplates() {
   return LABEL_TEMPLATES.map(({ file, marker, originalText, baseFontSize, originalOffset, ...template }) => template);
 }
 
-function textWeight(value) {
-  return Array.from(String(value || '')).reduce((total, character) => {
-    if (/\s/.test(character)) return total + 0.32;
-    if (/[ilI1.,'|]/.test(character)) return total + 0.32;
-    if (/[mwMW@%]/.test(character)) return total + 0.9;
-    if (/[A-ZÀ-Ý]/.test(character)) return total + 0.67;
-    return total + 0.55;
-  }, 0);
+function postScriptNumber(value) {
+  return Number(value.toFixed(3)).toString();
 }
 
-function postScriptString(value) {
-  return Array.from(String(value || '')).map(character => {
-    if (character === '\\' || character === '(' || character === ')') return `\\${character}`;
-    const code = character.charCodeAt(0);
-    if (code >= 32 && code <= 126) return character;
-    if (code <= 255) return `\\${code.toString(8).padStart(3, '0')}`;
-    const fallback = character.normalize('NFD').replace(/[\u0300-\u036f]/g, '')[0];
-    return fallback && fallback.charCodeAt(0) <= 126 ? fallback : '?';
-  }).join('');
+function vectorTextPostScript(value, fontSize, offset) {
+  const outline = LABEL_FONT.getPath(value, offset, 0, fontSize);
+  const commands = ['% Texto convertido em curvas para preservar todos os caracteres', 'newpath'];
+  let currentX = 0;
+  let currentY = 0;
+
+  outline.commands.forEach(command => {
+    if (command.type === 'M') {
+      currentX = command.x;
+      currentY = -command.y;
+      commands.push(`${postScriptNumber(currentX)} ${postScriptNumber(currentY)} moveto`);
+    } else if (command.type === 'L') {
+      currentX = command.x;
+      currentY = -command.y;
+      commands.push(`${postScriptNumber(currentX)} ${postScriptNumber(currentY)} lineto`);
+    } else if (command.type === 'C') {
+      currentX = command.x;
+      currentY = -command.y;
+      commands.push(
+        `${postScriptNumber(command.x1)} ${postScriptNumber(-command.y1)} `
+        + `${postScriptNumber(command.x2)} ${postScriptNumber(-command.y2)} `
+        + `${postScriptNumber(currentX)} ${postScriptNumber(currentY)} curveto`
+      );
+    } else if (command.type === 'Q') {
+      const controlX1 = currentX + (2 / 3) * (command.x1 - currentX);
+      const controlY1 = currentY + (2 / 3) * (-command.y1 - currentY);
+      const endX = command.x;
+      const endY = -command.y;
+      const controlX2 = endX + (2 / 3) * (command.x1 - endX);
+      const controlY2 = endY + (2 / 3) * (-command.y1 - endY);
+      commands.push(
+        `${postScriptNumber(controlX1)} ${postScriptNumber(controlY1)} `
+        + `${postScriptNumber(controlX2)} ${postScriptNumber(controlY2)} `
+        + `${postScriptNumber(endX)} ${postScriptNumber(endY)} curveto`
+      );
+      currentX = endX;
+      currentY = endY;
+    } else if (command.type === 'Z') {
+      commands.push('closepath');
+    }
+  });
+  commands.push('fill');
+  return commands.join('\r\n');
 }
 
 function splitBinaryEps(buffer) {
@@ -154,19 +185,14 @@ function generateLabelEps(templateId, mealName) {
   const textEnd = postScript.indexOf('\nT', markerIndex);
   if (fontStart < 0 || textEnd < 0) throw new Error(`Bloco de texto inválido no modelo ${template.id}.`);
 
-  const originalBlock = postScript.slice(fontStart, textEnd + 2);
-  const fontMatch = originalBlock.match(/^(\/_[^\s]+-ArialMT)\s+[\d.]+\s+z/m);
-  if (!fontMatch) throw new Error(`Fonte variável não encontrada no modelo ${template.id}.`);
-
-  const originalWeight = Math.max(1, textWeight(template.originalText));
-  const newWeight = Math.max(1, textWeight(cleanName));
-  const fitRatio = Math.min(1, originalWeight / newWeight);
+  const originalWidth = LABEL_FONT.getAdvanceWidth(template.originalText, template.baseFontSize);
+  const requestedWidth = LABEL_FONT.getAdvanceWidth(cleanName, template.baseFontSize);
+  const fitRatio = Math.min(1, originalWidth / Math.max(1, requestedWidth));
   const fontSize = Math.round(template.baseFontSize * Math.max(0.48, fitRatio));
-  const renderedRatio = (fontSize * newWeight) / (template.baseFontSize * originalWeight);
-  const offset = template.originalOffset
-    ? Math.round(template.originalOffset * renderedRatio)
-    : 0;
-  const replacement = `${fontMatch[1]} ${fontSize.toFixed(5)} z\r\n${offset} 0 (${postScriptString(cleanName)}) @t\r\nT`;
+  const renderedWidth = LABEL_FONT.getAdvanceWidth(cleanName, fontSize);
+  const offset = template.originalOffset ? Math.round(-renderedWidth / 2) : 0;
+  const safeComment = cleanName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\x20-\x7E]/g, '?');
+  const replacement = `%%LabelText: ${safeComment}\r\n%%LabelFontSize: ${fontSize}\r\n${vectorTextPostScript(cleanName, fontSize, offset)}\r\nT`;
   const generatedPostScript = Buffer.from(
     postScript.slice(0, fontStart) + replacement + postScript.slice(textEnd + 2),
     'latin1'

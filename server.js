@@ -1232,9 +1232,12 @@ app.post('/api/rotulos/public/orders', requestRateLimit({ windowMs: 15 * 60 * 10
     const products = requestedItems.map((requestedItem, index) => {
       const template = ROTULOS.templateById(text(requestedItem.templateId, 80));
       const mealName = text(requestedItem.mealName, 60).replace(/\s+/g, ' ');
-      const quantity = Math.min(100000, Math.max(1, Number.parseInt(requestedItem.quantity, 10) || 0));
+      const quantity = Number.parseInt(requestedItem.quantity, 10) || 0;
       const taxMode = requestedItem.taxMode === 'isento' ? 'isento' : 'iva';
       if (!template || !mealName) throw new Error(`Preencha corretamente o rótulo ${index + 1}.`);
+      if (quantity < 15 || quantity > 99990 || quantity % 15 !== 0) {
+        throw new Error(`A quantidade do rótulo ${index + 1} deve ser múltipla de 15, com mínimo de 15 unidades.`);
+      }
 
       const unitPrice = money(customer.prices?.[template.id]);
       const net = money(unitPrice * quantity);
@@ -1252,7 +1255,6 @@ app.post('/api/rotulos/public/orders', requestRateLimit({ windowMs: 15 * 60 * 10
         valorIVA: itemVat,
         subtotal: net,
         total: money(net + itemVat),
-        observacoes: text(requestedItem.notes, 300),
         entregue: false
       };
     });
@@ -1295,7 +1297,7 @@ app.post('/api/rotulos/public/orders', requestRateLimit({ windowMs: 15 * 60 * 10
     const ref = await db.collection('events').add(event);
     res.status(201).json({ success: true, order: labelOrderPublic(ref.id, payload) });
   } catch (error) {
-    const isInputError = /Preencha corretamente/.test(error.message);
+    const isInputError = /Preencha corretamente|deve ser múltipla de 15/.test(error.message);
     if (!isInputError) console.error('Erro ao criar pedido de rótulos:', error);
     res.status(isInputError ? 400 : 500).json({
       success: false,

@@ -47,10 +47,9 @@
         <h2>2. Preencha o rótulo</h2>
         <div class="form-grid">
           <label>Nome da marmita<input id="mealName" maxlength="60" placeholder="Ex.: Frango com batata-doce"></label>
-          <label>Quantidade<input id="quantity" type="number" min="1" max="100000" value="50"></label>
+          <label>Quantidade (múltiplos de 15)<input id="quantity" type="number" min="15" step="15" max="99990" value="15"></label>
           <label>Faturação<select id="taxMode"><option value="iva">IVA 23%</option><option value="isento">Isento</option></select></label>
         </div>
-        <label style="margin-top:12px">Observações<textarea id="itemNotes" maxlength="300" placeholder="Opcional"></textarea></label>
         <button class="btn" id="addItem" style="margin-top:14px">Adicionar ao pedido</button>
       </div>
       <div class="panel">
@@ -130,9 +129,10 @@
       const mealName=document.getElementById('mealName').value.trim();
       const quantity=Number.parseInt(document.getElementById('quantity').value,10);
       if(!state.selectedTemplate) return showMessage('Escolha primeiro um modelo.',true);
-      if(!mealName||!quantity||quantity<1) return showMessage('Indique o nome da marmita e a quantidade.',true);
-      state.cart.push({templateId:state.selectedTemplate.id,mealName,quantity,taxMode:document.getElementById('taxMode').value,notes:document.getElementById('itemNotes').value.trim()});
-      document.getElementById('mealName').value='';document.getElementById('itemNotes').value='';showMessage('Rótulo adicionado ao pedido.');renderCart();
+      if(!mealName) return showMessage('Indique o nome da marmita.',true);
+      if(!quantity||quantity<15||quantity%15!==0) return showMessage('A quantidade mínima é 15 e deve ser sempre múltipla de 15.',true);
+      state.cart.push({templateId:state.selectedTemplate.id,mealName,quantity,taxMode:document.getElementById('taxMode').value});
+      document.getElementById('mealName').value='';document.getElementById('quantity').value='15';showMessage('Rótulo adicionado ao pedido.');renderCart();
     });
     document.getElementById('submitOrder').addEventListener('click',async()=>{
       if(!state.cart.length) return showMessage('Adicione pelo menos um rótulo.',true);

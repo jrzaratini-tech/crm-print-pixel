@@ -1201,12 +1201,20 @@ test('bloqueia importação fiscal duplicada', async () => {
 
 test('gera EPS de rótulos com nome variável e preserva CutContour', () => {
   for (const template of ROTULOS.LABEL_TEMPLATES) {
-    const eps = ROTULOS.generateLabelEps(template.id, 'Bacalhau à Brás com legumes');
+    const eps = ROTULOS.generateLabelEps(template.id, 'Teste');
+    const postScript = eps.toString('latin1');
     assert.equal(Buffer.isBuffer(eps), true);
     assert.equal(eps.includes(Buffer.from('CutContour', 'latin1')), true);
-    assert.equal(eps.includes(Buffer.from('Bacalhau', 'latin1')), true);
+    assert.equal(eps.includes(Buffer.from('%%LabelText: Teste', 'latin1')), true);
+    assert.equal(eps.includes(Buffer.from(`%%LabelFontSize: ${template.baseFontSize}`, 'latin1')), true);
+    assert.match(postScript, /Texto convertido em curvas/);
+    assert.match(postScript, /curveto/);
     assert.equal(eps.readUInt32LE(0), 0xc6d3d0c5);
     assert.equal(eps.readUInt32LE(20), eps.readUInt32LE(4) + eps.readUInt32LE(8));
+
+    const longTextEps = ROTULOS.generateLabelEps(template.id, 'Escalopes de frango ao molho de mostarda e legumes').toString('latin1');
+    const adjustedSize = Number(longTextEps.match(/%%LabelFontSize: (\d+)/)?.[1]);
+    assert.ok(adjustedSize < template.baseFontSize);
   }
 });
 
@@ -1231,27 +1239,27 @@ test('portal de rótulos cria cliente, pedido, pagamento e EPS', async () => {
   const createdOrder = await post('/api/rotulos/public/orders', {
     token,
     items: [
-      { templateId: 'proteico-grande', mealName: 'Frango à portuguesa', quantity: 100, taxMode: 'iva' },
-      { templateId: 'vegetariano-pequeno', mealName: 'Caril de legumes', quantity: 50, taxMode: 'isento' }
+      { templateId: 'proteico-grande', mealName: 'Frango à portuguesa', quantity: 90, taxMode: 'iva' },
+      { templateId: 'vegetariano-pequeno', mealName: 'Caril de legumes', quantity: 45, taxMode: 'isento' }
     ]
   });
   assert.equal(createdOrder.response.status, 201);
-  assert.equal(createdOrder.body.order.subtotal, 75);
-  assert.equal(createdOrder.body.order.iva, 11.5);
-  assert.equal(createdOrder.body.order.total, 86.5);
+  assert.equal(createdOrder.body.order.subtotal, 67.5);
+  assert.equal(createdOrder.body.order.iva, 10.35);
+  assert.equal(createdOrder.body.order.total, 77.85);
 
   const orderId = createdOrder.body.order.id;
   const epsResponse = await fetch(`${baseUrl}/api/rotulos/orders/${orderId}/items/0/eps`);
   const eps = Buffer.from(await epsResponse.arrayBuffer());
   assert.equal(epsResponse.status, 200);
-  assert.match(epsResponse.headers.get('content-disposition'), /100un\.eps/);
+  assert.match(epsResponse.headers.get('content-disposition'), /90un\.eps/);
   assert.equal(eps.includes(Buffer.from('CutContour', 'latin1')), true);
-  assert.equal(eps.includes(Buffer.from('Frango', 'latin1')), true);
+  assert.equal(eps.includes(Buffer.from('%%LabelText: Frango a portuguesa', 'latin1')), true);
 
   const payment = await post(`/api/rotulos/orders/${orderId}/payments`, { value: 40, method: 'mbway' });
   assert.equal(payment.response.status, 200);
   assert.equal(payment.body.totalPago, 40);
-  assert.equal(payment.body.saldoPendente, 46.5);
+  assert.equal(payment.body.saldoPendente, 37.85);
 
   const status = await post(`/api/rotulos/orders/${orderId}/status`, { status: 'processamento' });
   assert.equal(status.response.status, 200);
@@ -1259,7 +1267,14 @@ test('portal de rótulos cria cliente, pedido, pagamento e EPS', async () => {
   const order = refreshed.body.orders.find(item => item.id === orderId);
   assert.equal(order.status, 'processamento');
   assert.equal(order.totalPago, 40);
-  assert.equal(order.saldoPendente, 46.5);
+  assert.equal(order.saldoPendente, 37.85);
+
+  const invalidQuantity = await post('/api/rotulos/public/orders', {
+    token,
+    items: [{ templateId: 'proteico-grande', mealName: 'Quantidade inválida', quantity: 20, taxMode: 'iva' }]
+  });
+  assert.equal(invalidQuantity.response.status, 400);
+  assert.match(invalidQuantity.body.message, /múltipla de 15/);
 });
 
 test('estatísticas respondem sem exigir índice composto do Firestore', async () => {
