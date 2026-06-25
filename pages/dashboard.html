@@ -682,6 +682,7 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            position: relative;
         }
 
         .delivery-calendar-header {
@@ -874,6 +875,16 @@
         .delivery-day.has-deliveries {
             border-color: #93c5fd;
             background: #eff6ff;
+            cursor: pointer;
+            transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+        }
+
+        .delivery-day.has-deliveries:hover,
+        .delivery-day.has-deliveries:focus-visible {
+            border-color: #2563eb;
+            box-shadow: 0 8px 20px rgba(37, 99, 235, .18);
+            outline: none;
+            transform: translateY(-2px);
         }
 
         .delivery-day.weekend {
@@ -974,6 +985,127 @@
             text-align: center;
         }
 
+        .delivery-day-details {
+            position: absolute;
+            inset: 0;
+            z-index: 20;
+            display: grid;
+            grid-template-columns: 1fr min(520px, 92%);
+        }
+
+        .delivery-day-details[hidden] {
+            display: none;
+        }
+
+        .delivery-details-backdrop {
+            border: 0;
+            background: rgba(15, 23, 42, .48);
+            cursor: pointer;
+        }
+
+        .delivery-details-panel {
+            background: #f8fafc;
+            box-shadow: -16px 0 40px rgba(15, 23, 42, .18);
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .delivery-details-header {
+            background: linear-gradient(135deg, #1e3a8a, #2563eb);
+            color: #fff;
+            padding: 20px;
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+        }
+
+        .delivery-details-header h3 {
+            margin: 0;
+            font-size: 21px;
+        }
+
+        .delivery-details-header p {
+            margin: 6px 0 0;
+            opacity: .86;
+            font-size: 13px;
+        }
+
+        .delivery-details-close {
+            width: 42px;
+            height: 42px;
+            flex: 0 0 auto;
+            border: 1px solid rgba(255, 255, 255, .35);
+            border-radius: 12px;
+            background: rgba(255, 255, 255, .15);
+            color: #fff;
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        .delivery-details-list {
+            padding: 16px;
+            overflow-y: auto;
+            display: grid;
+            gap: 12px;
+        }
+
+        .delivery-detail-card {
+            background: #fff;
+            border: 1px solid #dbeafe;
+            border-left: 5px solid #2563eb;
+            border-radius: 14px;
+            padding: 14px;
+            box-shadow: 0 4px 14px rgba(15, 23, 42, .07);
+        }
+
+        .delivery-detail-topline {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .delivery-detail-card h4 {
+            margin: 0;
+            color: #0f172a;
+            font-size: 16px;
+        }
+
+        .delivery-detail-number {
+            color: #475569;
+            font-size: 12px;
+            font-weight: 800;
+            margin-top: 4px;
+            overflow-wrap: anywhere;
+        }
+
+        .delivery-detail-products {
+            margin: 12px 0;
+            color: #334155;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .delivery-detail-actions {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .delivery-detail-open {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            border-radius: 9px;
+            background: #1d4ed8;
+            color: #fff;
+            padding: 8px 11px;
+            font-size: 12px;
+            font-weight: 900;
+            text-decoration: none;
+        }
+
         .delivery-day-note {
             color: #9f1239;
             font-size: 9px;
@@ -989,6 +1121,16 @@
             text-align: center;
             color: #64748b;
             font-weight: 700;
+        }
+
+        @media (max-width: 700px) {
+            .delivery-day-details {
+                grid-template-columns: 1fr;
+            }
+
+            .delivery-details-backdrop {
+                display: none;
+            }
         }
     </style>
 </head>
@@ -1292,6 +1434,21 @@
                 <div class="delivery-calendar-days" id="deliveryCalendarDays"></div>
                 <div class="delivery-empty-month" id="deliveryEmptyMonth" hidden>Nenhuma entrega cadastrada para este mes.</div>
             </div>
+            <div class="delivery-day-details" id="deliveryDayDetails" hidden aria-hidden="true">
+                <button class="delivery-details-backdrop" id="deliveryDetailsBackdrop" type="button" aria-label="Fechar detalhes do dia"></button>
+                <section class="delivery-details-panel" role="dialog" aria-modal="true" aria-labelledby="deliveryDetailsTitle">
+                    <div class="delivery-details-header">
+                        <div>
+                            <h3 id="deliveryDetailsTitle">Trabalhos do dia</h3>
+                            <p id="deliveryDetailsSubtitle"></p>
+                        </div>
+                        <button class="delivery-details-close" id="deliveryDetailsClose" type="button" aria-label="Fechar">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="delivery-details-list" id="deliveryDetailsList"></div>
+                </section>
+            </div>
         </div>
     </div>
 
@@ -1322,6 +1479,12 @@
             const deliveryMonthTotal = document.getElementById('deliveryMonthTotal');
             const deliveryFilledDays = document.getElementById('deliveryFilledDays');
             const deliveryNoDateTotal = document.getElementById('deliveryNoDateTotal');
+            const deliveryDayDetails = document.getElementById('deliveryDayDetails');
+            const deliveryDetailsBackdrop = document.getElementById('deliveryDetailsBackdrop');
+            const deliveryDetailsClose = document.getElementById('deliveryDetailsClose');
+            const deliveryDetailsTitle = document.getElementById('deliveryDetailsTitle');
+            const deliveryDetailsSubtitle = document.getElementById('deliveryDetailsSubtitle');
+            const deliveryDetailsList = document.getElementById('deliveryDetailsList');
             const plannerProductionDays = document.getElementById('plannerProductionDays');
             const plannerStartDate = document.getElementById('plannerStartDate');
             const plannerFindDate = document.getElementById('plannerFindDate');
@@ -1391,6 +1554,26 @@
                 deliveryCalendarClose.addEventListener('click', fecharCalendarioEntregas);
                 deliveryCalendarOverlay.addEventListener('click', event => {
                     if (event.target === deliveryCalendarOverlay) fecharCalendarioEntregas();
+                });
+                deliveryCalendarDays.addEventListener('click', event => {
+                    const day = event.target.closest('[data-delivery-date]');
+                    if (day) abrirDetalhesDia(day.dataset.deliveryDate);
+                });
+                deliveryCalendarDays.addEventListener('keydown', event => {
+                    const day = event.target.closest('[data-delivery-date]');
+                    if (!day || (event.key !== 'Enter' && event.key !== ' ')) return;
+                    event.preventDefault();
+                    abrirDetalhesDia(day.dataset.deliveryDate);
+                });
+                deliveryDetailsBackdrop.addEventListener('click', fecharDetalhesDia);
+                deliveryDetailsClose.addEventListener('click', fecharDetalhesDia);
+                document.addEventListener('keydown', event => {
+                    if (event.key !== 'Escape') return;
+                    if (!deliveryDayDetails.hidden) {
+                        fecharDetalhesDia();
+                    } else if (deliveryCalendarOverlay.classList.contains('active')) {
+                        fecharCalendarioEntregas();
+                    }
                 });
                 deliveryPrevMonth.addEventListener('click', () => alterarMesCalendario(-1));
                 deliveryNextMonth.addEventListener('click', () => alterarMesCalendario(1));
@@ -1548,7 +1731,7 @@
                             status: payload.status || 'pendente',
                             dataEntrega,
                             diasProducao: Math.max(1, parseInt(payload.diasProducao || payload.prazoProducaoDias || payload.tempoProducaoDias || 1, 10) || 1),
-                            produtos: produtos.map(produto => produto.nome).filter(Boolean).slice(0, 3)
+                            produtos: produtos.map(produto => produto.nome).filter(Boolean)
                         };
                     });
             }
@@ -1560,13 +1743,60 @@
             }
 
             function fecharCalendarioEntregas() {
+                fecharDetalhesDia();
                 deliveryCalendarOverlay.classList.remove('active');
                 deliveryCalendarOverlay.setAttribute('aria-hidden', 'true');
             }
 
             function alterarMesCalendario(offset) {
+                fecharDetalhesDia();
                 deliveryCalendarDate = new Date(deliveryCalendarDate.getFullYear(), deliveryCalendarDate.getMonth() + offset, 1);
                 renderDeliveryCalendar();
+            }
+
+            function abrirDetalhesDia(dateKey) {
+                const date = parseDeliveryDate(dateKey);
+                if (!date) return;
+                const pedidos = pedidosParaCalendario()
+                    .filter(pedido => pedido.dataEntrega && formatDateKey(pedido.dataEntrega) === dateKey)
+                    .sort((a, b) => String(a.numero).localeCompare(String(b.numero), 'pt', { numeric: true }));
+                if (!pedidos.length) return;
+
+                deliveryDetailsTitle.textContent = date.toLocaleDateString('pt-PT', {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric'
+                });
+                deliveryDetailsSubtitle.textContent = `${pedidos.length} ${pedidos.length === 1 ? 'trabalho agendado' : 'trabalhos agendados'}`;
+                deliveryDetailsList.innerHTML = pedidos.map(pedido => `
+                    <article class="delivery-detail-card">
+                        <div class="delivery-detail-topline">
+                            <div>
+                                <h4>${escapeHtml(pedido.cliente)}</h4>
+                                <div class="delivery-detail-number">${escapeHtml(pedido.numero)}${pedido.empresa ? ' | ' + escapeHtml(pedido.empresa) : ''}</div>
+                            </div>
+                            <span class="delivery-item-status">${escapeHtml(pedido.status)}</span>
+                        </div>
+                        <div class="delivery-detail-products">
+                            <strong>Trabalho:</strong> ${escapeHtml(pedido.produtos.join(', ') || 'Produtos nao detalhados')}
+                        </div>
+                        <div class="delivery-detail-actions">
+                            <a class="delivery-detail-open" href="novopedido.html?edit=${encodeURIComponent(pedido.id)}">
+                                <i class="fas fa-folder-open"></i> Abrir trabalho
+                            </a>
+                        </div>
+                    </article>
+                `).join('');
+                deliveryDayDetails.hidden = false;
+                deliveryDayDetails.setAttribute('aria-hidden', 'false');
+                deliveryDetailsClose.focus();
+            }
+
+            function fecharDetalhesDia() {
+                if (!deliveryDayDetails || deliveryDayDetails.hidden) return;
+                deliveryDayDetails.hidden = true;
+                deliveryDayDetails.setAttribute('aria-hidden', 'true');
             }
 
             function deliveryLoadMap(pedidos) {
@@ -1676,7 +1906,8 @@
                         </div>
                     `).join('');
                     cells.push(`
-                        <div class="delivery-day ${outside ? 'outside' : ''} ${today ? 'today' : ''} ${weekend ? 'weekend' : ''} ${holiday ? 'holiday' : ''} ${suggested ? 'suggested-delivery' : ''} ${dayOrders.length ? 'has-deliveries' : ''}">
+                        <div class="delivery-day ${outside ? 'outside' : ''} ${today ? 'today' : ''} ${weekend ? 'weekend' : ''} ${holiday ? 'holiday' : ''} ${suggested ? 'suggested-delivery' : ''} ${dayOrders.length ? 'has-deliveries' : ''}"
+                            ${dayOrders.length ? `data-delivery-date="${key}" role="button" tabindex="0" aria-label="${dayOrders.length} ${dayOrders.length === 1 ? 'trabalho' : 'trabalhos'} em ${date.toLocaleDateString('pt-PT')}. Clique para ver todos."` : ''}>
                             <div class="delivery-day-number">
                                 <span>${date.getDate()}</span>
                                 ${dayOrders.length ? `<span class="delivery-day-count">${dayOrders.length}</span>` : ''}
