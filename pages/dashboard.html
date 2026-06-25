@@ -991,41 +991,19 @@
             border-left: 3px solid #2563eb;
             background: rgba(255, 255, 255, .94);
             border-radius: 7px;
-            padding: 4px 5px;
+            padding: 5px 6px;
             box-shadow: 0 2px 6px rgba(15, 23, 42, .05);
         }
 
-        .delivery-preview-item strong,
-        .delivery-preview-item span {
+        .delivery-preview-item strong {
             display: block;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-        }
-
-        .delivery-preview-item strong {
             color: #0f172a;
-            font-size: 10px;
-            line-height: 1.2;
-        }
-
-        .delivery-preview-item span {
-            color: #64748b;
-            font-size: 8px;
-            line-height: 1.2;
-            margin-top: 2px;
-        }
-
-        .delivery-preview-hint {
-            position: sticky;
-            bottom: 0;
-            color: #1d4ed8;
-            background: #dbeafe;
-            border-radius: 999px;
-            padding: 3px 7px;
-            font-size: 10px;
+            font-size: 11px;
+            line-height: 1.25;
             font-weight: 900;
-            text-align: center;
         }
 
         .delivery-day-details {
@@ -1938,15 +1916,11 @@
                     const holiday = holidayLabel(date);
                     const weekend = date.getDay() === 0 || date.getDay() === 6;
                     const suggested = key === suggestedDeliveryKey;
-                    const items = dayOrders.map(pedido => {
-                        const nomeTrabalho = pedido.produtos.join(', ') || 'Trabalho sem nome';
-                        return `
-                        <div class="delivery-preview-item" title="${escapeHtml(nomeTrabalho)} — ${escapeHtml(pedido.cliente)}">
-                            <strong>${escapeHtml(nomeTrabalho)}</strong>
-                            <span>${escapeHtml(pedido.cliente)} · ${escapeHtml(pedido.numero)}</span>
+                    const items = dayOrders.map(pedido => `
+                        <div class="delivery-preview-item" title="${escapeHtml(pedido.cliente)}">
+                            <strong>${escapeHtml(pedido.cliente)}</strong>
                         </div>
-                    `;
-                    }).join('');
+                    `).join('');
                     cells.push(`
                         <div class="delivery-day ${outside ? 'outside' : ''} ${today ? 'today' : ''} ${weekend ? 'weekend' : ''} ${holiday ? 'holiday' : ''} ${suggested ? 'suggested-delivery' : ''} ${dayOrders.length ? 'has-deliveries' : ''}"
                             ${dayOrders.length ? `data-delivery-date="${key}" role="button" tabindex="0" aria-label="${dayOrders.length} ${dayOrders.length === 1 ? 'trabalho' : 'trabalhos'} em ${date.toLocaleDateString('pt-PT')}. Clique para ver todos."` : ''}>
@@ -1959,7 +1933,6 @@
                             ${dayOrders.length ? `
                                 <div class="delivery-day-preview">
                                     ${items}
-                                    <div class="delivery-preview-hint">Clique para ver detalhes</div>
                                 </div>
                             ` : ''}
                         </div>
