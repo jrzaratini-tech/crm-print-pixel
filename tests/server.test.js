@@ -156,6 +156,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(menuResult.body, /pages\/rotulos\.html/);
   assert.match(labelsAdminPageResult.body, /Portal de Rótulos/);
   assert.match(labelsAdminPageResult.body, /api\/rotulos\/orders/);
+  assert.match(labelsAdminPageResult.body, /Baixar todos EPS/);
   assert.match(labelsPortalResult.body, /Pedidos de rótulos/);
   assert.match(labelsPortalResult.body, /api\/rotulos\/public\/orders/);
   assert.match(pageResult.body, /Cadastro de Materiais/);
@@ -1208,6 +1209,12 @@ test('gera EPS de rótulos com nome variável e preserva CutContour', () => {
     assert.equal(eps.includes(Buffer.from('CutContour', 'latin1')), true);
     assert.equal(eps.includes(Buffer.from('%%LabelText: Teste', 'latin1')), true);
     assert.equal(eps.includes(Buffer.from(`%%LabelFontSize: ${template.baseFontSize}`, 'latin1')), true);
+    const textOffset = Number(postScript.match(/%%LabelTextOffset: (-?\d+)/)?.[1]);
+    if (template.originalOffset) {
+      assert.ok(textOffset < 0, `${template.id} deve centralizar pela ancora do Corel`);
+    } else {
+      assert.ok(textOffset > 0, `${template.id} deve centralizar dentro da caixa original`);
+    }
     assert.match(postScript, /Texto convertido em curvas/);
     assert.match(postScript, /curveto/);
     assert.equal(eps.readUInt32LE(0), 0xc6d3d0c5);
@@ -1300,6 +1307,15 @@ test('portal de rótulos cria cliente, pedido, pagamento e EPS', async () => {
   assert.equal(eps.includes(Buffer.from('CutContour', 'latin1')), true);
   assert.equal(eps.includes(Buffer.from('%%LabelText: Frango a portuguesa', 'latin1')), true);
   assert.equal(eps.includes(Buffer.from('%%LabelNutrition: kcal=455', 'latin1')), true);
+
+  const zipResponse = await fetch(`${baseUrl}/api/rotulos/orders/${orderId}/eps`);
+  const zip = Buffer.from(await zipResponse.arrayBuffer());
+  assert.equal(zipResponse.status, 200);
+  assert.equal(zipResponse.headers.get('content-type'), 'application/zip');
+  assert.match(zipResponse.headers.get('content-disposition'), /filename="ROT-\d+-[A-F0-9]+-eps\.zip"/);
+  assert.equal(zip.readUInt32LE(0), 0x04034b50);
+  assert.equal(zip.includes(Buffer.from('90un-Frango-a-portuguesa.eps')), true);
+  assert.equal(zip.includes(Buffer.from('45un-Caril-de-legumes.eps')), true);
 
   const payment = await post(`/api/rotulos/orders/${orderId}/payments`, { value: 40, method: 'mbway' });
   assert.equal(payment.response.status, 200);

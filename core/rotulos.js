@@ -45,6 +45,7 @@ const LABEL_TEMPLATES = [
     preview: '/rotulos/previews/lowcarb-grande.webp',
     marker: 'Escalopes de frango ao molho de mostarda',
     nutritionMarker: 'Escalopes de frang',
+    nutritionOriginalText: 'Escalopes de frango',
     nutritionRemoveMarkers: ['(o)'],
     originalText: 'Escalopes de frango ao molho de mostarda',
     baseFontSize: 38251,
@@ -75,6 +76,7 @@ const LABEL_TEMPLATES = [
     preview: '/rotulos/previews/vegetariano-grande.webp',
     marker: 'Caril de legumes c/ gr\\343o de bico',
     nutritionMarker: 'Caril de legumes',
+    nutritionOriginalText: 'Caril de legumes',
     originalText: 'Caril de legumes c/ grão de bico',
     baseFontSize: 54194,
     nutritionFontSize: 22595,
@@ -114,6 +116,7 @@ function publicTemplates() {
     nutritionFile,
     marker,
     nutritionMarker,
+    nutritionOriginalText,
     nutritionRemoveMarkers,
     originalText,
     baseFontSize,
@@ -235,6 +238,18 @@ function nutritionSummary(nutrition) {
     .join(' | ');
 }
 
+function mealTextTargetWidth(template, withNutrition) {
+  const referenceText = withNutrition && template.nutritionOriginalText
+    ? template.nutritionOriginalText
+    : template.originalText;
+  return LABEL_FONT.getAdvanceWidth(referenceText, template.baseFontSize);
+}
+
+function mealTextOffset(template, renderedWidth, targetWidth) {
+  if (template.originalOffset) return Math.round(-renderedWidth / 2);
+  return Math.round(Math.max(0, targetWidth - renderedWidth) / 2);
+}
+
 function generateLabelEps(templateId, mealName, nutrition = null) {
   const template = templateById(templateId);
   if (!template) throw new Error('Modelo de rótulo inválido.');
@@ -257,14 +272,14 @@ function generateLabelEps(templateId, mealName, nutrition = null) {
   const textEnd = postScript.indexOf('\nT', markerIndex);
   if (fontStart < 0 || textEnd < 0) throw new Error(`Bloco de texto inválido no modelo ${template.id}.`);
 
-  const originalWidth = LABEL_FONT.getAdvanceWidth(template.originalText, template.baseFontSize);
+  const originalWidth = mealTextTargetWidth(template, withNutrition);
   const requestedWidth = LABEL_FONT.getAdvanceWidth(cleanName, template.baseFontSize);
   const fitRatio = Math.min(1, originalWidth / Math.max(1, requestedWidth));
   const fontSize = Math.round(template.baseFontSize * Math.max(0.48, fitRatio));
   const renderedWidth = LABEL_FONT.getAdvanceWidth(cleanName, fontSize);
-  const offset = template.originalOffset ? Math.round(-renderedWidth / 2) : 0;
+  const offset = mealTextOffset(template, renderedWidth, originalWidth);
   const safeComment = cleanName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\x20-\x7E]/g, '?');
-  const replacement = `%%LabelText: ${safeComment}\r\n%%LabelFontSize: ${fontSize}\r\n${vectorTextPostScript(cleanName, fontSize, offset)}\r\nT`;
+  const replacement = `%%LabelText: ${safeComment}\r\n%%LabelFontSize: ${fontSize}\r\n%%LabelTextOffset: ${offset}\r\n${vectorTextPostScript(cleanName, fontSize, offset)}\r\nT`;
   postScript = postScript.slice(0, fontStart) + replacement + postScript.slice(textEnd + 2);
   if (withNutrition && Array.isArray(template.nutritionRemoveMarkers)) {
     let removeStart = markerIndex + replacement.length;
