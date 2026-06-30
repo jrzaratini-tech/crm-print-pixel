@@ -1216,6 +1216,17 @@ test('gera EPS de rótulos com nome variável e preserva CutContour', () => {
     const longTextEps = ROTULOS.generateLabelEps(template.id, 'Escalopes de frango ao molho de mostarda e legumes').toString('latin1');
     const adjustedSize = Number(longTextEps.match(/%%LabelFontSize: (\d+)/)?.[1]);
     assert.ok(adjustedSize < template.baseFontSize);
+
+    const nutritionEps = ROTULOS.generateLabelEps(template.id, 'Teste', {
+      enabled: true,
+      kcal: '455',
+      protein: '18',
+      carbs: '54',
+      fat: '16',
+      fiber: '10'
+    }).toString('latin1');
+    assert.match(nutritionEps, /%%LabelNutrition: kcal=455/);
+    assert.match(nutritionEps, /%%LabelNutrition: protein=18g/);
   }
 });
 
@@ -1264,7 +1275,13 @@ test('portal de rótulos cria cliente, pedido, pagamento e EPS', async () => {
   const createdOrder = await post('/api/rotulos/public/orders', {
     token,
     items: [
-      { templateId: 'proteico-grande', mealName: 'Frango à portuguesa', quantity: 90, taxMode: 'iva' },
+      {
+        templateId: 'proteico-grande',
+        mealName: 'Frango à portuguesa',
+        quantity: 90,
+        taxMode: 'iva',
+        nutrition: { enabled: true, kcal: '455', protein: '18', carbs: '54', fat: '16', fiber: '10' }
+      },
       { templateId: 'vegetariano-pequeno', mealName: 'Caril de legumes', quantity: 45, taxMode: 'isento' }
     ]
   });
@@ -1272,6 +1289,8 @@ test('portal de rótulos cria cliente, pedido, pagamento e EPS', async () => {
   assert.equal(createdOrder.body.order.subtotal, 67.5);
   assert.equal(createdOrder.body.order.iva, 10.35);
   assert.equal(createdOrder.body.order.total, 77.85);
+  assert.equal(createdOrder.body.order.produtos[0].hasNutrition, true);
+  assert.match(createdOrder.body.order.produtos[0].nutritionText, /Kcal: 455/);
 
   const orderId = createdOrder.body.order.id;
   const epsResponse = await fetch(`${baseUrl}/api/rotulos/orders/${orderId}/items/0/eps`);
@@ -1280,6 +1299,7 @@ test('portal de rótulos cria cliente, pedido, pagamento e EPS', async () => {
   assert.match(epsResponse.headers.get('content-disposition'), /filename="90un-Frango-a-portuguesa\.eps"/);
   assert.equal(eps.includes(Buffer.from('CutContour', 'latin1')), true);
   assert.equal(eps.includes(Buffer.from('%%LabelText: Frango a portuguesa', 'latin1')), true);
+  assert.equal(eps.includes(Buffer.from('%%LabelNutrition: kcal=455', 'latin1')), true);
 
   const payment = await post(`/api/rotulos/orders/${orderId}/payments`, { value: 40, method: 'mbway' });
   assert.equal(payment.response.status, 200);

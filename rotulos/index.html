@@ -17,7 +17,7 @@
     .templates{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.template{border:2px solid transparent;border-radius:16px;background:#f8f7f3;padding:12px;cursor:pointer;transition:.18s}
     .template:hover{transform:translateY(-2px)}.template.selected{border-color:var(--green2);background:#edf5f1}.template img{width:100%;height:210px;object-fit:contain;border-radius:10px;background:#fff}
     .template strong,.template small{display:block}.template small{color:var(--muted);margin-top:3px}
-    .form-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px}label{display:grid;gap:6px;font-weight:700;color:#34423d}
+    .form-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px}.nutrition-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:12px}.choice{margin-top:12px}label{display:grid;gap:6px;font-weight:700;color:#34423d}
     input,select,textarea{width:100%;border:1px solid #cfcfc8;border-radius:10px;padding:12px;background:#fff;font:inherit}textarea{min-height:80px;resize:vertical}
     .cart-row,.order{border:1px solid var(--line);border-radius:13px;padding:14px;margin-top:10px}.cart-row{display:grid;grid-template-columns:1fr auto;gap:12px}.muted{color:var(--muted)}.money{font-weight:800}
     .summary{display:flex;justify-content:flex-end;gap:24px;flex-wrap:wrap;margin:18px 0}.summary div{min-width:110px}.summary small{display:block;color:var(--muted)}
@@ -25,8 +25,8 @@
     .plan{border-left:5px solid var(--green2);background:linear-gradient(90deg,#f1f8f4,#fff 38%)}.plan-name{color:var(--green2);font-weight:850}
     .status.concluido,.status.entregue{background:#dcf4e7;color:#17603f}.status.processamento{background:#ddebfa;color:#235b8d}.status.cancelado{background:#f8dddd;color:#8d2828}
     .order-items{margin:10px 0 0;padding-left:18px}.hidden{display:none!important}.empty{text-align:center;color:var(--muted);padding:28px}.message{padding:12px;border-radius:10px;margin:12px 0;background:#e8f4ee;color:#175b3d;font-weight:700}.message.error{background:#f9e2df;color:#8e2c24}
-    @media(max-width:800px){.templates{grid-template-columns:repeat(2,minmax(0,1fr))}.form-grid{grid-template-columns:1fr 1fr}.form-grid label:first-child{grid-column:1/-1}}
-    @media(max-width:520px){header{padding:19px 8px}.wrap{width:min(100% - 18px,1120px)}.templates{grid-template-columns:1fr 1fr;gap:8px}.template{padding:7px}.template img{height:145px}.panel{padding:14px}.form-grid{grid-template-columns:1fr}.form-grid label:first-child{grid-column:auto}.cart-row{grid-template-columns:1fr}.order-head{display:block}}
+    @media(max-width:800px){.templates{grid-template-columns:repeat(2,minmax(0,1fr))}.form-grid{grid-template-columns:1fr 1fr}.form-grid label:first-child{grid-column:1/-1}.nutrition-grid{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:520px){header{padding:19px 8px}.wrap{width:min(100% - 18px,1120px)}.templates{grid-template-columns:1fr 1fr;gap:8px}.template{padding:7px}.template img{height:145px}.panel{padding:14px}.form-grid,.nutrition-grid{grid-template-columns:1fr}.form-grid label:first-child{grid-column:auto}.cart-row{grid-template-columns:1fr}.order-head{display:block}}
   </style>
 </head>
 <body>
@@ -51,6 +51,14 @@
           <label>Quantidade (múltiplos de 15)<input id="quantity" type="number" min="15" step="15" max="99990" value="15"></label>
           <label>Faturação<select id="taxMode"><option value="iva">IVA 23%</option><option value="isento">Isento</option></select></label>
         </div>
+        <label class="choice">Informação nutricional<select id="nutritionMode"><option value="name">Só nome da marmita</option><option value="nutrition">Nome + tabela nutricional</option></select></label>
+        <div class="nutrition-grid hidden" id="nutritionFields">
+          <label>Kcal<input id="nutritionKcal" inputmode="decimal" placeholder="455"></label>
+          <label>Proteína (g)<input id="nutritionProtein" inputmode="decimal" placeholder="18"></label>
+          <label>Hidratos (g)<input id="nutritionCarbs" inputmode="decimal" placeholder="54"></label>
+          <label>Gorduras (g)<input id="nutritionFat" inputmode="decimal" placeholder="16"></label>
+          <label>Fibras (g)<input id="nutritionFiber" inputmode="decimal" placeholder="10"></label>
+        </div>
         <button class="btn" id="addItem" style="margin-top:14px">Adicionar ao pedido</button>
       </div>
       <div class="panel">
@@ -74,6 +82,8 @@
     const state = { customer: null, templates: [], orders: [], cart: [], selectedTemplate: null };
     const euro = value => new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR'}).format(Number(value)||0);
     const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+    const nutritionText = nutrition => nutrition?.enabled?`Kcal: ${nutrition.kcal} · Proteína: ${nutrition.protein}g · Hidratos: ${nutrition.carbs}g · Gorduras: ${nutrition.fat}g · Fibras: ${nutrition.fiber}g`:'';
+    const cleanNumber = value => String(value||'').replace(',','.').replace(/[^\d.]/g,'').trim();
     const showMessage = (text, error=false) => {
       const box=document.getElementById('message');
       box.innerHTML=text?`<div class="message ${error?'error':''}">${escapeHtml(text)}</div>`:'';
@@ -112,7 +122,7 @@
         const template=state.templates.find(entry=>entry.id===item.templateId);
         const price=Number(state.customer.prices?.[item.templateId]||0);
         const total=price*item.quantity*(item.taxMode==='iva'?1.23:1);
-        return `<div class="cart-row"><div><strong>${escapeHtml(item.mealName)}</strong><div class="muted">${escapeHtml(template.category)} · ${escapeHtml(template.size)} · ${item.quantity} un. · ${item.taxMode==='iva'?'IVA 23%':'Isento'}</div><div class="money">${euro(total)}</div></div><button class="btn danger" data-remove="${index}">Remover</button></div>`;
+        return `<div class="cart-row"><div><strong>${escapeHtml(item.mealName)}</strong><div class="muted">${escapeHtml(template.category)} · ${escapeHtml(template.size)} · ${item.quantity} un. · ${item.taxMode==='iva'?'IVA 23%':'Isento'}</div>${item.nutrition?.enabled?`<div class="muted">Nutricional: ${escapeHtml(nutritionText(item.nutrition))}</div>`:''}<div class="money">${euro(total)}</div></div><button class="btn danger" data-remove="${index}">Remover</button></div>`;
       }).join(''):'<div class="empty">Ainda não adicionou nenhum rótulo.</div>';
       document.querySelectorAll('[data-remove]').forEach(button=>button.addEventListener('click',()=>{state.cart.splice(Number(button.dataset.remove),1);renderCart()}));
       const totals=cartTotals();document.getElementById('subtotal').textContent=euro(totals.subtotal);document.getElementById('vat').textContent=euro(totals.vat);document.getElementById('total').textContent=euro(totals.total);
@@ -121,7 +131,7 @@
       document.getElementById('orders').innerHTML=state.orders.length?state.orders.map(order=>`
         <article class="order ${order.recordType==='platform_fee'?'plan':''}">
           <div class="order-head"><div><div class="${order.recordType==='platform_fee'?'plan-name':''}">${escapeHtml(order.title)}</div><strong>${escapeHtml(order.numero)}</strong><div class="muted">${new Date(order.data+'T12:00:00').toLocaleDateString('pt-PT')}</div></div><div class="order-actions"><span class="status ${escapeHtml(order.status)}">${order.paid?'pago':escapeHtml(order.status)}</span>${order.canHide?`<button class="btn secondary" data-hide="${order.id}">Remover do histórico</button>`:''}</div></div>
-          <ul class="order-items">${order.produtos.map(item=>`<li>${escapeHtml(item.nome)}${order.recordType==='platform_fee'?'':` — ${escapeHtml(item.modeloRotulo)} — ${item.quantidade} un.`}</li>`).join('')}</ul>
+          <ul class="order-items">${order.produtos.map(item=>`<li>${escapeHtml(item.nome)}${order.recordType==='platform_fee'?'':` — ${escapeHtml(item.modeloRotulo)} — ${item.quantidade} un.${item.hasNutrition?`<br><span class="muted">Nutricional: ${escapeHtml(item.nutritionText||'')}</span>`:''}`}</li>`).join('')}</ul>
           <div class="summary"><div><small>Total</small><span class="money">${euro(order.total)}</span></div><div><small>Pago</small><span class="money">${euro(order.totalPago)}</span></div><div><small>Em falta</small><span class="money">${euro(order.saldoPendente)}</span></div></div>
         </article>`).join(''):'<div class="empty">Ainda não existem pedidos.</div>';
       document.querySelectorAll('[data-hide]').forEach(button=>button.addEventListener('click',()=>hideRecord(button.dataset.hide)));
@@ -134,14 +144,27 @@
         state.orders=state.orders.filter(order=>order.id!==id);renderOrders();showMessage('Registo removido do seu histórico.');
       }catch(error){showMessage(error.message,true)}
     }
+    document.getElementById('nutritionMode').addEventListener('change',event=>{
+      document.getElementById('nutritionFields').classList.toggle('hidden',event.target.value!=='nutrition');
+    });
     document.getElementById('addItem').addEventListener('click',()=>{
       const mealName=document.getElementById('mealName').value.trim();
       const quantity=Number.parseInt(document.getElementById('quantity').value,10);
+      const useNutrition=document.getElementById('nutritionMode').value==='nutrition';
+      const nutrition=useNutrition?{
+        enabled:true,
+        kcal:cleanNumber(document.getElementById('nutritionKcal').value),
+        protein:cleanNumber(document.getElementById('nutritionProtein').value),
+        carbs:cleanNumber(document.getElementById('nutritionCarbs').value),
+        fat:cleanNumber(document.getElementById('nutritionFat').value),
+        fiber:cleanNumber(document.getElementById('nutritionFiber').value)
+      }:null;
       if(!state.selectedTemplate) return showMessage('Escolha primeiro um modelo.',true);
       if(!mealName) return showMessage('Indique o nome da marmita.',true);
       if(!quantity||quantity<15||quantity%15!==0) return showMessage('A quantidade mínima é 15 e deve ser sempre múltipla de 15.',true);
-      state.cart.push({templateId:state.selectedTemplate.id,mealName,quantity,taxMode:document.getElementById('taxMode').value});
-      document.getElementById('mealName').value='';document.getElementById('quantity').value='15';showMessage('Rótulo adicionado ao pedido.');renderCart();
+      if(useNutrition&&!['kcal','protein','carbs','fat','fiber'].every(key=>nutrition[key])) return showMessage('Preencha todos os valores da tabela nutricional.',true);
+      state.cart.push({templateId:state.selectedTemplate.id,mealName,quantity,taxMode:document.getElementById('taxMode').value,nutrition});
+      document.getElementById('mealName').value='';document.getElementById('quantity').value='15';['nutritionKcal','nutritionProtein','nutritionCarbs','nutritionFat','nutritionFiber'].forEach(id=>document.getElementById(id).value='');showMessage('Rótulo adicionado ao pedido.');renderCart();
     });
     document.getElementById('submitOrder').addEventListener('click',async()=>{
       if(!state.cart.length) return showMessage('Adicione pelo menos um rótulo.',true);

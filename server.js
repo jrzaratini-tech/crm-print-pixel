@@ -255,6 +255,8 @@ function labelOrderPublic(id, payload) {
       modeloRotulo: product.modeloRotulo,
       tamanho: product.tamanho,
       quantidade: product.quantidade,
+      hasNutrition: product.hasNutrition === true,
+      nutritionText: product.nutritionText || '',
       comIVA: product.comIVA,
       valor: product.valor,
       total: product.total
@@ -1333,9 +1335,19 @@ app.post('/api/rotulos/public/orders', requestRateLimit({ windowMs: 15 * 60 * 10
       const mealName = text(requestedItem.mealName, 60).replace(/\s+/g, ' ');
       const quantity = Number.parseInt(requestedItem.quantity, 10) || 0;
       const taxMode = requestedItem.taxMode === 'isento' ? 'isento' : 'iva';
+      const hasNutrition = requestedItem.nutrition?.enabled === true;
+      const nutrition = hasNutrition ? Object.fromEntries(ROTULOS.NUTRITION_FIELDS.map(field => [
+        field.key,
+        ROTULOS.formattedNutritionValue(requestedItem.nutrition, field)
+      ])) : null;
+      if (nutrition) nutrition.enabled = true;
       if (!template || !mealName) throw new Error(`Preencha corretamente o rótulo ${index + 1}.`);
       if (quantity < 15 || quantity > 99990 || quantity % 15 !== 0) {
         throw new Error(`A quantidade do rótulo ${index + 1} deve ser múltipla de 15, com mínimo de 15 unidades.`);
+      }
+
+      if (hasNutrition && !ROTULOS.NUTRITION_FIELDS.every(field => nutrition[field.key])) {
+        throw new Error(`Preencha todos os valores nutricionais do rotulo ${index + 1}.`);
       }
 
       const unitPrice = money(customer.prices?.[template.id]);
@@ -1348,6 +1360,9 @@ app.post('/api/rotulos/public/orders', requestRateLimit({ windowMs: 15 * 60 * 10
         modeloRotulo: template.id,
         categoriaRotulo: template.category,
         tamanho: template.dimensions,
+        hasNutrition,
+        nutrition,
+        nutritionText: hasNutrition ? ROTULOS.nutritionSummary(nutrition) : '',
         quantidade: quantity,
         valor: unitPrice,
         comIVA: taxMode === 'iva' ? 'sim' : 'nao',
@@ -1400,6 +1415,9 @@ app.post('/api/rotulos/public/orders', requestRateLimit({ windowMs: 15 * 60 * 10
   } catch (error) {
     const isInputError = /Preencha corretamente|deve ser múltipla de 15/.test(error.message);
     if (!isInputError) console.error('Erro ao criar pedido de rótulos:', error);
+    if (/valores nutricionais/.test(error.message)) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
     res.status(isInputError ? 400 : 500).json({
       success: false,
       message: isInputError ? error.message : 'Não foi possível enviar o pedido.'
@@ -2233,7 +2251,7 @@ app.get('/api/rotulos/orders/:id/items/:itemIndex/eps', async (req, res) => {
     const item = payload?.source === 'rotulos' && Array.isArray(payload.produtos) ? payload.produtos[itemIndex] : null;
     if (!item) return res.status(404).json({ success: false, message: 'Rótulo não encontrado.' });
 
-    const eps = ROTULOS.generateLabelEps(item.modeloRotulo, item.nome);
+    const eps = ROTULOS.generateLabelEps(item.modeloRotulo, item.nome, item.nutrition);
     const filename = `${item.quantidade}un-${ROTULOS.safeFilename(item.nome)}.eps`;
     res.set({
       'Content-Type': 'application/postscript',
