@@ -2536,7 +2536,11 @@ app.get('/api/moloni/options', async (req, res) => {
     const client = new MoloniClient({ accessToken });
     const config = await moloniConfig();
     const companies = await client.call('companies/getAll');
-    const companyId = Number(config.companyId || companies?.[0]?.company_id || 0);
+    const requestedCompanyId = Number(req.query.companyId || 0);
+    const realCompany = (Array.isArray(companies) ? companies : []).find(company =>
+      !/demonstra/i.test(String(company?.name || ''))
+    );
+    const companyId = Number(requestedCompanyId || config.companyId || realCompany?.company_id || companies?.[0]?.company_id || 0);
     const common = { company_id: companyId, qty: 50, offset: 0 };
     const [documentSets, taxes, paymentMethods, products] = await Promise.all([
       client.call('documentSets/getAll', common),
@@ -2544,7 +2548,7 @@ app.get('/api/moloni/options', async (req, res) => {
       client.call('paymentMethods/getAll', common),
       client.call('products/getAll', common)
     ]);
-    res.json({ success: true, companies, documentSets, taxes, paymentMethods, products });
+    res.json({ success: true, companyId, companies, documentSets, taxes, paymentMethods, products });
   } catch (error) {
     res.status(502).json({ success: false, message: error.message || 'Falha ao sincronizar opcoes do Moloni.' });
   }

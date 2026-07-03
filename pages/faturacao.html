@@ -424,10 +424,11 @@
         }).filter(([name, id]) => name && id > 0));
       }
 
-      async function syncOptions() {
-        state.options = await api('/api/moloni/options');
+      async function syncOptions(companyId = '') {
+        const suffix = companyId ? `?companyId=${encodeURIComponent(companyId)}` : '';
+        state.options = await api(`/api/moloni/options${suffix}`);
         const settings = state.status?.settings || {};
-        selectOptions($('companyId'), state.options.companies, 'company_id', 'name', state.status?.companyId);
+        selectOptions($('companyId'), state.options.companies, 'company_id', 'name', companyId || state.status?.companyId || state.options.companyId);
         selectOptions($('invoiceSet'), state.options.documentSets, 'document_set_id', 'name', settings.invoiceDocumentSetId);
         selectOptions($('invoiceReceiptSet'), state.options.documentSets, 'document_set_id', 'name', settings.invoiceReceiptDocumentSetId);
         selectOptions($('receiptSet'), state.options.documentSets, 'document_set_id', 'name', settings.receiptDocumentSetId);
@@ -488,7 +489,8 @@
       $('closeBtn').addEventListener('click', () => issueDocument('closed'));
       $('settingsBtn').addEventListener('click', openSettings);
       $('closeSettings').addEventListener('click', () => $('settingsDialog').close());
-      $('syncOptionsBtn').addEventListener('click', () => syncOptions().catch(error => message(error.message, 'error')));
+      $('companyId').addEventListener('change', () => syncOptions($('companyId').value).catch(error => message(error.message, 'error')));
+      $('syncOptionsBtn').addEventListener('click', () => syncOptions($('companyId').value).catch(error => message(error.message, 'error')));
       $('saveSettingsBtn').addEventListener('click', () => saveSettings().catch(error => message(error.message, 'error')));
       $('connectBtn').addEventListener('click', connect);
       $('disconnectBtn').addEventListener('click', () => disconnect().catch(error => message(error.message, 'error')));
