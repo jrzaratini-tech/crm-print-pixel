@@ -14,6 +14,26 @@ const {
   roundMoney: moloniMoney
 } = require('./core/moloni.js');
 
+function loadLocalEnvFile() {
+  const envPath = path.join(__dirname, '.env');
+  if (!require('fs').existsSync(envPath)) return;
+  const content = require('fs').readFileSync(envPath, 'utf8');
+  content.split(/\r?\n/).forEach(line => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) return;
+    const separator = trimmed.indexOf('=');
+    if (separator <= 0) return;
+    const key = trimmed.slice(0, separator).trim();
+    let value = trimmed.slice(separator + 1).trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+      value = value.slice(1, -1);
+    }
+    if (!Object.prototype.hasOwnProperty.call(process.env, key)) process.env[key] = value;
+  });
+}
+
+loadLocalEnvFile();
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
@@ -469,11 +489,14 @@ async function moloniDocuments() {
 
 function moloniPublicStatus(config = {}) {
   const connected = Boolean(config.tokens);
+  const checklist = moloniRequiredSettings(config);
   return {
     mode: MOLONI_MODE,
     connected,
-    readyForLive: MOLONI_MODE === 'live' && connected && Boolean(config.companyId),
+    readyForLive: MOLONI_MODE === 'live' && checklist.every(item => item.ok),
     credentialsConfigured: Boolean(MOLONI_CLIENT_ID && MOLONI_CLIENT_SECRET && MOLONI_REDIRECT_URI),
+    redirectUri: MOLONI_REDIRECT_URI,
+    checklist,
     companyId: config.companyId || '',
     settings: config.settings || {},
     updatedAt: config.updatedAt || ''
@@ -492,6 +515,29 @@ function moloniPaymentMethodId(settings, method) {
   const normalized = String(method || '').trim().toLowerCase();
   const mappings = settings.paymentMethods || {};
   return Number(mappings[normalized] || mappings.outro || settings.defaultPaymentMethodId || 0);
+}
+
+function moloniRequiredSettings(config = {}) {
+  const settings = config.settings || {};
+  return [
+    { key: 'modeLive', label: 'Modo live ativo', ok: MOLONI_MODE === 'live' },
+    { key: 'credentials', label: 'Developer ID, Client Secret e Redirect URI configurados', ok: Boolean(MOLONI_CLIENT_ID && MOLONI_CLIENT_SECRET && MOLONI_REDIRECT_URI) },
+    { key: 'connected', label: 'Conta Moloni ligada por OAuth', ok: Boolean(config.tokens) },
+    { key: 'company', label: 'Empresa Moloni selecionada', ok: Number(config.companyId || 0) > 0 },
+    { key: 'invoiceSet', label: 'Serie de Faturas selecionada', ok: Number(settings.invoiceDocumentSetId || 0) > 0 },
+    { key: 'invoiceReceiptSet', label: 'Serie de Faturas-Recibo selecionada', ok: Number(settings.invoiceReceiptDocumentSetId || 0) > 0 },
+    { key: 'receiptSet', label: 'Serie de Recibos selecionada', ok: Number(settings.receiptDocumentSetId || 0) > 0 },
+    { key: 'product', label: 'Artigo generico selecionado', ok: Number(settings.defaultProductId || 0) > 0 },
+    { key: 'payment', label: 'Metodo de pagamento predefinido selecionado', ok: Number(settings.defaultPaymentMethodId || 0) > 0 }
+  ];
+}
+
+function moloniAssertReadyForIssue(config = {}) {
+  if (MOLONI_MODE !== 'live') return;
+  const missing = moloniRequiredSettings(config).filter(item => !item.ok);
+  if (missing.length) {
+    throw new Error(`Integracao Moloni incompleta: ${missing.map(item => item.label).join(', ')}.`);
+  }
 }
 
 function moloniSalesPayload(preview, config, status) {
@@ -2451,6 +2497,17 @@ app.post('/api/moloni/settings', async (req, res) => {
     if (MOLONI_MODE === 'live' && !(companyId > 0)) {
       return res.status(400).json({ success: false, message: 'Selecione a empresa Moloni.' });
     }
+    if (MOLONI_MODE === 'live') {
+      const required = [
+        ['invoiceDocumentSetId', 'Selecione a serie de Faturas.'],
+        ['invoiceReceiptDocumentSetId', 'Selecione a serie de Faturas-Recibo.'],
+        ['receiptDocumentSetId', 'Selecione a serie de Recibos.'],
+        ['defaultProductId', 'Selecione o artigo generico.'],
+        ['defaultPaymentMethodId', 'Selecione o metodo de pagamento predefinido.']
+      ];
+      const missing = required.find(([key]) => !(Number(normalized[key] || 0) > 0));
+      if (missing) return res.status(400).json({ success: false, message: missing[1] });
+    }
     const config = await saveMoloniConfig({ companyId, settings: normalized });
     res.json({ success: true, ...moloniPublicStatus(config) });
   } catch (error) {
@@ -2608,7 +2665,7 @@ app.post('/api/moloni/documents', async (req, res) => {
       };
     } else {
       const config = await moloniConfig();
-      if (!config.companyId) throw new Error('Configure a empresa e as series Moloni antes de emitir.');
+      moloniAssertReadyForIssue(config);
       const client = new MoloniClient({ accessToken: await moloniAccessToken() });
       preview.moloniCustomerId = await ensureMoloniCustomer(client, preview, config);
       const payload = preview.type === 'receipt'

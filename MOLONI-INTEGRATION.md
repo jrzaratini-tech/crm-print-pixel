@@ -1,45 +1,79 @@
 # Integração Moloni
 
-O CRM inicia com `MOLONI_MODE=mock`. Neste modo é possível testar a página de
-faturação, validações, pagamentos parciais, histórico e bloqueio de duplicados
-sem criar documentos fiscais reais.
+O CRM suporta dois modos:
 
-## Fluxos implementados
+- `MOLONI_MODE=mock`: modo seguro para testar o fluxo sem criar documentos fiscais reais.
+- `MOLONI_MODE=live`: ligação real à API Moloni, com OAuth, séries, artigos, impostos e métodos de pagamento sincronizados da conta.
 
-- Fatura para um pedido ainda não liquidado.
+## O que já está implementado
+
+- Fatura para pedido ainda não liquidado.
 - Fatura-Recibo quando o pedido está totalmente pago.
-- Recibos parciais ou finais associados à fatura.
+- Recibo parcial ou final associado à fatura já emitida.
 - Um recibo por pagamento registado no pedido.
 - Rascunho ou documento fechado.
-- Histórico por pedido, estado de erro e consulta de PDF em modo real.
+- Histórico por pedido, bloqueio de duplicados e consulta de PDF em modo real.
+- Tokens OAuth cifrados antes de guardar no Firestore.
 
-## Ativação real
+## Ativar em modo real
 
-1. Alterar a subscrição Moloni para um plano com acesso à API.
-2. Ativar a conta Developer e criar o `Developer ID`, `Client Secret` e a URI
-   de resposta.
-3. Configurar no servidor:
+1. No Moloni, confirmar que o plano Flex/API está ativo.
+2. Na área Developer/API do Moloni, criar/confirmar:
+   - Developer ID;
+   - Client Secret;
+   - Redirect URI.
+3. A Redirect URI deve ser exatamente a rota pública do CRM:
 
-   - `MOLONI_MODE=live`
-   - `MOLONI_CLIENT_ID`
-   - `MOLONI_CLIENT_SECRET`
-   - `MOLONI_REDIRECT_URI`
-   - `MOLONI_ENCRYPTION_KEY`
+   ```text
+   https://SEU-DOMINIO/api/moloni/oauth/callback
+   ```
 
-4. Reiniciar o CRM e abrir **Faturação > Ligar Moloni**.
-5. Em **Configuração**, selecionar a empresa, as três séries, o artigo
-   genérico, o imposto e os métodos de pagamento.
-6. Criar primeiro um documento em rascunho e confirmar os dados diretamente no
-   Moloni. Só depois usar **Emitir e fechar**.
+4. No servidor/hosting do CRM, configurar:
+
+   ```env
+   MOLONI_MODE=live
+   MOLONI_CLIENT_ID=developer-id-do-moloni
+   MOLONI_CLIENT_SECRET=client-secret-do-moloni
+   MOLONI_REDIRECT_URI=https://SEU-DOMINIO/api/moloni/oauth/callback
+   MOLONI_ENCRYPTION_KEY=uma-chave-longa-aleatoria-e-exclusiva
+   ```
+
+   Em desenvolvimento local, o `server.js` também carrega um ficheiro `.env` na raiz do projeto. Esse ficheiro está ignorado pelo Git.
+
+5. Reiniciar o CRM.
+6. Abrir `Faturação Moloni`.
+7. Clicar em `Ligar Moloni` e autorizar a conta no ecrã do Moloni.
+8. Abrir `Configuração` e sincronizar opções.
+9. Selecionar:
+   - empresa;
+   - série de Faturas;
+   - série de Faturas-Recibo;
+   - série de Recibos;
+   - artigo genérico;
+   - IVA normal;
+   - método de pagamento predefinido;
+   - mapeamento de pagamentos do CRM para métodos Moloni, se necessário.
+
+## Primeiro teste recomendado
+
+Antes de fechar qualquer documento real:
+
+1. Escolher um pedido simples.
+2. Criar `Rascunho`.
+3. Abrir o Moloni e confirmar cliente, NIF, linhas, IVA, série e total.
+4. Só depois usar `Emitir e fechar`.
+
+Documento fechado (`status=1`) pode comunicar/conciliar fiscalmente e não deve ser usado como teste visual.
 
 ## Segurança e controlo
 
-- Tokens OAuth são cifrados antes de serem guardados.
 - O navegador nunca recebe o `Client Secret` nem os tokens.
+- O access token é renovado automaticamente com refresh token.
+- Se o refresh token expirar, é necessário voltar a ligar a conta Moloni.
+- O CRM bloqueia emissão live se faltar empresa, séries, artigo ou método de pagamento.
 - Cada pedido só pode originar uma Fatura ou Fatura-Recibo válida.
 - Cada pagamento possui uma chave única para impedir recibos duplicados.
 - Um recibo não pode ultrapassar o saldo ainda não conciliado.
 - O fecho exige confirmação explícita na interface.
 
-Antes da ativação real, confirme com o contabilista qual o documento a usar
-para adiantamentos no enquadramento fiscal da empresa.
+Confirme com o contabilista qual o documento correto para adiantamentos no enquadramento fiscal da empresa.

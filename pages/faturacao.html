@@ -67,6 +67,12 @@
     .notice.warning { background: #fff7ed; color: #9a3412; }
     .notice.success { background: #ecfdf5; color: #047857; }
     .notice.error { background: #fef2f2; color: #b91c1c; }
+    .activation { margin-bottom: 20px; }
+    .activation ul { margin: 10px 0 0; padding-left: 0; display: grid; gap: 7px; list-style: none; }
+    .activation li { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+    .activation li.ok { color: #047857; font-weight: 700; }
+    .activation li.missing { color: #b45309; }
+    .code { display: inline-block; background: #f1f5f9; border: 1px solid #dbe3ef; border-radius: 7px; padding: 3px 7px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 12px; }
     .actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
     table { width: 100%; border-collapse: collapse; }
     th, td { text-align: left; padding: 11px 9px; border-bottom: 1px solid var(--line); vertical-align: top; }
@@ -105,6 +111,7 @@
     </div>
 
     <div id="globalMessage"></div>
+    <article class="card activation" id="activationCard" hidden></article>
 
     <section class="layout">
       <div>
@@ -238,6 +245,25 @@
         $('connectBtn').hidden = mock || state.status.connected;
         $('disconnectBtn').hidden = !state.status.connected;
         if (mock) message('Pode testar todo o fluxo. Os documentos criados ficam identificados como MOCK e não chegam à Autoridade Tributária.', 'warning');
+        renderActivation();
+      }
+
+      function renderActivation() {
+        const status = state.status || {};
+        const card = $('activationCard');
+        if (!status || status.mode === 'mock') {
+          card.hidden = true;
+          return;
+        }
+        const checklist = status.checklist || [];
+        const missing = checklist.filter(item => !item.ok);
+        card.hidden = false;
+        card.innerHTML = `
+          <div class="card-title"><h2>Ativação da API Moloni</h2><span class="badge ${missing.length ? 'error' : 'live'}">${missing.length ? 'Incompleto' : 'Pronto'}</span></div>
+          <p class="muted">Redirect URI configurado no CRM: <span class="code">${escapeHtml(status.redirectUri || 'por configurar')}</span></p>
+          <ul>${checklist.map(item => `<li class="${item.ok ? 'ok' : 'missing'}"><i class="fa-solid ${item.ok ? 'fa-circle-check' : 'fa-circle-exclamation'}"></i> ${escapeHtml(item.label)}</li>`).join('')}</ul>
+          ${missing.length ? '<div class="notice warning">Complete estes pontos antes de usar “Emitir e fechar”. O primeiro documento real deve ser criado como rascunho para confirmar os dados no Moloni.</div>' : '<div class="notice success">Integração pronta. Recomendo criar o primeiro documento como rascunho e confirmar no Moloni antes de fechar.</div>'}
+        `;
       }
 
       async function loadOrders() {
