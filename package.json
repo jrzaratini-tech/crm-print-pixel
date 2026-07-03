@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "moloni:check": "node scripts/moloni-check.js",
     "test": "node --test tests/*.test.js"
   },
   "dependencies": {
