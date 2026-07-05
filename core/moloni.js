@@ -68,6 +68,92 @@ function documentLabel(type) {
   }[type] || type;
 }
 
+function recommendDocumentAction({ order = {}, documents = [] } = {}) {
+  const totals = orderTotals(order);
+  const activeDocuments = (Array.isArray(documents) ? documents : []).filter(document => document && document.state !== 'error');
+  const saleDocument = activeDocuments.find(document => ['invoice', 'invoice_receipt'].includes(document.type));
+  const receiptDocuments = activeDocuments.filter(document => document.type === 'receipt');
+  const receipted = roundMoney(receiptDocuments.reduce((sum, document) => sum + roundMoney(document.value), 0));
+  const pendingReceipt = Math.max(0, roundMoney(totals.paid - receipted));
+
+  if (!(totals.total > 0)) {
+    return {
+      type: 'blocked',
+      documentType: 'invoice',
+      title: 'Pedido sem valor para faturar',
+      message: 'Este pedido não tem total positivo. Corrija o pedido antes de criar documentos fiscais.',
+      amount: 0
+    };
+  }
+
+  if (!saleDocument) {
+    if (totals.paid >= totals.total && totals.paid <= totals.total + 0.009) {
+      return {
+        type: 'invoice_receipt',
+        documentType: 'invoice_receipt',
+        title: 'Recomendado: Fatura-Recibo',
+        message: 'O pedido está totalmente pago e ainda não tem documento de venda. A opção mais direta é emitir Fatura-Recibo.',
+        amount: totals.total
+      };
+    }
+    if (totals.paid > 0 && totals.paid < totals.total) {
+      return {
+        type: 'invoice_then_receipt',
+        documentType: 'invoice',
+        title: 'Recomendado: Fatura primeiro, depois Recibo parcial',
+        message: `O cliente já pagou ${totals.paid.toFixed(2)} mas ainda falta ${totals.outstanding.toFixed(2)}. Emita primeiro a Fatura do total; depois emita Recibo do pagamento recebido.`,
+        amount: totals.total,
+        receiptAmount: totals.paid
+      };
+    }
+    return {
+      type: 'invoice',
+      documentType: 'invoice',
+      title: 'Recomendado: Fatura',
+      message: 'Ainda não há pagamento registado para este pedido. Emita Fatura e depois crie recibos à medida que o cliente pagar.',
+      amount: totals.total
+    };
+  }
+
+  if (saleDocument.type === 'invoice_receipt') {
+    return {
+      type: 'complete',
+      documentType: 'invoice_receipt',
+      title: 'Pedido já faturado e recebido',
+      message: 'Este pedido já tem Fatura-Recibo. Não é necessário criar novo documento de venda.',
+      amount: 0
+    };
+  }
+
+  if (pendingReceipt > 0.009) {
+    return {
+      type: 'receipt',
+      documentType: 'receipt',
+      title: 'Recomendado: Recibo',
+      message: `A Fatura já existe e há ${pendingReceipt.toFixed(2)} recebido ainda sem recibo. Emita Recibo para conciliar esse pagamento.`,
+      amount: pendingReceipt
+    };
+  }
+
+  if (totals.outstanding > 0.009) {
+    return {
+      type: 'wait_payment',
+      documentType: 'receipt',
+      title: 'Aguardar próximo pagamento',
+      message: `A Fatura já existe e os pagamentos registados já estão conciliados. Falta receber ${totals.outstanding.toFixed(2)}.`,
+      amount: 0
+    };
+  }
+
+  return {
+    type: 'complete',
+    documentType: 'receipt',
+    title: 'Pedido faturado e recebido',
+    message: 'A Fatura já existe e os pagamentos registados estão conciliados.',
+    amount: 0
+  };
+}
+
 function buildDocumentPreview({ order, type, paymentId, amount, issueDate }) {
   const documentType = normalizeDocumentType(type);
   const errors = validateFiscalOrder(order);
@@ -198,5 +284,6 @@ module.exports = {
   oauthAuthorizationUrl,
   orderTotals,
   paidPayments,
+  recommendDocumentAction,
   roundMoney
 };

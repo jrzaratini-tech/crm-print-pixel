@@ -52,8 +52,9 @@
     input:focus, select:focus { outline: 3px solid rgba(37, 99, 235, .12); border-color: var(--primary); }
     .two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .order-list { display: grid; gap: 9px; max-height: 610px; overflow: auto; padding-right: 4px; }
-    .order { border: 1px solid var(--line); border-radius: 11px; padding: 13px; cursor: pointer; background: #fff; }
+    .order { width: 100%; text-align: left; border: 1px solid var(--line); border-radius: 11px; padding: 13px; cursor: pointer; background: #fff; color: inherit; }
     .order:hover, .order.active { border-color: #80a5ff; background: #f5f8ff; }
+    .order.active { box-shadow: inset 4px 0 0 var(--primary); }
     .order-top, .row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
     .order strong { font-size: 15px; }
     .money { font-weight: 800; white-space: nowrap; }
@@ -67,6 +68,10 @@
     .notice.warning { background: #fff7ed; color: #9a3412; }
     .notice.success { background: #ecfdf5; color: #047857; }
     .notice.error { background: #fef2f2; color: #b91c1c; }
+    .recommendation { border: 1px solid #bfdbfe; background: #eff6ff; color: #1e3a8a; border-radius: 12px; padding: 13px 14px; margin-bottom: 16px; }
+    .recommendation strong { display: block; color: #1d4ed8; margin-bottom: 4px; }
+    .recommendation .rec-actions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
+    .recommendation .mini { border: 0; border-radius: 999px; padding: 6px 10px; background: white; color: #1d4ed8; font-weight: 800; cursor: pointer; }
     .activation { margin-bottom: 20px; }
     .activation ul { margin: 10px 0 0; padding-left: 0; display: grid; gap: 7px; list-style: none; }
     .activation li { display: flex; align-items: center; gap: 8px; color: var(--muted); }
@@ -140,6 +145,7 @@
               <span class="money" id="selectedTotal"></span>
             </div>
             <div class="summary" id="orderSummary"></div>
+            <div id="recommendationBox"></div>
             <div class="two">
               <div class="field">
                 <label for="documentType">Documento</label>
@@ -283,6 +289,65 @@
           .reduce((sum, payment) => sum + Number(payment.valor || 0), 0);
       }
 
+      function roundMoney(value) {
+        const parsed = Number.parseFloat(String(value || 0).replace(',', '.'));
+        return Number.isFinite(parsed) ? Math.round(parsed * 100) / 100 : 0;
+      }
+
+      function orderDocuments(orderId) {
+        return (state.documents || []).filter(document => document.orderId === orderId && document.state !== 'error');
+      }
+
+      function recommendationFor(order) {
+        const total = roundMoney(order.total);
+        const paid = roundMoney(paidTotal(order));
+        const outstanding = Math.max(0, roundMoney(total - paid));
+        const documents = orderDocuments(order.id);
+        const sale = documents.find(document => ['invoice', 'invoice_receipt'].includes(document.type));
+        const receipted = roundMoney(documents
+          .filter(document => document.type === 'receipt')
+          .reduce((sum, document) => sum + Number(document.value || 0), 0));
+        const pendingReceipt = Math.max(0, roundMoney(paid - receipted));
+        if (!(total > 0)) return {
+          kind: 'blocked', documentType: 'invoice', title: 'Pedido sem valor para faturar',
+          message: 'Corrija o total do pedido antes de criar documentos fiscais.', amount: 0
+        };
+        if (!sale) {
+          if (paid >= total && paid <= total + 0.009) return {
+            kind: 'invoice_receipt', documentType: 'invoice_receipt', title: 'Recomendado: Fatura-Recibo',
+            message: 'O pedido está totalmente pago e ainda não tem documento de venda.', amount: total
+          };
+          if (paid > 0 && paid < total) return {
+            kind: 'invoice_then_receipt', documentType: 'invoice', title: 'Recomendado: Fatura primeiro, depois Recibo parcial',
+            message: `Já recebeu ${money(paid)} e falta ${money(outstanding)}. Emita primeiro a Fatura do total; depois emita Recibo do pagamento recebido.`,
+            amount: total,
+            receiptAmount: paid
+          };
+          return {
+            kind: 'invoice', documentType: 'invoice', title: 'Recomendado: Fatura',
+            message: 'Ainda não há pagamento registado. Emita Fatura e crie recibos à medida que o cliente pagar.', amount: total
+          };
+        }
+        if (sale.type === 'invoice_receipt') return {
+          kind: 'complete', documentType: 'invoice_receipt', title: 'Pedido já faturado e recebido',
+          message: 'Este pedido já tem Fatura-Recibo. Não crie outro documento de venda.', amount: 0
+        };
+        if (pendingReceipt > 0.009) return {
+          kind: 'receipt', documentType: 'receipt', title: 'Recomendado: Recibo',
+          message: `A Fatura já existe e há ${money(pendingReceipt)} recebido ainda sem recibo. Emita Recibo para conciliar.`,
+          amount: pendingReceipt
+        };
+        if (outstanding > 0.009) return {
+          kind: 'wait_payment', documentType: 'receipt', title: 'Aguardar próximo pagamento',
+          message: `A Fatura já existe e os pagamentos registados estão conciliados. Falta receber ${money(outstanding)}.`,
+          amount: 0
+        };
+        return {
+          kind: 'complete', documentType: 'receipt', title: 'Pedido faturado e recebido',
+          message: 'A Fatura já existe e os pagamentos registados estão conciliados.', amount: 0
+        };
+      }
+
       function renderOrders() {
         const query = $('search').value.trim().toLowerCase();
         const orders = state.orders.filter(order => [order.numero, order.cliente, order.empresa, order.nif]
@@ -290,14 +355,18 @@
         $('orderCount').textContent = `${orders.length} pedidos`;
         $('orderList').innerHTML = orders.length ? orders.map(order => {
           const paid = paidTotal(order);
-          return `<div class="order ${state.selected?.id === order.id ? 'active' : ''}" data-order-id="${escapeHtml(order.id)}">
+          return `<button type="button" class="order ${state.selected?.id === order.id ? 'active' : ''}" data-order-id="${escapeHtml(order.id)}" aria-pressed="${state.selected?.id === order.id ? 'true' : 'false'}">
             <div class="order-top"><strong>${escapeHtml(order.numero || 'Sem número')}</strong><span class="money">${money(order.total)}</span></div>
             <div>${escapeHtml(order.cliente || 'Cliente não indicado')}</div>
             <div class="tiny">${escapeHtml(order.nif || 'Sem NIF')} · pago ${money(paid)} · saldo ${money(Math.max(0, Number(order.total || 0) - paid))}</div>
-          </div>`;
+          </button>`;
         }).join('') : '<div class="empty">Nenhum pedido encontrado.</div>';
-        $('orderList').querySelectorAll('[data-order-id]').forEach(element => {
-          element.addEventListener('click', () => selectOrder(element.dataset.orderId));
+        $('orderList').querySelectorAll('button[data-order-id]').forEach(element => {
+          element.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            selectOrder(element.dataset.orderId);
+          });
         });
       }
 
@@ -313,7 +382,10 @@
         const order = state.selected;
         $('selectedEmpty').hidden = Boolean(order);
         $('issueForm').hidden = !order;
-        if (!order) return;
+        if (!order) {
+          $('recommendationBox').innerHTML = '';
+          return;
+        }
         const paid = paidTotal(order);
         const outstanding = Math.max(0, Number(order.total || 0) - paid);
         $('selectedCustomer').textContent = order.cliente || 'Cliente sem nome';
@@ -327,12 +399,46 @@
         $('paymentId').innerHTML = payments.length ? payments.map((payment, index) =>
           `<option value="${escapeHtml(payment.id || `payment-${index + 1}`)}">${escapeHtml(payment.data || '')} · ${money(payment.valor)} · ${escapeHtml(payment.formaPagamento || 'outro')}</option>`
         ).join('') : '<option value="">Sem pagamentos registados</option>';
+        renderRecommendation(order);
         updateDocumentFields();
         $('previewBox').innerHTML = '';
       }
 
+      function applyRecommendation(documentType) {
+        if (!documentType) return;
+        $('documentType').value = documentType;
+        updateDocumentFields();
+        $('previewBox').innerHTML = '';
+      }
+
+      function renderRecommendation(order) {
+        const recommendation = recommendationFor(order);
+        applyRecommendation(recommendation.documentType);
+        const disabled = ['blocked', 'complete', 'wait_payment'].includes(recommendation.kind);
+        $('draftBtn').disabled = disabled;
+        $('closeBtn').disabled = disabled;
+        const amount = recommendation.amount > 0 ? ` · Valor: ${money(recommendation.amount)}` : '';
+        const receiptHint = recommendation.receiptAmount > 0 ? `<div class="tiny">Depois da Fatura, emita Recibo de ${money(recommendation.receiptAmount)} para o pagamento já recebido.</div>` : '';
+        const button = disabled ? '' : `<button type="button" class="mini" id="applyRecommendationBtn">Usar sugestão${escapeHtml(amount)}</button>`;
+        $('recommendationBox').innerHTML = `
+          <div class="recommendation">
+            <strong>${escapeHtml(recommendation.title)}</strong>
+            <div>${escapeHtml(recommendation.message)}</div>
+            ${receiptHint}
+            <div class="rec-actions">${button}</div>
+          </div>`;
+        const applyBtn = $('applyRecommendationBtn');
+        if (applyBtn) applyBtn.addEventListener('click', () => applyRecommendation(recommendation.documentType));
+      }
+
       function updateDocumentFields() {
         $('paymentField').hidden = $('documentType').value !== 'receipt';
+        if (state.selected) {
+          const recommendation = recommendationFor(state.selected);
+          const disabled = ['blocked', 'complete', 'wait_payment'].includes(recommendation.kind);
+          $('draftBtn').disabled = disabled;
+          $('closeBtn').disabled = disabled;
+        }
       }
 
       async function previewDocument() {
@@ -347,6 +453,7 @@
           })
         });
         state.preview = result.preview;
+        state.recommendation = result.recommendation || state.recommendation;
         const preview = result.preview;
         $('previewBox').innerHTML = preview.valid
           ? `<div class="notice success"><strong>${escapeHtml(preview.label)} pronta.</strong> Valor: ${money(preview.type === 'receipt' ? preview.receiptValue : preview.totals.total)}. ${preview.products.length} linha(s).</div>`
@@ -377,11 +484,13 @@
           message(error.message, 'error');
         } finally {
           button.disabled = false;
+          updateDocumentFields();
         }
       }
 
       async function loadDocuments() {
         state.documents = (await api('/api/moloni/documents')).documents || [];
+        if (state.selected) renderSelected();
         renderDocuments();
       }
 

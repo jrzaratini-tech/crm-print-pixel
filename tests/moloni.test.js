@@ -4,7 +4,8 @@ const {
   buildDocumentPreview,
   flattenForm,
   orderTotals,
-  paidPayments
+  paidPayments,
+  recommendDocumentAction
 } = require('../core/moloni.js');
 
 const order = {
@@ -43,6 +44,44 @@ test('prepara recibo com o valor do pagamento escolhido', () => {
   assert.equal(preview.valid, true);
   assert.equal(preview.receiptValue, 300);
   assert.equal(preview.idempotencyKey, 'pedido-1:receipt:pag-1');
+});
+
+test('recomenda fatura quando o pedido tem pagamento parcial e ainda nao foi faturado', () => {
+  const recommendation = recommendDocumentAction({ order, documents: [] });
+  assert.equal(recommendation.documentType, 'invoice');
+  assert.equal(recommendation.type, 'invoice_then_receipt');
+  assert.equal(recommendation.amount, 1000);
+  assert.equal(recommendation.receiptAmount, 300);
+});
+
+test('recomenda fatura-recibo quando o pedido esta totalmente pago sem documento de venda', () => {
+  const recommendation = recommendDocumentAction({
+    order: { ...order, pagamentos: [{ id: 'pag-full', status: 'pago', valor: 1000 }] },
+    documents: []
+  });
+  assert.equal(recommendation.documentType, 'invoice_receipt');
+  assert.equal(recommendation.type, 'invoice_receipt');
+});
+
+test('recomenda recibo quando ja existe fatura e pagamento por conciliar', () => {
+  const recommendation = recommendDocumentAction({
+    order,
+    documents: [{ type: 'invoice', state: 'closed', value: 1000 }]
+  });
+  assert.equal(recommendation.documentType, 'receipt');
+  assert.equal(recommendation.type, 'receipt');
+  assert.equal(recommendation.amount, 300);
+});
+
+test('reconhece pedido completo quando fatura e recibos ja cobrem pagamentos', () => {
+  const recommendation = recommendDocumentAction({
+    order: { ...order, pagamentos: [{ id: 'pag-full', status: 'pago', valor: 1000 }] },
+    documents: [
+      { type: 'invoice', state: 'closed', value: 1000 },
+      { type: 'receipt', state: 'closed', value: 1000 }
+    ]
+  });
+  assert.equal(recommendation.type, 'complete');
 });
 
 test('serializa estruturas aninhadas para formularios Moloni', () => {

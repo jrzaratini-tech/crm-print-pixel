@@ -183,6 +183,9 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(billingPageResult.body, /Faturação Moloni/);
   assert.match(billingPageResult.body, /api\/moloni\/documents\/preview/);
   assert.match(billingPageResult.body, /Modo de teste/);
+  assert.match(billingPageResult.body, /button type="button" class="order/);
+  assert.match(billingPageResult.body, /recommendationBox/);
+  assert.match(billingPageResult.body, /Recomendado: Fatura primeiro, depois Recibo parcial/);
   assert.match(ordersPageResult.body, /hardDelete: true/);
   assert.match(expensesPageResult.body, /excluirDespesa/);
   assert.match(expensesPageResult.body, /hardDelete: true/);

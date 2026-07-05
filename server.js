@@ -11,6 +11,7 @@ const {
   buildDocumentPreview,
   cleanText: moloniText,
   oauthAuthorizationUrl,
+  recommendDocumentAction,
   roundMoney: moloniMoney
 } = require('./core/moloni.js');
 
@@ -2571,6 +2572,7 @@ app.post('/api/moloni/documents/preview', async (req, res) => {
   try {
     const order = await moloniOrder(req.body?.orderId);
     if (!order) return res.status(404).json({ success: false, message: 'Pedido nao encontrado.' });
+    const documents = await moloniDocuments();
     const preview = buildDocumentPreview({
       order,
       type: req.body?.type,
@@ -2578,7 +2580,6 @@ app.post('/api/moloni/documents/preview', async (req, res) => {
       amount: req.body?.amount,
       issueDate: req.body?.issueDate
     });
-    const documents = await moloniDocuments();
     if (preview.type === 'receipt') {
       const invoice = documents.find(document =>
         document.orderId === order.id && document.type === 'invoice' && document.state !== 'error'
@@ -2593,7 +2594,14 @@ app.post('/api/moloni/documents/preview', async (req, res) => {
       preview.valid = preview.errors.length === 0;
       preview.invoiceDocumentId = invoice?.moloniDocumentId || '';
     }
-    res.json({ success: true, preview: sanitizeForResponse(preview) });
+    res.json({
+      success: true,
+      preview: sanitizeForResponse(preview),
+      recommendation: sanitizeForResponse(recommendDocumentAction({
+        order,
+        documents: documents.filter(document => document.orderId === order.id)
+      }))
+    });
   } catch (error) {
     res.status(400).json({ success: false, message: error.message || 'Nao foi possivel preparar o documento.' });
   }
