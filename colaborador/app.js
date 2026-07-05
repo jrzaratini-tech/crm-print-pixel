@@ -4,6 +4,7 @@
   const TOKEN_KEY = 'printpixel_producao_token';
   let token = localStorage.getItem(TOKEN_KEY) || '';
   let assignments = [];
+  let currentWorker = null;
   let currentOrderId = '';
   let deferredInstall = null;
   const $ = id => document.getElementById(id);
@@ -63,6 +64,13 @@
     return list.reduce((sum, item) => sum + (Number(item.commission) || 0), 0);
   }
 
+  function assignedStepValue(assignment) {
+    const workerId = currentWorker?.id || '';
+    return (assignment.steps || [])
+      .filter(step => step.done && (!step.completedByWorkerId || step.completedByWorkerId === workerId))
+      .reduce((sum, step) => sum + (Number(step.commissionValue) || 0), 0);
+  }
+
   function renderCard(assignment, status) {
     const order = assignment.order;
     const card = document.createElement('article');
@@ -79,7 +87,8 @@
       </div>
       <div class="meta">
         <span>Entrega: ${escapeHtml(order.dataEntrega || 'Nao definida')}</span>
-        <span>Comissao: ${money(assignment.commission)}</span>
+        <span>Comissao total: ${money(assignment.commission)}</span>
+        <span>Ja atribuido: ${money(assignedStepValue(assignment))}</span>
         <span>${assignment.steps.filter(step => step.done).length}/${assignment.steps.length} etapas</span>
         <span>${status === 'paid' ? `Pago em ${new Date(assignment.paidAt).toLocaleDateString('pt-PT')}` : escapeHtml(order.empresa || '')}</span>
       </div>
@@ -122,6 +131,7 @@
       localStorage.setItem(TOKEN_KEY, token);
       const result = await api('/api/colaborador/session');
       showApp();
+      currentWorker = result.worker;
       $('workerName').textContent = result.worker.name;
       assignments = result.assignments;
       render();
@@ -160,7 +170,8 @@
         <p>Entrega: ${escapeHtml(order.dataEntrega || 'Nao definida')}</p>
         <p>Morada: ${escapeHtml(order.morada || 'Nao informada')}</p>
         <p>Contacto: ${escapeHtml(order.telemovel || 'Nao informado')}</p>
-        <p>Comissao: <strong>${money(assignment.commission)}</strong></p>
+        <p>Comissao total atribuida: <strong>${money(assignment.commission)}</strong></p>
+        <p>Ja marcado para voce: <strong>${money(assignedStepValue(assignment))}</strong></p>
         <p>Status do pagamento: <strong>${paid ? `Pago em ${new Date(assignment.paidAt).toLocaleString('pt-PT')}` : isDone(assignment) ? 'Concluido e aguardando pagamento' : 'Em andamento'}</strong></p>
         <p>${escapeHtml(order.observacoes || '')}</p>
       </div>
@@ -170,11 +181,15 @@
       </div>
       <div class="box">
         <b>Etapas</b>
-        ${assignment.steps.map(step => `<div class="step">
-          <label><input type="checkbox" data-step="${escapeHtml(step.id)}" ${step.done ? 'checked' : ''} ${paid ? 'disabled' : ''}><span>${escapeHtml(step.label)}</span></label>
-          <small>${Number(step.actualMinutes || 0)} min realizados</small>
-          ${paid ? '' : `<button type="button" data-timer-step="${escapeHtml(step.id)}" data-action="${activeTimerFor(assignment, step.id) ? 'stop' : 'start'}">${activeTimerFor(assignment, step.id) ? 'Parar tempo' : 'Iniciar tempo'}</button>`}
-        </div>`).join('')}
+        ${assignment.steps.map(step => {
+          const lockedByOther = step.done && step.completedByWorkerId && step.completedByWorkerId !== currentWorker?.id;
+          const owner = step.completedByWorkerName ? ` · feito por ${escapeHtml(step.completedByWorkerName)}` : '';
+          return `<div class="step">
+          <label><input type="checkbox" data-step="${escapeHtml(step.id)}" ${step.done ? 'checked' : ''} ${paid || lockedByOther ? 'disabled' : ''}><span>${escapeHtml(step.label)}</span></label>
+          <small>${Number(step.actualMinutes || 0)} min realizados · ${money(step.commissionValue || 0)}${owner}</small>
+          ${paid || lockedByOther ? '' : `<button type="button" data-timer-step="${escapeHtml(step.id)}" data-action="${activeTimerFor(assignment, step.id) ? 'stop' : 'start'}">${activeTimerFor(assignment, step.id) ? 'Parar tempo' : 'Iniciar tempo'}</button>`}
+        </div>`;
+        }).join('')}
       </div>
       <div class="box">
         <b>Chat privado</b>

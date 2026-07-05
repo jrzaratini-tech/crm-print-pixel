@@ -54,22 +54,21 @@ const UPLOAD_TTL_MS = 15 * 60 * 1000;
 const MOBILE_DEVICE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 const PRODUCTION_SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 const LABEL_PLATFORM_MONTHLY_FEE = 15;
-const PRODUCTION_STEPS = [
-  'Arte / projeto',
-  'Modelagem',
-  'Usinagem CNC',
-  'Impressao 3D',
-  'Montagem da estrutura',
-  'Pintura interna',
-  'LED / solda',
-  'Cola quente',
-  'Corte laser opalino',
-  'Pintura externa',
-  'Acabamento',
-  'Molde de instalacao',
-  'Embalagem',
-  'Instalacao'
+const PRODUCTION_PROCESS_CATALOG = [
+  { label: 'Pintura interna', difficulty: 4 },
+  { label: 'Montagem da estrutura', difficulty: 1 },
+  { label: 'Montagem do painel ACM', difficulty: 2 },
+  { label: 'Gabarito de instalacao', difficulty: 4 },
+  { label: 'Aplicar e soldar LED', difficulty: 1 },
+  { label: 'Cola quente', difficulty: 2 },
+  { label: 'Silicone', difficulty: 2 },
+  { label: 'Corte laser', difficulty: 3 },
+  { label: 'Montagem face', difficulty: 2 },
+  { label: 'Pintura prata / ouro', difficulty: 3 },
+  { label: 'Borracha neon', difficulty: 1 },
+  { label: 'Limpeza / embalagem', difficulty: 4 }
 ];
+const PRODUCTION_STEPS = PRODUCTION_PROCESS_CATALOG.map(step => step.label);
 const DEFAULT_PRODUCTS = [
   'Logo em Acrilico',
   'Logo Flutuante para Montra',
@@ -931,15 +930,56 @@ function productionStepId(label) {
     .toLowerCase();
 }
 
-function normalizeProductionSteps(selected = [], previous = []) {
+function productionStepMeta(value) {
+  const id = productionStepId(value?.id || value?.label || value);
+  const found = PRODUCTION_PROCESS_CATALOG.find(step => productionStepId(step.label) === id);
+  if (!found) return null;
+  const difficulty = Math.min(4, Math.max(1, Number(found.difficulty) || 4));
+  return { id, label: found.label, difficulty, weight: 5 - difficulty };
+}
+
+function splitProductionCommission(steps, commission) {
+  const totalWeight = steps.reduce((sum, step) => sum + Math.max(1, Number(step.weight) || 1), 0);
+  let allocated = 0;
+  return steps.map((step, index) => {
+    const raw = totalWeight > 0 ? money(commission) * Math.max(1, Number(step.weight) || 1) / totalWeight : 0;
+    const value = index === steps.length - 1 ? money(money(commission) - allocated) : money(raw);
+    allocated = money(allocated + value);
+    return { ...step, commissionValue: value };
+  });
+}
+
+function normalizeProductionWorkers(value, fallbackWorker = null) {
+  const source = Array.isArray(value) ? value : value ? [value] : [];
+  const ids = source
+    .map(item => String(item?.id || item || '').trim())
+    .filter(Boolean);
+  if (!ids.length && fallbackWorker?.id) ids.push(fallbackWorker.id);
+  return Array.from(new Set(ids));
+}
+
+function productionAssignmentWorkers(workerIds = [], allWorkers = [], fallback = null) {
+  const ids = normalizeProductionWorkers(workerIds, fallback);
+  return ids
+    .map(id => allWorkers.find(worker => worker.id === id && worker.active !== false))
+    .filter(Boolean)
+    .map(worker => ({ id: worker.id, name: worker.name, role: worker.role }));
+}
+
+function normalizeProductionSteps(selected = [], previous = [], commission = 0) {
   const selectedIds = new Set((Array.isArray(selected) ? selected : []).map(value => productionStepId(value.id || value)));
-  return PRODUCTION_STEPS
-    .filter(label => selectedIds.has(productionStepId(label)))
-    .map(label => {
-      const id = productionStepId(label);
+  const steps = PRODUCTION_PROCESS_CATALOG
+    .map(step => productionStepMeta(step))
+    .filter(Boolean)
+    .filter(step => selectedIds.has(step.id))
+    .map(meta => {
+      const id = meta.id;
       const old = (Array.isArray(previous) ? previous : []).find(step => step.id === id);
-      return old ? { ...old, id, label, tempoPrevistoMin: old.tempoPrevistoMin || 30 } : { id, label, done: false, completedAt: null, tempoPrevistoMin: 30, actualMinutes: 0 };
+      return old
+        ? { ...old, id, label: meta.label, difficulty: meta.difficulty, weight: meta.weight, tempoPrevistoMin: old.tempoPrevistoMin || 30 }
+        : { id, label: meta.label, difficulty: meta.difficulty, weight: meta.weight, done: false, completedAt: null, completedByWorkerId: '', completedByWorkerName: '', paymentStatus: 'pending', paidAt: null, paidBy: '', tempoPrevistoMin: 30, actualMinutes: 0 };
     });
+  return splitProductionCommission(steps, commission);
 }
 
 function productionProductId(value) {
@@ -1316,7 +1356,8 @@ async function assignmentForWorker(orderId, workerId, productId = '') {
   const assignment = assignmentDoc.data();
   if (assignment.active === false) return null;
   const worker = (await productionWorkers()).find(item => item.id === workerId && item.active !== false);
-  if (!worker || assignment.workerId !== workerId) return null;
+  const workerIds = normalizeProductionWorkers(assignment.workerIds, assignment.workerId ? { id: assignment.workerId } : null);
+  if (!worker || !workerIds.includes(workerId)) return null;
   return { id: assignmentId, ...assignment };
 }
 
@@ -1326,9 +1367,10 @@ async function workerHasOrderAssignment(orderId, workerId) {
   const snapshot = await db.collection('production_assignments').get();
   return snapshot.docs.some(doc => {
     const assignment = doc.data();
+    const workerIds = normalizeProductionWorkers(assignment.workerIds, assignment.workerId ? { id: assignment.workerId } : null);
     return assignment.orderId === orderId
       && assignment.active !== false
-      && assignment.workerId === workerId;
+      && workerIds.includes(workerId);
   });
 }
 
@@ -1807,7 +1849,10 @@ app.get('/api/colaborador/session', requireWorker, async (req, res) => {
     const snapshot = await db.collection('production_assignments').get();
     const assignments = await Promise.all(snapshot.docs
       .map(doc => ({ id: doc.id, ...doc.data() }))
-      .filter(item => item.active !== false && item.workerId === req.productionWorker.id)
+      .filter(item => {
+        const workerIds = normalizeProductionWorkers(item.workerIds, item.workerId ? { id: item.workerId } : null);
+        return item.active !== false && workerIds.includes(req.productionWorker.id);
+      })
       .map(async assignment => {
         const order = await getOrderEvent(assignment.orderId);
         return order ? {
@@ -1839,8 +1884,22 @@ app.post('/api/colaborador/ordens/:id/etapas', requireWorker, async (req, res) =
       return res.status(400).json({ success: false, message: 'Etapa invalida.' });
     }
     const now = new Date().toISOString();
+    const currentStep = assignment.steps.find(step => step.id === stepId);
+    const requestedDone = Boolean(req.body?.done);
+    if (requestedDone && currentStep?.done && currentStep.completedByWorkerId && currentStep.completedByWorkerId !== req.productionWorker.id) {
+      return res.status(409).json({ success: false, message: 'Esta etapa ja foi concluida por outro colaborador.' });
+    }
+    if (!requestedDone && currentStep?.done && currentStep.completedByWorkerId && currentStep.completedByWorkerId !== req.productionWorker.id) {
+      return res.status(403).json({ success: false, message: 'Somente quem concluiu a etapa pode reabrir.' });
+    }
     const steps = assignment.steps.map(step => step.id === stepId
-      ? { ...step, done: Boolean(req.body?.done), completedAt: req.body?.done ? now : null }
+      ? {
+        ...step,
+        done: requestedDone,
+        completedAt: requestedDone ? now : null,
+        completedByWorkerId: requestedDone ? req.productionWorker.id : '',
+        completedByWorkerName: requestedDone ? req.productionWorker.name : ''
+      }
       : step);
     const history = [
       ...(Array.isArray(assignment.history) ? assignment.history : []),
@@ -2888,7 +2947,7 @@ async function revokeWorkerSessions(workerId) {
 
 app.get('/api/production/workers', async (req, res) => {
   const allWorkers = (await productionWorkers()).map(safeProductionWorker);
-  res.json({ success: true, workers: allWorkers.filter(worker => worker.active !== false), allWorkers, steps: PRODUCTION_STEPS, appUrl: collaboratorUrl(req) });
+  res.json({ success: true, workers: allWorkers.filter(worker => worker.active !== false), allWorkers, steps: PRODUCTION_STEPS, processCatalog: PRODUCTION_PROCESS_CATALOG, appUrl: collaboratorUrl(req) });
 });
 
 app.post('/api/production/workers', async (req, res) => {
@@ -3282,24 +3341,31 @@ app.post('/api/production/assignments', async (req, res) => {
     const productId = productionProductId(req.body?.productId);
     const workerId = String(req.body?.workerId || '');
     const order = await getOrderEvent(orderId);
-    const worker = (await productionWorkers()).find(item => item.id === workerId && item.active !== false);
+    const allWorkers = await productionWorkers();
+    const requestedWorkerIds = normalizeProductionWorkers(req.body?.workerIds, workerId ? { id: workerId } : null);
+    const assignedWorkers = productionAssignmentWorkers(requestedWorkerIds, allWorkers);
+    const primaryWorker = assignedWorkers[0] || null;
     if (!order) return res.status(404).json({ success: false, message: 'Ordem de producao nao encontrada.' });
     const product = productForAssignment(order, productId);
     if (req.body?.productId && !product) return res.status(400).json({ success: false, message: 'Produto da O.S. invalido.' });
-    if (!worker) return res.status(400).json({ success: false, message: 'Selecione um colaborador ativo.' });
+    if (!assignedWorkers.length) return res.status(400).json({ success: false, message: 'Selecione ao menos um colaborador ativo.' });
     const assignmentId = productionAssignmentId(orderId, productId);
     const oldDoc = await db.collection('production_assignments').doc(assignmentId).get();
     const old = oldDoc.exists ? oldDoc.data() : {};
     const now = new Date().toISOString();
     const commission = money(req.body?.commission);
-    const keepPayment = old.paymentStatus === 'paid' && old.workerId === workerId && money(old.commission) === commission;
+    const oldWorkerIds = normalizeProductionWorkers(old.workerIds, old.workerId ? { id: old.workerId } : null);
+    const sameWorkers = oldWorkerIds.length === assignedWorkers.length && assignedWorkers.every(worker => oldWorkerIds.includes(worker.id));
+    const keepPayment = old.paymentStatus === 'paid' && sameWorkers && money(old.commission) === commission;
     const assignment = {
       orderId,
       productId,
       productName: product?.nome || '',
-      workerId,
-      workerName: worker.name,
-      workerRole: worker.role,
+      workerId: primaryWorker.id,
+      workerName: assignedWorkers.map(worker => worker.name).join(', '),
+      workerRole: primaryWorker.role,
+      workerIds: assignedWorkers.map(worker => worker.id),
+      workers: assignedWorkers,
       commission,
       paymentStatus: keepPayment ? 'paid' : 'pending',
       paidAt: keepPayment ? old.paidAt || null : null,
@@ -3308,30 +3374,31 @@ app.post('/api/production/assignments', async (req, res) => {
       steps: normalizeProductionSteps(req.body?.steps, old.steps),
       transitions: [
         ...(Array.isArray(old.transitions) ? old.transitions : []),
-        ...(old.workerId && old.workerId !== workerId ? [{
+        ...(old.workerId && !sameWorkers ? [{
           type: 'transfer',
           fromWorkerId: old.workerId,
           fromWorkerName: old.workerName,
-          toWorkerId: workerId,
-          toWorkerName: worker.name,
+          toWorkerId: primaryWorker.id,
+          toWorkerName: assignedWorkers.map(worker => worker.name).join(', '),
           createdAt: now
         }] : [])
       ].slice(-50),
       history: [
         ...(Array.isArray(old.history) ? old.history : []),
-        assignmentHistoryEntry(old.workerId && old.workerId !== workerId ? 'transferred' : 'assigned', {
+        assignmentHistoryEntry(old.workerId && !sameWorkers ? 'transferred' : 'assigned', {
           productId,
           productName: product?.nome || '',
           fromWorkerId: old.workerId || '',
           fromWorkerName: old.workerName || '',
-          workerId,
-          workerName: worker.name
+          workerId: primaryWorker.id,
+          workerName: assignedWorkers.map(worker => worker.name).join(', ')
         })
       ].slice(-100),
       active: true,
       createdAt: old.createdAt || now,
       updatedAt: now
     };
+    assignment.steps = normalizeProductionSteps(req.body?.steps, old.steps, commission);
     if (!assignment.steps.length) return res.status(400).json({ success: false, message: 'Selecione ao menos uma etapa.' });
     await db.collection('production_assignments').doc(assignmentId).set(assignment);
     res.json({ success: true, assignment: sanitizeForResponse(assignment) });

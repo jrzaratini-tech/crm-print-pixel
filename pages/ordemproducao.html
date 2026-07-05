@@ -1143,7 +1143,7 @@
             <div class="modal-content">
                 <div class="classification-grid">
                     <label>Produto da O.S.<select id="classificationProduct"></select></label>
-                    <label>Colaborador responsável<select id="classificationWorker"></select></label>
+                    <label>Colaborador responsável<select id="classificationWorker" multiple size="4"></select></label>
                     <label>Comissão pelo trabalho (€)<input id="classificationCommission" type="number" min="0" step="0.01" value="0"></label>
                 </div>
                 <div class="classification-box">
@@ -1222,6 +1222,7 @@
             let productionWorkers = [];
             let productionAssignments = [];
             let productionSteps = [];
+            let productionProcessCatalog = [];
             let classificationOrder = null;
             const camposConhecidosPayload = new Set([
                 'cliente', 'empresa', 'nif', 'morada', 'telemovel', 'numero', 'numeroFatura',
@@ -1699,6 +1700,7 @@
                 const assignmentsResult = await assignmentsResponse.json();
                 productionWorkers = workersResult.workers || [];
                 productionSteps = workersResult.steps || [];
+                productionProcessCatalog = workersResult.processCatalog || [];
                 productionAssignments = assignmentsResult.assignments || [];
                 atualizarFiltrosOperacionais();
             }
@@ -1825,9 +1827,15 @@
 
             function renderClassificationSteps(selected = []) {
                 const selectedIds = new Set(selected.map(step => step.id || step));
+                const commission = parseFloat(classificationCommission.value) || 0;
+                const selectedCatalog = productionProcessCatalog.filter(item => selectedIds.has(item.id || item.label.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '').toLowerCase()));
+                const totalWeight = selectedCatalog.reduce((sum, item) => sum + Math.max(1, 5 - (parseInt(item.difficulty, 10) || 4)), 0);
                 classificationSteps.innerHTML = productionSteps.map(label => {
                     const id = label.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '').toLowerCase();
-                    return `<label class="classification-step"><input type="checkbox" value="${escapeHtml(id)}" ${selectedIds.has(id) ? 'checked' : ''}><span>${escapeHtml(label)}</span></label>`;
+                    const meta = productionProcessCatalog.find(item => (item.id || item.label.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '').toLowerCase()) === id) || {};
+                    const weight = Math.max(1, 5 - (parseInt(meta.difficulty, 10) || 4));
+                    const estimated = selectedIds.has(id) && totalWeight > 0 ? commission * weight / totalWeight : 0;
+                    return `<label class="classification-step"><input type="checkbox" value="${escapeHtml(id)}" ${selectedIds.has(id) ? 'checked' : ''}><span>${escapeHtml(label)} · Dificuldade ${escapeHtml(meta.difficulty || 4)}${estimated ? ` · ${formatarMoedaPadrao(estimated)}` : ''}</span></label>`;
                 }).join('');
             }
 
@@ -1849,7 +1857,10 @@
             function carregarItemClassificacao() {
                 if (!classificationOrder) return;
                 const assignment = assignmentOf(classificationOrder.id, classificationProduct.value);
-                classificationWorker.value = assignment?.workerId || '';
+                const selectedWorkers = new Set((assignment?.workerIds?.length ? assignment.workerIds : [assignment?.workerId]).filter(Boolean));
+                Array.from(classificationWorker.options).forEach(option => {
+                    option.selected = selectedWorkers.has(option.value);
+                });
                 classificationCommission.value = assignment?.commission || 0;
                 renderClassificationSteps(assignment?.steps || []);
                 renderClassificationHistory(assignment || assignmentsOf(classificationOrder.id).find(item => (item.productId || '') === classificationProduct.value));
@@ -1878,7 +1889,7 @@
                 classificationTitle.textContent = `Classificar ${ordem.numero}`;
                 classificationProduct.innerHTML = (ordem.produtos || []).map((product, index) => `<option value="item_${index}">${escapeHtml(product.nome || `Produto ${index + 1}`)}${product.tamanho ? ` · ${escapeHtml(product.tamanho)}` : ''}</option>`).join('');
                 if (!classificationProduct.options.length) classificationProduct.innerHTML = '<option value="">Serviço geral da O.S.</option>';
-                classificationWorker.innerHTML = '<option value="">Não classificada / fila de produção</option>';
+                classificationWorker.innerHTML = '';
                 productionWorkers.forEach(worker => {
                     const option = document.createElement('option');
                     option.value = worker.id;
@@ -1892,7 +1903,8 @@
 
             async function salvarClassificacao() {
                 if (!classificationOrder) return;
-                if (!classificationWorker.value) return desclassificarOS();
+                const workerIds = Array.from(classificationWorker.selectedOptions).map(option => option.value).filter(Boolean);
+                if (!workerIds.length) return desclassificarOS();
                 const steps = Array.from(classificationSteps.querySelectorAll('input:checked')).map(input => input.value);
                 const response = await fetch('/api/production/assignments', {
                     method: 'POST',
@@ -1900,7 +1912,8 @@
                     body: JSON.stringify({
                         orderId: classificationOrder.id,
                         productId: classificationProduct.value,
-                        workerId: classificationWorker.value,
+                        workerId: workerIds[0],
+                        workerIds,
                         commission: classificationCommission.value,
                         steps
                     })
@@ -2899,6 +2912,14 @@
             classificationSave.addEventListener('click', salvarClassificacao);
             classificationUnassign.addEventListener('click', desclassificarOS);
             classificationProduct.addEventListener('change', carregarItemClassificacao);
+            classificationCommission.addEventListener('input', () => {
+                const selected = Array.from(classificationSteps.querySelectorAll('input:checked')).map(input => input.value);
+                renderClassificationSteps(selected);
+            });
+            classificationSteps.addEventListener('change', () => {
+                const selected = Array.from(classificationSteps.querySelectorAll('input:checked')).map(input => input.value);
+                renderClassificationSteps(selected);
+            });
             classificationChatForm.addEventListener('submit', async event => {
                 event.preventDefault();
                 if (!classificationOrder || !classificationChatInput.value.trim()) return;

@@ -405,7 +405,7 @@ test('classifica OS para colaborador com login sem expor precos e permite chat p
     orderId: order.body.id,
     workerId: created.body.worker.id,
     commission: 75,
-    steps: ['montagem_da_estrutura', 'acabamento']
+    steps: ['montagem_da_estrutura', 'limpeza_embalagem']
   });
   assert.equal(classified.response.status, 200);
   assert.equal(classified.body.assignment.commission, 75);
@@ -417,9 +417,9 @@ test('classifica OS para colaborador com login sem expor precos e permite chat p
   assert.equal('valor' in session.body.assignments[0].order.produtos[0], false);
   assert.equal('total' in session.body.assignments[0].order, false);
 
-  const step = await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas`, { stepId: 'acabamento', done: true }, token);
+  const step = await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas`, { stepId: 'limpeza_embalagem', done: true }, token);
   assert.equal(step.response.status, 200);
-  assert.equal(step.body.steps.find(item => item.id === 'acabamento').done, true);
+  assert.equal(step.body.steps.find(item => item.id === 'limpeza_embalagem').done, true);
 
   const workerChat = await workerPost(`/api/colaborador/ordens/${order.body.id}/chat`, { message: 'Preciso confirmar a fixacao.' }, token);
   assert.equal(workerChat.response.status, 200);
@@ -447,7 +447,7 @@ test('cada colaborador visualiza somente as OS atribuidas a ele independentement
   const secondOrder = await post('/api/database/commit', { schema: 'pedido', pageId: 'test', payload: { numero: 'PED-PROD-2', cliente: 'Cliente Dois', produtos: [{ nome: 'Painel' }] } });
   const mounting = await post('/api/production/workers', { name: 'Montagem Dois', username: 'montagem.dois', password: 'senha-segura-789', role: 'montagem' });
   const commercial = await post('/api/production/workers', { name: 'Comercial', username: 'comercial', password: 'senha-segura-abc', role: 'comercial' });
-  await post('/api/production/assignments', { orderId: secondOrder.body.id, workerId: mounting.body.worker.id, commission: 50, steps: ['acabamento'] });
+  await post('/api/production/assignments', { orderId: secondOrder.body.id, workerId: mounting.body.worker.id, commission: 50, steps: ['limpeza_embalagem'] });
   const mountingLogin = await post('/api/colaborador/login', { username: 'montagem.dois', password: 'senha-segura-789' });
   const commercialLogin = await post('/api/colaborador/login', { username: 'comercial', password: 'senha-segura-abc' });
   const mountingSession = await workerRequest('/api/colaborador/session', mountingLogin.body.token);
@@ -461,13 +461,13 @@ test('controla pagamento de comissao e move trabalho pago para historico do cola
   const order = await post('/api/database/commit', { schema: 'pedido', pageId: 'test', payload: { numero: 'PED-PAG-1', cliente: 'Cliente Pagamento', produtos: [{ nome: 'Caixa Slim' }] } });
   const worker = await post('/api/production/workers', { name: 'Montador Pagamento', username: 'montador.pagamento', password: 'senha-segura-pagamento', role: 'montagem' });
   const login = await post('/api/colaborador/login', { username: 'montador.pagamento', password: 'senha-segura-pagamento' });
-  await post('/api/production/assignments', { orderId: order.body.id, workerId: worker.body.worker.id, commission: 90, steps: ['montagem_da_estrutura', 'acabamento'] });
+  await post('/api/production/assignments', { orderId: order.body.id, workerId: worker.body.worker.id, commission: 90, steps: ['montagem_da_estrutura', 'limpeza_embalagem'] });
 
   const earlyPayment = await post(`/api/production/assignments/${order.body.id}/payment`, {});
   assert.equal(earlyPayment.response.status, 400);
 
   await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas`, { stepId: 'montagem_da_estrutura', done: true }, login.body.token);
-  await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas`, { stepId: 'acabamento', done: true }, login.body.token);
+  await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas`, { stepId: 'limpeza_embalagem', done: true }, login.body.token);
 
   const paid = await post(`/api/production/assignments/${order.body.id}/payment`, { paidBy: 'Responsavel financeiro' });
   assert.equal(paid.response.status, 200);
@@ -479,7 +479,7 @@ test('controla pagamento de comissao e move trabalho pago para historico do cola
   assert.equal(task.paymentStatus, 'paid');
   assert.ok(task.paidAt);
 
-  const blockedUpdate = await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas`, { stepId: 'acabamento', done: false }, login.body.token);
+  const blockedUpdate = await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas`, { stepId: 'limpeza_embalagem', done: false }, login.body.token);
   assert.equal(blockedUpdate.response.status, 400);
 });
 
@@ -489,8 +489,8 @@ test('devolve OS para fila e transfere para novo colaborador preservando progres
   const mounting = await post('/api/production/workers', { name: 'Montagem Esteira', username: 'montagem.esteira', password: 'senha-segura-montagem', role: 'montagem' });
   const designerLogin = await post('/api/colaborador/login', { username: 'projetista.esteira', password: 'senha-segura-projetista' });
   const mountingLogin = await post('/api/colaborador/login', { username: 'montagem.esteira', password: 'senha-segura-montagem' });
-  await post('/api/production/assignments', { orderId: order.body.id, workerId: designer.body.worker.id, commission: 30, steps: ['arte_projeto', 'acabamento'] });
-  const completed = await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas`, { stepId: 'arte_projeto', done: true }, designerLogin.body.token);
+  await post('/api/production/assignments', { orderId: order.body.id, workerId: designer.body.worker.id, commission: 30, steps: ['gabarito_de_instalacao', 'limpeza_embalagem'] });
+  const completed = await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas`, { stepId: 'gabarito_de_instalacao', done: true }, designerLogin.body.token);
   assert.equal(completed.response.status, 200);
 
   const unassigned = await post(`/api/production/assignments/${order.body.id}/unassign`, {});
@@ -499,9 +499,9 @@ test('devolve OS para fila e transfere para novo colaborador preservando progres
   const designerChatBlocked = await workerRequest(`/api/colaborador/ordens/${order.body.id}/chat`, designerLogin.body.token);
   assert.equal(designerChatBlocked.response.status, 404);
 
-  const transferred = await post('/api/production/assignments', { orderId: order.body.id, workerId: mounting.body.worker.id, commission: 70, steps: ['arte_projeto', 'acabamento'] });
+  const transferred = await post('/api/production/assignments', { orderId: order.body.id, workerId: mounting.body.worker.id, commission: 70, steps: ['gabarito_de_instalacao', 'limpeza_embalagem'] });
   assert.equal(transferred.response.status, 200);
-  assert.equal(transferred.body.assignment.steps.find(step => step.id === 'arte_projeto').done, true);
+  assert.equal(transferred.body.assignment.steps.find(step => step.id === 'gabarito_de_instalacao').done, true);
   assert.equal(transferred.body.assignment.transitions.at(-1).type, 'transfer');
   const mountingSession = await workerRequest('/api/colaborador/session', mountingLogin.body.token);
   assert.ok(mountingSession.body.assignments.some(item => item.orderId === order.body.id));
@@ -524,9 +524,9 @@ test('classifica produtos da mesma OS para colaboradores diferentes com historic
   const acmWorker = await post('/api/production/workers', { name: 'Operador ACM', username: 'operador.acm', password: 'senha-segura-acm', role: 'montagem' });
   const neonLogin = await post('/api/colaborador/login', { username: 'operador.neon', password: 'senha-segura-neon' });
   const acmLogin = await post('/api/colaborador/login', { username: 'operador.acm', password: 'senha-segura-acm' });
-  await post('/api/production/assignments', { orderId: order.body.id, productId: 'item_0', workerId: neonWorker.body.worker.id, commission: 45, steps: ['led_solda', 'acabamento'] });
-  await post('/api/production/assignments', { orderId: order.body.id, productId: 'item_1', workerId: acmWorker.body.worker.id, commission: 35, steps: ['usinagem_cnc', 'acabamento'] });
-  const invalidProduct = await post('/api/production/assignments', { orderId: order.body.id, productId: 'item_1_extra', workerId: acmWorker.body.worker.id, commission: 35, steps: ['acabamento'] });
+  await post('/api/production/assignments', { orderId: order.body.id, productId: 'item_0', workerId: neonWorker.body.worker.id, commission: 45, steps: ['aplicar_e_soldar_led', 'limpeza_embalagem'] });
+  await post('/api/production/assignments', { orderId: order.body.id, productId: 'item_1', workerId: acmWorker.body.worker.id, commission: 35, steps: ['corte_laser', 'limpeza_embalagem'] });
+  const invalidProduct = await post('/api/production/assignments', { orderId: order.body.id, productId: 'item_1_extra', workerId: acmWorker.body.worker.id, commission: 35, steps: ['limpeza_embalagem'] });
   assert.equal(invalidProduct.response.status, 400);
 
   const neonSession = await workerRequest('/api/colaborador/session', neonLogin.body.token);
@@ -539,22 +539,55 @@ test('classifica produtos da mesma OS para colaboradores diferentes com historic
   assert.equal(neonTask.order.produtos.length, 1);
   assert.equal(neonTask.order.produtos[0].nome, 'Letreiro Neon');
 
-  const completed = await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas`, { productId: 'item_0', stepId: 'led_solda', done: true }, neonLogin.body.token);
+  const completed = await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas`, { productId: 'item_0', stepId: 'aplicar_e_soldar_led', done: true }, neonLogin.body.token);
   assert.equal(completed.response.status, 200);
   const assignments = await request('/api/production/assignments');
   const neonAssignment = assignments.body.assignments.find(item => item.orderId === order.body.id && item.productId === 'item_0');
   const acmAssignment = assignments.body.assignments.find(item => item.orderId === order.body.id && item.productId === 'item_1');
-  assert.equal(neonAssignment.steps.find(step => step.id === 'led_solda').done, true);
-  assert.equal(acmAssignment.steps.find(step => step.id === 'usinagem_cnc').done, false);
+  assert.equal(neonAssignment.steps.find(step => step.id === 'aplicar_e_soldar_led').done, true);
+  assert.equal(acmAssignment.steps.find(step => step.id === 'corte_laser').done, false);
   assert.equal(neonAssignment.history.at(-1).type, 'step_completed');
   assert.equal(neonAssignment.history.at(-1).workerName, 'Operador Neon');
 
-  const transferred = await post('/api/production/assignments', { orderId: order.body.id, productId: 'item_0', workerId: acmWorker.body.worker.id, commission: 55, steps: ['led_solda', 'acabamento'] });
+  const transferred = await post('/api/production/assignments', { orderId: order.body.id, productId: 'item_0', workerId: acmWorker.body.worker.id, commission: 55, steps: ['aplicar_e_soldar_led', 'limpeza_embalagem'] });
   assert.equal(transferred.response.status, 200);
-  assert.equal(transferred.body.assignment.steps.find(step => step.id === 'led_solda').done, true);
+  assert.equal(transferred.body.assignment.steps.find(step => step.id === 'aplicar_e_soldar_led').done, true);
   assert.equal(transferred.body.assignment.history.at(-1).type, 'transferred');
   const previousWorkerSession = await workerRequest('/api/colaborador/session', neonLogin.body.token);
   assert.equal(previousWorkerSession.body.assignments.some(item => item.orderId === order.body.id && item.productId === 'item_0'), false);
+});
+
+test('mostra o mesmo trabalho para varios colaboradores e trava etapa concluida', async () => {
+  const order = await post('/api/database/commit', { schema: 'pedido', pageId: 'test', payload: { numero: 'PED-EQUIPE-1', cliente: 'Cliente Equipe', produtos: [{ nome: 'Letreiro compartilhado' }] } });
+  const firstWorker = await post('/api/production/workers', { name: 'Operador Um', username: 'operador.um', password: 'senha-segura-um', role: 'montagem' });
+  const secondWorker = await post('/api/production/workers', { name: 'Operador Dois', username: 'operador.dois', password: 'senha-segura-dois', role: 'montagem' });
+  const firstLogin = await post('/api/colaborador/login', { username: 'operador.um', password: 'senha-segura-um' });
+  const secondLogin = await post('/api/colaborador/login', { username: 'operador.dois', password: 'senha-segura-dois' });
+
+  const classified = await post('/api/production/assignments', {
+    orderId: order.body.id,
+    workerIds: [firstWorker.body.worker.id, secondWorker.body.worker.id],
+    commission: 100,
+    steps: ['montagem_da_estrutura', 'limpeza_embalagem']
+  });
+  assert.equal(classified.response.status, 200);
+  assert.equal(classified.body.assignment.workerIds.length, 2);
+  assert.equal(classified.body.assignment.steps.reduce((sum, step) => sum + step.commissionValue, 0), 100);
+
+  const firstSession = await workerRequest('/api/colaborador/session', firstLogin.body.token);
+  const secondSession = await workerRequest('/api/colaborador/session', secondLogin.body.token);
+  assert.equal(firstSession.body.assignments.some(item => item.orderId === order.body.id), true);
+  assert.equal(secondSession.body.assignments.some(item => item.orderId === order.body.id), true);
+
+  const completed = await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas`, { stepId: 'montagem_da_estrutura', done: true }, firstLogin.body.token);
+  assert.equal(completed.response.status, 200);
+  assert.equal(completed.body.steps.find(step => step.id === 'montagem_da_estrutura').completedByWorkerName, 'Operador Um');
+
+  const blocked = await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas`, { stepId: 'montagem_da_estrutura', done: true }, secondLogin.body.token);
+  assert.equal(blocked.response.status, 409);
+
+  const earlyPayment = await post(`/api/production/assignments/${order.body.id}/payment`, { paidBy: 'Financeiro' });
+  assert.equal(earlyPayment.response.status, 400);
 });
 
 test('aponta tempo real, baixa estoque e gera visao gerencial', async () => {
@@ -583,15 +616,15 @@ test('aponta tempo real, baixa estoque e gera visao gerencial', async () => {
   });
   const worker = await post('/api/production/workers', { name: 'Apontador Tempo', username: 'apontador.tempo', password: 'senha-segura-tempo', role: 'montagem' });
   const login = await post('/api/colaborador/login', { username: 'apontador.tempo', password: 'senha-segura-tempo' });
-  await post('/api/production/assignments', { orderId: order.body.id, productId: 'item_0', workerId: worker.body.worker.id, commission: 25, steps: ['led_solda'] });
+  await post('/api/production/assignments', { orderId: order.body.id, productId: 'item_0', workerId: worker.body.worker.id, commission: 25, steps: ['aplicar_e_soldar_led'] });
 
-  const started = await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas/tempo`, { productId: 'item_0', stepId: 'led_solda', action: 'start' }, login.body.token);
+  const started = await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas/tempo`, { productId: 'item_0', stepId: 'aplicar_e_soldar_led', action: 'start' }, login.body.token);
   assert.equal(started.response.status, 200);
-  const stopped = await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas/tempo`, { productId: 'item_0', stepId: 'led_solda', action: 'stop' }, login.body.token);
+  const stopped = await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas/tempo`, { productId: 'item_0', stepId: 'aplicar_e_soldar_led', action: 'stop' }, login.body.token);
   assert.equal(stopped.response.status, 200);
   assert.ok(stopped.body.assignment.timeLogs[0].minutes >= 1);
 
-  await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas`, { productId: 'item_0', stepId: 'led_solda', done: true }, login.body.token);
+  await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas`, { productId: 'item_0', stepId: 'aplicar_e_soldar_led', done: true }, login.body.token);
   const paid = await post(`/api/production/assignments/${order.body.id}/payment`, { productId: 'item_0', paidBy: 'Financeiro' });
   assert.equal(paid.response.status, 200);
   assert.equal(paid.body.stockMovements.length, 1);
