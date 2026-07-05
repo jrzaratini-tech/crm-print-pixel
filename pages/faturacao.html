@@ -277,7 +277,7 @@
           method: 'POST',
           body: JSON.stringify({ schema: 'pedido', filters: {}, limit: 500 })
         });
-        state.orders = (result.events || []).map(event => ({ id: event.id, ...(event.payload || {}) }))
+        state.orders = (result.events || []).map(event => ({ ...(event.payload || {}), id: event.id }))
           .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
         renderOrders();
         const requestedId = new URLSearchParams(location.search).get('orderId');

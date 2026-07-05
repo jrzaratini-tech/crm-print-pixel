@@ -478,7 +478,7 @@ async function moloniAccessToken() {
 async function moloniOrder(orderId) {
   const snapshot = await db.collection('events').doc(String(orderId || '')).get();
   if (!snapshot.exists || snapshot.data()?.schema !== 'pedido' || snapshot.data()?.deleted) return null;
-  return { id: String(orderId), ...snapshot.data().payload };
+  return { ...(snapshot.data().payload || {}), id: String(orderId) };
 }
 
 async function moloniDocuments() {

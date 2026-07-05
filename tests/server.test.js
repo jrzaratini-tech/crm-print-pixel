@@ -185,6 +185,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(billingPageResult.body, /Modo de teste/);
   assert.match(billingPageResult.body, /button type="button" class="order/);
   assert.match(billingPageResult.body, /recommendationBox/);
+  assert.match(billingPageResult.body, /\{\s*\.\.\.\(event\.payload \|\| \{\}\), id: event\.id\s*\}/);
   assert.match(billingPageResult.body, /Recomendado: Fatura primeiro, depois Recibo parcial/);
   assert.match(ordersPageResult.body, /hardDelete: true/);
   assert.match(expensesPageResult.body, /excluirDespesa/);
@@ -654,6 +655,7 @@ test('executa faturacao Moloni simulada com validacao e bloqueio de duplicados',
     schema: 'pedido',
     pageId: 'test-moloni',
     payload: {
+      id: 'stale-payload-id',
       numero: 'PED-MOLONI-1',
       cliente: 'Cliente Fiscal',
       empresa: 'Cliente Fiscal Lda',
@@ -676,6 +678,7 @@ test('executa faturacao Moloni simulada com validacao e bloqueio de duplicados',
   });
   assert.equal(preview.response.status, 200);
   assert.equal(preview.body.preview.valid, true);
+  assert.equal(preview.body.preview.order.id, createdOrder.body.id);
 
   const invoice = await post('/api/moloni/documents', {
     orderId: createdOrder.body.id,
