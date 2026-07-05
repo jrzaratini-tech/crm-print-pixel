@@ -2636,7 +2636,7 @@ app.get('/api/moloni/options', async (req, res) => {
       client.call('taxes/getAll', common),
       client.call('paymentMethods/getAll', common),
       client.call('products/getAll', common),
-      client.call('productCategories/getAll', common).catch(() => []),
+      client.call('productCategories/getAll', { ...common, parent_id: 0 }).catch(() => []),
       client.call('measurementUnits/getAll', common).catch(() => [])
     ]);
     const normalizedProductCategories = (Array.isArray(productCategories) ? productCategories : []).map(item => ({
