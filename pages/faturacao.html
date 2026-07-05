@@ -201,8 +201,14 @@
         <div class="field"><label for="invoiceReceiptSet">Série de Faturas-Recibo</label><select id="invoiceReceiptSet"></select></div>
         <div class="field"><label for="receiptSet">Série de Recibos</label><select id="receiptSet"></select></div>
         <div class="field"><label for="defaultProduct">Artigo genérico</label><select id="defaultProduct"></select></div>
+        <div class="field"><label for="defaultProductCategory">Categoria padrão dos artigos</label><select id="defaultProductCategory"></select></div>
+        <div class="field"><label for="defaultUnit">Unidade padrão</label><select id="defaultUnit"></select></div>
         <div class="field"><label for="standardTax">IVA normal</label><select id="standardTax"></select></div>
         <div class="field"><label for="defaultPayment">Pagamento predefinido</label><select id="defaultPayment"></select></div>
+        <div class="field full">
+          <label class="checkline"><input type="checkbox" id="autoCreateProducts" checked> Criar/reutilizar artigos Moloni automaticamente por linha</label>
+          <div class="tiny">Produtos do pedido entram como Produto; instalação, deslocação e serviços entram como Serviço. Se desligar, usa sempre o artigo genérico.</div>
+        </div>
         <div class="field full">
           <label for="paymentMap">Mapeamento de pagamentos</label>
           <input id="paymentMap" placeholder="multibanco:1, transferência:2, dinheiro:3">
@@ -542,8 +548,11 @@
         selectOptions($('invoiceReceiptSet'), state.options.documentSets, 'document_set_id', 'name', settings.invoiceReceiptDocumentSetId);
         selectOptions($('receiptSet'), state.options.documentSets, 'document_set_id', 'name', settings.receiptDocumentSetId);
         selectOptions($('defaultProduct'), state.options.products, 'product_id', 'name', settings.defaultProductId);
+        selectOptions($('defaultProductCategory'), state.options.productCategories, 'category_id', 'name', settings.defaultProductCategoryId);
+        selectOptions($('defaultUnit'), state.options.measurementUnits, 'unit_id', 'name', settings.defaultUnitId);
         selectOptions($('standardTax'), state.options.taxes, 'tax_id', 'name', settings.standardTaxId);
         selectOptions($('defaultPayment'), state.options.paymentMethods, 'payment_method_id', 'name', settings.defaultPaymentMethodId);
+        $('autoCreateProducts').checked = settings.autoCreateProducts !== false;
         $('paymentMap').value = paymentMapToText(settings.paymentMethods);
       }
 
@@ -560,8 +569,11 @@
             invoiceReceiptDocumentSetId: Number($('invoiceReceiptSet').value || 0),
             receiptDocumentSetId: Number($('receiptSet').value || 0),
             defaultProductId: Number($('defaultProduct').value || 0),
+            defaultProductCategoryId: Number($('defaultProductCategory').value || 0),
+            defaultUnitId: Number($('defaultUnit').value || 0),
             standardTaxId: Number($('standardTax').value || 0),
             defaultPaymentMethodId: Number($('defaultPayment').value || 0),
+            autoCreateProducts: $('autoCreateProducts').checked,
             exemptionReason: 'M99',
             paymentMethods: parsePaymentMap($('paymentMap').value)
           }

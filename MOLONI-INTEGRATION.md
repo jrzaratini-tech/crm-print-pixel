@@ -14,6 +14,8 @@ O CRM suporta dois modos:
 - Rascunho ou documento fechado.
 - Histórico por pedido, bloqueio de duplicados e consulta de PDF em modo real.
 - Tokens OAuth cifrados antes de guardar no Firestore.
+- Criação/reutilização automática de artigos Moloni por linha do pedido.
+- Classificação fiscal por linha: produtos como `Produto` e instalação/deslocação/serviços como `Serviço`.
 
 ## Ativar em modo real
 
@@ -50,8 +52,11 @@ O CRM suporta dois modos:
    - série de Faturas-Recibo;
    - série de Recibos;
    - artigo genérico;
+   - categoria padrão dos artigos;
+   - unidade padrão;
    - IVA normal;
    - método de pagamento predefinido;
+   - criação/reutilização automática de artigos, se desejar separar produtos e serviços no Moloni;
    - mapeamento de pagamentos do CRM para métodos Moloni, se necessário.
 
 ## Primeiro teste recomendado

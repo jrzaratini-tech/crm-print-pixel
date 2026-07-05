@@ -392,6 +392,7 @@ async function ensureAllLabelPlatformFees(customers) {
 }
 
 const MOLONI_CONFIG_DOC = db.collection('integrations').doc('moloni');
+const MOLONI_PRODUCTS_COLLECTION = db.collection('moloni_products');
 
 function moloniCryptoKey() {
   return crypto.createHash('sha256').update(MOLONI_ENCRYPTION_KEY).digest();
@@ -529,6 +530,8 @@ function moloniRequiredSettings(config = {}) {
     { key: 'invoiceReceiptSet', label: 'Serie de Faturas-Recibo selecionada', ok: Number(settings.invoiceReceiptDocumentSetId || 0) > 0 },
     { key: 'receiptSet', label: 'Serie de Recibos selecionada', ok: Number(settings.receiptDocumentSetId || 0) > 0 },
     { key: 'product', label: 'Artigo generico selecionado', ok: Number(settings.defaultProductId || 0) > 0 },
+    { key: 'productCategory', label: 'Categoria padrao de artigos selecionada', ok: Number(settings.defaultProductCategoryId || 0) > 0 },
+    { key: 'unit', label: 'Unidade padrao de artigos selecionada', ok: Number(settings.defaultUnitId || 0) > 0 },
     { key: 'payment', label: 'Metodo de pagamento predefinido selecionado', ok: Number(settings.defaultPaymentMethodId || 0) > 0 }
   ];
 }
@@ -541,13 +544,91 @@ function moloniAssertReadyForIssue(config = {}) {
   }
 }
 
+function moloniProductReference(product = {}) {
+  return moloniText(product.reference || product.name || 'artigo-crm', 80);
+}
+
+async function ensureMoloniProduct(client, product, config) {
+  const settings = config.settings || {};
+  if (settings.autoCreateProducts === false || !settings.defaultProductCategoryId || !settings.defaultUnitId) {
+    return Number(settings.defaultProductId || 0);
+  }
+  const reference = moloniProductReference(product);
+  const mappingId = crypto.createHash('sha256').update(`${config.companyId}|${reference}`).digest('hex').slice(0, 32);
+  const mappingRef = MOLONI_PRODUCTS_COLLECTION.doc(mappingId);
+  const mapped = await mappingRef.get();
+  if (mapped.exists && Number(mapped.data()?.productId || 0) > 0) return Number(mapped.data().productId);
+
+  const common = { company_id: Number(config.companyId), qty: 50, offset: 0 };
+  const existingProducts = await client.call('products/getAll', common).catch(() => []);
+  const existing = (Array.isArray(existingProducts) ? existingProducts : []).find(item =>
+    String(item.reference || '').toLowerCase() === reference.toLowerCase()
+    || String(item.name || '').trim().toLowerCase() === String(product.name || '').trim().toLowerCase()
+  );
+  if (existing?.product_id) {
+    await mappingRef.set({
+      companyId: Number(config.companyId),
+      reference,
+      name: product.name,
+      nature: product.nature || 'product',
+      productId: Number(existing.product_id),
+      source: 'existing',
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+    return Number(existing.product_id);
+  }
+
+  const taxes = product.vatIncluded && Number(settings.standardTaxId)
+    ? [{ tax_id: Number(settings.standardTaxId), value: 0, order: 1, cumulative: 0 }]
+    : [];
+  const payload = {
+    company_id: Number(config.companyId),
+    category_id: Number(settings.defaultProductCategoryId),
+    type: product.nature === 'service' ? 2 : 1,
+    name: moloniText(product.name || 'Artigo CRM', 160),
+    summary: moloniText(product.summary || '', 250),
+    reference,
+    ean: '',
+    price: moloniMoney(product.price),
+    unit_id: Number(settings.defaultUnitId),
+    has_stock: 0,
+    stock: 0,
+    minimum_stock: 0,
+    pos_favorite: 0,
+    taxes,
+    ...(!taxes.length ? { exemption_reason: settings.exemptionReason || 'M99' } : {})
+  };
+  const created = await client.call('products/insert', payload);
+  if (!created?.product_id) throw new Error(`Nao foi possivel criar o artigo Moloni "${product.name}".`);
+  await mappingRef.set({
+    companyId: Number(config.companyId),
+    reference,
+    name: product.name,
+    nature: product.nature || 'product',
+    productId: Number(created.product_id),
+    source: 'created',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  }, { merge: true });
+  return Number(created.product_id);
+}
+
+async function attachMoloniProducts(client, preview, config) {
+  if (!['invoice', 'invoice_receipt'].includes(preview.type)) return preview;
+  preview.products = await Promise.all(preview.products.map(async product => ({
+    ...product,
+    moloniProductId: await ensureMoloniProduct(client, product, config)
+  })));
+  return preview;
+}
+
 function moloniSalesPayload(preview, config, status) {
   const settings = config.settings || {};
   const documentSetId = preview.type === 'invoice'
     ? settings.invoiceDocumentSetId
     : settings.invoiceReceiptDocumentSetId;
   const products = preview.products.map(product => ({
-    product_id: Number(settings.defaultProductId),
+    product_id: Number(product.moloniProductId || settings.defaultProductId),
     name: product.name,
     summary: product.summary,
     qty: product.qty,
@@ -2487,9 +2568,12 @@ app.post('/api/moloni/settings', async (req, res) => {
       invoiceReceiptDocumentSetId: Number(settings.invoiceReceiptDocumentSetId || 0),
       receiptDocumentSetId: Number(settings.receiptDocumentSetId || 0),
       defaultProductId: Number(settings.defaultProductId || 0),
+      defaultProductCategoryId: Number(settings.defaultProductCategoryId || 0),
+      defaultUnitId: Number(settings.defaultUnitId || 0),
       standardTaxId: Number(settings.standardTaxId || 0),
       defaultPaymentMethodId: Number(settings.defaultPaymentMethodId || 0),
       exemptionReason: text(settings.exemptionReason || 'M99', 20),
+      autoCreateProducts: settings.autoCreateProducts !== false,
       paymentMethods: Object.fromEntries(
         Object.entries(settings.paymentMethods || {}).map(([key, value]) => [text(key, 80).toLowerCase(), Number(value || 0)])
       )
@@ -2504,6 +2588,8 @@ app.post('/api/moloni/settings', async (req, res) => {
         ['invoiceReceiptDocumentSetId', 'Selecione a serie de Faturas-Recibo.'],
         ['receiptDocumentSetId', 'Selecione a serie de Recibos.'],
         ['defaultProductId', 'Selecione o artigo generico.'],
+        ['defaultProductCategoryId', 'Selecione a categoria padrao de artigos.'],
+        ['defaultUnitId', 'Selecione a unidade padrao de artigos.'],
         ['defaultPaymentMethodId', 'Selecione o metodo de pagamento predefinido.']
       ];
       const missing = required.find(([key]) => !(Number(normalized[key] || 0) > 0));
@@ -2530,7 +2616,9 @@ app.get('/api/moloni/options', async (req, res) => {
         ],
         taxes: [{ tax_id: 23, name: 'IVA 23%' }],
         paymentMethods: [{ payment_method_id: 1, name: 'Transferencia / teste' }],
-        products: [{ product_id: 1, name: 'Servico PrintPixel / teste' }]
+        products: [{ product_id: 1, name: 'Servico PrintPixel / teste' }],
+        productCategories: [{ category_id: 1, name: 'Servicos PrintPixel / teste' }],
+        measurementUnits: [{ unit_id: 1, name: 'Unidade' }]
       });
     }
     const accessToken = await moloniAccessToken();
@@ -2543,13 +2631,35 @@ app.get('/api/moloni/options', async (req, res) => {
     );
     const companyId = Number(requestedCompanyId || config.companyId || realCompany?.company_id || companies?.[0]?.company_id || 0);
     const common = { company_id: companyId, qty: 50, offset: 0 };
-    const [documentSets, taxes, paymentMethods, products] = await Promise.all([
+    const [documentSets, taxes, paymentMethods, products, productCategories, measurementUnits] = await Promise.all([
       client.call('documentSets/getAll', common),
       client.call('taxes/getAll', common),
       client.call('paymentMethods/getAll', common),
-      client.call('products/getAll', common)
+      client.call('products/getAll', common),
+      client.call('productCategories/getAll', common).catch(() => []),
+      client.call('measurementUnits/getAll', common).catch(() => [])
     ]);
-    res.json({ success: true, companyId, companies, documentSets, taxes, paymentMethods, products });
+    const normalizedProductCategories = (Array.isArray(productCategories) ? productCategories : []).map(item => ({
+      ...item,
+      category_id: item.category_id || item.product_category_id || item.id,
+      name: item.name || item.title || item.category || item.category_id || item.product_category_id || item.id
+    }));
+    const normalizedMeasurementUnits = (Array.isArray(measurementUnits) ? measurementUnits : []).map(item => ({
+      ...item,
+      unit_id: item.unit_id || item.measurement_unit_id || item.id,
+      name: item.name || item.title || item.unit || item.unit_id || item.measurement_unit_id || item.id
+    }));
+    res.json({
+      success: true,
+      companyId,
+      companies,
+      documentSets,
+      taxes,
+      paymentMethods,
+      products,
+      productCategories: normalizedProductCategories,
+      measurementUnits: normalizedMeasurementUnits
+    });
   } catch (error) {
     res.status(502).json({ success: false, message: error.message || 'Falha ao sincronizar opcoes do Moloni.' });
   }
@@ -2680,6 +2790,7 @@ app.post('/api/moloni/documents', async (req, res) => {
       moloniAssertReadyForIssue(config);
       const client = new MoloniClient({ accessToken: await moloniAccessToken() });
       preview.moloniCustomerId = await ensureMoloniCustomer(client, preview, config);
+      await attachMoloniProducts(client, preview, config);
       const payload = preview.type === 'receipt'
         ? moloniReceiptPayload(preview, config, invoice.moloniDocumentId, status)
         : moloniSalesPayload(preview, config, status);

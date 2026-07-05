@@ -68,6 +68,28 @@ function documentLabel(type) {
   }[type] || type;
 }
 
+function stableReference(value, prefix = 'CRM') {
+  const source = cleanText(value, 180).toUpperCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+  let hash = 0;
+  for (const char of cleanText(value, 220)) hash = ((hash << 5) - hash + char.charCodeAt(0)) | 0;
+  return `${prefix}-${source || 'ARTIGO'}-${Math.abs(hash).toString(36).toUpperCase()}`.slice(0, 60);
+}
+
+function classifyLineNature(product = {}) {
+  const source = [product.nome, product.produto, product.categoria, product.tamanho, product.observacoes]
+    .map(value => cleanText(value, 120).toLowerCase())
+    .join(' ');
+  if (/instala|montagem|aplica[cç][aã]o|coloca[cç][aã]o/.test(source)) return 'service';
+  if (/desloca|transporte|entrega|viagem/.test(source)) return 'service';
+  if (/servi[cç]o|m[aã]o de obra|arte|design|projeto|or[cç]amento/.test(source)) return 'service';
+  return 'product';
+}
+
 function recommendDocumentAction({ order = {}, documents = [] } = {}) {
   const totals = orderTotals(order);
   const activeDocuments = (Array.isArray(documents) ? documents : []).filter(document => document && document.state !== 'error');
@@ -183,7 +205,9 @@ function buildDocumentPreview({ order, type, paymentId, amount, issueDate }) {
     summary: cleanText([product.tamanho, product.observacoes].filter(Boolean).join(' - '), 250),
     qty: Math.max(0.01, roundMoney(product.quantidade || 1)),
     price: roundMoney(product.valor),
-    vatIncluded: product.comIVA !== 'nao'
+    vatIncluded: product.comIVA !== 'nao',
+    nature: classifyLineNature(product),
+    reference: stableReference(product.referencia || product.sku || product.nome || `produto-${index + 1}`, classifyLineNature(product) === 'service' ? 'CRM-S' : 'CRM-P')
   }));
 
   const installation = roundMoney(order.instalacao);
@@ -194,7 +218,9 @@ function buildDocumentPreview({ order, type, paymentId, amount, issueDate }) {
       summary: '',
       qty: 1,
       price: installation,
-      vatIncluded: order.comIVA !== 'nao'
+      vatIncluded: order.comIVA !== 'nao',
+      nature: 'service',
+      reference: stableReference('Instalacao / deslocacao', 'CRM-S')
     });
   }
 
@@ -279,6 +305,7 @@ module.exports = {
   MoloniClient,
   buildDocumentPreview,
   cleanText,
+  classifyLineNature,
   documentLabel,
   flattenForm,
   oauthAuthorizationUrl,

@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 const {
   buildDocumentPreview,
+  classifyLineNature,
   flattenForm,
   orderTotals,
   paidPayments,
@@ -31,6 +32,23 @@ test('prepara uma fatura valida para o total do pedido', () => {
   assert.equal(preview.valid, true);
   assert.equal(preview.totals.total, 1000);
   assert.equal(preview.idempotencyKey, 'pedido-1:invoice:sale');
+});
+
+test('classifica linhas Moloni como produto ou servico com referencia estavel', () => {
+  const preview = buildDocumentPreview({
+    order: {
+      ...order,
+      produtos: [{ nome: 'Reclamo luminoso', quantidade: 1, valor: 900, comIVA: 'sim' }],
+      instalacao: 100
+    },
+    type: 'invoice'
+  });
+  assert.equal(preview.products[0].nature, 'product');
+  assert.match(preview.products[0].reference, /^CRM-P-/);
+  assert.equal(preview.products[1].nature, 'service');
+  assert.match(preview.products[1].reference, /^CRM-S-/);
+  assert.equal(classifyLineNature({ nome: 'Instalacao e deslocacao' }), 'service');
+  assert.equal(classifyLineNature({ nome: 'Vinil impresso' }), 'product');
 });
 
 test('impede fatura-recibo quando existe pagamento parcial', () => {

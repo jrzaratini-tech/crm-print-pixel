@@ -185,6 +185,9 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(billingPageResult.body, /Modo de teste/);
   assert.match(billingPageResult.body, /button type="button" class="order/);
   assert.match(billingPageResult.body, /recommendationBox/);
+  assert.match(billingPageResult.body, /defaultProductCategory/);
+  assert.match(billingPageResult.body, /defaultUnit/);
+  assert.match(billingPageResult.body, /autoCreateProducts/);
   assert.match(billingPageResult.body, /\{\s*\.\.\.\(event\.payload \|\| \{\}\), id: event\.id\s*\}/);
   assert.match(billingPageResult.body, /Recomendado: Fatura primeiro, depois Recibo parcial/);
   assert.match(ordersPageResult.body, /hardDelete: true/);
