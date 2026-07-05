@@ -309,8 +309,8 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(workerAppResult.body, /Concluido a receber/);
   assert.match(workerAppResult.body, /Historico \/ pagos/);
   assert.match(workerAppResult.body, /assignedValue/);
-  assert.match(workerScriptResult.body, /Iniciar tempo/);
-  assert.match(workerScriptResult.body, /etapas\/tempo/);
+  assert.doesNotMatch(workerScriptResult.body, /Iniciar tempo/);
+  assert.doesNotMatch(workerScriptResult.body, /etapas\/tempo/);
   assert.match(workerScriptResult.body, /Todos os processos deste trabalho foram executados/);
   assert.match(productionPageResult.body, /HISTÓRICO DA PRODUÇÃO POR ARTIGO/);
 });

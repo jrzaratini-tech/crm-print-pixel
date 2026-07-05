@@ -48,10 +48,6 @@
     return assignment.paymentStatus === 'paid';
   }
 
-  function activeTimerFor(assignment, stepId) {
-    return assignment.activeTimer && assignment.activeTimer.stepId === stepId;
-  }
-
   function groupAssignments() {
     return {
       open: assignments.filter(item => !isDone(item)),
@@ -187,7 +183,6 @@
           return `<div class="step">
           <label><input type="checkbox" data-step="${escapeHtml(step.id)}" ${step.done ? 'checked' : ''} ${paid || lockedByOther ? 'disabled' : ''}><span>${escapeHtml(step.label)}</span></label>
           <small>${Number(step.actualMinutes || 0)} min realizados · ${money(step.commissionValue || 0)}${owner}</small>
-          ${paid || lockedByOther ? '' : `<button type="button" data-timer-step="${escapeHtml(step.id)}" data-action="${activeTimerFor(assignment, step.id) ? 'stop' : 'start'}">${activeTimerFor(assignment, step.id) ? 'Parar tempo' : 'Iniciar tempo'}</button>`}
         </div>`;
         }).join('')}
       </div>
@@ -204,13 +199,6 @@
         return;
       }
       await api(`/api/colaborador/ordens/${encodeURIComponent(orderId)}/etapas`, { method: 'POST', body: JSON.stringify({ productId: assignment.productId, stepId: event.target.dataset.step, done: event.target.checked }) });
-      await load();
-    }));
-    $('orderDetail').querySelectorAll('[data-timer-step]').forEach(button => button.addEventListener('click', async event => {
-      await api(`/api/colaborador/ordens/${encodeURIComponent(orderId)}/etapas/tempo`, {
-        method: 'POST',
-        body: JSON.stringify({ productId: assignment.productId, stepId: event.target.dataset.timerStep, action: event.target.dataset.action })
-      });
       await load();
     }));
     if (!paid) {
