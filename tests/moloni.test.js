@@ -4,6 +4,7 @@ const {
   buildDocumentPreview,
   classifyLineNature,
   flattenForm,
+  moloniDocumentResult,
   orderTotals,
   paidPayments,
   recommendDocumentAction
@@ -106,4 +107,16 @@ test('serializa estruturas aninhadas para formularios Moloni', () => {
   const form = flattenForm({ products: [{ name: 'Teste', taxes: [{ tax_id: 23 }] }] });
   assert.equal(form.get('products[0][name]'), 'Teste');
   assert.equal(form.get('products[0][taxes][0][tax_id]'), '23');
+});
+
+test('extrai identificador de documento Moloni em respostas variadas', () => {
+  assert.deepEqual(
+    { id: moloniDocumentResult({ document_id: 123, document_number: 'FT A/1' }).id, number: moloniDocumentResult({ document_id: 123, document_number: 'FT A/1' }).number },
+    { id: '123', number: 'FT A/1' }
+  );
+  assert.deepEqual(
+    { id: moloniDocumentResult({ data: { document: { id: 456, number: 'FR A/2' } } }).id, number: moloniDocumentResult({ data: { document: { id: 456, number: 'FR A/2' } } }).number },
+    { id: '456', number: 'FR A/2' }
+  );
+  assert.equal(moloniDocumentResult({ valid: 1 }).id, '');
 });

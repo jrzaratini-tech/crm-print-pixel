@@ -10,6 +10,7 @@ const {
   MoloniClient,
   buildDocumentPreview,
   cleanText: moloniText,
+  moloniDocumentResult,
   oauthAuthorizationUrl,
   recommendDocumentAction,
   roundMoney: moloniMoney
@@ -2856,11 +2857,17 @@ app.post('/api/moloni/documents', async (req, res) => {
       result = await client.call(moloniEndpointFor(preview.type), payload);
     }
 
+    const documentResult = moloniDocumentResult(result);
+    if (!documentResult.id) {
+      console.error('Resposta Moloni sem identificador de documento:', JSON.stringify(result).slice(0, 1000));
+      throw new Error(`O Moloni respondeu sem identificador para ${preview.label}. Confirme no Moloni se o rascunho foi criado antes de tentar novamente.`);
+    }
+
     const completed = {
       ...pending,
       state: status,
-      moloniDocumentId: result.document_id,
-      number: result.document_number || '',
+      moloniDocumentId: documentResult.id,
+      number: documentResult.number || '',
       response: result,
       updatedAt: new Date().toISOString()
     };

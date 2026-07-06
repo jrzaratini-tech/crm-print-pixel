@@ -266,6 +266,68 @@ function flattenForm(value, prefix = '', output = new URLSearchParams()) {
   return output;
 }
 
+function moloniDocumentResult(result = {}) {
+  const directIdKeys = new Set([
+    'document_id',
+    'documentId',
+    'invoice_id',
+    'invoiceId',
+    'invoice_receipt_id',
+    'invoiceReceiptId',
+    'receipt_id',
+    'receiptId'
+  ]);
+  const numberKeys = new Set([
+    'document_number',
+    'documentNumber',
+    'invoice_number',
+    'invoiceNumber',
+    'receipt_number',
+    'receiptNumber',
+    'number'
+  ]);
+  const normalize = value => {
+    const clean = cleanText(value, 120);
+    return clean && clean !== '0' ? clean : '';
+  };
+  const find = (value, path = []) => {
+    if (!value || typeof value !== 'object') return { id: '', number: '' };
+    const entries = Array.isArray(value)
+      ? value.map((item, index) => [String(index), item])
+      : Object.entries(value);
+    let number = '';
+    for (const [key, nested] of entries) {
+      if (!number && numberKeys.has(key)) number = normalize(nested);
+    }
+    for (const [key, nested] of entries) {
+      if (directIdKeys.has(key)) {
+        const id = normalize(nested);
+        if (id) return { id, number };
+      }
+    }
+    for (const [key, nested] of entries) {
+      if (key === 'id' && /document|invoice|receipt/i.test(path.join('.'))) {
+        const id = normalize(nested);
+        if (id) return { id, number };
+      }
+      const found = find(nested, [...path, key]);
+      if (found.id) return { id: found.id, number: found.number || number };
+      if (!number && found.number) number = found.number;
+    }
+    if (!path.length && Object.prototype.hasOwnProperty.call(value, 'id')) {
+      const id = normalize(value.id);
+      if (id) return { id, number };
+    }
+    return { id: '', number };
+  };
+  const found = find(result);
+  return {
+    id: found.id,
+    number: found.number,
+    raw: result
+  };
+}
+
 function oauthAuthorizationUrl({ clientId, redirectUri, state }) {
   const url = new URL(MOLONI_OAUTH_URL);
   url.searchParams.set('response_type', 'code');
@@ -308,6 +370,7 @@ module.exports = {
   classifyLineNature,
   documentLabel,
   flattenForm,
+  moloniDocumentResult,
   oauthAuthorizationUrl,
   orderTotals,
   paidPayments,
