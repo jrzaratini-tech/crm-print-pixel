@@ -352,8 +352,9 @@ class MoloniClient {
       body: flattenForm(payload)
     });
     const body = await response.json().catch(() => ({}));
-    if (!response.ok || body?.error || body?.valid === 0) {
-      const error = new Error(body?.error_description || body?.message || 'Erro devolvido pela API Moloni.');
+    const arrayError = Array.isArray(body) && body.every(item => typeof item === 'string');
+    if (!response.ok || body?.error || body?.valid === 0 || arrayError) {
+      const error = new Error(body?.error_description || body?.message || (arrayError ? body.join('; ') : 'Erro devolvido pela API Moloni.'));
       error.status = response.status;
       error.details = body;
       throw error;

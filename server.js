@@ -548,6 +548,23 @@ function moloniProductReference(product = {}) {
   return moloniText(product.reference || product.name || 'artigo-crm', 80);
 }
 
+function moloniCustomerId(value = {}) {
+  if (!value || typeof value !== 'object') return 0;
+  const candidates = [
+    value.customer_id,
+    value.customerId,
+    value.client_id,
+    value.clientId,
+    value.id,
+    value.customer?.customer_id,
+    value.customer?.id,
+    value.data?.customer_id,
+    value.data?.customer?.customer_id,
+    value.data?.customer?.id
+  ];
+  return Number(candidates.find(candidate => Number(candidate) > 0) || 0);
+}
+
 async function ensureMoloniProduct(client, product, config) {
   const settings = config.settings || {};
   if (settings.autoCreateProducts === false || !settings.defaultProductCategoryId || !settings.defaultUnitId) {
@@ -683,19 +700,19 @@ function moloniReceiptPayload(preview, config, invoiceDocumentId, status) {
 }
 
 async function ensureMoloniCustomer(client, preview, config) {
-  const vat = preview.order.vat;
-  if (vat) {
-    const matches = await client.call('customers/getByVat', {
-      company_id: Number(config.companyId),
-      vat
-    }).catch(() => []);
-    const customer = Array.isArray(matches) ? matches[0] : matches;
-    if (customer?.customer_id) return customer.customer_id;
-  }
+  const vat = preview.order.vat || '999999990';
+  const matches = await client.call('customers/getByVat', {
+    company_id: Number(config.companyId),
+    vat
+  }).catch(() => []);
+  const existingCustomers = Array.isArray(matches) ? matches : [matches];
+  const existingId = moloniCustomerId(existingCustomers.find(customer => moloniCustomerId(customer)) || {});
+  if (existingId) return existingId;
+
   const created = await client.call('customers/insert', {
     company_id: Number(config.companyId),
-    name: preview.order.company || preview.order.customer,
-    vat: vat || '999999990',
+    name: preview.order.vat ? (preview.order.company || preview.order.customer) : 'Consumidor final',
+    vat,
     address: preview.order.address,
     city: '',
     zip_code: '',
@@ -705,7 +722,9 @@ async function ensureMoloniCustomer(client, preview, config) {
     maturity_date_id: 0,
     payment_method_id: Number(config.settings?.defaultPaymentMethodId || 0)
   });
-  return created.customer_id;
+  const createdId = moloniCustomerId(created);
+  if (!createdId) throw new Error(`Nao foi possivel obter o ID do cliente Moloni para ${preview.order.customer || preview.order.company || vat}.`);
+  return createdId;
 }
 
 function hash(value) {
