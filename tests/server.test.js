@@ -726,6 +726,22 @@ test('executa faturacao Moloni simulada com validacao e bloqueio de duplicados',
   assert.equal(invoice.body.document.mode, 'mock');
   assert.equal(invoice.body.document.state, 'draft');
 
+  const deletedDraft = await post(`/api/moloni/documents/${invoice.body.document.id}/delete`, {});
+  assert.equal(deletedDraft.response.status, 200);
+  assert.equal(deletedDraft.body.success, true);
+
+  const listedAfterDelete = await request(`/api/moloni/documents?orderId=${createdOrder.body.id}`);
+  assert.equal(listedAfterDelete.response.status, 200);
+  assert.equal(listedAfterDelete.body.documents.length, 0);
+
+  const invoiceAgain = await post('/api/moloni/documents', {
+    orderId: createdOrder.body.id,
+    type: 'invoice',
+    issueDate: '2026-06-22',
+    status: 'draft'
+  });
+  assert.equal(invoiceAgain.response.status, 201);
+
   const duplicate = await post('/api/moloni/documents', {
     orderId: createdOrder.body.id,
     type: 'invoice',
@@ -744,6 +760,10 @@ test('executa faturacao Moloni simulada com validacao e bloqueio de duplicados',
   });
   assert.equal(receipt.response.status, 201);
   assert.equal(receipt.body.document.value, 50);
+
+  const deleteClosed = await post(`/api/moloni/documents/${receipt.body.document.id}/delete`, {});
+  assert.equal(deleteClosed.response.status, 409);
+  assert.match(deleteClosed.body.message, /Documentos fechados/);
 
   const listed = await request(`/api/moloni/documents?orderId=${createdOrder.body.id}`);
   assert.equal(listed.response.status, 200);

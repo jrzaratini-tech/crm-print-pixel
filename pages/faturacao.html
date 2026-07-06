@@ -510,15 +510,31 @@
             <td>${escapeHtml(document.orderNumber || '-')}<div class="tiny">${escapeHtml(document.customer || '')}</div></td>
             <td class="money">${money(document.value)}</td>
             <td><span class="status ${escapeHtml(document.state)}">${escapeHtml(document.state)}</span></td>
-            <td>${document.mode === 'live' && document.state === 'closed' ? `<button class="btn neutral pdf-btn" data-id="${escapeHtml(document.id)}"><i class="fa-solid fa-file-pdf"></i></button>` : ''}</td>
+            <td>
+              ${document.mode === 'live' && document.moloniDocumentId && document.state !== 'error' ? `<button class="btn neutral pdf-btn" title="Abrir PDF" data-id="${escapeHtml(document.id)}"><i class="fa-solid fa-file-pdf"></i></button>` : ''}
+              ${['draft', 'error'].includes(document.state) ? `<button class="btn danger delete-doc-btn" title="Remover do CRM" data-id="${escapeHtml(document.id)}" data-state="${escapeHtml(document.state)}"><i class="fa-solid fa-trash"></i></button>` : ''}
+            </td>
           </tr>`).join('') : '<tr><td colspan="5" class="empty">Sem documentos para mostrar.</td></tr>';
         $('documentRows').querySelectorAll('.pdf-btn').forEach(button => button.addEventListener('click', () => openPdf(button.dataset.id)));
+        $('documentRows').querySelectorAll('.delete-doc-btn').forEach(button => button.addEventListener('click', () => deleteDocument(button.dataset.id, button.dataset.state)));
       }
 
       async function openPdf(id) {
         try {
           const result = await api(`/api/moloni/documents/${encodeURIComponent(id)}/pdf`);
           window.open(result.url, '_blank', 'noopener');
+        } catch (error) { message(error.message, 'error'); }
+      }
+
+      async function deleteDocument(id, state) {
+        const warning = state === 'draft'
+          ? 'Remover este rascunho apenas do CRM? Se ele existir no Moloni, apague tambem no Moloni para nao ficar um rascunho fiscal solto.'
+          : 'Remover este registo com erro do CRM?';
+        if (!confirm(warning)) return;
+        try {
+          const result = await api(`/api/moloni/documents/${encodeURIComponent(id)}/delete`, { method: 'POST', body: '{}' });
+          message(result.message || 'Documento removido do CRM.', 'success');
+          await loadDocuments();
         } catch (error) { message(error.message, 'error'); }
       }
 

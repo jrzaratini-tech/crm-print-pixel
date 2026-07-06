@@ -2907,6 +2907,31 @@ app.get('/api/moloni/documents/:id/pdf', async (req, res) => {
   }
 });
 
+app.post('/api/moloni/documents/:id/delete', async (req, res) => {
+  try {
+    const id = String(req.params.id || '');
+    const ref = db.collection('moloni_documents').doc(id);
+    const snapshot = await ref.get();
+    if (!snapshot.exists) return res.status(404).json({ success: false, message: 'Documento nao encontrado.' });
+    const document = snapshot.data();
+    if (!['draft', 'error'].includes(document.state)) {
+      return res.status(409).json({
+        success: false,
+        message: 'Apenas documentos em rascunho ou erro podem ser removidos do CRM. Documentos fechados devem ser tratados no Moloni.'
+      });
+    }
+    await ref.delete();
+    res.json({
+      success: true,
+      message: document.state === 'draft'
+        ? 'Documento removido do CRM. Se o rascunho existir no Moloni, apague-o tambem no Moloni.'
+        : 'Documento com erro removido do CRM.'
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message || 'Nao foi possivel remover o documento do CRM.' });
+  }
+});
+
 async function productionWorkers() {
   const snapshot = await db.collection('production_workers').get();
   const workers = new Map();
