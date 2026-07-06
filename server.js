@@ -711,6 +711,7 @@ async function ensureMoloniCustomer(client, preview, config) {
 
   const created = await client.call('customers/insert', {
     company_id: Number(config.companyId),
+    number: `CRM-${vat}`.slice(0, 30),
     name: preview.order.vat ? (preview.order.company || preview.order.customer) : 'Consumidor final',
     vat,
     address: preview.order.address,
@@ -719,8 +720,13 @@ async function ensureMoloniCustomer(client, preview, config) {
     country_id: 1,
     phone: preview.order.phone,
     language_id: 1,
+    salesman_id: 0,
     maturity_date_id: 0,
-    payment_method_id: Number(config.settings?.defaultPaymentMethodId || 0)
+    payment_method_id: Number(config.settings?.defaultPaymentMethodId || 0),
+    payment_day: 0,
+    discount: 0,
+    credit_limit: 0,
+    delivery_method_id: 0
   });
   const createdId = moloniCustomerId(created);
   if (!createdId) throw new Error(`Nao foi possivel obter o ID do cliente Moloni para ${preview.order.customer || preview.order.company || vat}.`);
