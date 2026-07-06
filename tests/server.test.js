@@ -305,6 +305,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(productionPageResult.body, /Desclassificar e devolver à fila/);
   assert.match(productionPageResult.body, /classificationProduct/);
   assert.match(productionPageResult.body, /Controle de comissoes da producao/);
+  assert.match(productionPageResult.body, /extraPaymentOpen/);
   assert.match(productionPageResult.body, /data-payment-filter="process"/);
   assert.match(workerAppResult.body, /Concluido a receber/);
   assert.match(workerAppResult.body, /Historico \/ pagos/);
@@ -473,14 +474,49 @@ test('controla pagamento de comissao e move trabalho pago para historico do cola
   assert.equal(paid.response.status, 200);
   assert.equal(paid.body.assignment.paymentStatus, 'paid');
   assert.equal(paid.body.assignment.history.at(-1).type, 'payment_paid');
+  assert.ok(paid.body.expenseId);
 
   const session = await workerRequest('/api/colaborador/session', login.body.token);
   const task = session.body.assignments.find(item => item.orderId === order.body.id);
   assert.equal(task.paymentStatus, 'paid');
   assert.ok(task.paidAt);
 
+  const expenses = await post('/api/database/query', { schema: 'despesa', filters: { id: paid.body.expenseId } });
+  assert.equal(expenses.body.events.length, 1);
+  assert.equal(expenses.body.events[0].payload.valorTotal, 90);
+  assert.equal(expenses.body.events[0].payload.tipoDespesa, 'comissao_producao');
+
   const blockedUpdate = await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas`, { stepId: 'limpeza_embalagem', done: false }, login.body.token);
   assert.equal(blockedUpdate.response.status, 400);
+});
+
+test('adiciona pagamento extra ao colaborador e baixa como despesa', async () => {
+  const worker = await post('/api/production/workers', { name: 'Extra Producao', username: 'extra.producao', password: 'senha-segura-extra', role: 'acabamento' });
+  const login = await post('/api/colaborador/login', { username: 'extra.producao', password: 'senha-segura-extra' });
+
+  const created = await post('/api/production/extra-payments', { workerId: worker.body.worker.id, amount: 42.5, description: 'Acerto manual de instalacao' });
+  assert.equal(created.response.status, 200);
+  assert.equal(created.body.payment.paymentStatus, 'pending');
+
+  const beforePay = await workerRequest('/api/colaborador/session', login.body.token);
+  const pendingExtra = beforePay.body.assignments.find(item => item.extraPayment);
+  assert.ok(pendingExtra);
+  assert.equal(pendingExtra.commission, 42.5);
+  assert.equal(pendingExtra.paymentStatus, 'pending');
+
+  const paid = await post(`/api/production/extra-payments/${created.body.payment.id}/payment`, { paidBy: 'Financeiro' });
+  assert.equal(paid.response.status, 200);
+  assert.equal(paid.body.payment.paymentStatus, 'paid');
+  assert.ok(paid.body.expenseId);
+
+  const afterPay = await workerRequest('/api/colaborador/session', login.body.token);
+  const paidExtra = afterPay.body.assignments.find(item => item.id === created.body.payment.id);
+  assert.equal(paidExtra.paymentStatus, 'paid');
+
+  const expenses = await post('/api/database/query', { schema: 'despesa', filters: { id: paid.body.expenseId } });
+  assert.equal(expenses.body.events.length, 1);
+  assert.equal(expenses.body.events[0].payload.valorTotal, 42.5);
+  assert.equal(expenses.body.events[0].payload.tipoDespesa, 'pagamento_extra_producao');
 });
 
 test('devolve OS para fila e transfere para novo colaborador preservando progresso', async () => {

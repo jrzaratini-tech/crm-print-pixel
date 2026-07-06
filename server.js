@@ -1344,6 +1344,114 @@ function assignmentHistoryEntry(type, data = {}) {
   return { type, ...data, createdAt: new Date().toISOString() };
 }
 
+function productionPaymentExpenseId(type, id) {
+  return `production-${type}-expense-${hash(id).slice(0, 32)}`;
+}
+
+async function ensureProductionPaymentExpense({ id, type, workerId, workerName, amount, description, paidAt, paidBy, assignmentId = '', orderId = '', productId = '' }) {
+  const value = money(amount);
+  if (!id || !type || !(value > 0) || !paidAt) return null;
+  const eventId = productionPaymentExpenseId(type, id);
+  const now = new Date().toISOString();
+  const cleanWorkerName = text(workerName || 'Colaborador de producao', 160);
+  const cleanDescription = text(description || (type === 'extra' ? 'Pagamento extra de producao' : 'Comissao de producao'), 300);
+  const payload = {
+    fornecedor: cleanWorkerName,
+    nifFornecedor: '',
+    numeroFatura: `PROD-${type.toUpperCase()}-${String(id).slice(0, 40)}`,
+    tipoDocumento: 'RECIBO_INTERNO',
+    dataCompra: String(paidAt).slice(0, 10),
+    dataVencimento: String(paidAt).slice(0, 10),
+    descricao: cleanDescription,
+    categoria: 'MAO DE OBRA',
+    tipoDespesa: type === 'extra' ? 'pagamento_extra_producao' : 'comissao_producao',
+    formaPagamento: text(paidBy || 'CRM', 80),
+    valorBruto: value,
+    valorIVA: 0,
+    valorTotal: value,
+    comIVA: 'nao',
+    ivaDedutivel: false,
+    statusPagamento: 'pago',
+    origemLancamento: 'producao',
+    classificationStatus: 'classified',
+    classificationSource: 'production_payment',
+    productionPaymentType: type,
+    productionPaymentId: id,
+    productionAssignmentId: assignmentId,
+    orderId,
+    productId,
+    workerId: text(workerId, 120),
+    workerName: cleanWorkerName
+  };
+  await db.collection('events').doc(eventId).set({
+    schema: 'despesa',
+    pageId: 'ordemproducao',
+    timestamp: paidAt,
+    created_at: paidAt,
+    updated_at: now,
+    deleted: false,
+    payload
+  }, { merge: true });
+  return eventId;
+}
+
+async function ensurePaidProductionPaymentExpenses(assignments = []) {
+  const paidAssignments = assignments.filter(item => item?.paymentStatus === 'paid' && money(item.commission) > 0);
+  await Promise.all(paidAssignments.map(item => ensureProductionPaymentExpense({
+    id: item.id || productionAssignmentId(item.orderId, item.productId),
+    type: 'assignment',
+    workerId: item.workerId,
+    workerName: item.workerName,
+    amount: item.commission,
+    description: `Comissao de producao${item.productName ? ` - ${item.productName}` : ''}`,
+    paidAt: item.paidAt,
+    paidBy: item.paidBy,
+    assignmentId: item.id || productionAssignmentId(item.orderId, item.productId),
+    orderId: item.orderId,
+    productId: item.productId || ''
+  })));
+}
+
+async function productionExtraPayments() {
+  const snapshot = await db.collection('production_extra_payments').get();
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
+
+function safeExtraPaymentForWorker(payment, worker) {
+  const paid = payment.paymentStatus === 'paid';
+  return sanitizeForResponse({
+    id: payment.id,
+    extraPayment: true,
+    orderId: '',
+    productId: '',
+    productName: 'Pagamento extra',
+    workerId: worker.id,
+    workerName: worker.name,
+    workerIds: [worker.id],
+    workers: [safeProductionWorker(worker)],
+    commission: money(payment.amount),
+    description: text(payment.description, 300),
+    paymentStatus: paid ? 'paid' : 'pending',
+    paidAt: payment.paidAt || null,
+    paidBy: payment.paidBy || '',
+    paymentNote: payment.paymentNote || '',
+    steps: [],
+    history: Array.isArray(payment.history) ? payment.history : [],
+    active: payment.active !== false,
+    createdAt: payment.createdAt,
+    updatedAt: payment.updatedAt,
+    order: {
+      id: '',
+      numero: 'Pagamento extra',
+      cliente: text(payment.description || 'Credito adicional', 160),
+      empresa: '',
+      dataEntrega: payment.createdAt ? String(payment.createdAt).slice(0, 10) : '',
+      produtos: [{ nome: 'Pagamento extra', tamanho: '', quantidade: 1, observacoes: text(payment.description, 300) }]
+    },
+    product: { id: '', nome: 'Pagamento extra', tamanho: '', quantidade: 1, observacoes: text(payment.description, 300) }
+  });
+}
+
 async function getActiveWorkerByToken(token) {
   if (!token || token.length < 40 || token.length > 200) return null;
   const sessionDoc = await db.collection('production_sessions').doc(hash(token)).get();
@@ -1897,6 +2005,9 @@ app.post('/api/vendedor/orcamentos/:id/aprovar', requireSeller, async (req, res)
 app.get('/api/colaborador/session', requireWorker, async (req, res) => {
   try {
     const snapshot = await db.collection('production_assignments').get();
+    const extraPayments = (await productionExtraPayments())
+      .filter(item => item.active !== false && item.workerId === req.productionWorker.id)
+      .map(item => safeExtraPaymentForWorker(item, req.productionWorker));
     const assignments = await Promise.all(snapshot.docs
       .map(doc => ({ id: doc.id, ...doc.data() }))
       .filter(item => {
@@ -1914,7 +2025,7 @@ app.get('/api/colaborador/session', requireWorker, async (req, res) => {
     res.json({
       success: true,
       worker: sanitizeForResponse({ id: req.productionWorker.id, name: req.productionWorker.name, role: req.productionWorker.role }),
-      assignments: assignments.filter(Boolean).sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+      assignments: [...assignments.filter(Boolean), ...extraPayments].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
     });
   } catch (error) {
     console.error('Erro ao carregar painel do colaborador:', error);
@@ -3408,7 +3519,9 @@ app.post('/api/sales/commissions/:id/payment', async (req, res) => {
 
 app.get('/api/production/assignments', async (req, res) => {
   const snapshot = await db.collection('production_assignments').get();
-  res.json({ success: true, assignments: snapshot.docs.map(doc => sanitizeForResponse({ id: doc.id, ...doc.data() })) });
+  const assignments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  await ensurePaidProductionPaymentExpenses(assignments);
+  res.json({ success: true, assignments: assignments.map(item => sanitizeForResponse(item)) });
 });
 
 app.get('/api/production/assignments/:id', async (req, res) => {
@@ -3530,11 +3643,129 @@ app.post('/api/production/assignments/:id/payment', async (req, res) => {
       updatedAt: now
     };
     await db.collection('production_assignments').doc(assignmentId).set(updated);
+    const expenseId = await ensureProductionPaymentExpense({
+      id: assignmentId,
+      type: 'assignment',
+      workerId: assignment.workerId,
+      workerName: assignment.workerName,
+      amount: assignment.commission,
+      description: `Comissao de producao${assignment.productName ? ` - ${assignment.productName}` : ''}`,
+      paidAt: now,
+      paidBy,
+      assignmentId,
+      orderId,
+      productId
+    });
     const stockMovements = await issueStockForAssignment(orderId, productId, updated, now);
-    res.json({ success: true, assignment: sanitizeForResponse({ id: assignmentId, ...updated }), stockMovements });
+    res.json({ success: true, assignment: sanitizeForResponse({ id: assignmentId, ...updated }), stockMovements, expenseId });
   } catch (error) {
     console.error('Erro ao marcar comissao como paga:', error);
     res.status(500).json({ success: false, message: 'Nao foi possivel marcar a comissao como paga.' });
+  }
+});
+
+app.get('/api/production/extra-payments', async (req, res) => {
+  try {
+    const payments = await productionExtraPayments();
+    await Promise.all(payments
+      .filter(item => item.paymentStatus === 'paid' && money(item.amount) > 0)
+      .map(item => ensureProductionPaymentExpense({
+        id: item.id,
+        type: 'extra',
+        workerId: item.workerId,
+        workerName: item.workerName,
+        amount: item.amount,
+        description: item.description,
+        paidAt: item.paidAt,
+        paidBy: item.paidBy
+      })));
+    res.json({ success: true, payments: payments.map(sanitizeForResponse) });
+  } catch (error) {
+    console.error('Erro ao listar pagamentos extras:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel carregar pagamentos extras.' });
+  }
+});
+
+app.post('/api/production/extra-payments', async (req, res) => {
+  try {
+    const workerId = String(req.body?.workerId || '');
+    const worker = (await productionWorkers()).find(item => item.id === workerId && item.active !== false);
+    const amount = money(req.body?.amount);
+    const description = text(req.body?.description, 300);
+    if (!worker) return res.status(400).json({ success: false, message: 'Selecione um colaborador ativo.' });
+    if (!(amount > 0)) return res.status(400).json({ success: false, message: 'Informe um valor maior que zero.' });
+    if (!description) return res.status(400).json({ success: false, message: 'Informe uma descricao para o pagamento extra.' });
+    const now = new Date().toISOString();
+    const id = `extra-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
+    const payment = {
+      workerId: worker.id,
+      workerName: worker.name,
+      amount,
+      description,
+      paymentStatus: 'pending',
+      paidAt: null,
+      paidBy: '',
+      paymentNote: '',
+      active: true,
+      history: [
+        assignmentHistoryEntry('extra_created', { workerId: worker.id, workerName: worker.name, amount, description })
+      ],
+      createdAt: now,
+      updatedAt: now
+    };
+    await db.collection('production_extra_payments').doc(id).set(payment);
+    res.json({ success: true, payment: sanitizeForResponse({ id, ...payment }) });
+  } catch (error) {
+    console.error('Erro ao criar pagamento extra:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel criar o pagamento extra.' });
+  }
+});
+
+app.post('/api/production/extra-payments/:id/payment', async (req, res) => {
+  try {
+    const id = String(req.params.id || '');
+    if (!isSafeIdentifier(id)) return res.status(400).json({ success: false, message: 'Pagamento extra invalido.' });
+    const ref = db.collection('production_extra_payments').doc(id);
+    const doc = await ref.get();
+    if (!doc.exists || doc.data().active === false) return res.status(404).json({ success: false, message: 'Pagamento extra nao encontrado.' });
+    const payment = doc.data();
+    if (money(payment.amount) <= 0) return res.status(400).json({ success: false, message: 'Este pagamento extra nao possui valor a pagar.' });
+    const now = new Date().toISOString();
+    const paidBy = text(req.body?.paidBy || 'Equipe interna', 120);
+    const paymentNote = text(req.body?.note, 300);
+    const updated = {
+      ...payment,
+      paymentStatus: 'paid',
+      paidAt: now,
+      paidBy,
+      paymentNote,
+      history: [
+        ...(Array.isArray(payment.history) ? payment.history : []),
+        assignmentHistoryEntry('extra_payment_paid', {
+          workerId: payment.workerId,
+          workerName: payment.workerName,
+          paidBy,
+          amount: money(payment.amount),
+          note: paymentNote
+        })
+      ].slice(-100),
+      updatedAt: now
+    };
+    await ref.set(updated);
+    const expenseId = await ensureProductionPaymentExpense({
+      id,
+      type: 'extra',
+      workerId: payment.workerId,
+      workerName: payment.workerName,
+      amount: payment.amount,
+      description: payment.description,
+      paidAt: now,
+      paidBy
+    });
+    res.json({ success: true, payment: sanitizeForResponse({ id, ...updated }), expenseId });
+  } catch (error) {
+    console.error('Erro ao pagar extra de producao:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel marcar o pagamento extra como pago.' });
   }
 });
 

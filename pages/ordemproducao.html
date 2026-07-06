@@ -339,6 +339,17 @@
             background: rgba(59, 130, 246, 0.1);
         }
 
+        .payment-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .payment-actions .refresh-btn {
+            margin: 0;
+        }
+
         .operational-filters {
             display: grid;
             grid-template-columns: repeat(3, minmax(160px, 1fr));
@@ -1133,6 +1144,9 @@
                 <h2>Controle de comissoes da producao</h2>
                 <p style="margin:4px 0 0;color:var(--text-secondary)">Servicos concluidos entram como saldo a pagar. Ao confirmar o pagamento, somem do painel principal do colaborador.</p>
             </div>
+            <div class="payment-actions">
+                <button type="button" class="refresh-btn" id="extraPaymentOpen"><i class="fas fa-plus"></i> Pagamento extra</button>
+            </div>
         </div>
         <div class="payment-summary" id="paymentSummary"></div>
         <div class="payment-tabs">
@@ -1213,6 +1227,23 @@
             </div>
         </div>
     </div>
+
+    <div class="modal-overlay" id="extraPaymentOverlay">
+        <div class="modal-container">
+            <div class="modal-header">
+                <h2 class="modal-title">Pagamento extra</h2>
+                <button class="modal-close" id="extraPaymentClose"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-content">
+                <div class="classification-grid">
+                    <label>Colaborador<select id="extraPaymentWorker"></select></label>
+                    <label>Valor (â‚¬)<input id="extraPaymentAmount" type="number" min="0" step="0.01" value="0"></label>
+                    <label>DescriÃ§Ã£o<input id="extraPaymentDescription" maxlength="300" placeholder="Ex.: bonus, acerto, ajuda em instalaÃ§Ã£o"></label>
+                </div>
+                <button class="refresh-btn" id="extraPaymentSave" style="width:100%;margin-top:18px;"><i class="fas fa-save"></i> Adicionar Ã  lista a pagar</button>
+            </div>
+        </div>
+    </div>
     
     <!-- ============================================
          INDICADOR DE AUTO-REFRESH
@@ -1246,6 +1277,13 @@
             const paymentSummary = document.getElementById('paymentSummary');
             const paymentList = document.getElementById('paymentList');
             const paymentTabs = document.querySelectorAll('[data-payment-filter]');
+            const extraPaymentOpen = document.getElementById('extraPaymentOpen');
+            const extraPaymentOverlay = document.getElementById('extraPaymentOverlay');
+            const extraPaymentClose = document.getElementById('extraPaymentClose');
+            const extraPaymentWorker = document.getElementById('extraPaymentWorker');
+            const extraPaymentAmount = document.getElementById('extraPaymentAmount');
+            const extraPaymentDescription = document.getElementById('extraPaymentDescription');
+            const extraPaymentSave = document.getElementById('extraPaymentSave');
             const classificationOverlay = document.getElementById('classificationOverlay');
             const classificationClose = document.getElementById('classificationClose');
             const classificationTitle = document.getElementById('classificationTitle');
@@ -1267,6 +1305,7 @@
             let contadorRefresh = 30;
             let productionWorkers = [];
             let productionAssignments = [];
+            let productionExtraPayments = [];
             let productionSteps = [];
             let productionProcessCatalog = [];
             let classificationOrder = null;
@@ -1737,17 +1776,20 @@
             // ============================================
             
             async function carregarMetadadosProducao() {
-                const [workersResponse, assignmentsResponse] = await Promise.all([
+                const [workersResponse, assignmentsResponse, extrasResponse] = await Promise.all([
                     fetch('/api/production/workers'),
-                    fetch('/api/production/assignments')
+                    fetch('/api/production/assignments'),
+                    fetch('/api/production/extra-payments')
                 ]);
-                if (!workersResponse.ok || !assignmentsResponse.ok) throw new Error('Erro ao carregar classificação da produção');
+                if (!workersResponse.ok || !assignmentsResponse.ok || !extrasResponse.ok) throw new Error('Erro ao carregar classificação da produção');
                 const workersResult = await workersResponse.json();
                 const assignmentsResult = await assignmentsResponse.json();
+                const extrasResult = await extrasResponse.json();
                 productionWorkers = workersResult.workers || [];
                 productionSteps = workersResult.steps || [];
                 productionProcessCatalog = workersResult.processCatalog || [];
                 productionAssignments = assignmentsResult.assignments || [];
+                productionExtraPayments = extrasResult.payments || [];
                 atualizarFiltrosOperacionais();
             }
 
@@ -1777,15 +1819,29 @@
 
             function assignmentPaymentRows() {
                 const ordersById = new Map(todasOrdens.map(ordem => [ordem.id, ordem]));
-                return productionAssignments
+                const assignmentRows = productionAssignments
                     .filter(item => item.active !== false && parseFloat(item.commission) > 0)
                     .map(item => ({
                         ...item,
+                        rowType: 'assignment',
                         order: ordersById.get(item.orderId),
                         commissionValue: parseFloat(item.commission) || 0,
                         done: assignmentDone(item),
                         paid: item.paymentStatus === 'paid'
-                    }))
+                    }));
+                const extraRows = productionExtraPayments
+                    .filter(item => item.active !== false && parseFloat(item.amount) > 0)
+                    .map(item => ({
+                        ...item,
+                        rowType: 'extra',
+                        order: null,
+                        commissionValue: parseFloat(item.amount) || 0,
+                        done: true,
+                        paid: item.paymentStatus === 'paid',
+                        workerName: item.workerName || 'Colaborador',
+                        productName: 'Pagamento extra'
+                    }));
+                return [...assignmentRows, ...extraRows]
                     .sort((a, b) => new Date(b.paidAt || b.updatedAt || 0) - new Date(a.paidAt || a.updatedAt || 0));
             }
 
@@ -1814,17 +1870,21 @@
                 paymentList.innerHTML = visibleRows.map(item => {
                     const order = item.order || {};
                     const progress = assignmentProgress(item);
+                    const isExtra = item.rowType === 'extra';
                     return `<div class="payment-row">
                         <div>
                             <strong>${escapeHtml(item.workerName)} - ${formatarMoedaPadrao(item.commissionValue)}</strong>
-                            <small>${escapeHtml(order.numero || item.orderId)} - ${escapeHtml(order.cliente || 'Cliente nao encontrado')} - ${escapeHtml(item.productName || 'Servico geral')}</small>
-                            <small>${item.paid ? `Pago em ${escapeHtml(formatarDataPadrao(item.paidAt, true))} por ${escapeHtml(item.paidBy || 'responsavel')}` : item.done ? 'Concluido e aguardando pagamento' : `Em andamento: ${progress.done}/${progress.total} etapas`}</small>
+                            <small>${isExtra ? `Pagamento extra - ${escapeHtml(item.description || '')}` : `${escapeHtml(order.numero || item.orderId)} - ${escapeHtml(order.cliente || 'Cliente nao encontrado')} - ${escapeHtml(item.productName || 'Servico geral')}`}</small>
+                            <small>${item.paid ? `Pago em ${escapeHtml(formatarDataPadrao(item.paidAt, true))} por ${escapeHtml(item.paidBy || 'responsavel')}` : isExtra ? 'Extra aguardando pagamento' : item.done ? 'Concluido e aguardando pagamento' : `Em andamento: ${progress.done}/${progress.total} etapas`}</small>
                         </div>
-                        ${item.paid ? '<span class="order-status status-concluido">Pago</span>' : item.done ? `<button type="button" data-pay-assignment="${escapeHtml(item.orderId)}" data-product-id="${escapeHtml(item.productId || '')}">Marcar pago</button>` : '<span class="order-status status-processamento">Em processo</span>'}
+                        ${item.paid ? '<span class="order-status status-concluido">Pago</span>' : isExtra ? `<button type="button" data-pay-extra="${escapeHtml(item.id)}">Marcar pago</button>` : item.done ? `<button type="button" data-pay-assignment="${escapeHtml(item.orderId)}" data-product-id="${escapeHtml(item.productId || '')}">Marcar pago</button>` : '<span class="order-status status-processamento">Em processo</span>'}
                     </div>`;
                 }).join('') || `<div style="color:var(--text-secondary);padding:10px;">${paymentFilter === 'paid' ? 'Nenhum pagamento registrado ainda.' : paymentFilter === 'process' ? 'Nenhum servico em processo.' : 'Nenhuma comissao concluida pendente de pagamento.'}</div>`;
                 paymentList.querySelectorAll('[data-pay-assignment]').forEach(button => {
                     button.addEventListener('click', () => markAssignmentPaid(button.dataset.payAssignment, button.dataset.productId || ''));
+                });
+                paymentList.querySelectorAll('[data-pay-extra]').forEach(button => {
+                    button.addEventListener('click', () => markExtraPaymentPaid(button.dataset.payExtra));
                 });
             }
 
@@ -1841,6 +1901,53 @@
                 renderPaymentControl();
                 if (classificationOrder?.id === orderId) carregarItemClassificacao();
                 alert('Pagamento registrado. O servico agora ira para o historico pago do colaborador.');
+            }
+
+            function openExtraPaymentModal() {
+                extraPaymentWorker.innerHTML = productionWorkers.map(worker => `<option value="${escapeHtml(worker.id)}">${escapeHtml(worker.name)}${worker.role ? ` - ${escapeHtml(worker.role)}` : ''}</option>`).join('');
+                extraPaymentAmount.value = '';
+                extraPaymentDescription.value = '';
+                extraPaymentOverlay.classList.add('active');
+            }
+
+            function closeExtraPaymentModal() {
+                extraPaymentOverlay.classList.remove('active');
+            }
+
+            async function saveExtraPayment() {
+                const workerId = extraPaymentWorker.value;
+                const amount = parseFloat(extraPaymentAmount.value) || 0;
+                const description = extraPaymentDescription.value.trim();
+                if (!workerId) return alert('Selecione um colaborador.');
+                if (!(amount > 0)) return alert('Informe um valor maior que zero.');
+                if (!description) return alert('Informe a descricao do pagamento extra.');
+                const response = await fetch('/api/production/extra-payments', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ workerId, amount, description })
+                });
+                const result = await response.json();
+                if (!response.ok) return alert(result.message || 'Nao foi possivel adicionar o pagamento extra.');
+                closeExtraPaymentModal();
+                paymentFilter = 'pending';
+                paymentTabs.forEach(item => item.classList.toggle('active', item.dataset.paymentFilter === 'pending'));
+                await carregarMetadadosProducao();
+                renderPaymentControl();
+                alert('Pagamento extra adicionado a lista a pagar do colaborador.');
+            }
+
+            async function markExtraPaymentPaid(id) {
+                if (!confirm('Confirmar que este pagamento extra ja foi pago ao colaborador?')) return;
+                const response = await fetch(`/api/production/extra-payments/${encodeURIComponent(id)}/payment`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ paidBy: 'Equipe interna' })
+                });
+                const result = await response.json();
+                if (!response.ok) return alert(result.message || 'Nao foi possivel marcar o extra como pago.');
+                await carregarMetadadosProducao();
+                renderPaymentControl();
+                alert('Pagamento extra registrado e lancado como despesa.');
             }
 
             function orderProgress(orderId) {
@@ -2962,6 +3069,12 @@
             // INICIALIZAÇÃO
             // ============================================
             
+            extraPaymentOpen.addEventListener('click', openExtraPaymentModal);
+            extraPaymentClose.addEventListener('click', closeExtraPaymentModal);
+            extraPaymentOverlay.addEventListener('click', event => {
+                if (event.target === extraPaymentOverlay) closeExtraPaymentModal();
+            });
+            extraPaymentSave.addEventListener('click', saveExtraPayment);
             classificationClose.addEventListener('click', fecharClassificacao);
             classificationOverlay.addEventListener('click', event => {
                 if (event.target === classificationOverlay) fecharClassificacao();

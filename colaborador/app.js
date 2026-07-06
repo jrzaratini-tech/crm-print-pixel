@@ -41,6 +41,7 @@
   }
 
   function isDone(assignment) {
+    if (assignment.extraPayment) return true;
     return assignment.steps.length > 0 && assignment.steps.every(step => step.done);
   }
 
@@ -61,6 +62,7 @@
   }
 
   function assignedStepValue(assignment) {
+    if (assignment.extraPayment) return Number(assignment.commission) || 0;
     const workerId = currentWorker?.id || '';
     return (assignment.steps || [])
       .filter(step => step.done && (!step.completedByWorkerId || step.completedByWorkerId === workerId))
@@ -73,6 +75,23 @@
     card.className = `order ${status}`;
     const label = status === 'paid' ? 'Pago' : status === 'done' ? 'A receber' : 'Em andamento';
     const tagClass = status === 'paid' ? 'paid' : status === 'done' ? 'waiting' : '';
+    if (assignment.extraPayment) {
+      card.innerHTML = `
+      <div class="row">
+        <div>
+          <h2>Pagamento extra</h2>
+          <p>${escapeHtml(assignment.description || 'Credito adicional')}</p>
+        </div>
+        <span class="tag ${tagClass}">${label}</span>
+      </div>
+      <div class="meta">
+        <span>Valor: ${money(assignment.commission)}</span>
+        <span>${status === 'paid' ? `Pago em ${new Date(assignment.paidAt).toLocaleDateString('pt-PT')}` : 'Aguardando pagamento'}</span>
+      </div>
+      <button type="button">${status === 'paid' ? 'Abrir historico' : 'Ver detalhe'}</button>`;
+      card.querySelector('button').addEventListener('click', () => openOrder(assignment.id));
+      return card;
+    }
     card.innerHTML = `
       <div class="row">
         <div>
@@ -155,6 +174,19 @@
     const assignment = assignments.find(item => item.id === assignmentId);
     if (!assignment) return;
     const paid = isPaid(assignment);
+    if (assignment.extraPayment) {
+      $('orderDetail').innerHTML = `
+      <h2>Pagamento extra</h2>
+      <p>${escapeHtml(currentWorker?.name || '')}</p>
+      <div class="box">
+        <b>Detalhe do pagamento</b>
+        <p>Valor: <strong>${money(assignment.commission)}</strong></p>
+        <p>Descricao: ${escapeHtml(assignment.description || 'Credito adicional')}</p>
+        <p>Status do pagamento: <strong>${paid ? `Pago em ${new Date(assignment.paidAt).toLocaleString('pt-PT')}` : 'Aguardando pagamento'}</strong></p>
+      </div>`;
+      if (!$('orderDialog').open) $('orderDialog').showModal();
+      return;
+    }
     const orderId = assignment.orderId;
     const order = assignment.order;
     const products = assignment.product ? [assignment.product] : order.produtos;
