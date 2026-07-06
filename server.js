@@ -615,7 +615,31 @@ async function ensureMoloniProduct(client, product, config) {
     taxes,
     ...(!taxes.length ? { exemption_reason: settings.exemptionReason || 'M99' } : {})
   };
-  const created = await client.call('products/insert', payload);
+  let created;
+  try {
+    created = await client.call('products/insert', payload);
+  } catch (error) {
+    const fallbackProductId = Number(settings.defaultProductId || 0);
+    if (fallbackProductId > 0 && /\breference\b/i.test(String(error.message || ''))) {
+      console.warn('Falha ao criar artigo Moloni; usando artigo generico configurado.', {
+        reference,
+        name: product.name,
+        error: error.message
+      });
+      await mappingRef.set({
+        companyId: Number(config.companyId),
+        reference,
+        name: product.name,
+        nature: product.nature || 'product',
+        productId: fallbackProductId,
+        source: 'fallback-default',
+        lastError: error.message,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      return fallbackProductId;
+    }
+    throw error;
+  }
   if (!created?.product_id) throw new Error(`Nao foi possivel criar o artigo Moloni "${product.name}".`);
   await mappingRef.set({
     companyId: Number(config.companyId),
