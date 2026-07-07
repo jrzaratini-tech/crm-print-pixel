@@ -15,7 +15,7 @@ main { max-width:760px; margin:auto; padding:18px; }
 .hero { padding:10px 0; }
 .eyebrow { margin:0; color:var(--primary); font-size:11px; font-weight:900; text-transform:uppercase; letter-spacing:.1em; }
 h1 { margin:5px 0; font-size:26px; } h2,p { margin:4px 0; } p { color:var(--muted); line-height:1.45; }
-.summary { display:grid; grid-template-columns:repeat(4,1fr); gap:9px; margin:16px 0; }
+.summary { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:9px; margin:16px 0; }
 .summary div { padding:13px; border:1px solid var(--line); border-radius:12px; background:var(--card); text-align:center; }
 .summary b,.summary span { display:block; } .summary b { font-size:22px; color:var(--primary); } .summary span { font-size:11px; color:var(--muted); }
 .work-section { margin:18px 0; } .work-section h2 { font-size:16px; }
@@ -25,6 +25,7 @@ h1 { margin:5px 0; font-size:26px; } h2,p { margin:4px 0; } p { color:var(--mute
 .sale { padding:16px; border:1px solid var(--line); border-left:5px solid var(--warn); border-radius:13px; background:var(--card); box-shadow:0 5px 16px #33415512; }
 .sale.paid { border-left-color:var(--ok); opacity:.86; }
 .sale.debt { border-left-color:#b91c1c; }
+.sale.purchase { border-left-color:#047857; }
 .summary b.negative { color:#b91c1c; }
 .sale.quote { border-left-color:var(--primary); }
 .sale.quote.approved { border-left-color:var(--ok); }

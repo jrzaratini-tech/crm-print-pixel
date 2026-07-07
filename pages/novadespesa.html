@@ -591,6 +591,14 @@
                         <label for="nifFornecedor">NIF do Fornecedor</label>
                         <input type="text" id="nifFornecedor" name="nifFornecedor" data-bind="despesa.nifFornecedor" placeholder="Número de identificação fiscal">
                     </div>
+
+                    <div class="form-group">
+                        <label for="sellerPurchaseId">Compra feita de vendedor</label>
+                        <select id="sellerPurchaseId" name="sellerPurchaseId" class="categoria-select" data-bind="despesa.sellerPurchaseId">
+                            <option value="">Não vincular a vendedor</option>
+                        </select>
+                        <div class="field-note">Use quando a Print Pixel comprou este produto ou serviço de um vendedor cadastrado.</div>
+                    </div>
                 </div>
             </div>
             
@@ -799,6 +807,7 @@
             <input type="hidden" id="despesaNifAdquirente" data-bind="despesa.nifAdquirente" value="">
             <input type="hidden" id="despesaTipoDocumento" data-bind="despesa.tipoDocumento" value="">
             <input type="hidden" id="despesaSalaryOnly" data-bind="despesa.salaryOnly" value="false">
+            <input type="hidden" id="despesaSellerPurchaseName" data-bind="despesa.sellerPurchaseName" value="">
             
             <div class="form-actions">
                 <button type="button" class="btn-cancel" id="cancelBtn">CANCELAR</button>
@@ -874,6 +883,8 @@
             const qrFiscalHidden = document.getElementById('despesaQrFiscal');
             const nifAdquirenteHidden = document.getElementById('despesaNifAdquirente');
             const tipoDocumentoHidden = document.getElementById('despesaTipoDocumento');
+            const sellerPurchaseSelect = document.getElementById('sellerPurchaseId');
+            const sellerPurchaseNameHidden = document.getElementById('despesaSellerPurchaseName');
             
             // ============================================
             // INICIALIZAÇÃO
@@ -895,6 +906,7 @@
                 }
                 
                 configurarEventListeners();
+                carregarVendedoresParaCompra();
                 calcularTotais();
                 showMessage('Formulário pronto para ' + (isEditMode ? 'edição de despesa' : 'nova despesa') + '.', 'success');
             }
@@ -903,6 +915,33 @@
             // SISTEMA DE QR CODE (CORRIGIDO PARA EDIÇÃO)
             // ============================================
             
+            async function carregarVendedoresParaCompra(selectedId = sellerPurchaseSelect.value) {
+                if (!sellerPurchaseSelect) return;
+                try {
+                    const response = await fetch('/api/sellers');
+                    if (!response.ok) throw new Error('Erro ao carregar vendedores');
+                    const result = await response.json();
+                    sellerPurchaseSelect.innerHTML = '<option value="">Não vincular a vendedor</option>';
+                    (result.sellers || []).filter(seller => seller.active !== false).forEach(seller => {
+                        const option = document.createElement('option');
+                        option.value = seller.id;
+                        option.textContent = seller.name;
+                        option.dataset.name = seller.name;
+                        sellerPurchaseSelect.append(option);
+                    });
+                    sellerPurchaseSelect.value = selectedId || '';
+                    atualizarNomeVendedorCompra();
+                } catch (error) {
+                    console.warn('Não foi possível carregar vendedores para despesas:', error);
+                }
+            }
+
+            function atualizarNomeVendedorCompra() {
+                if (!sellerPurchaseSelect || !sellerPurchaseNameHidden) return;
+                const selected = sellerPurchaseSelect.selectedOptions[0];
+                sellerPurchaseNameHidden.value = selected && sellerPurchaseSelect.value ? (selected.dataset.name || selected.textContent || '') : '';
+            }
+
             function gerarUploadSession() {
                 uploadSessionId = 'UPL-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
                 console.log('🆕 Sessão de upload gerada:', uploadSessionId);
@@ -1299,6 +1338,8 @@
                         outroPagamentoInput.value = '';
                     }
                 });
+
+                sellerPurchaseSelect.addEventListener('change', atualizarNomeVendedorCompra);
                 
                 // Processar arquivo de nota fiscal (PC)
                 notaFiscalInput.addEventListener('change', (e) => {
@@ -1431,6 +1472,8 @@
                     document.getElementById('observacoes').value = despesa.observacoes || '';
                     document.getElementById('telefone').value = despesa.telefone || '';
                     document.getElementById('nifFornecedor').value = despesa.nifFornecedor || '';
+                    sellerPurchaseNameHidden.value = despesa.sellerPurchaseName || '';
+                    await carregarVendedoresParaCompra(despesa.sellerPurchaseId || '');
                     document.getElementById('numeroFatura').value = despesa.numeroFatura || '';
                     valorTotalHidden.value = despesa.valorTotal || 0;
                     valorIVAHidden.value = despesa.valorIVA || 0;

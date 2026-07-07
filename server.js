@@ -1894,12 +1894,52 @@ async function sellerDebts(sellerId) {
     .sort((a, b) => new Date(b.dataEntrega || 0) - new Date(a.dataEntrega || 0));
 }
 
-function sellerBalanceSummary(sales = [], debts = []) {
+function paidExpenseTotal(payload = {}) {
+  const payments = Array.isArray(payload.pagamentos) ? payload.pagamentos : [];
+  if (payments.length) {
+    return money(payments
+      .filter(payment => payment.status === 'pago' || payment.status === 'paga')
+      .reduce((sum, payment) => sum + money(payment.valor || payment.valorPago || payment.total), 0));
+  }
+  return money(payload.totalPago || payload.valorPago || payload.pago);
+}
+
+async function sellerPurchases(sellerId) {
+  const snapshot = await db.collection('events').get();
+  return snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }))
+    .filter(event => !event.deleted && event.schema === 'despesa' && event.payload?.sellerPurchaseId === sellerId)
+    .map(event => {
+      const payload = event.payload || {};
+      const total = money(payload.valorTotal || payload.total || payload.valorBruto || payload.valor);
+      const paid = payload.statusPagamento === 'pago' || payload.statusPagamento === 'paga'
+        ? total
+        : paidExpenseTotal(payload);
+      const due = money(payload.saldoRestante || payload.saldoPendente || Math.max(0, total - paid));
+      return sanitizeForResponse({
+        id: event.id,
+        product: payload.descricao || payload.categoria || payload.fornecedor || 'Compra',
+        sellerName: payload.sellerPurchaseName || '',
+        total,
+        paid,
+        due,
+        status: due <= 0.009 ? 'paid' : paid > 0 ? 'partial' : 'pending',
+        dataCompra: payload.dataCompra || payload.dataVencimento || event.created_at || ''
+      });
+    })
+    .filter(item => item.total > 0)
+    .sort((a, b) => new Date(b.dataCompra || 0) - new Date(a.dataCompra || 0));
+}
+
+function sellerBalanceSummary(sales = [], debts = [], purchases = []) {
   const commissionsDue = money(sales
     .filter(item => item.paymentStatus !== 'paid')
     .reduce((sum, item) => sum + money(item.commission), 0));
   const debtDue = money(debts.reduce((sum, item) => sum + money(item.debt), 0));
-  return { commissionsDue, debtDue, net: Math.round((commissionsDue - debtDue) * 100) / 100 };
+  const purchasesDue = money(purchases
+    .filter(item => item.status !== 'paid')
+    .reduce((sum, item) => sum + money(item.due), 0));
+  return { commissionsDue, purchasesDue, debtDue, net: Math.round((commissionsDue + purchasesDue - debtDue) * 100) / 100 };
 }
 
 async function sellerQuotes(sellerId) {
@@ -1941,7 +1981,8 @@ app.get('/api/vendedor/session', requireSeller, async (req, res) => {
   try {
     const sales = await sellerOrders(req.seller.id);
     const debts = await sellerDebts(req.seller.id);
-    res.json({ success: true, seller: safeSellerForResponse(req.seller), sales, debts, balance: sellerBalanceSummary(sales, debts), quotes: await sellerQuotes(req.seller.id) });
+    const purchases = await sellerPurchases(req.seller.id);
+    res.json({ success: true, seller: safeSellerForResponse(req.seller), sales, debts, purchases, balance: sellerBalanceSummary(sales, debts, purchases), quotes: await sellerQuotes(req.seller.id) });
   } catch (error) {
     console.error('Erro ao carregar painel do vendedor:', error);
     res.status(500).json({ success: false, message: 'Nao foi possivel carregar suas vendas.' });
@@ -3486,9 +3527,11 @@ app.get('/api/sales/commissions', async (req, res) => {
   const balances = await Promise.all(allSellers.map(async seller => {
     const sales = await sellerOrders(seller.id);
     const debts = await sellerDebts(seller.id);
-    return sanitizeForResponse({ sellerId: seller.id, sellerName: seller.name, debts, ...sellerBalanceSummary(sales, debts) });
+    const purchases = await sellerPurchases(seller.id);
+    return sanitizeForResponse({ sellerId: seller.id, sellerName: seller.name, debts, purchases, ...sellerBalanceSummary(sales, debts, purchases) });
   }));
-  res.json({ success: true, sellers: allSellers.map(safeSellerForResponse), commissions, balances });
+  const purchases = balances.flatMap(balance => (balance.purchases || []).map(item => ({ ...item, sellerId: balance.sellerId, sellerName: balance.sellerName })));
+  res.json({ success: true, sellers: allSellers.map(safeSellerForResponse), commissions, purchases, balances });
 });
 
 app.post('/api/sales/commissions/:id/payment', async (req, res) => {

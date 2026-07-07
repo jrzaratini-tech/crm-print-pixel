@@ -87,6 +87,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   const menuResult = await request('/menu/menu.config.js');
   const pageResult = await request('/pages/materiais.html');
   const expensesPageResult = await request('/pages/despesas.html');
+  const newExpensePageResult = await request('/pages/novadespesa.html');
   const orderFormPageResult = await request('/pages/novopedido.html');
   const orderBudgetPageResult = await request('/pages/novoorcamento.html');
   const calculatorPageResult = await request('/pages/calculadora.html');
@@ -119,6 +120,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.equal(menuResult.response.status, 200);
   assert.equal(pageResult.response.status, 200);
   assert.equal(expensesPageResult.response.status, 200);
+  assert.equal(newExpensePageResult.response.status, 200);
   assert.equal(orderFormPageResult.response.status, 200);
   assert.equal(orderBudgetPageResult.response.status, 200);
   assert.equal(calculatorPageResult.response.status, 200);
@@ -299,8 +301,13 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(classifyExpensesPageResult.body, /BRICO DEPÔT/);
   assert.match(suppliersPageResult.body, /BRICO DEPÔT/);
   assert.match(commissionsPageResult.body, /sellerForm/);
+  assert.match(newExpensePageResult.body, /sellerPurchaseId/);
+  assert.match(newExpensePageResult.body, /despesaSellerPurchaseName/);
+  assert.match(commissionsPageResult.body, /purchaseList/);
   assert.match(sellerAppResult.body, /PrintPixel Vendedor/);
+  assert.match(sellerAppResult.body, /purchaseValue/);
   assert.match(sellerScriptResult.body, /api\/vendedor\/session/);
+  assert.match(sellerScriptResult.body, /purchaseList/);
   assert.match(sellerAppResult.body, /Orçamentos enviados/);
   assert.match(sellerScriptResult.body, /api\/vendedor\/orcamentos/);
   assert.match(productionPageResult.body, /classificationOverlay/);
@@ -1158,16 +1165,34 @@ test('calcula saldo liquido entre comissoes e divida de compras do vendedor', as
   });
   assert.equal(purchaseOrder.response.status, 200);
 
+  const sellerExpense = await post('/api/database/commit', {
+    schema: 'despesa',
+    pageId: 'test',
+    payload: {
+      fornecedor: seller.body.seller.name,
+      descricao: 'Material vendido pelo vendedor',
+      dataCompra: '2026-06-20',
+      valorTotal: 75,
+      statusPagamento: 'pendente',
+      sellerPurchaseId: seller.body.seller.id,
+      sellerPurchaseName: seller.body.seller.name
+    }
+  });
+  assert.equal(sellerExpense.response.status, 200);
+
   const balances = await request('/api/sales/commissions');
   const balance = balances.body.balances.find(item => item.sellerId === seller.body.seller.id);
   assert.equal(balance.commissionsDue, 100);
+  assert.equal(balance.purchasesDue, 75);
   assert.equal(balance.debtDue, 100);
-  assert.equal(balance.net, 0);
+  assert.equal(balance.net, 75);
+  assert.equal(balances.body.purchases.find(item => item.sellerId === seller.body.seller.id).product, 'Material vendido pelo vendedor');
 
   const login = await post('/api/vendedor/login', { username: 'vendedor.devedor', password: 'senha-segura-devedor' });
   const session = await workerRequest('/api/vendedor/session', login.body.token);
   assert.equal(session.body.debts[0].debt, 100);
-  assert.equal(session.body.balance.net, 0);
+  assert.equal(session.body.purchases[0].due, 75);
+  assert.equal(session.body.balance.net, 75);
 });
 
 test('rejeita uso do app movel sem dispositivo ativado', async () => {

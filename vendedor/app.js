@@ -6,6 +6,7 @@
   let sales = [];
   let quotes = [];
   let debts = [];
+  let purchases = [];
   let balance = {};
   let currentSeller = null;
 
@@ -204,6 +205,7 @@
     const openQuotes = quotes.filter(item => item.status !== 'approved' && item.status !== 'aprovado');
     $('openQuoteCount').textContent = openQuotes.length;
     $('pendingValue').textContent = money(pending.reduce((sum, item) => sum + Number(item.commission || 0), 0));
+    $('purchaseValue').textContent = money(balance.purchasesDue);
     $('debtValue').textContent = money(balance.debtDue);
     $('netValue').textContent = money(balance.net);
     $('netValue').classList.toggle('negative', Number(balance.net) < 0);
@@ -223,6 +225,22 @@
         card.className = 'sale debt';
         card.innerHTML = `<div class="row"><div><h2>${escapeHtml(debt.numero)}</h2><p>Compra própria</p></div><span class="tag">A pagar</span></div><div class="meta"><span>Total: ${money(debt.total)}</span><span>Já pago: ${money(debt.paid)}</span><strong>Dívida: ${money(debt.debt)}</strong></div>`;
         debtList.append(card);
+      });
+    }
+
+    const purchaseList = $('purchaseList');
+    purchaseList.replaceChildren();
+    if (!purchases.length) {
+      const empty = document.createElement('div');
+      empty.className = 'list-empty';
+      empty.textContent = 'Nenhuma venda para a PrintPixel registrada.';
+      purchaseList.append(empty);
+    } else {
+      purchases.forEach(purchase => {
+        const card = document.createElement('article');
+        card.className = 'sale purchase';
+        card.innerHTML = `<div class="row"><div><h2>${escapeHtml(purchase.product)}</h2><p>Compra da PrintPixel</p></div><span class="tag">${purchase.status === 'paid' ? 'Pago' : 'A receber'}</span></div><div class="meta"><span>Valor: ${money(purchase.total)}</span><span>Comprado em: ${purchase.dataCompra ? new Date(purchase.dataCompra).toLocaleDateString('pt-PT') : 'sem data'}</span>${Number(purchase.due || 0) > 0 ? `<strong>Em aberto: ${money(purchase.due)}</strong>` : ''}</div>`;
+        purchaseList.append(card);
       });
     }
 
@@ -250,6 +268,7 @@
       sales = result.sales || [];
       quotes = result.quotes || [];
       debts = result.debts || [];
+      purchases = result.purchases || [];
       balance = result.balance || {};
       render();
     } catch (error) {
