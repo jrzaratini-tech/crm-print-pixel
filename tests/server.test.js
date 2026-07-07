@@ -271,6 +271,9 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.doesNotMatch(dashboardPageResult.body, /plannerProductionCapacity/);
   assert.match(dashboardPageResult.body, /rgba\(34, 197, 94/);
   assert.match(dashboardPageResult.body, /rgba\(239, 68, 68/);
+  assert.match(dashboardPageResult.body, /saldoPagarDespesaPayload/);
+  assert.match(dashboardPageResult.body, /valorPagoDespesaPayload/);
+  assert.match(dashboardPageResult.body, /saldoRestante/);
   assert.match(scanPageResult.body, /Ler QR fiscal/);
   assert.match(mobilePageResult.body, /PrintPixel Fiscal/);
   assert.match(mobilePageResult.body, /Despesa da empresa/);

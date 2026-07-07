@@ -2198,11 +2198,39 @@
                     const valor = FINANCEIRO.totalComIva(evento.payload);
                     return Number.isFinite(valor) ? valor : 0;
                 };
-                const valorDespesaEvento = evento => {
-                    const payload = evento.payload || {};
-                    const valor = parseFloat(payload.valorTotal || payload.total || payload.valorBruto || payload.valor || 0);
-                    return Number.isFinite(valor) ? valor : 0;
+                const normalizarValor = valor => {
+                    if (typeof valor === 'number') return Number.isFinite(valor) ? valor : 0;
+                    if (typeof valor !== 'string') return 0;
+                    const limpo = valor.trim().replace(/\s/g, '');
+                    if (!limpo) return 0;
+                    const normalizado = limpo.includes(',')
+                        ? limpo.replace(/\./g, '').replace(',', '.')
+                        : limpo;
+                    const numero = parseFloat(normalizado);
+                    return Number.isFinite(numero) ? numero : 0;
                 };
+                const arredondarMoeda = valor => Math.max(0, Math.round((normalizarValor(valor) + Number.EPSILON) * 100) / 100);
+                const valorDespesaPayload = payload => arredondarMoeda(payload?.valorTotal ?? payload?.total ?? payload?.valorBruto ?? payload?.valor ?? 0);
+                const valorPagoDespesaPayload = payload => {
+                    if (Array.isArray(payload?.pagamentos)) {
+                        return arredondarMoeda(payload.pagamentos
+                            .filter(pagamento => !pagamento?.status || pagamento.status === 'pago' || pagamento.status === 'paga')
+                            .reduce((soma, pagamento) => soma + normalizarValor(pagamento.valor ?? pagamento.valorPago ?? pagamento.total ?? 0), 0));
+                    }
+                    return arredondarMoeda(payload?.totalPago ?? payload?.valorPago ?? payload?.pago ?? 0);
+                };
+                const saldoPagarDespesaPayload = payload => {
+                    const statusPagamento = payload?.statusPagamento || payload?.status || 'pendente';
+                    if (statusPagamento === 'pago' || statusPagamento === 'paga') return 0;
+
+                    const saldoGuardado = payload?.saldoRestante ?? payload?.saldoPendente;
+                    if (saldoGuardado !== undefined && saldoGuardado !== null && saldoGuardado !== '') {
+                        return arredondarMoeda(saldoGuardado);
+                    }
+
+                    return arredondarMoeda(valorDespesaPayload(payload) - valorPagoDespesaPayload(payload));
+                };
+                const valorDespesaEvento = evento => valorDespesaPayload(evento.payload || {});
                 
                 // Calcular mês anterior para comparação
                 const mesAnterior = mesAtual === 0 ? 11 : mesAtual - 1;
@@ -2287,30 +2315,19 @@
                         }
                         
                     } else if (evento.schema === 'despesa') {
-                        // Extrair o valor da despesa corretamente
-                        let valorDespesa = 0;
-                        const payload = evento.payload;
-                        
-                        // Tenta diferentes campos onde o valor pode estar armazenado
-                        if (payload?.valorTotal) {
-                            valorDespesa = parseFloat(payload.valorTotal);
-                        } else if (payload?.total) {
-                            valorDespesa = parseFloat(payload.total);
-                        } else if (payload?.valorBruto) {
-                            valorDespesa = parseFloat(payload.valorBruto);
-                        } else if (payload?.valor) {
-                            valorDespesa = parseFloat(payload.valor);
-                        }
+                        const payload = evento.payload || {};
+                        const valorDespesa = valorDespesaPayload(payload);
                         
                         if (!isNaN(valorDespesa) && valorDespesa > 0) {
                             totalDespesas += valorDespesa;
                             
                             // Verificar status de pagamento para despesas
                             const statusPagamento = payload?.statusPagamento || payload?.status || 'pendente';
+                            const saldoAPagar = saldoPagarDespesaPayload(payload);
                             
                             // Adicionar ao total a pagar apenas se não estiver paga
                             if (statusPagamento !== 'pago' && statusPagamento !== 'paga') {
-                                totalAPagar += valorDespesa;
+                                totalAPagar += saldoAPagar;
                             }
                             
                             // Agrupar por categoria
