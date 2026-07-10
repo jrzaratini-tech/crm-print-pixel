@@ -1098,7 +1098,8 @@
                         },
                         body: JSON.stringify({
                             schema: 'despesa',
-                            filters: { deleted: false }
+                            filters: { deleted: false },
+                            limit: 5000
                         })
                     });
                     
@@ -1580,7 +1581,8 @@
                         },
                         body: JSON.stringify({
                             schema: 'despesa',
-                            filters: {}
+                            filters: {},
+                            limit: 5000
                         })
                     });
                     
