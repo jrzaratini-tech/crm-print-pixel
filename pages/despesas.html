@@ -1022,6 +1022,49 @@
             let todasDespesas = [];
             let filtroAtual = 'all';
             let termoBusca = '';
+            const primeiroValor = (...valores) => valores.find(valor => valor !== undefined && valor !== null && valor !== '');
+            const normalizarValor = valor => {
+                if (typeof valor === 'number') return Number.isFinite(valor) ? valor : 0;
+                if (typeof valor !== 'string') return 0;
+                const limpo = valor.trim().replace(/\s/g, '');
+                if (!limpo) return 0;
+                const normalizado = limpo.includes(',')
+                    ? limpo.replace(/\./g, '').replace(',', '.')
+                    : limpo;
+                const numero = parseFloat(normalizado);
+                return Number.isFinite(numero) ? numero : 0;
+            };
+            const arredondarMoeda = valor => Math.max(0, Math.round((normalizarValor(valor) + Number.EPSILON) * 100) / 100);
+            const statusPago = status => ['pago', 'paga', 'paid', 'liquidado', 'finalizado'].includes(String(status || '').toLowerCase());
+            const valorPagoDespesa = payload => {
+                if (Array.isArray(payload?.pagamentos)) {
+                    return arredondarMoeda(payload.pagamentos
+                        .filter(pagamento => !pagamento?.status || statusPago(pagamento.status))
+                        .reduce((soma, pagamento) => soma + normalizarValor(primeiroValor(pagamento.valor, pagamento.valorPago, pagamento.total, 0)), 0));
+                }
+                return arredondarMoeda(primeiroValor(payload?.totalPago, payload?.valorPago, payload?.pago, 0));
+            };
+            const calcularValoresDespesa = payload => {
+                const comIVA = payload.comIVA === 'sim' || payload.comIVA === 'comIVA' || payload.comIVA === true;
+                const totalInformado = primeiroValor(payload.valorTotal, payload.total, payload.valor);
+                const brutoInformado = primeiroValor(payload.valorBruto, payload.subtotal);
+                const ivaInformado = primeiroValor(payload.valorIVA, payload.iva);
+                let valorTotal = totalInformado !== undefined ? arredondarMoeda(totalInformado) : 0;
+                let valorBruto = brutoInformado !== undefined ? arredondarMoeda(brutoInformado) : 0;
+                let valorIVA = ivaInformado !== undefined ? arredondarMoeda(ivaInformado) : 0;
+
+                if (!valorTotal && valorBruto) valorTotal = comIVA ? arredondarMoeda(valorBruto * 1.23) : valorBruto;
+                if (!valorBruto && valorTotal) valorBruto = Math.max(0, arredondarMoeda(valorTotal - valorIVA));
+                if (!valorIVA && comIVA && valorTotal > valorBruto) valorIVA = arredondarMoeda(valorTotal - valorBruto);
+
+                const pago = valorPagoDespesa(payload);
+                const saldoGuardado = primeiroValor(payload.saldoRestante, payload.saldoPendente);
+                const saldoPendente = statusPago(payload.statusPagamento || payload.status)
+                    ? 0
+                    : (saldoGuardado !== undefined ? arredondarMoeda(saldoGuardado) : arredondarMoeda(valorTotal - pago));
+
+                return { valorBruto, valorIVA, valorTotal, valorPago: pago, saldoPendente, comIVA };
+            };
             
             // ============================================
             // FUNÇÕES PRINCIPAIS
@@ -1109,21 +1152,11 @@
                             }
                         }
                         
-                        // Calcular totais corretamente
-                        const valorBruto = parseFloat(payload.valorBruto) || 0;
-                        const comIVA = payload.comIVA === 'sim' || payload.comIVA === 'comIVA' || payload.comIVA === true;
-                        
-                        let valorIVA = 0;
-                        let valorTotal = valorBruto;
-                        
-                        if (comIVA) {
-                            valorIVA = valorBruto * 0.23;
-                            valorTotal = valorBruto + valorIVA;
-                        }
+                        const valores = calcularValoresDespesa(payload);
                         
                         // Status de pagamento corretamente interpretado
                         let statusPagamento = 'pendente';
-                        if (payload.statusPagamento === 'paga' || payload.statusPagamento === 'pago') {
+                        if (statusPago(payload.statusPagamento || payload.status) || (valores.valorTotal > 0 && valores.saldoPendente <= 0)) {
                             statusPagamento = 'paga';
                         } else if (payload.statusPagamento === 'pendente') {
                             statusPagamento = 'pendente';
@@ -1135,12 +1168,14 @@
                             id: event.id,
                             fornecedor: payload.fornecedor || 'Fornecedor não informado',
                             descricao: payload.descricao || 'Despesa sem descrição',
-                            valorBruto: valorBruto,
-                            valorIVA: valorIVA,
-                            valorTotal: valorTotal,
+                            valorBruto: valores.valorBruto,
+                            valorIVA: valores.valorIVA,
+                            valorTotal: valores.valorTotal,
+                            valorPago: valores.valorPago,
+                            saldoPendente: valores.saldoPendente,
                             categoria: payload.categoria || 'OUTROS',
                             outraCategoria: payload.outraCategoria || '',
-                            data: payload.data || new Date().toISOString().split('T')[0],
+                            data: payload.dataCompra || payload.dataDespesa || payload.data || new Date().toISOString().split('T')[0],
                             observacoes: payload.observacoes || '',
                             dataCompra: payload.dataCompra || '',
                             dataVencimento: payload.dataVencimento || '',
@@ -1150,7 +1185,7 @@
                             
                             // Status e IVA - seguindo padrão pedidos
                             statusPagamento: statusPagamento,
-                            comIVA: comIVA ? 'sim' : 'nao',
+                            comIVA: valores.comIVA || valores.valorIVA > 0 ? 'sim' : 'nao',
                             
                             // Forma de pagamento
                             formaPagamento: payload.formaPagamento || '',
@@ -1264,6 +1299,7 @@
             // Criar card de despesa (FORNECEDOR em destaque, DESCRIÇÃO abaixo)
             function criarCardDespesa(despesa) {
                 const valorTotal = despesa.valorTotal || 0;
+                const saldoPendente = despesa.saldoPendente || 0;
                 const status = despesa.statusPagamento;
                 const statusClasse = (status === 'paga') ? 'paga' : 'pendente';
                 const statusTexto = (status === 'paga') ? 'Paga' : 'A Pagar';
@@ -1355,6 +1391,12 @@
                                 <span>Total:</span>
                                 <span>${formatarMoeda(valorTotal)}</span>
                             </div>
+                            ${saldoPendente > 0 ? `
+                                <div class="resumo-item">
+                                    <span>Restante:</span>
+                                    <span>${formatarMoeda(saldoPendente)}</span>
+                                </div>
+                            ` : ''}
                         </div>
                     </div>
                     
@@ -1390,6 +1432,7 @@
                 const valorBruto = despesa.valorBruto || 0;
                 const valorIVA = despesa.valorIVA || 0;
                 const valorTotal = despesa.valorTotal || 0;
+                const saldoPendente = despesa.saldoPendente || 0;
                 const status = despesa.statusPagamento;
                 const statusTexto = (status === 'paga') ? 'Paga' : 'A Pagar';
                 const categoria = despesa.categoria || 'OUTROS';
@@ -1470,6 +1513,10 @@
                                 <div class="total-row">
                                     <span>Valor Total:</span>
                                     <span>${formatarMoeda(valorTotal)}</span>
+                                </div>
+                                <div class="total-row">
+                                    <span>Restante a pagar:</span>
+                                    <span>${formatarMoeda(saldoPendente)}</span>
                                 </div>
                             </div>
                         </div>
@@ -1564,6 +1611,7 @@
                     if (despesaIndex !== -1) {
                         todasDespesas[despesaIndex].statusPagamento = novoStatus;
                         todasDespesas[despesaIndex].dataPagamento = novoStatus === 'paga' ? new Date().toISOString().split('T')[0] : '';
+                        todasDespesas[despesaIndex].saldoPendente = novoStatus === 'paga' ? 0 : todasDespesas[despesaIndex].valorTotal;
                     }
                     
                     // Feedback visual
@@ -1580,6 +1628,7 @@
                     }
                     
                     atualizarContadores();
+                    aplicarFiltrosEBusca();
                     console.log(`✅ Status da despesa ${despesaId} atualizado para: ${novoStatus}`);
                     
                 } catch (error) {

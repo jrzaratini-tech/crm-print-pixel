@@ -1984,7 +1984,7 @@
                     fetch('/api/database/query', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ schema: 'all', limit: 500 })
+                        body: JSON.stringify({ schema: 'all', limit: 5000 })
                     }),
                     fetch('/api/database/query', {
                         method: 'POST',
@@ -2210,18 +2210,20 @@
                     return Number.isFinite(numero) ? numero : 0;
                 };
                 const arredondarMoeda = valor => Math.max(0, Math.round((normalizarValor(valor) + Number.EPSILON) * 100) / 100);
-                const valorDespesaPayload = payload => arredondarMoeda(payload?.valorTotal ?? payload?.total ?? payload?.valorBruto ?? payload?.valor ?? 0);
+                const primeiroValor = (...valores) => valores.find(valor => valor !== undefined && valor !== null && valor !== '');
+                const statusPago = status => ['pago', 'paga', 'paid', 'liquidado', 'finalizado'].includes(String(status || '').toLowerCase());
+                const valorDespesaPayload = payload => arredondarMoeda(primeiroValor(payload?.valorTotal, payload?.total, payload?.valorBruto, payload?.valor, 0));
                 const valorPagoDespesaPayload = payload => {
                     if (Array.isArray(payload?.pagamentos)) {
                         return arredondarMoeda(payload.pagamentos
-                            .filter(pagamento => !pagamento?.status || pagamento.status === 'pago' || pagamento.status === 'paga')
+                            .filter(pagamento => !pagamento?.status || statusPago(pagamento.status))
                             .reduce((soma, pagamento) => soma + normalizarValor(pagamento.valor ?? pagamento.valorPago ?? pagamento.total ?? 0), 0));
                     }
                     return arredondarMoeda(payload?.totalPago ?? payload?.valorPago ?? payload?.pago ?? 0);
                 };
                 const saldoPagarDespesaPayload = payload => {
                     const statusPagamento = payload?.statusPagamento || payload?.status || 'pendente';
-                    if (statusPagamento === 'pago' || statusPagamento === 'paga') return 0;
+                    if (statusPago(statusPagamento)) return 0;
 
                     const saldoGuardado = payload?.saldoRestante ?? payload?.saldoPendente;
                     if (saldoGuardado !== undefined && saldoGuardado !== null && saldoGuardado !== '') {
@@ -2231,6 +2233,29 @@
                     return arredondarMoeda(valorDespesaPayload(payload) - valorPagoDespesaPayload(payload));
                 };
                 const valorDespesaEvento = evento => valorDespesaPayload(evento.payload || {});
+                const saldoReceberPedidoPayload = payload => {
+                    const total = FINANCEIRO.totalComIva(payload);
+                    if (!Number.isFinite(total) || total <= 0) return 0;
+                    const saldoGuardado = primeiroValor(payload?.saldoRestante, payload?.saldoPendente);
+                    if (saldoGuardado !== undefined) return arredondarMoeda(saldoGuardado);
+                    const totalPago = normalizarValor(primeiroValor(payload?.totalPago, payload?.valorPago, payload?.pago, 0));
+                    return arredondarMoeda(total - totalPago);
+                };
+                const calcularContasGlobais = () => {
+                    const resumo = { receber: 0, pagar: 0 };
+                    eventosHistorico.forEach(evento => {
+                        if (evento.deleted) return;
+                        const payload = evento.payload || {};
+                        if (evento.schema === 'pedido') {
+                            resumo.receber += saldoReceberPedidoPayload(payload);
+                        } else if (evento.schema === 'despesa') {
+                            resumo.pagar += saldoPagarDespesaPayload(payload);
+                        }
+                    });
+                    resumo.receber = arredondarMoeda(resumo.receber);
+                    resumo.pagar = arredondarMoeda(resumo.pagar);
+                    return resumo;
+                };
                 
                 // Calcular mês anterior para comparação
                 const mesAnterior = mesAtual === 0 ? 11 : mesAtual - 1;
@@ -2272,10 +2297,6 @@
                             totalVendas += valorFaturamento;
                             totalVendasBruto += valorTotal;
                             totalPedidosValor += valorFaturamento;
-                            
-                            // Calcular saldo pendente
-                            const saldoPendente = Math.max(0, valorTotal - totalPago);
-                            totalAReceber += saldoPendente;
                             
                             // Contar pedidos por status
                             if (status === 'pendente' || status === 'processamento' || status === 'produção') {
@@ -2321,14 +2342,8 @@
                         if (!isNaN(valorDespesa) && valorDespesa > 0) {
                             totalDespesas += valorDespesa;
                             
-                            // Verificar status de pagamento para despesas
-                            const statusPagamento = payload?.statusPagamento || payload?.status || 'pendente';
-                            const saldoAPagar = saldoPagarDespesaPayload(payload);
                             
                             // Adicionar ao total a pagar apenas se não estiver paga
-                            if (statusPagamento !== 'pago' && statusPagamento !== 'paga') {
-                                totalAPagar += saldoAPagar;
-                            }
                             
                             // Agrupar por categoria
                             const categoria = payload?.categoria || payload?.tipo || payload?.descricao || 'Outros';
@@ -2409,6 +2424,10 @@
                 });
                 
                 // Calcular variação das despesas
+                const contasGlobais = calcularContasGlobais();
+                totalAReceber = contasGlobais.receber;
+                totalAPagar = contasGlobais.pagar;
+
                 let variacaoDespesas = 0;
                 if (despesasMesAnterior > 0 && totalDespesas > 0) {
                     variacaoDespesas = ((totalDespesas - despesasMesAnterior) / despesasMesAnterior) * 100;
