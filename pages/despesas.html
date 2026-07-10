@@ -138,7 +138,7 @@
         
         .counters-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(6, 1fr);
             gap: 16px;
         }
         
@@ -163,6 +163,16 @@
             text-align: center;
             transition: transform 0.2s;
         }
+
+        .counter-card.clickable {
+            cursor: pointer;
+        }
+
+        .counter-card.clickable.active,
+        .counter-card.clickable:focus-visible {
+            outline: 3px solid rgba(37, 99, 235, .28);
+            outline-offset: 3px;
+        }
         
         .counter-card:hover {
             transform: translateY(-2px);
@@ -182,6 +192,14 @@
         
         .counter-card.pendentes {
             border-top: 4px solid var(--warning-color);
+        }
+
+        .counter-card.vencidas {
+            border-top: 4px solid var(--danger-color);
+        }
+
+        .counter-card.vencer {
+            border-top: 4px solid #f59e0b;
         }
         
         .counter-icon {
@@ -214,6 +232,16 @@
             background: #fef3c7;
             color: #92400e;
         }
+
+        .counter-card.vencidas .counter-icon {
+            background: #fee2e2;
+            color: var(--danger-color);
+        }
+
+        .counter-card.vencer .counter-icon {
+            background: #ffedd5;
+            color: #c2410c;
+        }
         
         .counter-value {
             font-size: 28px;
@@ -235,6 +263,21 @@
         
         .counter-card.pendentes .counter-value {
             color: var(--warning-color);
+        }
+
+        .counter-card.vencidas .counter-value {
+            color: var(--danger-color);
+        }
+
+        .counter-card.vencer .counter-value {
+            color: #c2410c;
+        }
+
+        .counter-meta {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 4px;
         }
         
         .counter-label {
@@ -929,6 +972,24 @@
                 <div class="counter-value" data-bind="despesas.pendentes">0</div>
                 <div class="counter-label">A Pagar</div>
             </div>
+
+            <div class="counter-card vencidas clickable" data-due-filter="vencidas" role="button" tabindex="0">
+                <div class="counter-icon">
+                    <i class="fas fa-exclamation-triangle"></i>
+                </div>
+                <div class="counter-value" data-bind="despesas.vencidas.count">0</div>
+                <div class="counter-meta" data-bind="despesas.vencidas.valor">€ 0,00</div>
+                <div class="counter-label">Contas Vencidas</div>
+            </div>
+
+            <div class="counter-card vencer clickable" data-due-filter="vence_5_dias" role="button" tabindex="0">
+                <div class="counter-icon">
+                    <i class="fas fa-calendar-day"></i>
+                </div>
+                <div class="counter-value" data-bind="despesas.vence5.count">0</div>
+                <div class="counter-meta" data-bind="despesas.vence5.valor">€ 0,00</div>
+                <div class="counter-label">Vencem em 5 dias</div>
+            </div>
         </div>
     </section>
 
@@ -1029,6 +1090,7 @@
             const searchInput = document.getElementById('searchInput');
             const filterButtons = document.querySelectorAll('.filter-btn');
             const periodFilterButtons = document.querySelectorAll('.period-filter-btn');
+            const dueFilterCards = document.querySelectorAll('[data-due-filter]');
             const modalOverlay = document.getElementById('modalOverlay');
             const modalClose = document.getElementById('modalClose');
             const modalContent = document.getElementById('modalContent');
@@ -1037,6 +1099,7 @@
             let todasDespesas = [];
             let filtroAtual = 'all';
             let periodoAtual = 'todos';
+            let vencimentoFiltroAtual = 'all';
             let termoBusca = '';
             const primeiroValor = (...valores) => valores.find(valor => valor !== undefined && valor !== null && valor !== '');
             const normalizarValor = valor => {
@@ -1052,6 +1115,31 @@
             };
             const arredondarMoeda = valor => Math.max(0, Math.round((normalizarValor(valor) + Number.EPSILON) * 100) / 100);
             const statusPago = status => ['pago', 'paga', 'paid', 'liquidado', 'finalizado'].includes(String(status || '').toLowerCase());
+            const hojeInicio = () => {
+                const hoje = new Date();
+                return new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+            };
+            const parseDataLocal = valor => {
+                if (!valor) return null;
+                if (/^\d{4}-\d{2}-\d{2}$/.test(String(valor))) {
+                    const [ano, mes, dia] = String(valor).split('-').map(Number);
+                    return new Date(ano, mes - 1, dia);
+                }
+                const data = new Date(valor);
+                return Number.isNaN(data.getTime()) ? null : new Date(data.getFullYear(), data.getMonth(), data.getDate());
+            };
+            const estaEmAberto = despesa => despesa.statusPagamento !== 'paga' && arredondarMoeda(despesa.saldoPendente || despesa.valorTotal || 0) > 0;
+            const estaVencida = despesa => {
+                const vencimento = parseDataLocal(despesa.dataVencimento);
+                return estaEmAberto(despesa) && vencimento && vencimento < hojeInicio();
+            };
+            const venceNosProximosDias = (despesa, dias = 5) => {
+                const vencimento = parseDataLocal(despesa.dataVencimento);
+                if (!estaEmAberto(despesa) || !vencimento) return false;
+                const inicio = hojeInicio();
+                const fim = new Date(inicio.getFullYear(), inicio.getMonth(), inicio.getDate() + dias);
+                return vencimento >= inicio && vencimento <= fim;
+            };
             const valorPagoDespesa = payload => {
                 if (Array.isArray(payload?.pagamentos)) {
                     return arredondarMoeda(payload.pagamentos
@@ -1253,6 +1341,10 @@
                 });
                 
                 const totalMes = despesasMes.reduce((sum, d) => sum + d.valorTotal, 0);
+                const vencidas = todasDespesas.filter(estaVencida);
+                const vence5 = todasDespesas.filter(d => venceNosProximosDias(d, 5));
+                const valorVencidas = vencidas.reduce((sum, d) => sum + arredondarMoeda(d.saldoPendente || d.valorTotal || 0), 0);
+                const valorVence5 = vence5.reduce((sum, d) => sum + arredondarMoeda(d.saldoPendente || d.valorTotal || 0), 0);
                 
                 console.log(`📊 Contadores: Total=${total}, Pagas=${pagas}, Pendentes=${pendentes}, Total Mês=${totalMes}`);
                 
@@ -1261,6 +1353,10 @@
                 document.querySelector('[data-bind="despesas.mensal"]').textContent = formatarMoeda(totalMes);
                 document.querySelector('[data-bind="despesas.pagas"]').textContent = pagas;
                 document.querySelector('[data-bind="despesas.pendentes"]').textContent = pendentes;
+                document.querySelector('[data-bind="despesas.vencidas.count"]').textContent = vencidas.length;
+                document.querySelector('[data-bind="despesas.vencidas.valor"]').textContent = formatarMoeda(valorVencidas);
+                document.querySelector('[data-bind="despesas.vence5.count"]').textContent = vence5.length;
+                document.querySelector('[data-bind="despesas.vence5.valor"]').textContent = formatarMoeda(valorVence5);
             }
             
             // Aplicar filtros e busca
@@ -1277,6 +1373,12 @@
                             && dataDespesa.getMonth() === mesAtual
                             && dataDespesa.getFullYear() === anoAtual;
                     });
+                }
+
+                if (vencimentoFiltroAtual === 'vencidas') {
+                    despesasFiltradas = despesasFiltradas.filter(estaVencida);
+                } else if (vencimentoFiltroAtual === 'vence_5_dias') {
+                    despesasFiltradas = despesasFiltradas.filter(d => venceNosProximosDias(d, 5));
                 }
                 
                 // Aplicar filtro de status
@@ -1399,6 +1501,12 @@
                                 <span class="detalhe-label">Data de Registro:</span>
                                 <span class="detalhe-value">${formatarData(despesa.createdAt)}</span>
                             </div>
+                            ${despesa.dataVencimento ? `
+                                <div class="detalhe-item">
+                                    <span class="detalhe-label">Vencimento:</span>
+                                    <span class="detalhe-value">${formatarData(despesa.dataVencimento)}</span>
+                                </div>
+                            ` : ''}
                             ${despesa.dataPagamento ? `
                                 <div class="detalhe-item">
                                     <span class="detalhe-label">Data de Pagamento:</span>
@@ -1519,6 +1627,10 @@
                             <div class="info-item">
                                 <div class="info-label">Data da Despesa</div>
                                 <div class="info-value">${formatarData(despesa.data)}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Data de Vencimento</div>
+                                <div class="info-value">${formatarData(despesa.dataVencimento)}</div>
                             </div>
                             <div class="info-item">
                                 <div class="info-label">Registrado em</div>
@@ -1753,6 +1865,8 @@
                     filterButtons.forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                     filtroAtual = btn.dataset.filter;
+                    vencimentoFiltroAtual = 'all';
+                    atualizarCardsVencimentoAtivos();
                     aplicarFiltrosEBusca();
                 });
             });
@@ -1762,7 +1876,42 @@
                     periodFilterButtons.forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                     periodoAtual = btn.dataset.period || 'todos';
+                    vencimentoFiltroAtual = 'all';
+                    atualizarCardsVencimentoAtivos();
                     aplicarFiltrosEBusca();
+                });
+            });
+
+            function atualizarCardsVencimentoAtivos() {
+                dueFilterCards.forEach(card => {
+                    card.classList.toggle('active', card.dataset.dueFilter === vencimentoFiltroAtual);
+                });
+            }
+
+            function selecionarBotao(selector, collection) {
+                const button = document.querySelector(selector);
+                if (!button) return;
+                collection.forEach(item => item.classList.remove('active'));
+                button.classList.add('active');
+            }
+
+            dueFilterCards.forEach(card => {
+                const aplicarFiltroVencimento = () => {
+                    vencimentoFiltroAtual = card.dataset.dueFilter || 'all';
+                    periodoAtual = 'todos';
+                    filtroAtual = 'all';
+                    termoBusca = '';
+                    searchInput.value = '';
+                    selecionarBotao('.period-filter-btn[data-period="todos"]', periodFilterButtons);
+                    selecionarBotao('.filter-btn[data-filter="all"]', filterButtons);
+                    atualizarCardsVencimentoAtivos();
+                    aplicarFiltrosEBusca();
+                };
+                card.addEventListener('click', aplicarFiltroVencimento);
+                card.addEventListener('keydown', event => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return;
+                    event.preventDefault();
+                    aplicarFiltroVencimento();
                 });
             });
 
