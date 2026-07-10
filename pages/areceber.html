@@ -307,7 +307,8 @@
             flex-wrap: wrap;
         }
         
-        .filter-btn {
+        .filter-btn,
+        .period-filter-btn {
             padding: 8px 16px;
             border: none;
             border-radius: 20px;
@@ -322,16 +323,19 @@
             gap: 6px;
         }
         
-        .filter-btn:hover {
+        .filter-btn:hover,
+        .period-filter-btn:hover {
             background: var(--hover-bg);
         }
         
-        .filter-btn.active {
+        .filter-btn.active,
+        .period-filter-btn.active {
             background: var(--receber-primary);
             color: white;
         }
         
-        .filter-btn i {
+        .filter-btn i,
+        .period-filter-btn i {
             font-size: 12px;
         }
         
@@ -1156,7 +1160,18 @@
                     Vencidos
                 </button>
             </div>
-            
+
+            <div class="filter-group">
+                <button class="period-filter-btn active" data-period="todos">
+                    <i class="fas fa-infinity"></i>
+                    Todo o período
+                </button>
+                <button class="period-filter-btn" data-period="mes_atual">
+                    <i class="fas fa-calendar-alt"></i>
+                    Mês atual
+                </button>
+            </div>
+
             <div class="search-box">
                 <i class="fas fa-search search-icon"></i>
                 <input type="text" class="search-input" id="searchInput" placeholder="Buscar cliente, empresa, nº pedido...">
@@ -1222,6 +1237,7 @@
             const loadingState = document.getElementById('loadingState');
             const searchInput = document.getElementById('searchInput');
             const filterButtons = document.querySelectorAll('.filter-btn');
+            const periodFilterButtons = document.querySelectorAll('.period-filter-btn');
             const modalOverlay = document.getElementById('modalOverlay');
             const modalClose = document.getElementById('modalClose');
             const modalContent = document.getElementById('modalContent');
@@ -1229,6 +1245,7 @@
             // Estado da aplicação
             let todosPedidos = [];
             let filtroAtual = 'all';
+            let periodoAtual = 'todos';
             let termoBusca = '';
             let modalPedidoAtual = null;
             
@@ -1447,6 +1464,18 @@
             // Aplicar filtros e busca
             function aplicarFiltrosEBusca() {
                 let pedidosFiltrados = [...todosPedidos];
+
+                if (periodoAtual === 'mes_atual') {
+                    const hoje = new Date();
+                    const mesAtual = hoje.getMonth();
+                    const anoAtual = hoje.getFullYear();
+                    pedidosFiltrados = pedidosFiltrados.filter(p => {
+                        const dataPedido = new Date(p.dataEntrega || p.dataFechamento || p.createdAt);
+                        return !isNaN(dataPedido.getTime())
+                            && dataPedido.getMonth() === mesAtual
+                            && dataPedido.getFullYear() === anoAtual;
+                    });
+                }
                 
                 // Aplicar filtro de status
                 if (filtroAtual !== 'all') {
@@ -1808,7 +1837,38 @@
                     aplicarFiltrosEBusca();
                 });
             });
-            
+
+            periodFilterButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    periodFilterButtons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    periodoAtual = btn.dataset.period || 'todos';
+                    aplicarFiltrosEBusca();
+                });
+            });
+
+            function aplicarParametrosDaUrl() {
+                const params = new URLSearchParams(window.location.search);
+                const filtroUrl = params.get('filter');
+                const periodoUrl = params.get('periodo');
+                if (filtroUrl) {
+                    const filtroBtn = document.querySelector(`.filter-btn[data-filter="${filtroUrl}"]`);
+                    if (filtroBtn) {
+                        filterButtons.forEach(b => b.classList.remove('active'));
+                        filtroBtn.classList.add('active');
+                        filtroAtual = filtroUrl;
+                    }
+                }
+                if (periodoUrl) {
+                    const periodoBtn = document.querySelector(`.period-filter-btn[data-period="${periodoUrl}"]`);
+                    if (periodoBtn) {
+                        periodFilterButtons.forEach(b => b.classList.remove('active'));
+                        periodoBtn.classList.add('active');
+                        periodoAtual = periodoUrl;
+                    }
+                }
+            }
+
             // Buscar pedidos
             searchInput.addEventListener('input', (e) => {
                 termoBusca = e.target.value.toLowerCase();
@@ -1834,8 +1894,9 @@
             
             // Tornar função disponível globalmente
             window.abrirModalFinanceiro = abrirModalFinanceiro;
-            
+
             // Iniciar carregamento
+            aplicarParametrosDaUrl();
             carregarPedidos();
             
             console.log('✅ Sistema de Contas a Receber inicializado');

@@ -268,7 +268,8 @@
             border: 1px solid var(--border-color);
         }
         
-        .filter-btn {
+        .filter-btn,
+        .period-filter-btn {
             padding: 8px 16px;
             border: none;
             border-radius: 20px;
@@ -283,11 +284,13 @@
             gap: 6px;
         }
         
-        .filter-btn:hover {
+        .filter-btn:hover,
+        .period-filter-btn:hover {
             background: var(--hover-bg);
         }
         
-        .filter-btn.active {
+        .filter-btn.active,
+        .period-filter-btn.active {
             background: var(--primary-color);
             color: white;
         }
@@ -948,7 +951,18 @@
                     A Pagar
                 </button>
             </div>
-            
+
+            <div class="filter-group">
+                <button class="period-filter-btn active" data-period="todos">
+                    <i class="fas fa-infinity"></i>
+                    Todo o período
+                </button>
+                <button class="period-filter-btn" data-period="mes_atual">
+                    <i class="fas fa-calendar-alt"></i>
+                    Mês atual
+                </button>
+            </div>
+
             <div class="search-box">
                 <i class="fas fa-search search-icon"></i>
                 <input type="text" class="search-input" id="searchInput" placeholder="Buscar fornecedor ou descrição...">
@@ -1014,6 +1028,7 @@
             const loadingState = document.getElementById('loadingState');
             const searchInput = document.getElementById('searchInput');
             const filterButtons = document.querySelectorAll('.filter-btn');
+            const periodFilterButtons = document.querySelectorAll('.period-filter-btn');
             const modalOverlay = document.getElementById('modalOverlay');
             const modalClose = document.getElementById('modalClose');
             const modalContent = document.getElementById('modalContent');
@@ -1021,6 +1036,7 @@
             // Estado da aplicação
             let todasDespesas = [];
             let filtroAtual = 'all';
+            let periodoAtual = 'todos';
             let termoBusca = '';
             const primeiroValor = (...valores) => valores.find(valor => valor !== undefined && valor !== null && valor !== '');
             const normalizarValor = valor => {
@@ -1249,6 +1265,18 @@
             // Aplicar filtros e busca
             function aplicarFiltrosEBusca() {
                 let despesasFiltradas = [...todasDespesas];
+
+                if (periodoAtual === 'mes_atual') {
+                    const hoje = new Date();
+                    const mesAtual = hoje.getMonth();
+                    const anoAtual = hoje.getFullYear();
+                    despesasFiltradas = despesasFiltradas.filter(d => {
+                        const dataDespesa = new Date(d.data || d.createdAt);
+                        return !isNaN(dataDespesa.getTime())
+                            && dataDespesa.getMonth() === mesAtual
+                            && dataDespesa.getFullYear() === anoAtual;
+                    });
+                }
                 
                 // Aplicar filtro de status
                 if (filtroAtual !== 'all') {
@@ -1726,6 +1754,37 @@
                     aplicarFiltrosEBusca();
                 });
             });
+
+            periodFilterButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    periodFilterButtons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    periodoAtual = btn.dataset.period || 'todos';
+                    aplicarFiltrosEBusca();
+                });
+            });
+
+            function aplicarParametrosDaUrl() {
+                const params = new URLSearchParams(window.location.search);
+                const filtroUrl = params.get('filter');
+                const periodoUrl = params.get('periodo');
+                if (filtroUrl) {
+                    const filtroBtn = document.querySelector(`.filter-btn[data-filter="${filtroUrl}"]`);
+                    if (filtroBtn) {
+                        filterButtons.forEach(b => b.classList.remove('active'));
+                        filtroBtn.classList.add('active');
+                        filtroAtual = filtroUrl;
+                    }
+                }
+                if (periodoUrl) {
+                    const periodoBtn = document.querySelector(`.period-filter-btn[data-period="${periodoUrl}"]`);
+                    if (periodoBtn) {
+                        periodFilterButtons.forEach(b => b.classList.remove('active'));
+                        periodoBtn.classList.add('active');
+                        periodoAtual = periodoUrl;
+                    }
+                }
+            }
             
             searchInput.addEventListener('input', (e) => {
                 termoBusca = e.target.value.toLowerCase();
@@ -1749,6 +1808,7 @@
             // INICIALIZAÇÃO
             // ============================================
             
+            aplicarParametrosDaUrl();
             carregarDespesas();
             console.log('✅ Sistema de gestão de despesas inicializado');
         });

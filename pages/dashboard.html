@@ -229,6 +229,15 @@
             transform: translateY(-8px);
             box-shadow: var(--shadow-lg);
         }
+
+        .metric-card.account-action {
+            cursor: pointer;
+        }
+
+        .metric-card.account-action:focus-visible {
+            outline: 3px solid rgba(37, 99, 235, .45);
+            outline-offset: 3px;
+        }
         
         .metric-card.sales { 
             border-left-color: var(--success-color);
@@ -1248,7 +1257,7 @@
                 </div>
             </div>
             
-            <div class="metric-card receber">
+            <div class="metric-card receber account-action" data-open-page="areceber.html?periodo=todos&filter=all" role="button" tabindex="0">
                 <div class="metric-header">
                     <div class="metric-title">Restante a Receber</div>
                     <div class="metric-icon receber">
@@ -1262,7 +1271,7 @@
                 </div>
             </div>
             
-            <div class="metric-card pagar">
+            <div class="metric-card pagar account-action" data-open-page="despesas.html?periodo=todos&filter=pendente" role="button" tabindex="0">
                 <div class="metric-header">
                     <div class="metric-title">Restante a Pagar</div>
                     <div class="metric-icon pagar">
@@ -1569,6 +1578,18 @@
                     } else {
                         solicitarTodosDadosAoCore();
                     }
+                });
+
+                document.querySelectorAll('[data-open-page]').forEach(card => {
+                    const abrirDestino = () => {
+                        window.location.href = card.dataset.openPage;
+                    };
+                    card.addEventListener('click', abrirDestino);
+                    card.addEventListener('keydown', event => {
+                        if (event.key !== 'Enter' && event.key !== ' ') return;
+                        event.preventDefault();
+                        abrirDestino();
+                    });
                 });
 
                 deliveryCalendarBtn.addEventListener('click', abrirCalendarioEntregas);
