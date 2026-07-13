@@ -49,6 +49,10 @@ const MOLONI_CLIENT_ID = process.env.MOLONI_CLIENT_ID || '';
 const MOLONI_CLIENT_SECRET = process.env.MOLONI_CLIENT_SECRET || '';
 const MOLONI_REDIRECT_URI = process.env.MOLONI_REDIRECT_URI || '';
 const MOLONI_ENCRYPTION_KEY = process.env.MOLONI_ENCRYPTION_KEY || CRM_PASSWORD || 'development-only-moloni-key';
+const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || '';
+const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || '';
+const STRIPE_CURRENCY = String(process.env.STRIPE_CURRENCY || 'eur').toLowerCase();
+const STRIPE_RETURN_BASE_URL = process.env.STRIPE_RETURN_BASE_URL || '';
 const MAX_QUERY_LIMIT = 5000;
 const MAX_UPLOAD_BYTES = 500 * 1024;
 const UPLOAD_TTL_MS = 15 * 60 * 1000;
@@ -200,7 +204,12 @@ app.use(cors({
   methods: ['GET', 'POST'],
   allowedHeaders: ['Authorization', 'Content-Type']
 }));
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({
+  limit: '1mb',
+  verify: (req, res, buffer) => {
+    if (req.originalUrl === '/api/stripe/webhook') req.rawBody = Buffer.from(buffer);
+  }
+}));
 app.use('/api', requestRateLimit({ windowMs: 60 * 1000, max: 240 }));
 
 function mobileSessionExpired(session) {
@@ -503,6 +512,202 @@ function moloniPublicStatus(config = {}) {
     settings: config.settings || {},
     updatedAt: config.updatedAt || ''
   };
+}
+
+function stripeMode() {
+  return STRIPE_SECRET_KEY ? 'live' : 'mock';
+}
+
+function publicBaseUrl(req) {
+  const configured = STRIPE_RETURN_BASE_URL.trim().replace(/\/+$/, '');
+  if (configured) return configured;
+  const protocol = req.get('x-forwarded-proto') || req.protocol || 'http';
+  const host = req.get('host');
+  return `${protocol}://${host}`;
+}
+
+function stripeAmountToCents(value) {
+  return Math.round(money(value) * 100);
+}
+
+function centsToMoney(value) {
+  return money(Number(value || 0) / 100);
+}
+
+function orderPaidTotal(order = {}) {
+  return money((Array.isArray(order.pagamentos) ? order.pagamentos : [])
+    .filter(payment => payment && (payment.status === 'pago' || payment.status === 'paga'))
+    .reduce((sum, payment) => sum + money(payment.valor || payment.valorPago || payment.total), 0));
+}
+
+function orderOutstanding(order = {}) {
+  return money(Math.max(0, money(order.total) - orderPaidTotal(order)));
+}
+
+function stripePublicStatus() {
+  return {
+    mode: stripeMode(),
+    configured: Boolean(STRIPE_SECRET_KEY),
+    webhookConfigured: Boolean(STRIPE_WEBHOOK_SECRET),
+    currency: STRIPE_CURRENCY,
+    ready: Boolean(STRIPE_SECRET_KEY)
+  };
+}
+
+function stripeLinkPublic(id, link = {}) {
+  return sanitizeForResponse({
+    id,
+    orderId: link.orderId || '',
+    orderNumber: link.orderNumber || '',
+    customer: link.customer || '',
+    amount: centsToMoney(link.amountCents),
+    currency: link.currency || STRIPE_CURRENCY,
+    status: link.status || 'open',
+    paymentStatus: link.paymentStatus || 'unpaid',
+    checkoutSessionId: link.checkoutSessionId || '',
+    paymentIntentId: link.paymentIntentId || '',
+    url: link.url || '',
+    mode: link.mode || stripeMode(),
+    description: link.description || '',
+    paidAt: link.paidAt || '',
+    expiresAt: link.expiresAt || '',
+    createdAt: link.createdAt || '',
+    updatedAt: link.updatedAt || ''
+  });
+}
+
+async function stripePaymentLinks(orderId = '') {
+  const snapshot = await db.collection('stripe_payment_links').get();
+  return snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }))
+    .filter(link => !orderId || link.orderId === orderId)
+    .sort((a, b) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
+}
+
+function stripeFormBody(params = {}) {
+  const body = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && value !== '') body.append(key, String(value));
+  });
+  return body;
+}
+
+async function stripeRequest(endpoint, params = {}) {
+  if (!STRIPE_SECRET_KEY) throw new Error('Configure STRIPE_SECRET_KEY para criar links reais da Stripe.');
+  const response = await fetch(`https://api.stripe.com/v1/${endpoint}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${STRIPE_SECRET_KEY}`,
+      'Content-Type': 'application/x-www-form-urlencoded'
+    },
+    body: stripeFormBody(params)
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || body.error) {
+    throw new Error(body.error?.message || 'A Stripe recusou o pedido.');
+  }
+  return body;
+}
+
+async function stripeRetrieveCheckoutSession(sessionId) {
+  if (!STRIPE_SECRET_KEY) throw new Error('Configure STRIPE_SECRET_KEY para consultar a Stripe.');
+  const response = await fetch(`https://api.stripe.com/v1/checkout/sessions/${encodeURIComponent(sessionId)}`, {
+    headers: { Authorization: `Bearer ${STRIPE_SECRET_KEY}` }
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || body.error) throw new Error(body.error?.message || 'Nao foi possivel consultar a sessao Stripe.');
+  return body;
+}
+
+function verifyStripeWebhookSignature(rawBody, header) {
+  if (!STRIPE_WEBHOOK_SECRET) return true;
+  const parts = Object.fromEntries(String(header || '').split(',').map(part => {
+    const [key, value] = part.split('=');
+    return [key, value];
+  }));
+  const timestamp = parts.t;
+  const signature = parts.v1;
+  if (!timestamp || !signature || !rawBody) return false;
+  const expected = crypto.createHmac('sha256', STRIPE_WEBHOOK_SECRET)
+    .update(`${timestamp}.${rawBody.toString('utf8')}`)
+    .digest('hex');
+  return safeEqual(signature, expected);
+}
+
+async function registerStripePaymentFromSession(session = {}) {
+  const metadata = session.metadata || {};
+  const orderId = metadata.crm_order_id || session.client_reference_id || '';
+  const linkId = metadata.crm_payment_link_id || '';
+  if (!isSafeIdentifier(orderId) || !isSafeIdentifier(linkId)) return null;
+
+  const orderRef = db.collection('events').doc(orderId);
+  const linkRef = db.collection('stripe_payment_links').doc(linkId);
+  const now = new Date().toISOString();
+  const amount = centsToMoney(session.amount_total || session.amount_subtotal);
+  const paymentIntentId = String(session.payment_intent || '');
+
+  let updatedPayload = null;
+  await db.runTransaction(async transaction => {
+    const orderSnapshot = await transaction.get(orderRef);
+    const linkSnapshot = await transaction.get(linkRef);
+    if (!orderSnapshot.exists || orderSnapshot.data()?.schema !== 'pedido' || orderSnapshot.data()?.deleted) return;
+
+    const link = linkSnapshot.exists ? linkSnapshot.data() : {};
+    const payload = { ...(orderSnapshot.data().payload || {}) };
+    const payments = Array.isArray(payload.pagamentos) ? [...payload.pagamentos] : [];
+    const alreadyRegistered = payments.some(payment =>
+      payment?.stripeCheckoutSessionId === session.id
+      || (paymentIntentId && payment?.stripePaymentIntentId === paymentIntentId)
+    );
+
+    if (!alreadyRegistered && amount > 0) {
+      payments.push({
+        id: `stripe_${String(session.id || Date.now()).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 80)}`,
+        tipo: 'pagamento',
+        data: now.slice(0, 10),
+        valor: amount,
+        formaPagamento: 'stripe',
+        status: 'pago',
+        observacoes: `Pagamento recebido pela Stripe${session.customer_details?.email ? ` (${session.customer_details.email})` : ''}`,
+        referencia: String(session.id || ''),
+        stripeCheckoutSessionId: String(session.id || ''),
+        stripePaymentIntentId: paymentIntentId
+      });
+    }
+
+    const totalPago = money(payments
+      .filter(payment => payment.status === 'pago' || payment.status === 'paga')
+      .reduce((sum, payment) => sum + money(payment.valor), 0));
+    const saldoPendente = money(Math.max(0, money(payload.total) - totalPago));
+    const statusPagamento = totalPago <= 0 ? 'pendente' : saldoPendente > 0.009 ? 'parcial' : 'pago';
+    updatedPayload = { ...payload, pagamentos: payments, totalPago, saldoPendente, statusPagamento };
+
+    transaction.set(orderRef, {
+      payload: updatedPayload,
+      updated: true,
+      updated_at: now,
+      timestamp: orderSnapshot.data().timestamp || now
+    }, { merge: true });
+    transaction.set(linkRef, {
+      ...link,
+      orderId,
+      status: 'paid',
+      paymentStatus: session.payment_status || 'paid',
+      checkoutSessionId: String(session.id || link.checkoutSessionId || ''),
+      paymentIntentId,
+      amountCents: Number(session.amount_total || link.amountCents || 0),
+      paidAt: now,
+      updatedAt: now,
+      stripeSession: {
+        id: session.id || '',
+        payment_status: session.payment_status || '',
+        status: session.status || '',
+        customer_email: session.customer_details?.email || session.customer_email || ''
+      }
+    }, { merge: true });
+  });
+
+  return updatedPayload;
 }
 
 function moloniEndpointFor(type) {
@@ -2789,6 +2994,163 @@ app.get('/api/rotulos/orders/:id/items/:itemIndex/eps', async (req, res) => {
 });
 
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+
+app.get('/api/stripe/status', (req, res) => {
+  res.json({ success: true, ...stripePublicStatus() });
+});
+
+app.get('/api/stripe/payment-links', async (req, res) => {
+  try {
+    const orderId = text(req.query.orderId, 200);
+    const links = await stripePaymentLinks(orderId);
+    res.json({ success: true, links: links.map(link => stripeLinkPublic(link.id, link)) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Nao foi possivel carregar os links de pagamento.' });
+  }
+});
+
+app.post('/api/stripe/payment-links', async (req, res) => {
+  try {
+    const order = await moloniOrder(req.body?.orderId);
+    if (!order) return res.status(404).json({ success: false, message: 'Pedido nao encontrado.' });
+
+    const outstanding = orderOutstanding(order);
+    const requestedAmount = money(req.body?.amount || outstanding);
+    if (!(requestedAmount > 0)) {
+      return res.status(400).json({ success: false, message: 'Informe um valor maior que zero para gerar o link.' });
+    }
+    if (outstanding > 0 && requestedAmount > outstanding + 0.009) {
+      return res.status(400).json({ success: false, message: 'O link nao pode ultrapassar o saldo pendente do pedido.' });
+    }
+
+    const now = new Date().toISOString();
+    const id = `stripe_${crypto.randomBytes(12).toString('hex')}`;
+    const amountCents = stripeAmountToCents(requestedAmount);
+    const baseUrl = publicBaseUrl(req);
+    const successUrl = `${baseUrl}/pages/faturacao.html?orderId=${encodeURIComponent(order.id)}&stripe=success`;
+    const cancelUrl = `${baseUrl}/pages/faturacao.html?orderId=${encodeURIComponent(order.id)}&stripe=cancel`;
+    const description = text(req.body?.description || `Pagamento do pedido ${order.numero || order.id}`, 500);
+    const pending = {
+      orderId: order.id,
+      orderNumber: order.numero || '',
+      customer: order.cliente || order.empresa || '',
+      amountCents,
+      currency: STRIPE_CURRENCY,
+      status: 'open',
+      paymentStatus: 'unpaid',
+      mode: stripeMode(),
+      description,
+      createdAt: now,
+      updatedAt: now
+    };
+    await db.collection('stripe_payment_links').doc(id).set(pending);
+
+    let session;
+    if (stripeMode() === 'mock') {
+      session = {
+        id: `cs_mock_${id}`,
+        url: successUrl,
+        status: 'open',
+        payment_status: 'unpaid',
+        expires_at: Math.floor(Date.now() / 1000) + 24 * 60 * 60
+      };
+    } else {
+      session = await stripeRequest('checkout/sessions', {
+        mode: 'payment',
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        client_reference_id: order.id,
+        customer_email: order.email || order.emailCliente || '',
+        'line_items[0][price_data][currency]': STRIPE_CURRENCY,
+        'line_items[0][price_data][unit_amount]': amountCents,
+        'line_items[0][price_data][product_data][name]': `Pedido ${order.numero || order.id} - PrintPixel`,
+        'line_items[0][price_data][product_data][description]': description,
+        'line_items[0][quantity]': 1,
+        'metadata[source]': 'crm',
+        'metadata[crm_order_id]': order.id,
+        'metadata[crm_payment_link_id]': id,
+        'payment_intent_data[metadata][source]': 'crm',
+        'payment_intent_data[metadata][crm_order_id]': order.id,
+        'payment_intent_data[metadata][crm_payment_link_id]': id
+      });
+    }
+
+    const completed = {
+      ...pending,
+      checkoutSessionId: session.id || '',
+      paymentStatus: session.payment_status || 'unpaid',
+      status: session.status === 'complete' ? 'paid' : 'open',
+      url: session.url || '',
+      expiresAt: session.expires_at ? new Date(Number(session.expires_at) * 1000).toISOString() : '',
+      stripeSession: {
+        id: session.id || '',
+        status: session.status || '',
+        payment_status: session.payment_status || ''
+      },
+      updatedAt: new Date().toISOString()
+    };
+    await db.collection('stripe_payment_links').doc(id).set(completed);
+    res.status(201).json({ success: true, link: stripeLinkPublic(id, completed) });
+  } catch (error) {
+    console.error('Erro ao criar link Stripe:', error);
+    res.status(502).json({ success: false, message: error.message || 'Nao foi possivel criar o link de pagamento.' });
+  }
+});
+
+app.post('/api/stripe/payment-links/:id/sync', async (req, res) => {
+  try {
+    const id = String(req.params.id || '');
+    if (!isSafeIdentifier(id)) return res.status(400).json({ success: false, message: 'Link invalido.' });
+    const ref = db.collection('stripe_payment_links').doc(id);
+    const snapshot = await ref.get();
+    if (!snapshot.exists) return res.status(404).json({ success: false, message: 'Link nao encontrado.' });
+    const link = snapshot.data();
+    if (link.mode === 'mock') return res.json({ success: true, link: stripeLinkPublic(id, link) });
+    const session = await stripeRetrieveCheckoutSession(link.checkoutSessionId);
+    if (session.payment_status === 'paid' || session.status === 'complete') {
+      await registerStripePaymentFromSession(session);
+    } else {
+      await ref.set({
+        status: session.status || link.status || 'open',
+        paymentStatus: session.payment_status || link.paymentStatus || 'unpaid',
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+    }
+    const updated = await ref.get();
+    res.json({ success: true, link: stripeLinkPublic(id, updated.data() || {}) });
+  } catch (error) {
+    res.status(502).json({ success: false, message: error.message || 'Nao foi possivel atualizar o estado Stripe.' });
+  }
+});
+
+app.post('/api/stripe/webhook', async (req, res) => {
+  try {
+    if (!verifyStripeWebhookSignature(req.rawBody, req.get('stripe-signature'))) {
+      return res.status(400).json({ success: false, message: 'Assinatura Stripe invalida.' });
+    }
+    const event = req.body && typeof req.body === 'object'
+      ? req.body
+      : JSON.parse((req.rawBody || Buffer.from('{}')).toString('utf8'));
+    if (['checkout.session.completed', 'checkout.session.async_payment_succeeded'].includes(event.type)) {
+      await registerStripePaymentFromSession(event.data?.object || {});
+    }
+    if (event.type === 'checkout.session.expired') {
+      const session = event.data?.object || {};
+      const linkId = session.metadata?.crm_payment_link_id || '';
+      if (isSafeIdentifier(linkId)) {
+        await db.collection('stripe_payment_links').doc(linkId).set({
+          status: 'expired',
+          paymentStatus: session.payment_status || 'unpaid',
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      }
+    }
+    res.json({ received: true });
+  } catch (error) {
+    console.error('Erro no webhook Stripe:', error);
+    res.status(400).json({ success: false, message: 'Webhook Stripe invalido.' });
+  }
+});
 
 app.get('/api/moloni/status', async (req, res) => {
   try {

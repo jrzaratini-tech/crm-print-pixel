@@ -491,6 +491,11 @@
             color: var(--primary-color);
             border-color: var(--primary-color);
         }
+
+        .action-btn.payment:hover {
+            color: var(--success-color);
+            border-color: var(--success-color);
+        }
         
         .pedido-content {
             display: grid;
@@ -1428,6 +1433,9 @@
                             </div>
                         </div>
                         <div class="pedido-actions">
+                            <button class="action-btn payment" title="Gerar link de pagamento" data-id="${pedido.id}">
+                                <i class="fas fa-credit-card"></i>
+                            </button>
                             <button class="action-btn invoice" title="Faturar pedido" data-id="${pedido.id}">
                                 <i class="fas fa-file-invoice-dollar"></i>
                             </button>
@@ -1516,11 +1524,15 @@
                 
                 // Adicionar event listeners
                 const invoiceBtn = card.querySelector('.action-btn.invoice');
+                const paymentBtn = card.querySelector('.action-btn.payment');
                 const editBtn = card.querySelector('.action-btn.edit');
                 const viewBtn = card.querySelector('.action-btn.view');
                 const deleteBtn = card.querySelector('.action-btn.delete');
                 const statusSelect = card.querySelector('.status-select');
                 
+                paymentBtn.addEventListener('click', () => {
+                    window.location.href = `faturacao.html?orderId=${encodeURIComponent(pedido.id)}&stripe=1`;
+                });
                 invoiceBtn.addEventListener('click', () => {
                     window.location.href = `faturacao.html?orderId=${encodeURIComponent(pedido.id)}`;
                 });

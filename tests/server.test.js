@@ -182,7 +182,9 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(orderFormPageResult.body, /buyerSellerId/);
   assert.match(ordersPageResult.body, /excluirPedido/);
   assert.match(ordersPageResult.body, /faturacao\.html\?orderId=/);
-  assert.match(billingPageResult.body, /Faturação Moloni/);
+  assert.match(billingPageResult.body, /Faturação e pagamentos/);
+  assert.match(billingPageResult.body, /Link de pagamento Stripe/);
+  assert.match(billingPageResult.body, /api\/stripe\/payment-links/);
   assert.match(billingPageResult.body, /api\/moloni\/documents\/preview/);
   assert.match(billingPageResult.body, /Modo de teste/);
   assert.match(billingPageResult.body, /button type="button" class="order/);
@@ -814,6 +816,43 @@ test('executa faturacao Moloni simulada com validacao e bloqueio de duplicados',
   const listed = await request(`/api/moloni/documents?orderId=${createdOrder.body.id}`);
   assert.equal(listed.response.status, 200);
   assert.equal(listed.body.documents.length, 2);
+});
+
+test('gera link Stripe em modo interno e lista por pedido', async () => {
+  const createdOrder = await post('/api/database/commit', {
+    schema: 'pedido',
+    pageId: 'test',
+    payload: {
+      numero: 'PED-STRIPE-1',
+      cliente: 'Cliente Stripe',
+      email: 'stripe@example.com',
+      total: 120,
+      pagamentos: [{ valor: 20, status: 'pago' }],
+      totalPago: 20,
+      saldoPendente: 100,
+      statusPagamento: 'parcial'
+    }
+  });
+  assert.equal(createdOrder.response.status, 200);
+
+  const status = await request('/api/stripe/status');
+  assert.equal(status.response.status, 200);
+  assert.equal(status.body.mode, 'mock');
+
+  const link = await post('/api/stripe/payment-links', {
+    orderId: createdOrder.body.id,
+    amount: 100,
+    description: 'Pagamento teste Stripe'
+  });
+  assert.equal(link.response.status, 201);
+  assert.equal(link.body.link.orderId, createdOrder.body.id);
+  assert.equal(link.body.link.amount, 100);
+  assert.match(link.body.link.url, /faturacao\.html\?orderId=/);
+
+  const listed = await request(`/api/stripe/payment-links?orderId=${createdOrder.body.id}`);
+  assert.equal(listed.response.status, 200);
+  assert.equal(listed.body.links.length, 1);
+  assert.equal(listed.body.links[0].id, link.body.link.id);
 });
 
 test('modo salario ignora NIF e IVA da nota e registra somente o valor', async () => {

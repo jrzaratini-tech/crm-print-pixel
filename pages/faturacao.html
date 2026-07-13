@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Faturação Moloni</title>
+  <title>Faturação e Pagamentos</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <style>
     :root {
@@ -72,6 +72,13 @@
     .recommendation strong { display: block; color: #1d4ed8; margin-bottom: 4px; }
     .recommendation .rec-actions { margin-top: 10px; display: flex; gap: 8px; flex-wrap: wrap; }
     .recommendation .mini { border: 0; border-radius: 999px; padding: 6px 10px; background: white; color: #1d4ed8; font-weight: 800; cursor: pointer; }
+    .payment-box { border: 1px solid #c7d2fe; background: #f8faff; border-radius: 12px; padding: 14px; margin-bottom: 16px; }
+    .payment-box .box-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 12px; }
+    .payment-box h3 { margin: 0; font-size: 16px; }
+    .payment-link-row { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; padding: 10px 0; border-top: 1px solid #dbe3ef; }
+    .payment-link-row:first-child { border-top: 0; }
+    .payment-link-url { color: var(--muted); word-break: break-all; font-size: 12px; margin-top: 2px; }
+    .payment-link-actions { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
     .activation { margin-bottom: 20px; }
     .activation ul { margin: 10px 0 0; padding-left: 0; display: grid; gap: 7px; list-style: none; }
     .activation li { display: flex; align-items: center; gap: 8px; color: var(--muted); }
@@ -85,6 +92,9 @@
     .status { font-size: 11px; text-transform: uppercase; font-weight: 800; padding: 4px 7px; border-radius: 999px; background: #eef2f7; }
     .status.closed { background: #dcfce7; color: #166534; }
     .status.draft { background: #e0e7ff; color: #3730a3; }
+    .status.open { background: #dbeafe; color: #1d4ed8; }
+    .status.paid { background: #dcfce7; color: #166534; }
+    .status.expired { background: #f1f5f9; color: #475569; }
     .status.error { background: #fee2e2; color: #991b1b; }
     dialog { width: min(760px, calc(100% - 32px)); border: 0; border-radius: 16px; padding: 0; box-shadow: 0 30px 80px rgba(15, 23, 42, .3); }
     dialog::backdrop { background: rgba(15, 23, 42, .55); }
@@ -102,8 +112,8 @@
   <main class="page">
     <header class="hero">
       <div>
-        <h1><i class="fa-solid fa-file-invoice-dollar"></i> Faturação Moloni</h1>
-        <p class="muted">Emissão fiscal ligada aos pedidos e respetivos pagamentos.</p>
+        <h1><i class="fa-solid fa-file-invoice-dollar"></i> Faturação e pagamentos</h1>
+        <p class="muted">Emissão fiscal, links Stripe e pagamentos ligados aos pedidos.</p>
       </div>
       <div id="modeBadge" class="badge mock"><i class="fa-solid fa-flask"></i> A verificar...</div>
     </header>
@@ -113,6 +123,7 @@
       <button class="btn neutral" id="settingsBtn"><i class="fa-solid fa-gear"></i> Configuração</button>
       <button class="btn neutral" id="refreshBtn"><i class="fa-solid fa-rotate"></i> Atualizar</button>
       <button class="btn danger" id="disconnectBtn" hidden><i class="fa-solid fa-link-slash"></i> Desligar</button>
+      <span id="stripeBadge" class="badge mock"><i class="fa-solid fa-credit-card"></i> Stripe...</span>
     </div>
 
     <div id="globalMessage"></div>
@@ -145,6 +156,37 @@
               <span class="money" id="selectedTotal"></span>
             </div>
             <div class="summary" id="orderSummary"></div>
+            <section class="payment-box" id="stripeBox">
+              <div class="box-head">
+                <div>
+                  <h3><i class="fa-solid fa-credit-card"></i> Link de pagamento Stripe</h3>
+                  <div class="tiny">Envie uma URL segura para o cliente escolher a forma de pagamento ativa na Stripe.</div>
+                </div>
+                <span class="status" id="stripeOrderStatus">saldo</span>
+              </div>
+              <div class="two">
+                <div class="field">
+                  <label for="stripeAmountMode">Valor a cobrar</label>
+                  <select id="stripeAmountMode">
+                    <option value="outstanding">Saldo pendente</option>
+                    <option value="total">Total do pedido</option>
+                    <option value="custom">Valor personalizado</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="stripeAmount">Valor</label>
+                  <input id="stripeAmount" type="number" min="0.01" step="0.01">
+                </div>
+              </div>
+              <div class="field">
+                <label for="stripeDescription">Descrição para o cliente</label>
+                <input id="stripeDescription" maxlength="500" placeholder="Pagamento do pedido">
+              </div>
+              <div class="actions">
+                <button class="btn primary" id="createStripeLinkBtn"><i class="fa-solid fa-link"></i> Gerar link</button>
+              </div>
+              <div id="stripeLinks" class="tiny" style="margin-top:12px">Sem links gerados para este pedido.</div>
+            </section>
             <div id="recommendationBox"></div>
             <div class="two">
               <div class="field">
@@ -224,7 +266,7 @@
 
   <script>
     (() => {
-      const state = { status: null, orders: [], documents: [], selected: null, preview: null, options: null };
+      const state = { status: null, stripeStatus: null, orders: [], documents: [], stripeLinks: [], selected: null, preview: null, options: null };
       const $ = id => document.getElementById(id);
       const money = value => new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(Number(value || 0));
       const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[char]);
@@ -258,6 +300,15 @@
         $('disconnectBtn').hidden = !state.status.connected;
         if (mock) message('Pode testar todo o fluxo. Os documentos criados ficam identificados como MOCK e não chegam à Autoridade Tributária.', 'warning');
         renderActivation();
+      }
+
+      async function loadStripeStatus() {
+        state.stripeStatus = await api('/api/stripe/status');
+        const mock = state.stripeStatus.mode === 'mock';
+        $('stripeBadge').className = `badge ${mock ? 'mock' : 'live'}`;
+        $('stripeBadge').innerHTML = mock
+          ? '<i class="fa-solid fa-credit-card"></i> Stripe em teste interno'
+          : '<i class="fa-solid fa-credit-card"></i> Stripe ligado';
       }
 
       function renderActivation() {
@@ -298,6 +349,13 @@
       function roundMoney(value) {
         const parsed = Number.parseFloat(String(value || 0).replace(',', '.'));
         return Number.isFinite(parsed) ? Math.round(parsed * 100) / 100 : 0;
+      }
+
+      function selectedPaidAndOutstanding() {
+        const order = state.selected || {};
+        const paid = roundMoney(paidTotal(order));
+        const outstanding = Math.max(0, roundMoney(Number(order.total || 0) - paid));
+        return { paid, outstanding, total: roundMoney(order.total) };
       }
 
       function orderDocuments(orderId) {
@@ -379,9 +437,11 @@
       function selectOrder(id) {
         state.selected = state.orders.find(order => order.id === id) || null;
         state.preview = null;
+        state.stripeLinks = [];
         renderOrders();
         renderSelected();
         renderDocuments();
+        loadStripeLinks().catch(error => message(error.message, 'error'));
       }
 
       function renderSelected() {
@@ -401,6 +461,9 @@
           <div class="row"><span>Total do pedido</span><strong>${money(order.total)}</strong></div>
           <div class="row"><span>Pagamentos recebidos</span><strong>${money(paid)}</strong></div>
           <div class="row total"><span>Saldo pendente</span><span>${money(outstanding)}</span></div>`;
+        updateStripeAmount();
+        $('stripeDescription').value = `Pagamento do pedido ${order.numero || order.id}`;
+        renderStripeLinks();
         const payments = (order.pagamentos || []).filter(payment => payment.status === 'pago');
         $('paymentId').innerHTML = payments.length ? payments.map((payment, index) =>
           `<option value="${escapeHtml(payment.id || `payment-${index + 1}`)}">${escapeHtml(payment.data || '')} · ${money(payment.valor)} · ${escapeHtml(payment.formaPagamento || 'outro')}</option>`
@@ -498,6 +561,103 @@
         state.documents = (await api('/api/moloni/documents')).documents || [];
         if (state.selected) renderSelected();
         renderDocuments();
+      }
+
+      async function loadStripeLinks() {
+        if (!state.selected) {
+          state.stripeLinks = [];
+          renderStripeLinks();
+          return;
+        }
+        const result = await api(`/api/stripe/payment-links?orderId=${encodeURIComponent(state.selected.id)}`);
+        state.stripeLinks = result.links || [];
+        renderStripeLinks();
+      }
+
+      function updateStripeAmount() {
+        if (!state.selected) return;
+        const { total, outstanding } = selectedPaidAndOutstanding();
+        const mode = $('stripeAmountMode').value;
+        const amount = mode === 'total' ? total : mode === 'custom' ? roundMoney($('stripeAmount').value) : outstanding;
+        if (mode !== 'custom') $('stripeAmount').value = amount.toFixed(2);
+        $('stripeAmount').readOnly = mode !== 'custom';
+        $('stripeOrderStatus').textContent = outstanding > 0.009 ? `saldo ${money(outstanding)}` : 'pago';
+        $('stripeOrderStatus').className = `status ${outstanding > 0.009 ? 'open' : 'paid'}`;
+        $('createStripeLinkBtn').disabled = !(amount > 0);
+      }
+
+      async function createStripeLink() {
+        if (!state.selected) return;
+        updateStripeAmount();
+        const amount = roundMoney($('stripeAmount').value);
+        if (!(amount > 0)) return message('Informe um valor maior que zero para gerar o link.', 'error');
+        const button = $('createStripeLinkBtn');
+        button.disabled = true;
+        try {
+          const result = await api('/api/stripe/payment-links', {
+            method: 'POST',
+            body: JSON.stringify({
+              orderId: state.selected.id,
+              amount,
+              description: $('stripeDescription').value
+            })
+          });
+          state.stripeLinks = [result.link, ...state.stripeLinks.filter(link => link.id !== result.link.id)];
+          renderStripeLinks();
+          message('Link de pagamento criado. Pode copiar e enviar ao cliente.', 'success');
+        } catch (error) {
+          message(error.message, 'error');
+        } finally {
+          button.disabled = false;
+          updateStripeAmount();
+        }
+      }
+
+      async function copyStripeLink(url) {
+        await navigator.clipboard.writeText(url);
+        message('Link de pagamento copiado.', 'success');
+      }
+
+      async function syncStripeLink(id) {
+        try {
+          const result = await api(`/api/stripe/payment-links/${encodeURIComponent(id)}/sync`, { method: 'POST', body: '{}' });
+          state.stripeLinks = state.stripeLinks.map(link => link.id === id ? result.link : link);
+          await loadOrders();
+          if (state.selected) selectOrder(state.selected.id);
+          message('Estado do link atualizado.', 'success');
+        } catch (error) {
+          message(error.message, 'error');
+        }
+      }
+
+      function renderStripeLinks() {
+        const box = $('stripeLinks');
+        if (!state.selected) {
+          box.textContent = 'Selecione um pedido.';
+          return;
+        }
+        const links = state.stripeLinks || [];
+        if (!links.length) {
+          box.textContent = 'Sem links gerados para este pedido.';
+          return;
+        }
+        box.innerHTML = links.map(link => `
+          <div class="payment-link-row">
+            <div>
+              <strong>${money(link.amount)}</strong>
+              <span class="status ${escapeHtml(link.status)}">${escapeHtml(link.status)}</span>
+              <div class="tiny">${escapeHtml(link.createdAt ? new Date(link.createdAt).toLocaleString('pt-PT') : '')} · ${escapeHtml(link.mode || '')}</div>
+              <div class="payment-link-url">${escapeHtml(link.url || 'Sem URL')}</div>
+            </div>
+            <div class="payment-link-actions">
+              ${link.url ? `<button type="button" class="btn neutral stripe-open" data-url="${escapeHtml(link.url)}" title="Abrir link"><i class="fa-solid fa-up-right-from-square"></i></button>` : ''}
+              ${link.url ? `<button type="button" class="btn secondary stripe-copy" data-url="${escapeHtml(link.url)}" title="Copiar link"><i class="fa-solid fa-copy"></i></button>` : ''}
+              ${link.mode !== 'mock' && link.status !== 'paid' ? `<button type="button" class="btn neutral stripe-sync" data-id="${escapeHtml(link.id)}" title="Atualizar estado"><i class="fa-solid fa-rotate"></i></button>` : ''}
+            </div>
+          </div>`).join('');
+        box.querySelectorAll('.stripe-open').forEach(button => button.addEventListener('click', () => window.open(button.dataset.url, '_blank', 'noopener')));
+        box.querySelectorAll('.stripe-copy').forEach(button => button.addEventListener('click', () => copyStripeLink(button.dataset.url).catch(error => message(error.message, 'error'))));
+        box.querySelectorAll('.stripe-sync').forEach(button => button.addEventListener('click', () => syncStripeLink(button.dataset.id)));
       }
 
       function renderDocuments() {
@@ -615,12 +775,16 @@
 
       async function refresh() {
         message('');
-        await Promise.all([loadStatus(), loadOrders(), loadDocuments()]);
+        await Promise.all([loadStatus(), loadStripeStatus(), loadOrders(), loadDocuments()]);
+        await loadStripeLinks();
       }
 
       $('search').addEventListener('input', renderOrders);
       $('documentType').addEventListener('change', () => { updateDocumentFields(); $('previewBox').innerHTML = ''; });
       $('paymentId').addEventListener('change', () => $('previewBox').innerHTML = '');
+      $('stripeAmountMode').addEventListener('change', updateStripeAmount);
+      $('stripeAmount').addEventListener('input', updateStripeAmount);
+      $('createStripeLinkBtn').addEventListener('click', createStripeLink);
       $('previewBtn').addEventListener('click', () => previewDocument().catch(error => message(error.message, 'error')));
       $('draftBtn').addEventListener('click', () => issueDocument('draft'));
       $('closeBtn').addEventListener('click', () => issueDocument('closed'));
