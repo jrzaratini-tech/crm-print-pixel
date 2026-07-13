@@ -163,6 +163,165 @@
             background: rgba(255, 255, 255, 0.22);
             transform: translateY(-2px);
         }
+
+        .notification-center {
+            position: relative;
+        }
+
+        .notification-toggle {
+            background: rgba(255, 255, 255, 0.14);
+            border: 1px solid rgba(255, 255, 255, 0.28);
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 19px;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+            position: relative;
+        }
+
+        .notification-toggle:hover,
+        .notification-toggle.active {
+            background: rgba(255, 255, 255, 0.22);
+            transform: translateY(-2px);
+        }
+
+        .notification-badge {
+            position: absolute;
+            top: -6px;
+            right: -6px;
+            min-width: 20px;
+            height: 20px;
+            border-radius: 999px;
+            background: #ef4444;
+            color: #fff;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 0 6px;
+            font-size: 11px;
+            font-weight: 900;
+            border: 2px solid rgba(255, 255, 255, 0.95);
+        }
+
+        .notification-badge.visible {
+            display: flex;
+        }
+
+        .notification-panel {
+            position: absolute;
+            top: calc(100% + 12px);
+            right: 0;
+            width: min(380px, calc(100vw - 32px));
+            background: #fff;
+            color: #1f2937;
+            border: 1px solid #dbe3ef;
+            border-radius: 12px;
+            box-shadow: 0 18px 50px rgba(15, 23, 42, 0.22);
+            z-index: 50;
+            overflow: hidden;
+        }
+
+        .notification-panel[hidden] {
+            display: none;
+        }
+
+        .notification-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 14px 16px;
+            border-bottom: 1px solid #e5eaf2;
+        }
+
+        .notification-panel-header strong {
+            font-size: 15px;
+            color: #111827;
+        }
+
+        .notification-read-all {
+            border: 0;
+            background: transparent;
+            color: var(--primary-color);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .notification-list {
+            max-height: 360px;
+            overflow: auto;
+        }
+
+        .notification-item {
+            display: block;
+            padding: 13px 16px;
+            border-bottom: 1px solid #eef2f7;
+            color: inherit;
+            text-decoration: none;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .notification-item:hover {
+            background: #f8fafc;
+        }
+
+        .notification-item.unread {
+            background: #eef4ff;
+        }
+
+        .notification-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            font-weight: 900;
+            color: #111827;
+            margin-bottom: 5px;
+        }
+
+        .notification-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: #2563eb;
+            flex: 0 0 auto;
+        }
+
+        .notification-item:not(.unread) .notification-dot {
+            display: none;
+        }
+
+        .notification-message {
+            color: #475569;
+            font-size: 13px;
+            line-height: 1.35;
+        }
+
+        .notification-time {
+            color: #94a3b8;
+            font-size: 12px;
+            margin-top: 7px;
+        }
+
+        .notification-empty,
+        .notification-error {
+            padding: 24px 16px;
+            text-align: center;
+            color: #64748b;
+            font-size: 13px;
+        }
+
+        .notification-error {
+            color: #b91c1c;
+        }
         
         /* ============================================
            PERIOD FILTER
@@ -1197,6 +1356,22 @@
                 <i class="fas fa-eye"></i>
             </button>
 
+            <div class="notification-center" id="notificationCenter">
+                <button class="notification-toggle" id="notificationToggle" title="Notificacoes">
+                    <i class="fas fa-bell"></i>
+                    <span class="notification-badge" id="notificationBadge">0</span>
+                </button>
+                <div class="notification-panel" id="notificationPanel" hidden>
+                    <div class="notification-panel-header">
+                        <strong>Notificacoes</strong>
+                        <button class="notification-read-all" id="notificationReadAll" type="button">Marcar lidas</button>
+                    </div>
+                    <div class="notification-list" id="notificationList">
+                        <div class="notification-empty">Sem notificacoes novas.</div>
+                    </div>
+                </div>
+            </div>
+
             <button class="calendar-toggle" id="deliveryCalendarBtn" title="Ver calendario de entregas">
                 <i class="fas fa-calendar-days"></i>
                 <span>Calendario</span>
@@ -1497,6 +1672,12 @@
             const privacyToggle = document.getElementById('privacyToggle');
             const periodFilter = document.getElementById('periodFilter');
             const currentDate = document.getElementById('currentDate');
+            const notificationCenter = document.getElementById('notificationCenter');
+            const notificationToggle = document.getElementById('notificationToggle');
+            const notificationBadge = document.getElementById('notificationBadge');
+            const notificationPanel = document.getElementById('notificationPanel');
+            const notificationList = document.getElementById('notificationList');
+            const notificationReadAll = document.getElementById('notificationReadAll');
             const deliveryCalendarBtn = document.getElementById('deliveryCalendarBtn');
             const deliveryCalendarOverlay = document.getElementById('deliveryCalendarOverlay');
             const deliveryCalendarClose = document.getElementById('deliveryCalendarClose');
@@ -1531,6 +1712,8 @@
             let dadosCore = {};
             let todosEventos = [];
             let todosEventosComTimestampsCorrigidos = [];
+            let crmNotifications = [];
+            let notificationsOpen = false;
             let deliveryCalendarDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
             let suggestedDeliveryKey = '';
             
@@ -1543,6 +1726,8 @@
                 atualizarDataAtual();
                 criarGraficos();
                 configurarEventListeners();
+                carregarNotificacoes();
+                setInterval(carregarNotificacoes, 30000);
                 
                 // Solicitar dados ao Core
                 solicitarTodosDadosAoCore();
@@ -1566,6 +1751,17 @@
             function configurarEventListeners() {
                 // Botão de privacidade
                 privacyToggle.addEventListener('click', alternarPrivacidade);
+
+                notificationToggle.addEventListener('click', event => {
+                    event.stopPropagation();
+                    alternarPainelNotificacoes();
+                });
+                notificationPanel.addEventListener('click', event => event.stopPropagation());
+                notificationReadAll.addEventListener('click', marcarNotificacoesComoLidas);
+                document.addEventListener('click', event => {
+                    if (!notificationsOpen || notificationCenter.contains(event.target)) return;
+                    fecharPainelNotificacoes();
+                });
                 
                 // Filtro de período
                 periodFilter.addEventListener('change', function(e) {
@@ -1658,6 +1854,94 @@
                         elemento.classList.remove('hidden');
                     }
                 });
+            }
+
+            async function carregarNotificacoes() {
+                try {
+                    const response = await fetch('/api/notifications?limit=20');
+                    const data = await response.json();
+                    if (!response.ok || !data.success) throw new Error(data.message || 'Erro ao carregar notificacoes.');
+                    crmNotifications = data.notifications || [];
+                    renderizarNotificacoes(data.unread || 0);
+                } catch (error) {
+                    if (notificationList) {
+                        notificationList.innerHTML = '<div class="notification-error">Nao foi possivel carregar as notificacoes.</div>';
+                    }
+                }
+            }
+
+            function renderizarNotificacoes(unreadCount) {
+                notificationBadge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+                notificationBadge.classList.toggle('visible', unreadCount > 0);
+
+                if (!crmNotifications.length) {
+                    notificationList.innerHTML = '<div class="notification-empty">Sem notificacoes novas.</div>';
+                    return;
+                }
+
+                notificationList.innerHTML = crmNotifications.map(notification => {
+                    const href = notification.orderId
+                        ? `faturacao.html?orderId=${encodeURIComponent(notification.orderId)}&stripe=1`
+                        : '#';
+                    return `
+                        <a class="notification-item ${notification.read ? '' : 'unread'}" href="${href}" data-notification-id="${escapeHtml(notification.id)}">
+                            <div class="notification-title">
+                                <span>${escapeHtml(notification.title || 'Notificacao')}</span>
+                                <span class="notification-dot"></span>
+                            </div>
+                            <div class="notification-message">${escapeHtml(notification.message || '')}</div>
+                            <div class="notification-time">${formatarNotificacaoData(notification.createdAt)}</div>
+                        </a>
+                    `;
+                }).join('');
+
+                notificationList.querySelectorAll('[data-notification-id]').forEach(item => {
+                    item.addEventListener('click', () => marcarNotificacaoComoLida(item.dataset.notificationId));
+                });
+            }
+
+            async function alternarPainelNotificacoes() {
+                notificationsOpen = notificationPanel.hidden;
+                notificationPanel.hidden = !notificationsOpen;
+                notificationToggle.classList.toggle('active', notificationsOpen);
+                if (notificationsOpen) {
+                    await carregarNotificacoes();
+                    if (crmNotifications.some(notification => !notification.read)) {
+                        marcarNotificacoesComoLidas();
+                    }
+                }
+            }
+
+            function fecharPainelNotificacoes() {
+                notificationsOpen = false;
+                notificationPanel.hidden = true;
+                notificationToggle.classList.remove('active');
+            }
+
+            async function marcarNotificacoesComoLidas() {
+                try {
+                    await fetch('/api/notifications/read-all', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+                    crmNotifications = crmNotifications.map(notification => ({ ...notification, read: true }));
+                    renderizarNotificacoes(0);
+                } catch (error) {
+                    console.warn('Nao foi possivel marcar notificacoes como lidas.', error);
+                }
+            }
+
+            async function marcarNotificacaoComoLida(id) {
+                if (!id) return;
+                try {
+                    await fetch(`/api/notifications/${encodeURIComponent(id)}/read`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+                } catch (error) {
+                    console.warn('Nao foi possivel marcar notificacao como lida.', error);
+                }
+            }
+
+            function formatarNotificacaoData(value) {
+                if (!value) return '';
+                const date = new Date(value);
+                if (Number.isNaN(date.getTime())) return '';
+                return new Intl.DateTimeFormat('pt-PT', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(date);
             }
             
             // SOLUÇÃO CRÍTICA: Corrigir timestamps dos eventos

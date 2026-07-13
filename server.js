@@ -576,6 +576,15 @@ function stripeLinkPublic(id, link = {}) {
   });
 }
 
+async function runDbTransaction(work) {
+  if (typeof db.runTransaction === 'function') return db.runTransaction(work);
+  return work({
+    get: ref => ref.get(),
+    set: (ref, data, options) => ref.set(data, options),
+    update: (ref, data) => ref.update(data)
+  });
+}
+
 async function stripePaymentLinks(orderId = '') {
   const snapshot = await db.collection('stripe_payment_links').get();
   return snapshot.docs
@@ -642,12 +651,15 @@ async function registerStripePaymentFromSession(session = {}) {
 
   const orderRef = db.collection('events').doc(orderId);
   const linkRef = db.collection('stripe_payment_links').doc(linkId);
+  const notificationId = `stripe_paid_${String(session.id || linkId).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 90)}`;
+  const notificationRef = db.collection('crm_notifications').doc(notificationId);
   const now = new Date().toISOString();
   const amount = centsToMoney(session.amount_total || session.amount_subtotal);
   const paymentIntentId = String(session.payment_intent || '');
 
   let updatedPayload = null;
-  await db.runTransaction(async transaction => {
+  let notificationCreated = false;
+  await runDbTransaction(async transaction => {
     const orderSnapshot = await transaction.get(orderRef);
     const linkSnapshot = await transaction.get(linkRef);
     if (!orderSnapshot.exists || orderSnapshot.data()?.schema !== 'pedido' || orderSnapshot.data()?.deleted) return;
@@ -673,6 +685,23 @@ async function registerStripePaymentFromSession(session = {}) {
         stripeCheckoutSessionId: String(session.id || ''),
         stripePaymentIntentId: paymentIntentId
       });
+      const orderNumber = payload.numero || link.orderNumber || orderId;
+      const customer = payload.cliente || payload.empresa || link.customer || 'Cliente';
+      transaction.set(notificationRef, {
+        type: 'stripe_payment_paid',
+        title: 'Pagamento recebido',
+        message: `Pedido ${orderNumber} - ${customer} pagou ${amount.toFixed(2)} ${STRIPE_CURRENCY.toUpperCase()}`,
+        orderId,
+        orderNumber,
+        customer,
+        amount,
+        currency: STRIPE_CURRENCY,
+        source: 'stripe',
+        read: false,
+        createdAt: now,
+        updatedAt: now
+      }, { merge: true });
+      notificationCreated = true;
     }
 
     const totalPago = money(payments
@@ -707,7 +736,20 @@ async function registerStripePaymentFromSession(session = {}) {
     }, { merge: true });
   });
 
-  return updatedPayload;
+  return { payload: updatedPayload, notificationCreated };
+}
+
+async function crmNotifications(limit = 20) {
+  const normalizedLimit = Math.max(1, Math.min(100, Number(limit) || 20));
+  const snapshot = await db.collection('crm_notifications').get();
+  const notifications = [];
+  snapshot.forEach(doc => {
+    const data = doc.data() || {};
+    if (data.deleted) return;
+    notifications.push(sanitizeForResponse({ id: doc.id, ...data }));
+  });
+  notifications.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  return notifications.slice(0, normalizedLimit);
 }
 
 function moloniEndpointFor(type) {
@@ -2994,6 +3036,44 @@ app.get('/api/rotulos/orders/:id/items/:itemIndex/eps', async (req, res) => {
 });
 
 app.get('/health', (req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
+
+app.get('/api/notifications', async (req, res) => {
+  try {
+    const notifications = await crmNotifications(req.query.limit);
+    const unread = notifications.filter(notification => !notification.read).length;
+    res.json({ success: true, notifications, unread });
+  } catch (error) {
+    console.error('Erro ao carregar notificacoes:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel carregar as notificacoes.' });
+  }
+});
+
+app.post('/api/notifications/read-all', async (req, res) => {
+  try {
+    const notifications = await crmNotifications(100);
+    const now = new Date().toISOString();
+    await Promise.all(notifications
+      .filter(notification => !notification.read && isSafeIdentifier(notification.id))
+      .map(notification => db.collection('crm_notifications').doc(notification.id).set({ read: true, readAt: now, updatedAt: now }, { merge: true })));
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao marcar notificacoes como lidas:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel marcar as notificacoes.' });
+  }
+});
+
+app.post('/api/notifications/:id/read', async (req, res) => {
+  try {
+    const id = String(req.params.id || '');
+    if (!isSafeIdentifier(id)) return res.status(400).json({ success: false, message: 'Notificacao invalida.' });
+    const now = new Date().toISOString();
+    await db.collection('crm_notifications').doc(id).set({ read: true, readAt: now, updatedAt: now }, { merge: true });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erro ao marcar notificacao como lida:', error);
+    res.status(500).json({ success: false, message: 'Nao foi possivel marcar a notificacao.' });
+  }
+});
 
 app.get('/api/stripe/status', (req, res) => {
   res.json({ success: true, ...stripePublicStatus() });

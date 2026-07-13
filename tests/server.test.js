@@ -185,6 +185,8 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(billingPageResult.body, /Faturação e pagamentos/);
   assert.match(billingPageResult.body, /Link de pagamento Stripe/);
   assert.match(billingPageResult.body, /api\/stripe\/payment-links/);
+  assert.match(dashboardPageResult.body, /notificationToggle/);
+  assert.match(dashboardPageResult.body, /api\/notifications/);
   assert.match(billingPageResult.body, /api\/moloni\/documents\/preview/);
   assert.match(billingPageResult.body, /Modo de teste/);
   assert.match(billingPageResult.body, /button type="button" class="order/);
@@ -853,6 +855,39 @@ test('gera link Stripe em modo interno e lista por pedido', async () => {
   assert.equal(listed.response.status, 200);
   assert.equal(listed.body.links.length, 1);
   assert.equal(listed.body.links[0].id, link.body.link.id);
+
+  const paid = await post('/api/stripe/webhook', {
+    type: 'checkout.session.completed',
+    data: {
+      object: {
+        id: 'cs_test_notification_1',
+        amount_total: 10000,
+        payment_status: 'paid',
+        status: 'complete',
+        payment_intent: 'pi_test_notification_1',
+        customer_details: { email: 'stripe@example.com' },
+        metadata: {
+          crm_order_id: createdOrder.body.id,
+          crm_payment_link_id: link.body.link.id
+        }
+      }
+    }
+  });
+  assert.equal(paid.response.status, 200);
+
+  const notifications = await request('/api/notifications');
+  assert.equal(notifications.response.status, 200);
+  const stripeNotification = notifications.body.notifications.find(notification => notification.orderId === createdOrder.body.id);
+  assert.ok(stripeNotification);
+  assert.equal(stripeNotification.read, false);
+  assert.equal(stripeNotification.title, 'Pagamento recebido');
+  assert.match(stripeNotification.message, /Cliente Stripe/);
+
+  const read = await post('/api/notifications/read-all', {});
+  assert.equal(read.response.status, 200);
+  const afterRead = await request('/api/notifications');
+  const readStripeNotification = afterRead.body.notifications.find(notification => notification.orderId === createdOrder.body.id);
+  assert.equal(readStripeNotification.read, true);
 });
 
 test('modo salario ignora NIF e IVA da nota e registra somente o valor', async () => {
