@@ -5,6 +5,7 @@ const {
   buildDocumentPreview,
   classifyLineNature,
   flattenForm,
+  isMoloniAuthExpiredError,
   moloniDocumentResult,
   orderTotals,
   paidPayments,
@@ -148,4 +149,10 @@ test('mantem listas de objetos Moloni como respostas validas', async () => {
   });
   const products = await client.call('products/getAll', {});
   assert.equal(products[0].product_id, 1);
+});
+
+test('reconhece refresh token Moloni expirado', () => {
+  assert.equal(isMoloniAuthExpiredError(new Error('Refresh token has expired (1784554839 - 1784656710)')), true);
+  assert.equal(isMoloniAuthExpiredError({ details: { error: 'invalid_grant' } }), true);
+  assert.equal(isMoloniAuthExpiredError(new Error('Erro devolvido pela API Moloni.')), false);
 });

@@ -328,6 +328,20 @@ function moloniDocumentResult(result = {}) {
   };
 }
 
+function isMoloniAuthExpiredError(error) {
+  const text = [
+    error?.message,
+    error?.error,
+    error?.error_description,
+    error?.details?.message,
+    error?.details?.error,
+    error?.details?.error_description
+  ].map(value => cleanText(value, 500).toLowerCase()).join(' ');
+  return /refresh token/.test(text) && /expir/.test(text)
+    || /invalid_grant/.test(text)
+    || /autori[sz]a[cç][aã]o moloni expir/.test(text);
+}
+
 function oauthAuthorizationUrl({ clientId, redirectUri, state }) {
   const url = new URL(MOLONI_OAUTH_URL);
   url.searchParams.set('response_type', 'code');
@@ -371,6 +385,7 @@ module.exports = {
   classifyLineNature,
   documentLabel,
   flattenForm,
+  isMoloniAuthExpiredError,
   moloniDocumentResult,
   oauthAuthorizationUrl,
   orderTotals,

@@ -10,6 +10,7 @@ const {
   MoloniClient,
   buildDocumentPreview,
   cleanText: moloniText,
+  isMoloniAuthExpiredError,
   moloniDocumentResult,
   oauthAuthorizationUrl,
   recommendDocumentAction,
@@ -471,12 +472,21 @@ async function moloniAccessToken() {
   if (expiresAt > Date.now() + 60 * 1000) return tokens.access_token;
   if (!tokens.refresh_token) throw new Error('A autorizacao Moloni expirou. Volte a ligar a conta.');
 
-  const refreshed = await exchangeMoloniGrant({
-    grant_type: 'refresh_token',
-    client_id: MOLONI_CLIENT_ID,
-    client_secret: MOLONI_CLIENT_SECRET,
-    refresh_token: tokens.refresh_token
-  });
+  let refreshed;
+  try {
+    refreshed = await exchangeMoloniGrant({
+      grant_type: 'refresh_token',
+      client_id: MOLONI_CLIENT_ID,
+      client_secret: MOLONI_CLIENT_SECRET,
+      refresh_token: tokens.refresh_token
+    });
+  } catch (error) {
+    if (isMoloniAuthExpiredError(error)) {
+      await saveMoloniConfig({ tokens: null, connectedAt: null });
+      throw new Error('A autorizacao Moloni expirou. Volte a ligar a conta.');
+    }
+    throw error;
+  }
   const nextTokens = {
     ...refreshed,
     expires_at: Date.now() + Number(refreshed.expires_in || 3600) * 1000
