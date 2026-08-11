@@ -411,12 +411,14 @@ test('classifica OS para colaborador com login sem expor precos e permite chat p
   assert.equal('passwordHash' in workers.body.workers[0], false);
   assert.deepEqual(
     workers.body.processCatalog
-      .filter(step => ['Plotado / Descapelar', 'Aplicar vinil na tampa F/V', 'Colar as tampas', 'Limpeza e embalagem'].includes(step.label))
+      .filter(step => ['Plotado / Descapelar', 'Aplicar vinil na tampa F/V', 'Pedra + Silicone', 'Colar tampa 1', 'Colar tampa 2', 'Limpeza e embalagem'].includes(step.label))
       .map(step => ({ id: step.id, label: step.label, difficulty: step.difficulty })),
     [
       { id: undefined, label: 'Plotado / Descapelar', difficulty: 1 },
       { id: undefined, label: 'Aplicar vinil na tampa F/V', difficulty: 2 },
-      { id: undefined, label: 'Colar as tampas', difficulty: 4 },
+      { id: undefined, label: 'Pedra + Silicone', difficulty: 2 },
+      { id: 'colar_as_tampas', label: 'Colar tampa 1', difficulty: 4 },
+      { id: undefined, label: 'Colar tampa 2', difficulty: 4 },
       { id: 'limpeza_embalagem', label: 'Limpeza e embalagem', difficulty: 4 }
     ]
   );

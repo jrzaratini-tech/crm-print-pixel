@@ -70,11 +70,13 @@ const PRODUCTION_PROCESS_CATALOG = [
   { label: 'Aplicar e soldar LED', difficulty: 1 },
   { label: 'Cola quente', difficulty: 2 },
   { label: 'Silicone', difficulty: 2 },
+  { label: 'Pedra + Silicone', difficulty: 2 },
   { label: 'Corte laser', difficulty: 3 },
   { label: 'Montagem face', difficulty: 2 },
   { label: 'Pintura prata / ouro', difficulty: 3 },
   { label: 'Borracha neon', difficulty: 1 },
-  { label: 'Colar as tampas', difficulty: 4 },
+  { id: 'colar_as_tampas', label: 'Colar tampa 1', difficulty: 4 },
+  { label: 'Colar tampa 2', difficulty: 4 },
   { id: 'limpeza_embalagem', label: 'Limpeza e embalagem', difficulty: 4 }
 ];
 const PRODUCTION_STEPS = PRODUCTION_PROCESS_CATALOG.map(step => step.label);
