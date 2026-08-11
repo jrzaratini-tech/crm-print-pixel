@@ -63,7 +63,9 @@ const LABEL_PLATFORM_MONTHLY_FEE = 15;
 const PRODUCTION_PROCESS_CATALOG = [
   { label: 'Pintura interna', difficulty: 4 },
   { label: 'Montagem da estrutura', difficulty: 1 },
+  { label: 'Plotado / Descapelar', difficulty: 1 },
   { label: 'Montagem do painel ACM', difficulty: 2 },
+  { label: 'Aplicar vinil na tampa F/V', difficulty: 2 },
   { label: 'Gabarito de instalacao', difficulty: 4 },
   { label: 'Aplicar e soldar LED', difficulty: 1 },
   { label: 'Cola quente', difficulty: 2 },
@@ -72,7 +74,8 @@ const PRODUCTION_PROCESS_CATALOG = [
   { label: 'Montagem face', difficulty: 2 },
   { label: 'Pintura prata / ouro', difficulty: 3 },
   { label: 'Borracha neon', difficulty: 1 },
-  { label: 'Limpeza / embalagem', difficulty: 4 }
+  { label: 'Colar as tampas', difficulty: 4 },
+  { id: 'limpeza_embalagem', label: 'Limpeza e embalagem', difficulty: 4 }
 ];
 const PRODUCTION_STEPS = PRODUCTION_PROCESS_CATALOG.map(step => step.label);
 const DEFAULT_PRODUCTS = [
@@ -1239,10 +1242,12 @@ function productionStepId(label) {
 
 function productionStepMeta(value) {
   const id = productionStepId(value?.id || value?.label || value);
-  const found = PRODUCTION_PROCESS_CATALOG.find(step => productionStepId(step.label) === id);
+  const found = PRODUCTION_PROCESS_CATALOG.find(step =>
+    (step.id || productionStepId(step.label)) === id || productionStepId(step.label) === id
+  );
   if (!found) return null;
   const difficulty = Math.min(4, Math.max(1, Number(found.difficulty) || 4));
-  return { id, label: found.label, difficulty, weight: 5 - difficulty };
+  return { id: found.id || productionStepId(found.label), label: found.label, difficulty, weight: 5 - difficulty };
 }
 
 function splitProductionCommission(steps, commission) {

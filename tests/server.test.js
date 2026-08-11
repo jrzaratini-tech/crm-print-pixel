@@ -409,6 +409,17 @@ test('classifica OS para colaborador com login sem expor precos e permite chat p
   assert.match(created.body.appUrl, /\/colaborador\/$/);
   const workers = await request('/api/production/workers');
   assert.equal('passwordHash' in workers.body.workers[0], false);
+  assert.deepEqual(
+    workers.body.processCatalog
+      .filter(step => ['Plotado / Descapelar', 'Aplicar vinil na tampa F/V', 'Colar as tampas', 'Limpeza e embalagem'].includes(step.label))
+      .map(step => ({ id: step.id, label: step.label, difficulty: step.difficulty })),
+    [
+      { id: undefined, label: 'Plotado / Descapelar', difficulty: 1 },
+      { id: undefined, label: 'Aplicar vinil na tampa F/V', difficulty: 2 },
+      { id: undefined, label: 'Colar as tampas', difficulty: 4 },
+      { id: 'limpeza_embalagem', label: 'Limpeza e embalagem', difficulty: 4 }
+    ]
+  );
   const deniedLogin = await post('/api/colaborador/login', { username: 'montador.teste', password: 'senha-incorreta' });
   assert.equal(deniedLogin.response.status, 401);
   const login = await post('/api/colaborador/login', { username: 'montador.teste', password: 'senha-segura-123' });

@@ -1965,9 +1965,9 @@
                 workerFilter.innerHTML = '<option value="">Todos os colaboradores</option>';
                 productionWorkers.forEach(worker => workerFilter.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(worker.id)}">${escapeHtml(worker.name)}</option>`));
                 activityFilter.innerHTML = '<option value="">Todas as atividades</option>';
-                productionSteps.forEach(label => {
-                    const id = label.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^A-Za-z0-9]+/g, '_').replace(/^_|_$/g, '').toLowerCase();
-                    activityFilter.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(id)}">${escapeHtml(label)}</option>`);
+                productionProcessCatalog.forEach(meta => {
+                    const id = meta.id || productionStepDomId(meta.label);
+                    activityFilter.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(id)}">${escapeHtml(meta.label)}</option>`);
                 });
                 workerFilter.value = currentWorker;
                 activityFilter.value = currentActivity;
