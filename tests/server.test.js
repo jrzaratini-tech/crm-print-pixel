@@ -833,6 +833,17 @@ test('executa faturacao Moloni simulada com validacao e bloqueio de duplicados',
   assert.equal(listed.body.documents.length, 2);
 });
 
+test('nao apresenta token Moloni ilegivel como conta ligada', async () => {
+  const configRef = db.collection('integrations').doc('moloni');
+  await configRef.set({ tokens: { iv: 'invalido', tag: 'invalido', data: 'invalido' } });
+  const status = await request('/api/moloni/status');
+  assert.equal(status.response.status, 200);
+  assert.equal(status.body.connected, false);
+  assert.match(status.body.connectionError, /Volte a ligar a conta/);
+  assert.equal(status.body.checklist.find(item => item.key === 'connected').ok, false);
+  await configRef.delete();
+});
+
 test('gera link Stripe em modo interno e lista por pedido', async () => {
   const createdOrder = await post('/api/database/commit', {
     schema: 'pedido',

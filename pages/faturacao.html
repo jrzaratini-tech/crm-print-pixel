@@ -299,6 +299,7 @@
         $('connectBtn').hidden = mock || state.status.connected;
         $('disconnectBtn').hidden = !state.status.connected;
         if (mock) message('Pode testar todo o fluxo. Os documentos criados ficam identificados como MOCK e não chegam à Autoridade Tributária.', 'warning');
+        else if (state.status.connectionError) message(state.status.connectionError, 'error');
         renderActivation();
       }
 
@@ -551,6 +552,7 @@
           await loadDocuments();
         } catch (error) {
           message(error.message, 'error');
+          await loadStatus().catch(() => {});
         } finally {
           button.disabled = false;
           updateDocumentFields();

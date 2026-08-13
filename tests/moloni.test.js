@@ -6,6 +6,7 @@ const {
   classifyLineNature,
   flattenForm,
   isMoloniAuthExpiredError,
+  moloniApiErrors,
   moloniDocumentResult,
   orderTotals,
   paidPayments,
@@ -136,6 +137,22 @@ test('trata lista textual da API Moloni como erro de validacao', async () => {
     () => client.call('invoices/insert', { customer_id: 0 }),
     /customer_id/
   );
+});
+
+test('preserva mensagens de validacao Moloni indexadas por campo', async () => {
+  assert.deepEqual(moloniApiErrors({ 0: '2 customer_id 1 0', 1: ['3 products[0] 1 0'] }), [
+    '2 customer_id 1 0',
+    '3 products[0] 1 0'
+  ]);
+  const client = new MoloniClient({
+    accessToken: 'token-teste',
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ 0: '2 customer_id 1 0' })
+    })
+  });
+  await assert.rejects(() => client.call('invoices/insert', {}), /customer_id/);
 });
 
 test('mantem listas de objetos Moloni como respostas validas', async () => {

@@ -266,6 +266,22 @@ function flattenForm(value, prefix = '', output = new URLSearchParams()) {
   return output;
 }
 
+function moloniApiErrors(body) {
+  if (Array.isArray(body)) {
+    return body.flat(Infinity).filter(value => typeof value === 'string' && value.trim()).map(value => value.trim());
+  }
+  if (!body || typeof body !== 'object') return [];
+  const direct = [body.error_description, body.message, body.error]
+    .filter(value => typeof value === 'string' && value.trim())
+    .map(value => value.trim());
+  const indexed = Object.entries(body)
+    .filter(([key]) => /^\d+$/.test(key))
+    .flatMap(([, value]) => Array.isArray(value) ? value.flat(Infinity) : [value])
+    .filter(value => typeof value === 'string' && value.trim())
+    .map(value => value.trim());
+  return [...direct, ...indexed];
+}
+
 function moloniDocumentResult(result = {}) {
   const directIdKeys = new Set([
     'document_id',
@@ -366,9 +382,11 @@ class MoloniClient {
       body: flattenForm(payload)
     });
     const body = await response.json().catch(() => ({}));
-    const arrayError = Array.isArray(body) && body.every(item => typeof item === 'string');
-    if (!response.ok || body?.error || body?.valid === 0 || arrayError) {
-      const error = new Error(body?.error_description || body?.message || (arrayError ? body.join('; ') : 'Erro devolvido pela API Moloni.'));
+    const responseErrors = moloniApiErrors(body);
+    const validationError = body?.valid === 0 || (Array.isArray(body) && responseErrors.length > 0)
+      || (!Array.isArray(body) && Object.keys(body || {}).some(key => /^\d+$/.test(key)) && responseErrors.length > 0);
+    if (!response.ok || body?.error || validationError) {
+      const error = new Error(responseErrors.join('; ') || 'Erro devolvido pela API Moloni.');
       error.status = response.status;
       error.details = body;
       throw error;
@@ -386,6 +404,7 @@ module.exports = {
   documentLabel,
   flattenForm,
   isMoloniAuthExpiredError,
+  moloniApiErrors,
   moloniDocumentResult,
   oauthAuthorizationUrl,
   orderTotals,

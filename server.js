@@ -465,13 +465,23 @@ async function exchangeMoloniGrant(params) {
   Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
   const response = await fetch(url);
   const body = await response.json().catch(() => ({}));
-  if (!response.ok || body.error) throw new Error(body.error_description || 'Falha na autenticacao Moloni.');
+  if (!response.ok || body.error) {
+    const error = new Error(body.error_description || body.error || 'Falha na autenticacao Moloni.');
+    error.status = response.status;
+    error.details = body;
+    throw error;
+  }
   return body;
 }
 
 async function moloniAccessToken() {
   const config = await moloniConfig();
-  const tokens = decryptMoloniTokens(config.tokens);
+  let tokens;
+  try {
+    tokens = decryptMoloniTokens(config.tokens);
+  } catch {
+    throw new Error('A ligacao Moloni guardada ja nao e valida neste servidor. Volte a ligar a conta.');
+  }
   if (!tokens?.access_token) throw new Error('A conta Moloni ainda nao esta ligada.');
   const expiresAt = Number(tokens.expires_at || 0);
   if (expiresAt > Date.now() + 60 * 1000) return tokens.access_token;
@@ -514,11 +524,23 @@ async function moloniDocuments() {
 }
 
 function moloniPublicStatus(config = {}) {
-  const connected = Boolean(config.tokens);
+  let connected = false;
+  let connectionError = '';
+  if (config.tokens) {
+    try {
+      connected = Boolean(decryptMoloniTokens(config.tokens)?.access_token);
+      if (!connected) connectionError = 'A ligacao Moloni guardada esta incompleta. Volte a ligar a conta.';
+    } catch {
+      connectionError = 'A ligacao Moloni guardada ja nao e valida neste servidor. Volte a ligar a conta.';
+    }
+  }
   const checklist = moloniRequiredSettings(config);
+  const oauthItem = checklist.find(item => item.key === 'connected');
+  if (oauthItem) oauthItem.ok = connected;
   return {
     mode: MOLONI_MODE,
     connected,
+    connectionError,
     readyForLive: MOLONI_MODE === 'live' && checklist.every(item => item.ok),
     credentialsConfigured: Boolean(MOLONI_CLIENT_ID && MOLONI_CLIENT_SECRET && MOLONI_REDIRECT_URI),
     redirectUri: MOLONI_REDIRECT_URI,
@@ -938,7 +960,7 @@ function moloniSalesPayload(preview, config, status) {
     price: product.price,
     order: product.order,
     taxes: product.vatIncluded && Number(settings.standardTaxId)
-      ? [{ tax_id: Number(settings.standardTaxId), order: 1, cumulative: 0 }]
+      ? [{ tax_id: Number(settings.standardTaxId), value: 0, order: 1, cumulative: 0 }]
       : [],
     ...(!product.vatIncluded ? { exemption_reason: settings.exemptionReason || 'M99' } : {})
   }));
