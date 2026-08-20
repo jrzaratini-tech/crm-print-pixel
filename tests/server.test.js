@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const { after, before, test } = require('node:test');
 const { app } = require('../server.js');
 const { db } = require('../firebase.js');
@@ -76,6 +77,14 @@ test('não publica arquivos internos', async () => {
     const { response } = await request(path);
     assert.equal(response.status, 404, path);
   }
+});
+
+test('firebase aceita formatos seguros de credencial em producao', () => {
+  const source = fs.readFileSync('firebase.js', 'utf8');
+  assert.match(source, /FIREBASE_SERVICE_ACCOUNT_JSON/);
+  assert.match(source, /FIREBASE_SERVICE_ACCOUNT_BASE64/);
+  assert.match(source, /FIREBASE_SERVICE_ACCOUNT_FILE/);
+  assert.match(source, /GOOGLE_APPLICATION_CREDENTIALS/);
 });
 
 test('publica modulo de custeio e pagina de materiais', async () => {

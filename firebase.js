@@ -1,5 +1,6 @@
 const { initializeApp, cert } = require('firebase-admin/app');
 const { getFirestore } = require('firebase-admin/firestore');
+const fs = require('fs');
 
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 
@@ -47,14 +48,32 @@ function createMemoryDb() {
 }
 
 function readServiceAccount() {
-  if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
-    if (IS_PRODUCTION) throw new Error('Configure FIREBASE_SERVICE_ACCOUNT antes de iniciar o CRM em producao.');
+  const rawCredential = process.env.FIREBASE_SERVICE_ACCOUNT
+    || process.env.FIREBASE_SERVICE_ACCOUNT_JSON
+    || process.env.FIREBASE_SERVICE_ACCOUNT_BASE64
+    || '';
+  const credentialFile = process.env.FIREBASE_SERVICE_ACCOUNT_FILE
+    || process.env.GOOGLE_APPLICATION_CREDENTIALS
+    || '';
+
+  let credentialSource = rawCredential.trim();
+
+  if (!credentialSource && credentialFile.trim()) {
+    credentialSource = fs.readFileSync(credentialFile.trim(), 'utf8').trim();
+  }
+
+  if (!credentialSource) {
+    if (IS_PRODUCTION) throw new Error('Configure FIREBASE_SERVICE_ACCOUNT, FIREBASE_SERVICE_ACCOUNT_FILE ou GOOGLE_APPLICATION_CREDENTIALS antes de iniciar o CRM em producao.');
     console.warn('Firebase nao configurado. Usando banco em memoria para desenvolvimento.');
     return null;
   }
 
-  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-  if (!serviceAccount.private_key) throw new Error('FIREBASE_SERVICE_ACCOUNT nao possui private_key.');
+  if (!credentialSource.startsWith('{')) {
+    credentialSource = Buffer.from(credentialSource, 'base64').toString('utf8').trim();
+  }
+
+  const serviceAccount = JSON.parse(credentialSource);
+  if (!serviceAccount.private_key) throw new Error('Credencial Firebase nao possui private_key.');
   serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
   return serviceAccount;
 }
