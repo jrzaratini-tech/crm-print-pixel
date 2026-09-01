@@ -805,6 +805,15 @@
                     </div>
 
                     <div class="form-group">
+                        <label for="categoriaVenda">Canal / categoria da venda</label>
+                        <select id="categoriaVenda" name="categoriaVenda" data-bind="pedido.categoriaVenda">
+                            <option value="Venda direta">Venda direta / CRM</option>
+                            <option value="Print Pixel Studio">Print Pixel Studio</option>
+                        </select>
+                        <div class="field-note">Selecione Print Pixel Studio para identificar vendas originadas no site.</div>
+                    </div>
+
+                    <div class="form-group">
                         <label for="sellerId">Vendedor externo</label>
                         <select id="sellerId" name="sellerId" data-bind="pedido.sellerId">
                             <option value="">Sem vendedor externo</option>
@@ -1270,6 +1279,7 @@
                     document.getElementById('dataFechamento').value = pedido.dataFechamento || '';
                     document.getElementById('valorInstalacao').value = pedido.instalacao || '0';
                     document.getElementById('atendente').value = pedido.atendente || '';
+                    document.getElementById('categoriaVenda').value = pedido.categoriaVenda || 'Venda direta';
                     document.getElementById('sellerId').value = pedido.sellerId || '';
                     document.getElementById('sellerName').value = pedido.sellerName || '';
                     document.getElementById('sellerCommissionRate').value = pedido.sellerCommissionRate || '5';

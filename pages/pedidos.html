@@ -1029,6 +1029,17 @@
                 <i class="fas fa-search search-icon"></i>
                 <input type="text" class="search-input" id="searchInput" placeholder="Buscar cliente, empresa ou número...">
             </div>
+
+            <div class="filter-group">
+                <label for="channelFilter" style="display:flex;align-items:center;gap:6px;font-weight:700;color:var(--text-secondary);">
+                    <i class="fas fa-store"></i> Canal
+                </label>
+                <select id="channelFilter" style="border:0;background:transparent;color:var(--text-primary);font-weight:700;outline:none;">
+                    <option value="all">Todos</option>
+                    <option value="Print Pixel Studio">Print Pixel Studio</option>
+                    <option value="Venda direta">Venda direta / CRM</option>
+                </select>
+            </div>
         </div>
     </section>
 
@@ -1089,6 +1100,7 @@
             const emptyState = document.getElementById('emptyState');
             const loadingState = document.getElementById('loadingState');
             const searchInput = document.getElementById('searchInput');
+            const channelFilter = document.getElementById('channelFilter');
             const filterButtons = document.querySelectorAll('.filter-btn');
             const modalOverlay = document.getElementById('modalOverlay');
             const modalClose = document.getElementById('modalClose');
@@ -1097,6 +1109,7 @@
             // Estado da aplicação
             let todosPedidos = [];
             let filtroAtual = 'all';
+            let canalAtual = 'all';
             let termoBusca = '';
             let modalPedidoAtual = null;
             
@@ -1234,6 +1247,10 @@
                             atendente: payload.atendente || '',
                             observacoes: payload.observacoes || '',
                             comIVA: payload.comIVA || 'sim',
+                            categoriaVenda: payload.categoriaVenda === 'Print Pixel Studio'
+                                || ['print-pixel-studio', 'print_pixel_studio', 'website', 'site'].includes(String(payload.source || '').toLowerCase())
+                                ? 'Print Pixel Studio'
+                                : 'Venda direta',
                             
                             // Metadados do evento
                             createdAt: event.timestamp || event.created_at || new Date().toISOString(),
@@ -1287,6 +1304,10 @@
                 // Aplicar filtro de status
                 if (filtroAtual !== 'all') {
                     pedidosFiltrados = pedidosFiltrados.filter(p => p.status === filtroAtual);
+                }
+
+                if (canalAtual !== 'all') {
+                    pedidosFiltrados = pedidosFiltrados.filter(p => p.categoriaVenda === canalAtual);
                 }
                 
                 // Aplicar busca
@@ -1403,6 +1424,10 @@
                                 <div class="pedido-meta-item">
                                     <i class="fas fa-hashtag"></i>
                                     <span>${pedido.numero}</span>
+                                </div>
+                                <div class="pedido-meta-item">
+                                    <i class="fas fa-store"></i>
+                                    <span>${pedido.categoriaVenda}</span>
                                 </div>
                                 ${temFatura ? `
                                 <div class="pedido-meta-item">
@@ -1641,6 +1666,10 @@
                             <div class="info-item">
                                 <div class="info-label">Data de Criação</div>
                                 <div class="info-value">${formatarData(pedido.createdAt)}</div>
+                            </div>
+                            <div class="info-item">
+                                <div class="info-label">Canal da venda</div>
+                                <div class="info-value">${pedido.categoriaVenda}</div>
                             </div>
                             <div class="info-item">
                                 <div class="info-label">Data de Entrega</div>
@@ -2026,6 +2055,11 @@
             // Buscar pedidos
             searchInput.addEventListener('input', (e) => {
                 termoBusca = e.target.value.toLowerCase();
+                aplicarFiltrosEBusca();
+            });
+
+            channelFilter.addEventListener('change', (e) => {
+                canalAtual = e.target.value;
                 aplicarFiltrosEBusca();
             });
             

@@ -2801,8 +2801,16 @@
                                 pedidosConcluidos++;
                             }
                             
-                            // Agrupar vendas por produto/categoria
-                            if (evento.payload?.produtos && Array.isArray(evento.payload.produtos)) {
+                            // Vendas do site ficam agrupadas no canal Print Pixel Studio.
+                            // As demais mantêm o detalhamento histórico por tipo de produto.
+                            const categoriaVenda = String(evento.payload?.categoriaVenda || '').trim();
+                            const origemVenda = String(evento.payload?.source || '').trim().toLowerCase();
+                            const vendaPrintPixelStudio = categoriaVenda === 'Print Pixel Studio'
+                                || ['print-pixel-studio', 'print_pixel_studio', 'website', 'site'].includes(origemVenda);
+
+                            if (vendaPrintPixelStudio) {
+                                vendasPorCategoria['Print Pixel Studio'] = (vendasPorCategoria['Print Pixel Studio'] || 0) + valorFaturamento;
+                            } else if (evento.payload?.produtos && Array.isArray(evento.payload.produtos)) {
                                 evento.payload.produtos.forEach(produto => {
                                     const catProduto = produto.categoria || produto.tipo || produto.nome || 'Produto';
                                     const catProdutoLimpa = catProduto.trim() || 'Produto';
