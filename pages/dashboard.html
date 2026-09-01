@@ -368,6 +368,7 @@
         .dashboard-grid {
             display: grid;
             grid-template-columns: repeat(6, minmax(0, 1fr));
+            align-items: start;
             gap: 12px;
             margin-bottom: 30px;
         }
@@ -524,6 +525,89 @@
         .metric-card.iva .metric-change {
             margin-top: 4px;
             line-height: 1.25;
+        }
+
+        .iva-card-filter {
+            width: 100%;
+            margin: 10px 0 12px;
+            padding: 8px 10px;
+            border: 1px solid #ddd6fe;
+            border-radius: 9px;
+            background: #faf8ff;
+            color: #5b21b6;
+            font-size: 12px;
+            font-weight: 800;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .iva-period-state {
+            display: inline-flex;
+            align-items: center;
+            width: fit-content;
+            margin-top: 2px;
+            padding: 4px 8px;
+            border-radius: 999px;
+            background: #f3e8ff;
+            color: #6b21a8;
+            font-size: 10px;
+            font-weight: 900;
+            letter-spacing: .02em;
+            text-transform: uppercase;
+        }
+
+        .iva-breakdown {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 7px;
+            margin-top: 10px;
+        }
+
+        .iva-breakdown-item {
+            padding: 8px;
+            border: 1px solid #ede9fe;
+            border-radius: 9px;
+            background: #fcfbff;
+            min-width: 0;
+        }
+
+        .iva-breakdown-item span {
+            display: block;
+            margin-bottom: 3px;
+            color: #64748b;
+            font-size: 9px;
+            font-weight: 800;
+            text-transform: uppercase;
+        }
+
+        .iva-breakdown-item strong {
+            display: block;
+            color: #312e81;
+            font-size: 12px;
+            white-space: nowrap;
+        }
+
+        .iva-card-meta,
+        .iva-card-deadline {
+            margin-top: 8px;
+            color: #64748b;
+            font-size: 10px;
+            line-height: 1.35;
+        }
+
+        .iva-card-warning {
+            display: none;
+            margin-top: 7px;
+            padding: 6px 8px;
+            border-radius: 8px;
+            background: #fff7ed;
+            color: #c2410c;
+            font-size: 10px;
+            font-weight: 800;
+        }
+
+        .iva-card-warning.visible {
+            display: block;
         }
         
         .positive { 
@@ -1462,21 +1546,28 @@
 
             <div class="metric-card iva">
                 <div class="metric-header">
-                    <div class="metric-title">Estimativa Trimestral de IVA</div>
+                    <div class="metric-title">IVA — Apuramento Trimestral</div>
                     <div class="metric-icon iva">
                         <i class="fas fa-landmark"></i>
                     </div>
                 </div>
+                <select class="iva-card-filter" id="ivaQuarterFilter" aria-label="Selecionar trimestre de IVA"></select>
                 <div class="metric-value iva" data-bind="iva.saldo">€0,00</div>
-                <div class="metric-change">
-                    <span data-bind="iva.situacao">Sem saldo estimado</span>
+                <div class="iva-period-state" data-bind="iva.estado">A carregar</div>
+                <div class="metric-change" data-bind="iva.situacao">Sem saldo estimado</div>
+                <div class="iva-breakdown sensitive-value">
+                    <div class="iva-breakdown-item">
+                        <span>IVA liquidado</span>
+                        <strong data-bind="iva.liquidado">€0,00</strong>
+                    </div>
+                    <div class="iva-breakdown-item">
+                        <span>IVA dedutível</span>
+                        <strong data-bind="iva.dedutivel">€0,00</strong>
+                    </div>
                 </div>
-                <div class="metric-change">
-                    <span class="sensitive-value" data-bind="iva.detalhe">IVA vendas: €0,00 | IVA dedutível: €0,00</span>
-                </div>
-                <div class="metric-change">
-                    <span data-bind="iva.prazo">Declaração: --/--/----</span>
-                </div>
+                <div class="iva-card-meta" data-bind="iva.documentos">0 vendas · 0 compras</div>
+                <div class="iva-card-warning" data-bind="iva.pendentes"></div>
+                <div class="iva-card-deadline" data-bind="iva.prazo">Prazos: --/--/----</div>
             </div>
         </div>
 
@@ -1671,6 +1762,7 @@
             // Elementos do DOM
             const privacyToggle = document.getElementById('privacyToggle');
             const periodFilter = document.getElementById('periodFilter');
+            const ivaQuarterFilter = document.getElementById('ivaQuarterFilter');
             const currentDate = document.getElementById('currentDate');
             const notificationCenter = document.getElementById('notificationCenter');
             const notificationToggle = document.getElementById('notificationToggle');
@@ -1716,6 +1808,9 @@
             let notificationsOpen = false;
             let deliveryCalendarDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
             let suggestedDeliveryKey = '';
+            const hoje = new Date();
+            let anoIvaSelecionado = hoje.getFullYear();
+            let trimestreIvaSelecionado = Math.floor(hoje.getMonth() / 3) + 1;
             
             // ============================================
             // FUNÇÕES PRINCIPAIS - CORRIGIDAS
@@ -1724,6 +1819,7 @@
             // Inicializar dashboard
             function inicializar() {
                 atualizarDataAtual();
+                configurarFiltroIva();
                 criarGraficos();
                 configurarEventListeners();
                 carregarNotificacoes();
@@ -1733,6 +1829,29 @@
                 solicitarTodosDadosAoCore();
                 
                 console.log('✅ Dashboard inicializado');
+            }
+
+            function configurarFiltroIva() {
+                if (!ivaQuarterFilter) return;
+                const trimestreAtual = Math.floor(new Date().getMonth() / 3) + 1;
+                ivaQuarterFilter.replaceChildren();
+                for (let trimestre = 1; trimestre <= 4; trimestre += 1) {
+                    const estado = trimestre < trimestreAtual ? 'Encerrado' : trimestre === trimestreAtual ? 'Atual' : 'Próximo';
+                    const option = new Option(`${trimestre}.º trimestre ${anoIvaSelecionado} · ${estado}`, String(trimestre));
+                    option.selected = trimestre === trimestreIvaSelecionado;
+                    ivaQuarterFilter.add(option);
+                }
+            }
+
+            function contextoIvaSelecionado() {
+                const agora = new Date();
+                const inicio = new Date(anoIvaSelecionado, (trimestreIvaSelecionado - 1) * 3, 1);
+                const fim = new Date(anoIvaSelecionado, trimestreIvaSelecionado * 3, 0, 23, 59, 59, 999);
+                const estadoPeriodo = agora < inicio ? 'futuro' : agora > fim ? 'encerrado' : 'atual';
+                return {
+                    referencia: estadoPeriodo === 'atual' ? agora : estadoPeriodo === 'encerrado' ? fim : inicio,
+                    estadoPeriodo
+                };
             }
             
             // Atualizar data atual
@@ -1774,6 +1893,11 @@
                     } else {
                         solicitarTodosDadosAoCore();
                     }
+                });
+
+                ivaQuarterFilter?.addEventListener('change', function(e) {
+                    trimestreIvaSelecionado = Number(e.target.value) || trimestreIvaSelecionado;
+                    processarEFiltrarDados();
                 });
 
                 document.querySelectorAll('[data-open-page]').forEach(card => {
@@ -2841,7 +2965,11 @@
                     });
                 }
                 
-                const resumoIva = FINANCEIRO.resumoIvaTrimestral(todosEventosComTimestampsCorrigidos, agora);
+                const contextoIva = contextoIvaSelecionado();
+                const resumoIva = {
+                    ...FINANCEIRO.resumoIvaTrimestral(todosEventosComTimestampsCorrigidos, contextoIva.referencia),
+                    estadoPeriodo: contextoIva.estadoPeriodo
+                };
 
                 return {
                     vendas: {
@@ -2948,23 +3076,33 @@
 
                 const ivaSaldo = document.querySelector('[data-bind="iva.saldo"]');
                 const ivaSituacao = document.querySelector('[data-bind="iva.situacao"]');
-                const ivaDetalhe = document.querySelector('[data-bind="iva.detalhe"]');
+                const ivaEstado = document.querySelector('[data-bind="iva.estado"]');
+                const ivaLiquidado = document.querySelector('[data-bind="iva.liquidado"]');
+                const ivaDedutivel = document.querySelector('[data-bind="iva.dedutivel"]');
+                const ivaDocumentos = document.querySelector('[data-bind="iva.documentos"]');
+                const ivaPendentes = document.querySelector('[data-bind="iva.pendentes"]');
                 const ivaPrazo = document.querySelector('[data-bind="iva.prazo"]');
                 const formatarData = data => new Intl.DateTimeFormat('pt-PT').format(data);
                 if (ivaSaldo) ivaSaldo.textContent = formatarMoeda(Math.abs(dados.iva.saldo));
                 if (ivaSituacao) {
+                    const prefixo = dados.iva.estadoPeriodo === 'atual' ? 'Estimativa' : dados.iva.estadoPeriodo === 'futuro' ? 'Projeção' : 'Apuramento';
                     ivaSituacao.textContent = dados.iva.situacao === 'pagar'
-                        ? `Estimativa a pagar - ${dados.iva.trimestre}.º trimestre`
+                        ? `${prefixo} a pagar`
                         : dados.iva.situacao === 'receber'
-                            ? `Crédito estimado a recuperar - ${dados.iva.trimestre}.º trimestre`
-                            : `Sem saldo estimado - ${dados.iva.trimestre}.º trimestre`;
+                            ? `${prefixo} de crédito a recuperar`
+                            : dados.iva.estadoPeriodo === 'futuro' ? 'Ainda sem movimentos fiscais' : 'Sem saldo de IVA';
                 }
-                if (ivaDetalhe) {
-                    const pendentes = dados.iva.comprasPorClassificar ? ` | Por classificar: ${dados.iva.comprasPorClassificar}` : '';
-                    ivaDetalhe.textContent = `IVA vendas: ${formatarMoeda(dados.iva.ivaVendas)} (${dados.iva.documentosVenda} doc.) | IVA dedutível: ${formatarMoeda(dados.iva.ivaComprasDedutivel)} (${dados.iva.documentosCompra} doc.)${pendentes}`;
+                if (ivaEstado) ivaEstado.textContent = dados.iva.estadoPeriodo === 'atual' ? 'Estimativa até hoje' : dados.iva.estadoPeriodo === 'encerrado' ? 'Período encerrado' : 'Ainda não iniciado';
+                if (ivaLiquidado) ivaLiquidado.textContent = formatarMoeda(dados.iva.ivaVendas);
+                if (ivaDedutivel) ivaDedutivel.textContent = formatarMoeda(dados.iva.ivaComprasDedutivel);
+                if (ivaDocumentos) ivaDocumentos.textContent = `${dados.iva.documentosVenda} documento(s) de venda · ${dados.iva.documentosCompra} de compra`;
+                if (ivaPendentes) {
+                    ivaPendentes.textContent = dados.iva.comprasPorClassificar ? `${dados.iva.comprasPorClassificar} compra(s) aguardam classificação e não foram deduzidas` : '';
+                    ivaPendentes.classList.toggle('visible', Boolean(dados.iva.comprasPorClassificar));
                 }
                 if (ivaPrazo) {
-                    ivaPrazo.textContent = `Apurado até ${formatarData(dados.iva.apuradoAte)} · Declaração ${formatarData(dados.iva.entregaDeclaracao)} · Pagamento ${formatarData(dados.iva.pagamento)}`;
+                    const apuramento = dados.iva.estadoPeriodo === 'atual' ? `Apurado até ${formatarData(dados.iva.apuradoAte)} · ` : '';
+                    ivaPrazo.textContent = `${apuramento}Declaração até ${formatarData(dados.iva.entregaDeclaracao)} · Pagamento até ${formatarData(dados.iva.pagamento)}`;
                 }
                 
                 // Atualizar variações
@@ -3425,10 +3563,6 @@
             
             inicializar();
             
-            // Atualizar dados a cada 30 segundos
-            
-            // Forçar solicitação inicial após 1 segundo
-            setTimeout(solicitarTodosDadosAoCore, 1000);
         });
     </script>
     
