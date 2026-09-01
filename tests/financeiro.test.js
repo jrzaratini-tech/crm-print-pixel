@@ -54,12 +54,33 @@ test('identifica credito trimestral de IVA a recuperar', () => {
 
 test('usa faturas de venda como fonte fiscal sem duplicar IVA de pedidos', () => {
   const eventos = [
-    { schema: 'pedido', created_at: '2026-04-10T12:00:00', payload: { iva: 230, total: 1230 } },
-    { schema: 'fatura_venda', created_at: '2026-04-11T12:00:00', payload: { dataFatura: '2026-04-11', iva: 115, total: 615 } }
+    { schema: 'pedido', created_at: '2026-04-10T12:00:00', payload: { numeroFatura: 'FT 2026 / 1', iva: 115, total: 615 } },
+    { schema: 'fatura_venda', created_at: '2026-04-11T12:00:00', payload: { dataFatura: '2026-04-11', nifEmitente: '301621500', numeroFatura: 'FT2026/1', iva: 115, total: 615 } }
   ];
   const resumo = FINANCEIRO.resumoIvaTrimestral(eventos, new Date('2026-06-02T12:00:00'));
   assert.equal(resumo.ivaVendas, 115);
   assert.equal(resumo.fonteVendas, 'faturas');
+  assert.equal(resumo.documentosVenda, 1);
+});
+
+test('ignora anotacoes de pedidos quando existem documentos fiscais emitidos', () => {
+  const eventos = [
+    { schema: 'pedido', created_at: '2026-07-10T12:00:00', payload: { numeroFatura: 'fazer fatura 500 + iva', iva: 115 } },
+    { schema: 'fatura_venda', created_at: '2026-07-11T12:00:00', payload: { numeroFatura: 'MOLONI-100', iva: 46 } }
+  ];
+  const resumo = FINANCEIRO.resumoIvaTrimestral(eventos, new Date('2026-09-01T12:00:00'));
+  assert.equal(resumo.ivaVendas, 46);
+  assert.equal(resumo.documentosVenda, 1);
+});
+
+test('ignora documentos anulados ou cancelados', () => {
+  const eventos = [
+    { schema: 'fatura_venda', created_at: '2026-07-10T12:00:00', payload: { numeroFatura: 'FT 20', iva: 230, status: 'anulada' } },
+    { schema: 'despesa', created_at: '2026-07-11T12:00:00', payload: { numeroFatura: 'FC 20', valorIVA: 115, estado: 'cancelado' } }
+  ];
+  const resumo = FINANCEIRO.resumoIvaTrimestral(eventos, new Date('2026-09-01T12:00:00'));
+  assert.equal(resumo.ivaVendas, 0);
+  assert.equal(resumo.ivaComprasDedutivel, 0);
 });
 
 test('nao conta pedidos ainda nao faturados como IVA de vendas', () => {
@@ -90,6 +111,20 @@ test('aplica percentagem explicita e regra de 50 por cento ao gasoleo', () => {
   assert.equal(FINANCEIRO.ivaCompraDedutivel({ categoria: 'TELEFONE/INTERNET', valorIVA: 23, percentualIvaDedutivel: 40 }), 9.2);
   assert.equal(FINANCEIRO.ivaCompraDedutivel({ categoria: 'ALIMENTAÇÃO', valorIVA: 23 }), 0);
   assert.equal(FINANCEIRO.ivaCompraDedutivel({ categoria: 'A CLASSIFICAR', classificationStatus: 'pending', valorIVA: 23 }), 0);
+});
+
+test('deduz apenas compras com o NIF da empresa no periodo validado', () => {
+  const regras = { nifEmpresa: '301621500', validarNifDesde: '2026-07-01', dataDocumento: new Date('2026-08-01') };
+  assert.equal(FINANCEIRO.ivaCompraDedutivel({ nifAdquirente: '301621500', valorIVA: 23 }, regras), 23);
+  assert.equal(FINANCEIRO.ivaCompraDedutivel({ nifAdquirente: '999999990', valorIVA: 23 }, regras), 0);
+  assert.equal(FINANCEIRO.ivaCompraDedutivel({ valorIVA: 23 }, regras), 0);
+  assert.equal(FINANCEIRO.ivaCompraDedutivel({ nifAdquirente: '301621500', categoria: 'SALÁRIO', salaryOnly: true, valorIVA: 23 }, regras), 0);
+});
+
+test('preserva classificacao historica sem NIF anterior ao inicio da validacao', () => {
+  const regras = { nifEmpresa: '301621500', validarNifDesde: '2026-07-01', dataDocumento: new Date('2026-06-30') };
+  assert.equal(FINANCEIRO.estadoNifCompra({ valorIVA: 23 }, regras), 'legado_sem_nif');
+  assert.equal(FINANCEIRO.ivaCompraDedutivel({ valorIVA: 23 }, regras), 23);
 });
 
 test('reproduz os valores confirmados da declaracao do segundo trimestre de 2026', () => {

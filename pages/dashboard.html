@@ -422,6 +422,8 @@
         .metric-card.iva {
             border-left-color: #7c3aed;
             border-top: 4px solid #7c3aed;
+            height: 168px;
+            min-height: 168px;
         }
         
         .metric-header {
@@ -529,8 +531,8 @@
 
         .iva-card-filter {
             width: 100%;
-            margin: 10px 0 12px;
-            padding: 8px 10px;
+            margin: 0 0 9px;
+            padding: 7px 9px;
             border: 1px solid #ddd6fe;
             border-radius: 9px;
             background: #faf8ff;
@@ -539,6 +541,24 @@
             font-weight: 800;
             outline: none;
             cursor: pointer;
+        }
+
+        .iva-card-scroll {
+            height: 84px;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            padding-right: 5px;
+            scrollbar-width: thin;
+            scrollbar-color: #c4b5fd transparent;
+        }
+
+        .iva-card-scroll::-webkit-scrollbar {
+            width: 5px;
+        }
+
+        .iva-card-scroll::-webkit-scrollbar-thumb {
+            border-radius: 999px;
+            background: #c4b5fd;
         }
 
         .iva-period-state {
@@ -1551,23 +1571,25 @@
                         <i class="fas fa-landmark"></i>
                     </div>
                 </div>
-                <select class="iva-card-filter" id="ivaQuarterFilter" aria-label="Selecionar trimestre de IVA"></select>
-                <div class="metric-value iva" data-bind="iva.saldo">€0,00</div>
-                <div class="iva-period-state" data-bind="iva.estado">A carregar</div>
-                <div class="metric-change" data-bind="iva.situacao">Sem saldo estimado</div>
-                <div class="iva-breakdown sensitive-value">
-                    <div class="iva-breakdown-item">
-                        <span>IVA liquidado</span>
-                        <strong data-bind="iva.liquidado">€0,00</strong>
+                <div class="iva-card-scroll">
+                    <select class="iva-card-filter" id="ivaQuarterFilter" aria-label="Selecionar trimestre de IVA"></select>
+                    <div class="metric-value iva" data-bind="iva.saldo">€0,00</div>
+                    <div class="iva-period-state" data-bind="iva.estado">A carregar</div>
+                    <div class="metric-change" data-bind="iva.situacao">Sem saldo estimado</div>
+                    <div class="iva-breakdown sensitive-value">
+                        <div class="iva-breakdown-item">
+                            <span>IVA liquidado</span>
+                            <strong data-bind="iva.liquidado">€0,00</strong>
+                        </div>
+                        <div class="iva-breakdown-item">
+                            <span>IVA dedutível</span>
+                            <strong data-bind="iva.dedutivel">€0,00</strong>
+                        </div>
                     </div>
-                    <div class="iva-breakdown-item">
-                        <span>IVA dedutível</span>
-                        <strong data-bind="iva.dedutivel">€0,00</strong>
-                    </div>
+                    <div class="iva-card-meta" data-bind="iva.documentos">0 vendas · 0 compras</div>
+                    <div class="iva-card-warning" data-bind="iva.pendentes"></div>
+                    <div class="iva-card-deadline" data-bind="iva.prazo">Prazos: --/--/----</div>
                 </div>
-                <div class="iva-card-meta" data-bind="iva.documentos">0 vendas · 0 compras</div>
-                <div class="iva-card-warning" data-bind="iva.pendentes"></div>
-                <div class="iva-card-deadline" data-bind="iva.prazo">Prazos: --/--/----</div>
             </div>
         </div>
 
@@ -1804,6 +1826,7 @@
             let dadosCore = {};
             let todosEventos = [];
             let todosEventosComTimestampsCorrigidos = [];
+            let eventosFiscaisMoloni = [];
             let crmNotifications = [];
             let notificationsOpen = false;
             let deliveryCalendarDate = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
@@ -2403,6 +2426,46 @@
                     return eventoCorrigido;
                 });
             }
+
+            function criarEventosFiscaisMoloni(documentos = [], eventos = []) {
+                const pedidosPorNumero = new Map(
+                    eventos
+                        .filter(evento => evento.schema === 'pedido' && evento.payload?.numero)
+                        .map(evento => [String(evento.payload.numero).trim(), evento])
+                );
+
+                return documentos
+                    .filter(documento => ['invoice', 'invoice_receipt'].includes(documento.type) && !['error', 'cancelled', 'canceled', 'void'].includes(String(documento.state || '').toLowerCase()))
+                    .map(documento => {
+                        const pedido = pedidosPorNumero.get(String(documento.orderNumber || '').trim());
+                        if (!pedido) return null;
+                        const payloadPedido = pedido.payload || {};
+                        const totalPedido = Number(payloadPedido.total || payloadPedido.valorTotal || 0);
+                        const totalDocumento = Number(documento.value || totalPedido || 0);
+                        const proporcao = totalPedido > 0 ? Math.min(1, totalDocumento / totalPedido) : 1;
+                        const iva = Math.round((Number(payloadPedido.iva || payloadPedido.valorIVA || 0) * proporcao + Number.EPSILON) * 100) / 100;
+                        const identificador = documento.moloniDocumentId || documento.id;
+                        return {
+                            id: `moloni-fiscal-${identificador}`,
+                            schema: 'fatura_venda',
+                            created_at: documento.createdAt,
+                            timestamp: documento.updatedAt || documento.createdAt,
+                            deleted: false,
+                            payload: {
+                                dataFatura: documento.issueDate || String(documento.createdAt || '').slice(0, 10),
+                                numeroFatura: documento.number || `MOLONI-${identificador}`,
+                                tipoDocumento: documento.type === 'invoice_receipt' ? 'Fatura-recibo' : 'Fatura',
+                                subtotal: Math.max(0, totalDocumento - iva),
+                                iva,
+                                total: totalDocumento,
+                                origemLancamento: 'moloni_documento_emitido',
+                                pedidoId: pedido.id,
+                                numeroPedido: payloadPedido.numero
+                            }
+                        };
+                    })
+                    .filter(Boolean);
+            }
             
             // Solicitar TODOS os dados ao Core uma vez
             function solicitarTodosDadosAoCore() {
@@ -2418,21 +2481,24 @@
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ schema: 'config_equilibrio', limit: 1 })
-                    })
+                    }),
+                    fetch('/api/moloni/documents')
                 ])
-                .then(([response, configResponse]) => {
-                    if (!response.ok || !configResponse.ok) {
+                .then(([response, configResponse, moloniResponse]) => {
+                    if (!response.ok || !configResponse.ok || !moloniResponse.ok) {
                         throw new Error(`Erro na API: ${response.status}`);
                     }
-                    return Promise.all([response.json(), configResponse.json()]);
+                    return Promise.all([response.json(), configResponse.json(), moloniResponse.json()]);
                 })
-                .then(([result, configResult]) => {
+                .then(([result, configResult, moloniResult]) => {
                     const configEvent = (configResult.events || [])[0];
                     if (configEvent && configEvent.payload) {
                         configuracaoEquilibrio = { ...configuracaoEquilibrio, ...configEvent.payload };
                     }
                     todosEventos = result.events || [];
+                    eventosFiscaisMoloni = criarEventosFiscaisMoloni(moloniResult.documents || [], todosEventos);
                     console.log(`✅ Todos os dados recebidos da API:`, todosEventos.length, 'eventos');
+                    console.log(`✅ Documentos fiscais Moloni reconciliados:`, eventosFiscaisMoloni.length);
                     
                     if (!todosEventos || !Array.isArray(todosEventos)) {
                         console.error('❌ Dados inválidos recebidos da API');
@@ -2967,7 +3033,11 @@
                 
                 const contextoIva = contextoIvaSelecionado();
                 const resumoIva = {
-                    ...FINANCEIRO.resumoIvaTrimestral(todosEventosComTimestampsCorrigidos, contextoIva.referencia),
+                    ...FINANCEIRO.resumoIvaTrimestral(
+                        [...todosEventosComTimestampsCorrigidos, ...eventosFiscaisMoloni],
+                        contextoIva.referencia,
+                        { nifEmpresa: '301621500', validarNifDesde: '2026-07-01' }
+                    ),
                     estadoPeriodo: contextoIva.estadoPeriodo
                 };
 
@@ -3097,8 +3167,11 @@
                 if (ivaDedutivel) ivaDedutivel.textContent = formatarMoeda(dados.iva.ivaComprasDedutivel);
                 if (ivaDocumentos) ivaDocumentos.textContent = `${dados.iva.documentosVenda} documento(s) de venda · ${dados.iva.documentosCompra} de compra`;
                 if (ivaPendentes) {
-                    ivaPendentes.textContent = dados.iva.comprasPorClassificar ? `${dados.iva.comprasPorClassificar} compra(s) aguardam classificação e não foram deduzidas` : '';
-                    ivaPendentes.classList.toggle('visible', Boolean(dados.iva.comprasPorClassificar));
+                    const alertas = [];
+                    if (dados.iva.comprasPorClassificar) alertas.push(`${dados.iva.comprasPorClassificar} compra(s) aguardam classificação`);
+                    if (dados.iva.comprasNifInvalido) alertas.push(`${dados.iva.comprasNifInvalido} compra(s) sem o NIF da empresa`);
+                    ivaPendentes.textContent = alertas.length ? `${alertas.join(' · ')} — não deduzidas` : '';
+                    ivaPendentes.classList.toggle('visible', alertas.length > 0);
                 }
                 if (ivaPrazo) {
                     const apuramento = dados.iva.estadoPeriodo === 'atual' ? `Apurado até ${formatarData(dados.iva.apuradoAte)} · ` : '';

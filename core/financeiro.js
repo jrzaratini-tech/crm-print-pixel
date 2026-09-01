@@ -58,6 +58,7 @@
     function percentualIvaDedutivel(payload = {}) {
         const estadoClassificacao = textoNormalizado(`${payload.classificationStatus || ''} ${payload.categoria || ''}`);
         if (/pending|a classificar/.test(estadoClassificacao)) return 0;
+        if (payload.salaryOnly || /salario/.test(estadoClassificacao)) return 0;
         const explicito = payload.percentualIvaDedutivel ?? payload.ivaDedutivelPercentual ?? payload.percentagemIvaDedutivel;
         if (explicito !== undefined && explicito !== null && explicito !== '') return Math.min(100, Math.max(0, numero(explicito)));
         if (payload.ivaDedutivel === false || ['nao', 'não', 'false'].includes(textoNormalizado(payload.ivaDedutivel))) return 0;
@@ -68,7 +69,23 @@
         return 100;
     }
 
-    function ivaCompraDedutivel(payload = {}) {
+    function estadoNifCompra(payload = {}, regras = {}) {
+        if (payload.salaryOnly || /salario/.test(textoNormalizado(payload.categoria))) return 'salario';
+        const nifEmpresa = String(regras.nifEmpresa || '').replace(/\D/g, '');
+        if (!nifEmpresa) return 'nao_validado';
+        const nifAdquirente = String(payload.nifAdquirente || '').replace(/\D/g, '');
+        if (nifAdquirente === nifEmpresa) return 'empresa';
+        if (nifAdquirente) return 'outro_nif';
+
+        const inicioValidacao = regras.validarNifDesde ? new Date(regras.validarNifDesde) : null;
+        const dataDocumento = regras.dataDocumento ? new Date(regras.dataDocumento) : null;
+        if (inicioValidacao && dataDocumento && !Number.isNaN(dataDocumento.getTime()) && dataDocumento < inicioValidacao) return 'legado_sem_nif';
+        return 'sem_nif';
+    }
+
+    function ivaCompraDedutivel(payload = {}, regras = {}) {
+        const estadoNif = estadoNifCompra(payload, regras);
+        if (['salario', 'outro_nif', 'sem_nif'].includes(estadoNif)) return 0;
         return arredondarCentimos(ivaRegistado(payload) * (percentualIvaDedutivel(payload) / 100));
     }
 
@@ -116,10 +133,16 @@
 
     function chaveFiscal(evento = {}) {
         const payload = evento.payload || {};
-        const numeroDocumento = textoNormalizado(payload.numeroFatura || payload.numeroDocumento);
+        const numeroDocumento = textoNormalizado(payload.numeroFatura || payload.numeroDocumento).replace(/[^a-z0-9]/g, '');
         const nif = String(payload.nifEmitente || payload.nifFornecedor || '').replace(/\D/g, '');
-        if (numeroDocumento) return `${evento.schema === 'despesa' ? 'c' : 'v'}|${nif}|${numeroDocumento}`;
+        if (numeroDocumento) return evento.schema === 'despesa' ? `c|${nif}|${numeroDocumento}` : `v|${numeroDocumento}`;
         return evento.id ? `id|${evento.id}` : null;
+    }
+
+    function documentoAnulado(evento = {}) {
+        const payload = evento.payload || {};
+        const estado = textoNormalizado(`${payload.status || ''} ${payload.estado || ''} ${payload.statusDocumento || ''}`);
+        return /anulad|cancelad|void/.test(estado);
     }
 
     function semDuplicados(eventos = []) {
@@ -133,19 +156,22 @@
         });
     }
 
-    function resumoIvaTrimestral(eventos = [], referencia = new Date()) {
+    function resumoIvaTrimestral(eventos = [], referencia = new Date(), regras = {}) {
         const periodo = trimestreFiscal(referencia);
         const eventosDoPeriodo = eventos.filter(evento => {
-            if (!evento || evento.deleted) return false;
+            if (!evento || evento.deleted || documentoAnulado(evento)) return false;
             const data = dataDoEvento(evento);
             return !Number.isNaN(data.getTime()) && data >= periodo.inicio && data <= periodo.fim;
         });
         const faturasVenda = eventosDoPeriodo.filter(evento => evento.schema === 'fatura_venda');
         const pedidosComFatura = eventosDoPeriodo.filter(pedidoFaturado);
-        const vendas = semDuplicados([...faturasVenda, ...pedidosComFatura]);
+        // Havendo documentos fiscais emitidos, eles são a fonte de verdade.
+        // Pedidos com anotações de faturação servem apenas para períodos legados.
+        const vendas = semDuplicados(faturasVenda.length ? faturasVenda : pedidosComFatura);
         const compras = semDuplicados(eventosDoPeriodo.filter(evento => evento.schema === 'despesa'));
         const ivaVendas = arredondarCentimos(vendas.reduce((soma, evento) => soma + ivaRegistado(evento.payload), 0));
-        const ivaComprasDedutivel = arredondarCentimos(compras.reduce((soma, evento) => soma + ivaCompraDedutivel(evento.payload), 0));
+        const regrasCompra = evento => ({ ...regras, dataDocumento: dataDoEvento(evento) });
+        const ivaComprasDedutivel = arredondarCentimos(compras.reduce((soma, evento) => soma + ivaCompraDedutivel(evento.payload, regrasCompra(evento)), 0));
         const saldo = arredondarCentimos(ivaVendas - ivaComprasDedutivel);
         const dataReferencia = referencia instanceof Date ? referencia : new Date(referencia);
         return {
@@ -160,6 +186,8 @@
                 const payload = evento.payload || {};
                 return ivaRegistado(payload) !== 0 && /pending|a classificar/.test(textoNormalizado(`${payload.classificationStatus || ''} ${payload.categoria || ''}`));
             }).length,
+            comprasNifInvalido: compras.filter(evento => ['outro_nif', 'sem_nif'].includes(estadoNifCompra(evento.payload, regrasCompra(evento))) && ivaRegistado(evento.payload) !== 0).length,
+            comprasLegadoSemNif: compras.filter(evento => estadoNifCompra(evento.payload, regrasCompra(evento)) === 'legado_sem_nif' && ivaRegistado(evento.payload) !== 0).length,
             apuradoAte: dataReferencia < periodo.fim ? dataReferencia : periodo.fim,
             situacao: saldo > 0 ? 'pagar' : saldo < 0 ? 'receber' : 'equilibrado'
         };
@@ -171,6 +199,7 @@
         totalComIva,
         ivaRegistado,
         percentualIvaDedutivel,
+        estadoNifCompra,
         ivaCompraDedutivel,
         trimestreFiscal,
         resumoIvaTrimestral
