@@ -2264,14 +2264,13 @@
                     // Se houver uma data específica no payload (para pedidos e despesas), use-a
                     let dataParaFiltragem = timestampCriacao;
                     
-                    // Para pedidos: priorizar data do pedido se existir
-                    if (evento.schema === 'pedido' && evento.payload?.dataPedido) {
+                    // Usar a data fiscal do documento, mesmo quando ele for importado depois.
+                    if (evento.schema === 'fatura_venda' && evento.payload?.dataFatura) {
+                        dataParaFiltragem = evento.payload.dataFatura;
+                    } else if (evento.schema === 'pedido' && evento.payload?.dataPedido) {
                         dataParaFiltragem = evento.payload.dataPedido;
-                    }
-                    
-                    // Para despesas: priorizar data da despesa se existir
-                    if (evento.schema === 'despesa' && (evento.payload?.dataCompra || evento.payload?.dataDespesa)) {
-                        dataParaFiltragem = evento.payload.dataCompra || evento.payload.dataDespesa;
+                    } else if (evento.schema === 'despesa' && (evento.payload?.dataCompra || evento.payload?.dataDespesa || evento.payload?.dataFatura)) {
+                        dataParaFiltragem = evento.payload.dataCompra || evento.payload.dataDespesa || evento.payload.dataFatura;
                     }
                     
                     // Adicionar campo especial para filtragem que NUNCA muda
@@ -2961,10 +2960,11 @@
                             : `Sem saldo estimado - ${dados.iva.trimestre}.º trimestre`;
                 }
                 if (ivaDetalhe) {
-                    ivaDetalhe.textContent = `IVA vendas: ${formatarMoeda(dados.iva.ivaVendas)} | IVA dedutível: ${formatarMoeda(dados.iva.ivaComprasDedutivel)}`;
+                    const pendentes = dados.iva.comprasPorClassificar ? ` | Por classificar: ${dados.iva.comprasPorClassificar}` : '';
+                    ivaDetalhe.textContent = `IVA vendas: ${formatarMoeda(dados.iva.ivaVendas)} (${dados.iva.documentosVenda} doc.) | IVA dedutível: ${formatarMoeda(dados.iva.ivaComprasDedutivel)} (${dados.iva.documentosCompra} doc.)${pendentes}`;
                 }
                 if (ivaPrazo) {
-                    ivaPrazo.textContent = `Declaração até ${formatarData(dados.iva.entregaDeclaracao)} | Pagamento até ${formatarData(dados.iva.pagamento)}`;
+                    ivaPrazo.textContent = `Apurado até ${formatarData(dados.iva.apuradoAte)} · Declaração ${formatarData(dados.iva.entregaDeclaracao)} · Pagamento ${formatarData(dados.iva.pagamento)}`;
                 }
                 
                 // Atualizar variações
@@ -3426,7 +3426,6 @@
             inicializar();
             
             // Atualizar dados a cada 30 segundos
-            setInterval(solicitarTodosDadosAoCore, 30000);
             
             // Forçar solicitação inicial após 1 segundo
             setTimeout(solicitarTodosDadosAoCore, 1000);

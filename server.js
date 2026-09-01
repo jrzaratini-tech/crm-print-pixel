@@ -1402,14 +1402,26 @@ function expenseSupplierNif(payload = {}) {
   return digits(payload.nifFornecedor || payload.nifEmitente || payload.nif || payload.fornecedorNif);
 }
 
+function supplierVatDeductionPercentage(supplier = {}) {
+  const explicit = supplier.percentualIvaDedutivel ?? supplier.ivaDedutivelPercentual;
+  if (explicit !== undefined && explicit !== null && explicit !== '') return Math.min(100, Math.max(0, money(explicit)));
+  if (supplier.ivaDedutivel === false) return 0;
+  const classification = `${supplier.category || ''} ${supplier.expenseType || ''}`.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  if (/combustivel|gasoleo|diesel/.test(classification)) return 50;
+  if (/alimentacao|restaurante|refeicao|cafe/.test(classification)) return 0;
+  return 100;
+}
+
 function applySupplierToExpensePayload(payload = {}, supplier = {}, now = new Date().toISOString()) {
+  const percentualIvaDedutivel = supplierVatDeductionPercentage(supplier);
   return {
     ...payload,
     fornecedor: supplier.name,
     nifFornecedor: supplier.nif,
     categoria: supplier.category,
     tipoDespesa: supplier.expenseType,
-    ivaDedutivel: supplier.ivaDedutivel !== false,
+    ivaDedutivel: percentualIvaDedutivel > 0,
+    percentualIvaDedutivel,
     supplierId: supplier.id,
     classificationStatus: 'classified',
     classificationSource: 'supplier_nif',
@@ -1426,7 +1438,7 @@ function expenseHasSupplierClassification(payload = {}, supplier = {}) {
     && expenseSupplierNif(payload) === supplier.nif
     && text(payload.categoria, 80).toUpperCase() === supplier.category
     && text(payload.tipoDespesa, 80) === supplier.expenseType
-    && (payload.ivaDedutivel !== false) === (supplier.ivaDedutivel !== false);
+    && money(payload.percentualIvaDedutivel ?? (payload.ivaDedutivel === false ? 0 : 100)) === supplierVatDeductionPercentage(supplier);
 }
 
 async function classifyExpensePayloadByKnownSupplier(payload = {}, now = new Date().toISOString()) {
@@ -1488,15 +1500,21 @@ async function classifyExpensesByKnownSuppliers(now = new Date().toISOString()) 
 
 
 function normalizeSupplierPayload(body = {}) {
-  return {
+  const normalized = {
     name: text(body.name || body.nome || body.fornecedor, 160),
     nif: digits(body.nif || body.nifFornecedor),
     category: text(body.category || body.categoria || 'OUTROS', 80).toUpperCase(),
     expenseType: text(body.expenseType || body.tipoDespesa || 'geral', 80),
-    ivaDedutivel: body.ivaDedutivel !== false,
     notes: text(body.notes || body.observacoes, 500),
     active: body.active !== false
   };
+  normalized.percentualIvaDedutivel = supplierVatDeductionPercentage({
+    ...normalized,
+    ivaDedutivel: body.ivaDedutivel,
+    percentualIvaDedutivel: body.percentualIvaDedutivel
+  });
+  normalized.ivaDedutivel = normalized.percentualIvaDedutivel > 0;
+  return normalized;
 }
 
 function productSlug(value) {
@@ -3882,6 +3900,7 @@ async function saveSupplierFromClassification(body = {}, fallbackPayload = {}) {
     category: body.category || body.categoria || fallbackPayload.categoria,
     expenseType: body.expenseType || body.tipoDespesa || fallbackPayload.tipoDespesa,
     ivaDedutivel: body.ivaDedutivel,
+    percentualIvaDedutivel: body.percentualIvaDedutivel,
     notes: body.notes || ''
   });
   if (!supplierPayload.name || !/^\d{9}$/.test(supplierPayload.nif)) {

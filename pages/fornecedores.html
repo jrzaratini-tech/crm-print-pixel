@@ -17,7 +17,7 @@
         <label>NIF<input id="nif" required maxlength="20"></label>
         <label>Categoria<select id="category"></select></label>
         <label>Tipo de despesa<input id="expenseType" maxlength="80" placeholder="Ex: material, combustível"></label>
-        <label>IVA dedutível<select id="ivaDedutivel"><option value="true">Sim</option><option value="false">Não</option></select></label>
+        <label>IVA dedutível<select id="percentualIvaDedutivel"><option value="100">100% — uso profissional</option><option value="50">50% — gasóleo/uso misto</option><option value="0">0% — não dedutível</option></select></label>
         <label>Observações<input id="notes" maxlength="500"></label>
         <button class="btn" type="submit">Salvar fornecedor</button>
       </form>
@@ -30,8 +30,8 @@
     const $ = id => document.getElementById(id);
     const category = $('category'); CATEGORIES.forEach(item => category.add(new Option(item, item)));
     async function api(path, options={}){const r=await fetch(path,{...options,headers:{'Content-Type':'application/json',...(options.headers||{})}});const b=await r.json();if(!r.ok)throw new Error(b.message||'Erro');return b;}
-    async function load(){const result=await api('/api/suppliers');const list=$('list');list.replaceChildren();if(!result.suppliers.length){list.textContent='Nenhum fornecedor cadastrado.';return;}result.suppliers.forEach(s=>{const row=document.createElement('div');row.className='row';row.innerHTML=`<div><strong>${s.name}</strong><small>NIF ${s.nif} · ${s.category} · ${s.expenseType||'geral'} · IVA ${s.ivaDedutivel===false?'não dedutível':'dedutível'}</small></div><button class="btn danger">Excluir</button>`;row.querySelector('button').onclick=async()=>{if(confirm('Excluir fornecedor?')){await api('/api/suppliers/'+s.id+'/delete',{method:'POST'});await load();}};list.append(row);});}
-    $('supplierForm').addEventListener('submit',async e=>{e.preventDefault();try{await api('/api/suppliers',{method:'POST',body:JSON.stringify({name:$('name').value,nif:$('nif').value,category:$('category').value,expenseType:$('expenseType').value,ivaDedutivel:$('ivaDedutivel').value==='true',notes:$('notes').value})});$('supplierForm').reset();$('message').textContent='Fornecedor salvo.';await load();}catch(error){$('message').textContent=error.message;}});
+    async function load(){const result=await api('/api/suppliers');const list=$('list');list.replaceChildren();if(!result.suppliers.length){list.textContent='Nenhum fornecedor cadastrado.';return;}result.suppliers.forEach(s=>{const percentual=s.percentualIvaDedutivel ?? (s.ivaDedutivel===false?0:100);const row=document.createElement('div');row.className='row';row.innerHTML=`<div><strong>${s.name}</strong><small>NIF ${s.nif} · ${s.category} · ${s.expenseType||'geral'} · IVA dedutível ${percentual}%</small></div><button class="btn danger">Excluir</button>`;row.querySelector('button').onclick=async()=>{if(confirm('Excluir fornecedor?')){await api('/api/suppliers/'+s.id+'/delete',{method:'POST'});await load();}};list.append(row);});}
+    $('supplierForm').addEventListener('submit',async e=>{e.preventDefault();try{const percentual=Number($('percentualIvaDedutivel').value);await api('/api/suppliers',{method:'POST',body:JSON.stringify({name:$('name').value,nif:$('nif').value,category:$('category').value,expenseType:$('expenseType').value,ivaDedutivel:percentual>0,percentualIvaDedutivel:percentual,notes:$('notes').value})});$('supplierForm').reset();$('message').textContent='Fornecedor salvo.';await load();}catch(error){$('message').textContent=error.message;}});
     load().catch(error=>$('message').textContent=error.message);
   </script>
 </body>
