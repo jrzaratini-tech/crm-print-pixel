@@ -1859,7 +1859,8 @@
                 const trimestreAtual = Math.floor(new Date().getMonth() / 3) + 1;
                 ivaQuarterFilter.replaceChildren();
                 for (let trimestre = 1; trimestre <= 4; trimestre += 1) {
-                    const estado = trimestre < trimestreAtual ? 'Encerrado' : trimestre === trimestreAtual ? 'Atual' : 'Próximo';
+                    const declarado = todosEventos.some(evento => !evento.deleted && evento.schema === 'iva_declaracao' && Number(evento.payload?.ano) === anoIvaSelecionado && Number(evento.payload?.trimestre) === trimestre);
+                    const estado = declarado ? 'Declarado' : trimestre < trimestreAtual ? 'Encerrado' : trimestre === trimestreAtual ? 'Atual' : 'Próximo';
                     const option = new Option(`${trimestre}.º trimestre ${anoIvaSelecionado} · ${estado}`, String(trimestre));
                     option.selected = trimestre === trimestreIvaSelecionado;
                     ivaQuarterFilter.add(option);
@@ -2497,6 +2498,7 @@
                     }
                     todosEventos = result.events || [];
                     eventosFiscaisMoloni = criarEventosFiscaisMoloni(moloniResult.documents || [], todosEventos);
+                    configurarFiltroIva();
                     console.log(`✅ Todos os dados recebidos da API:`, todosEventos.length, 'eventos');
                     console.log(`✅ Documentos fiscais Moloni reconciliados:`, eventosFiscaisMoloni.length);
                     
@@ -3032,7 +3034,7 @@
                 }
                 
                 const contextoIva = contextoIvaSelecionado();
-                const resumoIva = {
+                let resumoIva = {
                     ...FINANCEIRO.resumoIvaTrimestral(
                         [...todosEventosComTimestampsCorrigidos, ...eventosFiscaisMoloni],
                         contextoIva.referencia,
@@ -3040,6 +3042,25 @@
                     ),
                     estadoPeriodo: contextoIva.estadoPeriodo
                 };
+                const declaracaoOficial = todosEventos
+                    .filter(evento => !evento.deleted && evento.schema === 'iva_declaracao' && Number(evento.payload?.ano) === anoIvaSelecionado && Number(evento.payload?.trimestre) === trimestreIvaSelecionado)
+                    .sort((a, b) => new Date(b.updated_at || b.created_at || 0) - new Date(a.updated_at || a.created_at || 0))[0];
+                if (declaracaoOficial?.payload) {
+                    const oficial = declaracaoOficial.payload;
+                    resumoIva = {
+                        ...resumoIva,
+                        ivaVendas: Number(oficial.ivaVendas || 0),
+                        ivaComprasDedutivel: Number(oficial.ivaComprasDedutivel || 0),
+                        saldo: Number(oficial.saldo || 0),
+                        situacao: Number(oficial.saldo || 0) > 0 ? 'pagar' : Number(oficial.saldo || 0) < 0 ? 'receber' : 'equilibrado',
+                        estadoPeriodo: 'declarado',
+                        apuramentoOficial: true,
+                        entregueEm: new Date(oficial.entregueEm),
+                        referenciaOficial: oficial.referencia || 'Declaração entregue',
+                        comprasPorClassificar: 0,
+                        comprasNifInvalido: 0
+                    };
+                }
 
                 return {
                     vendas: {
@@ -3155,17 +3176,17 @@
                 const formatarData = data => new Intl.DateTimeFormat('pt-PT').format(data);
                 if (ivaSaldo) ivaSaldo.textContent = formatarMoeda(Math.abs(dados.iva.saldo));
                 if (ivaSituacao) {
-                    const prefixo = dados.iva.estadoPeriodo === 'atual' ? 'Estimativa' : dados.iva.estadoPeriodo === 'futuro' ? 'Projeção' : 'Apuramento';
+                    const prefixo = dados.iva.estadoPeriodo === 'declarado' ? 'Valor oficial' : dados.iva.estadoPeriodo === 'atual' ? 'Estimativa' : dados.iva.estadoPeriodo === 'futuro' ? 'Projeção' : 'Apuramento';
                     ivaSituacao.textContent = dados.iva.situacao === 'pagar'
                         ? `${prefixo} a pagar`
                         : dados.iva.situacao === 'receber'
                             ? `${prefixo} de crédito a recuperar`
                             : dados.iva.estadoPeriodo === 'futuro' ? 'Ainda sem movimentos fiscais' : 'Sem saldo de IVA';
                 }
-                if (ivaEstado) ivaEstado.textContent = dados.iva.estadoPeriodo === 'atual' ? 'Estimativa até hoje' : dados.iva.estadoPeriodo === 'encerrado' ? 'Período encerrado' : 'Ainda não iniciado';
+                if (ivaEstado) ivaEstado.textContent = dados.iva.estadoPeriodo === 'declarado' ? 'Declaração entregue' : dados.iva.estadoPeriodo === 'atual' ? 'Estimativa até hoje' : dados.iva.estadoPeriodo === 'encerrado' ? 'Período encerrado' : 'Ainda não iniciado';
                 if (ivaLiquidado) ivaLiquidado.textContent = formatarMoeda(dados.iva.ivaVendas);
                 if (ivaDedutivel) ivaDedutivel.textContent = formatarMoeda(dados.iva.ivaComprasDedutivel);
-                if (ivaDocumentos) ivaDocumentos.textContent = `${dados.iva.documentosVenda} documento(s) de venda · ${dados.iva.documentosCompra} de compra`;
+                if (ivaDocumentos) ivaDocumentos.textContent = dados.iva.apuramentoOficial ? dados.iva.referenciaOficial : `${dados.iva.documentosVenda} documento(s) de venda · ${dados.iva.documentosCompra} de compra`;
                 if (ivaPendentes) {
                     const alertas = [];
                     if (dados.iva.comprasPorClassificar) alertas.push(`${dados.iva.comprasPorClassificar} compra(s) aguardam classificação`);
@@ -3174,8 +3195,12 @@
                     ivaPendentes.classList.toggle('visible', alertas.length > 0);
                 }
                 if (ivaPrazo) {
-                    const apuramento = dados.iva.estadoPeriodo === 'atual' ? `Apurado até ${formatarData(dados.iva.apuradoAte)} · ` : '';
-                    ivaPrazo.textContent = `${apuramento}Declaração até ${formatarData(dados.iva.entregaDeclaracao)} · Pagamento até ${formatarData(dados.iva.pagamento)}`;
+                    if (dados.iva.apuramentoOficial) {
+                        ivaPrazo.textContent = `Entregue em ${formatarData(dados.iva.entregueEm)} · Pagamento até ${formatarData(dados.iva.pagamento)}`;
+                    } else {
+                        const apuramento = dados.iva.estadoPeriodo === 'atual' ? `Apurado até ${formatarData(dados.iva.apuradoAte)} · ` : '';
+                        ivaPrazo.textContent = `${apuramento}Declaração até ${formatarData(dados.iva.entregaDeclaracao)} · Pagamento até ${formatarData(dados.iva.pagamento)}`;
+                    }
                 }
                 
                 // Atualizar variações
