@@ -4,6 +4,7 @@ const {
   MoloniClient,
   buildDocumentPreview,
   classifyLineNature,
+  createMoloniTokenProvider,
   flattenForm,
   isMoloniAuthExpiredError,
   moloniApiErrors,
@@ -12,6 +13,39 @@ const {
   paidPayments,
   recommendDocumentAction
 } = require('../core/moloni.js');
+
+test('partilha uma unica renovacao Moloni entre pedidos simultaneos', async () => {
+  let calls = 0;
+  let release;
+  const provider = createMoloniTokenProvider(async () => {
+    calls++;
+    await new Promise(resolve => { release = resolve; });
+    return 'renovado';
+  });
+  const first = provider();
+  const second = provider();
+  await Promise.resolve();
+  assert.equal(calls, 1);
+  release();
+  assert.deepEqual(await Promise.all([first, second]), ['renovado', 'renovado']);
+  const next = provider();
+  await Promise.resolve();
+  assert.equal(calls, 2);
+  release();
+  await next;
+});
+
+test('permite nova tentativa depois de falhar a renovacao Moloni', async () => {
+  let calls = 0;
+  const provider = createMoloniTokenProvider(async () => {
+    if (++calls === 1) throw new Error('Falha temporaria');
+    return 'recuperado';
+  });
+  const results = await Promise.allSettled([provider(), provider()]);
+  assert.equal(calls, 1);
+  assert.ok(results.every(result => result.status === 'rejected'));
+  assert.equal(await provider(), 'recuperado');
+});
 
 const order = {
   id: 'pedido-1',

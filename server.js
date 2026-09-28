@@ -10,6 +10,7 @@ const {
   MoloniClient,
   buildDocumentPreview,
   cleanText: moloniText,
+  createMoloniTokenProvider,
   isMoloniAuthExpiredError,
   moloniDocumentResult,
   oauthAuthorizationUrl,
@@ -474,7 +475,7 @@ async function exchangeMoloniGrant(params) {
   return body;
 }
 
-async function moloniAccessToken() {
+const moloniAccessToken = createMoloniTokenProvider(async () => {
   const config = await moloniConfig();
   let tokens;
   try {
@@ -497,7 +498,7 @@ async function moloniAccessToken() {
     });
   } catch (error) {
     if (isMoloniAuthExpiredError(error)) {
-      await saveMoloniConfig({ tokens: null, connectedAt: null });
+      await saveMoloniConfig({ tokens: null, connectedAt: null, connectionError: 'A autorizacao Moloni expirou. Clique em Ligar Moloni para voltar a autorizar a conta.' });
       throw new Error('A autorizacao Moloni expirou. Volte a ligar a conta.');
     }
     throw error;
@@ -506,9 +507,9 @@ async function moloniAccessToken() {
     ...refreshed,
     expires_at: Date.now() + Number(refreshed.expires_in || 3600) * 1000
   };
-  await saveMoloniConfig({ tokens: encryptMoloniTokens(nextTokens), connectedAt: new Date().toISOString() });
+  await saveMoloniConfig({ tokens: encryptMoloniTokens(nextTokens), connectedAt: new Date().toISOString(), connectionError: '' });
   return nextTokens.access_token;
-}
+});
 
 async function moloniOrder(orderId) {
   const snapshot = await db.collection('events').doc(String(orderId || '')).get();
@@ -525,7 +526,7 @@ async function moloniDocuments() {
 
 function moloniPublicStatus(config = {}) {
   let connected = false;
-  let connectionError = '';
+  let connectionError = config.connectionError || '';
   if (config.tokens) {
     try {
       connected = Boolean(decryptMoloniTokens(config.tokens)?.access_token);
@@ -2672,6 +2673,7 @@ app.get('/api/moloni/oauth/callback', async (req, res) => {
     };
     await saveMoloniConfig({
       tokens: encryptMoloniTokens(tokens),
+      connectionError: '',
       connectedAt: new Date().toISOString()
     });
     res.redirect('/pages/faturacao.html?moloni=connected');
@@ -3291,7 +3293,24 @@ app.post('/api/stripe/webhook', async (req, res) => {
 
 app.get('/api/moloni/status', async (req, res) => {
   try {
-    res.json({ success: true, ...moloniPublicStatus(await moloniConfig()) });
+    let config = await moloniConfig();
+    let connectionError = '';
+    if (MOLONI_MODE === 'live' && config.tokens) {
+      try {
+        await moloniAccessToken();
+      } catch (error) {
+        connectionError = error.message;
+      }
+      config = await moloniConfig();
+    }
+    const status = moloniPublicStatus(config);
+    if (connectionError) {
+      status.connected = false;
+      status.readyForLive = false;
+      status.connectionError = connectionError;
+      status.checklist.find(item => item.key === 'connected').ok = false;
+    }
+    res.json({ success: true, ...status });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Nao foi possivel consultar a configuracao Moloni.' });
   }
@@ -3316,7 +3335,7 @@ app.get('/api/moloni/oauth/start', async (req, res) => {
 });
 
 app.post('/api/moloni/disconnect', async (req, res) => {
-  await saveMoloniConfig({ tokens: null, connectedAt: null });
+  await saveMoloniConfig({ tokens: null, connectedAt: null, connectionError: '' });
   res.json({ success: true });
 });
 

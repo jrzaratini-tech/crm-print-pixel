@@ -358,6 +358,18 @@ function isMoloniAuthExpiredError(error) {
     || /autori[sz]a[cç][aã]o moloni expir/.test(text);
 }
 
+// Share token renewal across concurrent requests in this server process.
+// Always release the promise after failure so the next request can retry.
+function createMoloniTokenProvider(loadToken) {
+  let pending;
+  return function accessToken() {
+    if (!pending) {
+      pending = Promise.resolve().then(loadToken).finally(() => { pending = null; });
+    }
+    return pending;
+  };
+}
+
 function oauthAuthorizationUrl({ clientId, redirectUri, state }) {
   const url = new URL(MOLONI_OAUTH_URL);
   url.searchParams.set('response_type', 'code');
@@ -401,6 +413,7 @@ module.exports = {
   buildDocumentPreview,
   cleanText,
   classifyLineNature,
+  createMoloniTokenProvider,
   documentLabel,
   flattenForm,
   isMoloniAuthExpiredError,
