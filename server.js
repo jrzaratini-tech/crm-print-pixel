@@ -1013,7 +1013,7 @@ async function ensureMoloniCustomer(client, preview, config) {
   const matches = await client.call('customers/getByVat', {
     company_id: Number(config.companyId),
     vat
-  }).catch(() => []);
+  });
   const existingCustomers = Array.isArray(matches) ? matches : [matches];
   const existingId = moloniCustomerId(existingCustomers.find(customer => moloniCustomerId(customer)) || {});
   if (existingId) return existingId;

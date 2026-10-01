@@ -7,6 +7,7 @@ const {
   createMoloniTokenProvider,
   flattenForm,
   isMoloniAuthExpiredError,
+  isValidPortugueseVat,
   moloniApiErrors,
   moloniDocumentResult,
   orderTotals,
@@ -59,6 +60,17 @@ const order = {
     { id: 'pag-2', status: 'pendente', valor: 700, data: '2026-06-22', formaPagamento: 'dinheiro' }
   ]
 };
+
+test('bloqueia NIF com digito de controlo invalido antes de emitir', () => {
+  const preview = buildDocumentPreview({ order: { ...order, nif: '507073747' }, type: 'invoice' });
+  assert.equal(preview.valid, false);
+  assert.match(preview.errors.join(' '), /NIF 507073747 e invalido/);
+  assert.equal(isValidPortugueseVat('123456789'), true);
+  assert.equal(isValidPortugueseVat('999999990'), true);
+  assert.equal(isValidPortugueseVat('000000000'), false);
+  assert.equal(isValidPortugueseVat('123'), false);
+  assert.equal(buildDocumentPreview({ order: { ...order, nif: '' }, type: 'invoice' }).valid, true);
+});
 
 test('calcula pagamentos e saldo do pedido', () => {
   assert.equal(paidPayments(order).length, 1);

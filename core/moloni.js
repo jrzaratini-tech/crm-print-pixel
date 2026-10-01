@@ -50,11 +50,20 @@ function selectPayment(order, paymentId) {
   return payments.find(payment => payment.id === paymentId) || null;
 }
 
+function isValidPortugueseVat(value) {
+  const vat = String(value || '');
+  if (!/^[1235689]\d{8}$/.test(vat)) return false;
+  const sum = [...vat.slice(0, 8)].reduce((total, digit, index) => total + Number(digit) * (9 - index), 0);
+  const check = 11 - sum % 11;
+  return Number(vat[8]) === (check >= 10 ? 0 : check);
+}
+
 function validateFiscalOrder(order = {}) {
   const errors = [];
   if (!cleanText(order.cliente)) errors.push('Nome do cliente em falta.');
   const nif = cleanText(order.nif).replace(/\D/g, '');
   if (nif && !/^\d{9}$/.test(nif)) errors.push('O NIF deve ter 9 digitos.');
+  else if (nif && !isValidPortugueseVat(nif)) errors.push(`O NIF ${nif} e invalido. Confirme o NIF do cliente e corrija o pedido antes de faturar.`);
   if (!Array.isArray(order.produtos) || !order.produtos.length) errors.push('O pedido nao tem produtos.');
   if (!(roundMoney(order.total) > 0)) errors.push('O total do pedido deve ser superior a zero.');
   return errors;
@@ -417,6 +426,7 @@ module.exports = {
   documentLabel,
   flattenForm,
   isMoloniAuthExpiredError,
+  isValidPortugueseVat,
   moloniApiErrors,
   moloniDocumentResult,
   oauthAuthorizationUrl,
