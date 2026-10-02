@@ -20,13 +20,14 @@
     .form-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:12px}.nutrition-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-top:12px}.choice{margin-top:12px}label{display:grid;gap:6px;font-weight:700;color:#34423d}
     input,select,textarea{width:100%;border:1px solid #cfcfc8;border-radius:10px;padding:12px;background:#fff;font:inherit}textarea{min-height:80px;resize:vertical}
     .cart-row,.order{border:1px solid var(--line);border-radius:13px;padding:14px;margin-top:10px}.cart-row{display:grid;grid-template-columns:1fr auto;gap:12px}.muted{color:var(--muted)}.money{font-weight:800}
+    .month-card{border:1px solid var(--line);border-radius:16px;overflow:hidden;margin-top:14px}.month-head{display:flex;justify-content:space-between;gap:16px;align-items:center;padding:17px;background:linear-gradient(135deg,#edf5f1,#fff)}.month-name{font-size:20px;font-weight:850;text-transform:capitalize}.month-due{text-align:right}.month-due .money{display:block;font-size:22px;color:var(--red)}.month-record{padding:15px 17px;border-top:1px solid var(--line)}.month-record .summary{margin:12px 0 0}.open-note{display:inline-block;padding:5px 9px;border-radius:999px;background:#fff2c9;color:#745800;font-size:12px;font-weight:800}
     .summary{display:flex;justify-content:flex-end;gap:24px;flex-wrap:wrap;margin:18px 0}.summary div{min-width:110px}.summary small{display:block;color:var(--muted)}
     .order-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.order-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.status{display:inline-block;border-radius:999px;padding:5px 9px;background:#fff2c9;color:#745800;font-size:12px;font-weight:800}
     .plan{border-left:5px solid var(--green2);background:linear-gradient(90deg,#f1f8f4,#fff 38%)}.plan-name{color:var(--green2);font-weight:850}
     .status.concluido,.status.entregue{background:#dcf4e7;color:#17603f}.status.processamento{background:#ddebfa;color:#235b8d}.status.cancelado{background:#f8dddd;color:#8d2828}
     .order-items{margin:10px 0 0;padding-left:18px}.hidden{display:none!important}.empty{text-align:center;color:var(--muted);padding:28px}.message{padding:12px;border-radius:10px;margin:12px 0;background:#e8f4ee;color:#175b3d;font-weight:700}.message.error{background:#f9e2df;color:#8e2c24}
     @media(max-width:800px){.templates{grid-template-columns:repeat(2,minmax(0,1fr))}.form-grid{grid-template-columns:1fr 1fr}.form-grid label:first-child{grid-column:1/-1}.nutrition-grid{grid-template-columns:repeat(2,1fr)}}
-    @media(max-width:520px){header{padding:19px 8px}.wrap{width:min(100% - 18px,1120px)}.templates{grid-template-columns:1fr 1fr;gap:8px}.template{padding:7px}.template img{height:145px}.panel{padding:14px}.form-grid,.nutrition-grid{grid-template-columns:1fr}.form-grid label:first-child{grid-column:auto}.cart-row{grid-template-columns:1fr}.order-head{display:block}}
+    @media(max-width:520px){header{padding:19px 8px}.wrap{width:min(100% - 18px,1120px)}.templates{grid-template-columns:1fr 1fr;gap:8px}.template{padding:7px}.template img{height:145px}.panel{padding:14px}.form-grid,.nutrition-grid{grid-template-columns:1fr}.form-grid label:first-child{grid-column:auto}.cart-row{grid-template-columns:1fr}.order-head,.month-head{display:block}.month-due{text-align:left;margin-top:10px}}
   </style>
 </head>
 <body>
@@ -74,12 +75,12 @@
       </div>
     </section>
     <section id="historyView" class="hidden">
-      <div class="panel"><h2>Histórico e pagamentos</h2><div id="orders"></div></div>
+      <div class="panel"><h2>Valores mensais em aberto</h2><p class="muted">Aqui aparecem apenas os meses que ainda têm valor a pagar.</p><div id="orders"></div></div>
     </section>
   </main>
   <script>
     const token = new URLSearchParams(location.search).get('token') || '';
-    const state = { customer: null, templates: [], orders: [], cart: [], selectedTemplate: null };
+    const state = { customer: null, templates: [], orders: [], months: [], cart: [], selectedTemplate: null };
     const euro = value => new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR'}).format(Number(value)||0);
     const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
     const nutritionText = nutrition => nutrition?.enabled?`Kcal: ${nutrition.kcal} · Proteína: ${nutrition.protein}g · Hidratos: ${nutrition.carbs}g · Gorduras: ${nutrition.fat}g · Fibras: ${nutrition.fiber}g`:'';
@@ -128,14 +129,14 @@
       const totals=cartTotals();document.getElementById('subtotal').textContent=euro(totals.subtotal);document.getElementById('vat').textContent=euro(totals.vat);document.getElementById('total').textContent=euro(totals.total);
     }
     function renderOrders(){
-      document.getElementById('orders').innerHTML=state.orders.length?state.orders.map(order=>`
-        <article class="order ${order.recordType==='platform_fee'?'plan':''}">
-          <div class="order-head"><div><div class="${order.recordType==='platform_fee'?'plan-name':''}">${escapeHtml(order.title)}</div><strong>${escapeHtml(order.numero)}</strong><div class="muted">${new Date(order.data+'T12:00:00').toLocaleDateString('pt-PT')}</div></div><div class="order-actions"><span class="status ${escapeHtml(order.status)}">${order.paid?'pago':escapeHtml(order.status)}</span>${order.canHide?`<button class="btn secondary" data-hide="${order.id}">Remover do histórico</button>`:''}</div></div>
+      document.getElementById('orders').innerHTML=state.months.length?state.months.map(month=>`
+        <article class="month-card">
+          <div class="month-head"><div><div class="month-name">${escapeHtml(month.billingMonthName)}</div><div class="muted">${month.records.length} ${month.records.length===1?'registo':'registos'} neste mês</div></div><div class="month-due"><small>Valor em aberto</small><span class="money">${euro(month.saldoPendente)}</span><span class="open-note">A aguardar pagamento</span></div></div>
+          ${month.records.map(order=>`<div class="month-record"><div class="order-head"><div><div class="${order.recordType==='platform_fee'?'plan-name':''}">${escapeHtml(order.title)}</div><strong>${escapeHtml(order.numero)}</strong><div class="muted">${new Date(order.data+'T12:00:00').toLocaleDateString('pt-PT')}</div></div>${order.recordType==='platform_fee'?'':`<span class="status ${escapeHtml(order.status)}">${escapeHtml(order.status)}</span>`}</div>
           <ul class="order-items">${order.produtos.map(item=>`<li>${escapeHtml(item.nome)}${order.recordType==='platform_fee'?'':` — ${escapeHtml(item.modeloRotulo)} — ${item.quantidade} un.${item.hasNutrition?`<br><span class="muted">Nutricional: ${escapeHtml(item.nutritionText||'')}</span>`:''}`}</li>`).join('')}</ul>
-          <div class="summary"><div><small>Total</small><span class="money">${euro(order.total)}</span></div><div><small>Pago</small><span class="money">${euro(order.totalPago)}</span></div><div><small>Em falta</small><span class="money">${euro(order.saldoPendente)}</span></div></div>
-        </article>`).join(''):'<div class="empty">Ainda não existem pedidos.</div>';
-      document.querySelectorAll('[data-hide]').forEach(button=>button.addEventListener('click',()=>hideRecord(button.dataset.hide)));
-      document.getElementById('openBalance').textContent=euro(state.orders.reduce((sum,order)=>sum+Number(order.saldoPendente||0),0));
+          <div class="summary"><div><small>Total</small><span class="money">${euro(order.total)}</span></div>${order.totalPago>0?`<div><small>Já pago</small><span class="money">${euro(order.totalPago)}</span></div>`:''}<div><small>Em aberto</small><span class="money">${euro(order.saldoPendente)}</span></div></div></div>`).join('')}
+        </article>`).join(''):'<div class="empty"><strong>Não há mensalidades em aberto.</strong><br>Quando existir um novo valor mensal, ele aparecerá aqui.</div>';
+      document.getElementById('openBalance').textContent=euro(state.months.reduce((sum,month)=>sum+Number(month.saldoPendente||0),0));
     }
     async function hideRecord(id){
       if(!confirm('Remover este registo do seu histórico? Esta ação não elimina o documento da Print Pixel.')) return;
@@ -171,7 +172,7 @@
       const button=document.getElementById('submitOrder');button.disabled=true;button.textContent='A enviar…';
       try{
         const result=await api('/api/rotulos/public/orders',{method:'POST',body:JSON.stringify({token,items:state.cart,notes:document.getElementById('orderNotes').value.trim()})});
-        state.orders.unshift(result.order);state.cart=[];document.getElementById('orderNotes').value='';renderCart();renderOrders();showMessage(`Pedido ${result.order.numero} enviado com sucesso.`);
+        state.cart=[];document.getElementById('orderNotes').value='';renderCart();await loadSession();showMessage(`Pedido ${result.order.numero} enviado com sucesso.`);
       }catch(error){showMessage(error.message,true)}finally{button.disabled=false;button.textContent='Enviar pedido'}
     });
     document.querySelectorAll('[data-view]').forEach(tab=>tab.addEventListener('click',()=>{
@@ -179,13 +180,16 @@
       document.getElementById('newView').classList.toggle('hidden',tab.dataset.view!=='new');
       document.getElementById('historyView').classList.toggle('hidden',tab.dataset.view!=='history');
     }));
+    async function loadSession(){
+      const result=await api(`/api/rotulos/public/session?token=${encodeURIComponent(token)}`);
+      Object.assign(state,result);state.selectedTemplate=state.selectedTemplate||state.templates[0]||null;
+      document.getElementById('customerName').textContent=state.customer.name;document.getElementById('taxMode').value=state.customer.defaultTaxMode;
+      renderTemplates();renderCart();renderOrders();
+    }
     (async()=>{
       try{
         if(!token) throw new Error('Este link não possui uma chave de acesso.');
-        const result=await api(`/api/rotulos/public/session?token=${encodeURIComponent(token)}`);
-        Object.assign(state,result);state.selectedTemplate=state.templates[0]||null;
-        document.getElementById('customerName').textContent=state.customer.name;document.getElementById('taxMode').value=state.customer.defaultTaxMode;
-        renderTemplates();renderCart();renderOrders();
+        await loadSession();
       }catch(error){document.getElementById('newView').classList.add('hidden');showMessage(error.message,true)}
     })();
   </script>

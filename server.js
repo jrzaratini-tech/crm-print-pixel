@@ -61,6 +61,9 @@ const UPLOAD_TTL_MS = 15 * 60 * 1000;
 const MOBILE_DEVICE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 const PRODUCTION_SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 const LABEL_PLATFORM_MONTHLY_FEE = 15;
+const LABEL_OPEN_BALANCE_START_MONTH = /^\d{4}-\d{2}$/.test(process.env.LABEL_OPEN_BALANCE_START_MONTH || '')
+  ? process.env.LABEL_OPEN_BALANCE_START_MONTH
+  : '2026-09';
 const PRODUCTION_PROCESS_CATALOG = [
   { label: 'Pintura interna', difficulty: 4 },
   { label: 'Montagem da estrutura', difficulty: 1 },
@@ -306,6 +309,61 @@ function labelOrderPublic(id, payload) {
     paid,
     canHide: paid
   });
+}
+
+function labelRecordBillingMonth(payload = {}) {
+  const explicitMonth = String(payload.billingMonth || '');
+  if (/^\d{4}-\d{2}$/.test(explicitMonth)) return explicitMonth;
+  const recordDate = String(payload.data || payload.dataPedido || '');
+  if (/^\d{4}-\d{2}/.test(recordDate)) return recordDate.slice(0, 7);
+  return labelBillingMonth();
+}
+
+function labelMonthlyOpenGroups(events, customerMap = new Map()) {
+  const groups = new Map();
+  (events || []).forEach(event => {
+    const payload = event.payload || {};
+    const total = money(payload.total);
+    const totalPago = labelPaymentTotal(payload);
+    const saldoPendente = money(Math.max(0, total - totalPago));
+    if (saldoPendente <= 0.009) return;
+
+    const customerId = String(payload.labelCustomerId || '');
+    const billingMonth = labelRecordBillingMonth(payload);
+    if (billingMonth < LABEL_OPEN_BALANCE_START_MONTH) return;
+    const key = `${customerId}|${billingMonth}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        id: key,
+        customerId,
+        customer: customerMap.get(customerId)?.name || payload.cliente || '',
+        billingMonth,
+        billingMonthName: labelBillingMonthName(billingMonth),
+        total: 0,
+        totalPago: 0,
+        saldoPendente: 0,
+        records: []
+      });
+    }
+    const group = groups.get(key);
+    group.total = money(group.total + total);
+    group.totalPago = money(group.totalPago + totalPago);
+    group.saldoPendente = money(group.saldoPendente + saldoPendente);
+    group.records.push({
+      id: event.id,
+      ...payload,
+      recordType: payload.recordType || 'label_order',
+      totalPago,
+      saldoPendente
+    });
+  });
+
+  return Array.from(groups.values())
+    .map(group => ({
+      ...group,
+      records: group.records.sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')))
+    }))
+    .sort((a, b) => b.billingMonth.localeCompare(a.billingMonth) || a.customer.localeCompare(b.customer, 'pt'));
 }
 
 async function labelOrdersForCustomer(customerId) {
@@ -1937,10 +1995,16 @@ app.get('/api/rotulos/public/session', async (req, res) => {
     if (!customer) return res.status(401).json({ success: false, message: 'Link inválido ou desativado.' });
     await ensureLabelPlatformFee(customer);
     const orders = await labelOrdersForCustomer(customer.id);
+    const months = labelMonthlyOpenGroups(orders, new Map([[customer.id, customer]]));
     res.json({
       success: true,
       customer: labelCustomerPublic(customer),
       templates: ROTULOS.publicTemplates(),
+      openBalanceStartMonth: LABEL_OPEN_BALANCE_START_MONTH,
+      months: months.map(month => ({
+        ...month,
+        records: month.records.map(record => labelOrderPublic(record.id, record))
+      })),
       orders: orders.map(order => labelOrderPublic(order.id, order.payload))
     });
   } catch (error) {
@@ -2820,10 +2884,11 @@ app.get('/api/rotulos/orders', async (req, res) => {
     await ensureAllLabelPlatformFees(customers);
     const customerMap = new Map(customers.map(customer => [customer.id, customer]));
     const snapshot = await db.collection('events').get();
-    const orders = snapshot.docs
+    const orderEvents = snapshot.docs
       .map(doc => ({ id: doc.id, ...doc.data() }))
       .filter(event => !event.deleted && event.schema === 'pedido' && event.payload?.source === 'rotulos')
-      .sort((a, b) => new Date(b.timestamp || b.created_at || 0) - new Date(a.timestamp || a.created_at || 0))
+      .sort((a, b) => new Date(b.timestamp || b.created_at || 0) - new Date(a.timestamp || a.created_at || 0));
+    const orders = orderEvents
       .map(event => {
         const payload = event.payload || {};
         const totalPago = labelPaymentTotal(payload);
@@ -2836,7 +2901,8 @@ app.get('/api/rotulos/orders', async (req, res) => {
           saldoPendente: money(Math.max(0, money(payload.total) - totalPago))
         });
       });
-    res.json({ success: true, orders, templates: ROTULOS.publicTemplates() });
+    const months = labelMonthlyOpenGroups(orderEvents, customerMap).map(month => sanitizeForResponse(month));
+    res.json({ success: true, months, orders, templates: ROTULOS.publicTemplates(), openBalanceStartMonth: LABEL_OPEN_BALANCE_START_MONTH });
   } catch (error) {
     console.error('Erro ao listar pedidos de rótulos:', error);
     res.status(500).json({ success: false, message: 'Não foi possível carregar os pedidos.' });
@@ -2931,6 +2997,69 @@ app.post('/api/rotulos/orders/:id/payments', async (req, res) => {
   } catch (error) {
     console.error('Erro ao registar pagamento de rótulos:', error);
     res.status(500).json({ success: false, message: 'Não foi possível registar o pagamento.' });
+  }
+});
+
+app.post('/api/rotulos/months/:customerId/:month/paid', async (req, res) => {
+  try {
+    const customerId = String(req.params.customerId || '');
+    const month = String(req.params.month || '');
+    if (!isSafeIdentifier(customerId) || !/^\d{4}-\d{2}$/.test(month)) {
+      return res.status(400).json({ success: false, message: 'Cliente ou mês inválido.' });
+    }
+
+    const snapshot = await db.collection('events').get();
+    const records = snapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() }))
+      .filter(event => !event.deleted
+        && event.schema === 'pedido'
+        && event.payload?.source === 'rotulos'
+        && event.payload?.labelCustomerId === customerId
+        && labelRecordBillingMonth(event.payload) === month
+        && money(event.payload?.total) - labelPaymentTotal(event.payload) > 0.009);
+    if (!records.length) {
+      return res.status(404).json({ success: false, message: 'Não existe valor em aberto para este mês.' });
+    }
+
+    const paidAt = text(req.body?.date, 20) || new Date().toISOString().slice(0, 10);
+    const method = text(req.body?.method, 60) || 'transferencia';
+    const notes = text(req.body?.notes, 300);
+    const now = new Date().toISOString();
+    let paidValue = 0;
+    await Promise.all(records.map(async event => {
+      const payload = event.payload || {};
+      const pending = money(Math.max(0, money(payload.total) - labelPaymentTotal(payload)));
+      const payments = Array.isArray(payload.pagamentos) ? [...payload.pagamentos] : [];
+      payments.push({
+        id: `monthly_payment_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+        tipo: 'mensalidade',
+        competencia: month,
+        data: paidAt,
+        valor: pending,
+        formaPagamento: method,
+        status: 'pago',
+        observacoes: notes || `Pagamento mensal referente a ${labelBillingMonthName(month)}.`
+      });
+      const totalPago = money(labelPaymentTotal({ pagamentos: payments }));
+      paidValue = money(paidValue + pending);
+      await db.collection('events').doc(event.id).set({
+        ...event,
+        payload: {
+          ...payload,
+          pagamentos: payments,
+          totalPago,
+          saldoPendente: 0,
+          monthlyPaidAt: now,
+          monthlyPaidMonth: month
+        },
+        timestamp: now,
+        updated_at: now
+      });
+    }));
+    res.json({ success: true, customerId, month, paidValue, recordsPaid: records.length });
+  } catch (error) {
+    console.error('Erro ao quitar mês de rótulos:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível marcar o mês como pago.' });
   }
 });
 

@@ -1581,6 +1581,47 @@ test('portal de rótulos cria cliente, pedido, pagamento e EPS', async () => {
   assert.match(invalidQuantity.body.message, /múltipla de 15/);
 });
 
+test('rótulos agrupa a dívida por mês e remove a competência quitada dos dois portais', async () => {
+  const prices = Object.fromEntries(ROTULOS.LABEL_TEMPLATES.map(template => [template.id, 0.4]));
+  const createdCustomer = await post('/api/rotulos/customers', {
+    name: 'Cliente Mensal Rótulos',
+    defaultTaxMode: 'isento',
+    prices
+  });
+  const customerId = createdCustomer.body.customer.id;
+  const token = createdCustomer.body.customer.accessToken;
+
+  const initialSession = await request(`/api/rotulos/public/session?token=${encodeURIComponent(token)}`);
+  const billingMonth = initialSession.body.orders.find(item => item.recordType === 'platform_fee').billingMonth;
+  assert.equal(initialSession.body.openBalanceStartMonth, '2026-09');
+  assert.equal(initialSession.body.months.find(item => item.billingMonth === billingMonth).saldoPendente, 15);
+
+  const createdOrder = await post('/api/rotulos/public/orders', {
+    token,
+    items: [{ templateId: 'proteico-grande', mealName: 'Compra semanal', quantity: 30, taxMode: 'isento' }]
+  });
+  assert.equal(createdOrder.response.status, 201);
+
+  const groupedSession = await request(`/api/rotulos/public/session?token=${encodeURIComponent(token)}`);
+  const customerMonth = groupedSession.body.months.find(item => item.billingMonth === billingMonth);
+  assert.equal(customerMonth.records.length, 2);
+  assert.equal(customerMonth.saldoPendente, 27);
+
+  const adminBeforePayment = await request('/api/rotulos/orders');
+  const adminMonth = adminBeforePayment.body.months.find(item => item.customerId === customerId && item.billingMonth === billingMonth);
+  assert.equal(adminMonth.saldoPendente, 27);
+
+  const paid = await post(`/api/rotulos/months/${customerId}/${billingMonth}/paid`, { method: 'transferencia' });
+  assert.equal(paid.response.status, 200);
+  assert.equal(paid.body.paidValue, 27);
+  assert.equal(paid.body.recordsPaid, 2);
+
+  const customerAfterPayment = await request(`/api/rotulos/public/session?token=${encodeURIComponent(token)}`);
+  assert.equal(customerAfterPayment.body.months.some(item => item.billingMonth === billingMonth), false);
+  const adminAfterPayment = await request('/api/rotulos/orders');
+  assert.equal(adminAfterPayment.body.months.some(item => item.customerId === customerId && item.billingMonth === billingMonth), false);
+});
+
 test('estatísticas respondem sem exigir índice composto do Firestore', async () => {
   const { response, body } = await request('/api/database/stats');
   assert.equal(response.status, 200);

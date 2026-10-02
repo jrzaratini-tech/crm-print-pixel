@@ -14,8 +14,9 @@
     .form-grid{display:grid;grid-template-columns:2fr 1.4fr 1fr 1fr;gap:10px}label{display:grid;gap:5px;font-weight:700}input,select{width:100%;border:1px solid #cfd5df;border-radius:9px;padding:10px;font:inherit}
     .prices{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:14px 0}.prices label{font-size:12px}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}.card{padding:16px}.actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}.url{word-break:break-all;background:#f5f6f8;border-radius:8px;padding:9px;font-size:12px;color:#44506a;margin-top:10px}
     .order{margin-bottom:13px}.order-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.items{width:100%;border-collapse:collapse;margin-top:12px}.items th,.items td{border-bottom:1px solid var(--line);padding:9px;text-align:left}.money{font-weight:800}.summary{display:flex;gap:20px;justify-content:flex-end;margin-top:12px}.summary small{display:block;color:var(--muted)}
+    .month-toolbar{display:flex;justify-content:space-between;align-items:end;gap:14px}.month-toolbar label{min-width:220px}.month-card{overflow:hidden;padding:0}.month-header{display:flex;justify-content:space-between;gap:18px;align-items:center;padding:18px;background:linear-gradient(135deg,#eef2ff,#fff)}.month-title{font-size:20px;font-weight:850;text-transform:capitalize}.month-balance{text-align:right}.month-balance .money{display:block;font-size:23px;color:var(--red)}.record{padding:16px 18px;border-top:1px solid var(--line)}.record-head{display:flex;justify-content:space-between;gap:12px;align-items:start}.record-title{font-weight:800}.month-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.empty-state{text-align:center;padding:38px 18px}.count{color:var(--muted);font-size:12px;font-weight:700}
     .badge{display:inline-block;padding:4px 8px;border-radius:999px;background:#e7eefb;color:#274e89;font-size:12px;font-weight:800}.hidden{display:none}.message{margin:10px 0;padding:10px;border-radius:9px;background:#ddf3e8;color:#176143;font-weight:700}.message.error{background:#f9dddd;color:#8b2727}
-    @media(max-width:900px){.grid{grid-template-columns:1fr 1fr}.form-grid,.prices{grid-template-columns:1fr 1fr}}@media(max-width:620px){body{padding:12px}.top,.order-head{display:block}.grid,.form-grid,.prices{grid-template-columns:1fr}.items{display:block;overflow:auto}.summary{justify-content:flex-start;flex-wrap:wrap}}
+    @media(max-width:900px){.grid{grid-template-columns:1fr 1fr}.form-grid,.prices{grid-template-columns:1fr 1fr}}@media(max-width:620px){body{padding:12px}.top,.order-head,.month-header,.record-head,.month-toolbar{display:block}.grid,.form-grid,.prices{grid-template-columns:1fr}.items{display:block;overflow:auto}.summary{justify-content:flex-start;flex-wrap:wrap}.month-balance{text-align:left;margin-top:12px}.month-actions{margin-top:12px}.month-toolbar label{margin-bottom:10px}}
   </style>
 </head>
 <body data-page-id="rotulos" data-page-type="WRITE">
@@ -23,7 +24,10 @@
     <div class="top"><div><h1>Portal de Rótulos</h1><p class="subtitle">Clientes, pedidos semanais, pagamentos e ficheiros EPS prontos para a Roland.</p></div><button id="refresh">Atualizar</button></div>
     <div id="message"></div>
     <div class="tabs"><button class="tab active" data-tab="orders">Pedidos</button><button class="tab" data-tab="customers">Clientes e links</button></div>
-    <section id="ordersTab"><div id="orders"></div></section>
+    <section id="ordersTab">
+      <div class="panel month-toolbar"><div><h2 style="margin-bottom:3px">Mensalidades em aberto</h2><div class="muted">Pedidos e plano mensal agrupados por cliente e mês.</div></div><label>Filtrar por mês<select id="monthFilter"><option value="all">Todos os meses</option></select></label></div>
+      <div id="orders"></div>
+    </section>
     <section id="customersTab" class="hidden">
       <form class="panel" id="customerForm">
         <h2>Nova cliente</h2>
@@ -41,7 +45,7 @@
     </section>
   </main>
   <script>
-    const state={customers:[],templates:[],orders:[]};
+    const state={customers:[],templates:[],orders:[],months:[]};
     const euro=value=>new Intl.NumberFormat('pt-PT',{style:'currency',currency:'EUR'}).format(Number(value)||0);
     const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
     const message=(text,error=false)=>document.getElementById('message').innerHTML=text?`<div class="message ${error?'error':''}">${esc(text)}</div>`:'';
@@ -63,30 +67,40 @@
       document.querySelectorAll('[data-toggle]').forEach(button=>button.onclick=()=>toggleCustomer(button.dataset.toggle));
       document.querySelectorAll('[data-edit]').forEach(button=>button.onclick=()=>editCustomer(button.dataset.edit));
     }
+    function monthLabel(month){return new Intl.DateTimeFormat('pt-PT',{month:'long',year:'numeric'}).format(new Date(`${month}-01T12:00:00`))}
+    function renderMonthFilter(){
+      const filter=document.getElementById('monthFilter');const current=filter.value;
+      const months=[...new Set(state.months.map(item=>item.billingMonth))];
+      filter.innerHTML='<option value="all">Todos os meses</option>'+months.map(month=>`<option value="${month}">${esc(monthLabel(month))}</option>`).join('');
+      filter.value=months.includes(current)?current:'all';
+    }
     function renderOrders(){
-      document.getElementById('orders').innerHTML=state.orders.length?state.orders.map(order=>`
-        <article class="panel order">
-          <div class="order-head"><div><span class="badge">${order.recordType==='platform_fee'?'Mensalidade da plataforma':esc(order.numero)}</span>${order.hiddenFromCustomer?'<span class="badge" style="margin-left:6px;background:#eee;color:#555">Oculto pela cliente</span>':''}<h2 style="margin:8px 0 3px">${esc(order.customer)}</h2><div class="muted">${order.recordType==='platform_fee'?`Cobrança mensal de 15 € · ${esc(order.billingMonth||'')}`:new Date(order.data+'T12:00:00').toLocaleDateString('pt-PT')}</div></div><label>Estado<select data-status="${order.id}">${['pendente','processamento','concluido','entregue','cancelado'].map(status=>`<option value="${status}" ${order.status===status?'selected':''}>${status}</option>`).join('')}</select></label></div>
-          <table class="items"><thead><tr><th>Descrição</th><th>Modelo</th><th>Qtd.</th><th>IVA</th><th>Total</th><th>Produção</th></tr></thead><tbody>${(order.produtos||[]).map((item,index)=>`<tr><td><strong>${esc(item.nome)}</strong>${item.hasNutrition?`<div class="muted">Nutricional: ${esc(item.nutritionText||'')}</div>`:''}</td><td>${esc(item.categoriaRotulo||'')} ${esc(item.tamanho||'')}</td><td>${item.quantidade}</td><td>${item.comIVA==='sim'?'23%':'Isento'}</td><td>${euro(item.total)}</td><td>${order.recordType==='platform_fee'?'<span class="muted">Serviço digital</span>':`<a class="btn" href="/api/rotulos/orders/${encodeURIComponent(order.id)}/items/${index}/eps">EPS · ${item.quantidade} un.</a>`}</td></tr>`).join('')}</tbody></table>
-          <div class="summary"><div><small>Total</small><span class="money">${euro(order.total)}</span></div><div><small>Pago</small><span class="money">${euro(order.totalPago)}</span></div><div><small>Em falta</small><span class="money">${euro(order.saldoPendente)}</span></div>${order.recordType==='platform_fee'?'':`<a class="btn secondary" href="/api/rotulos/orders/${encodeURIComponent(order.id)}/eps">Baixar todos EPS</a>`}<button data-payment="${order.id}">Registar pagamento</button><button class="danger" data-delete="${order.id}">Excluir definitivamente</button></div>
-        </article>`).join(''):'<div class="panel muted">Ainda não existem pedidos feitos pelo portal.</div>';
+      const selected=document.getElementById('monthFilter').value;
+      const months=state.months.filter(month=>selected==='all'||month.billingMonth===selected);
+      document.getElementById('orders').innerHTML=months.length?months.map(month=>`
+        <article class="panel month-card">
+          <div class="month-header"><div><div class="month-title">${esc(month.billingMonthName||monthLabel(month.billingMonth))}</div><h2 style="margin:3px 0">${esc(month.customer)}</h2><div class="count">${month.records.length} ${month.records.length===1?'registo':'registos'} em aberto</div></div><div class="month-balance"><small>Valor em aberto do mês</small><span class="money">${euro(month.saldoPendente)}</span><div class="month-actions"><button data-month-paid="${esc(month.customerId)}" data-month="${esc(month.billingMonth)}">Marcar mês como pago</button></div></div></div>
+          ${month.records.map(order=>`<div class="record"><div class="record-head"><div><span class="badge">${order.recordType==='platform_fee'?'Plano mensal':esc(order.numero)}</span><div class="record-title" style="margin-top:7px">${order.recordType==='platform_fee'?'Mensalidade da plataforma':new Date(order.data+'T12:00:00').toLocaleDateString('pt-PT')}</div></div>${order.recordType==='platform_fee'?'<span class="muted">Serviço digital</span>':`<label>Estado<select data-status="${order.id}">${['pendente','processamento','concluido','entregue','cancelado'].map(status=>`<option value="${status}" ${order.status===status?'selected':''}>${status}</option>`).join('')}</select></label>`}</div>
+          <table class="items"><thead><tr><th>Descrição</th><th>Modelo</th><th>Qtd.</th><th>IVA</th><th>Total</th><th>Produção</th></tr></thead><tbody>${(order.produtos||[]).map((item,index)=>`<tr><td><strong>${esc(item.nome)}</strong>${item.hasNutrition?`<div class="muted">Nutricional: ${esc(item.nutritionText||'')}</div>`:''}</td><td>${esc(item.categoriaRotulo||'')} ${esc(item.tamanho||'')}</td><td>${item.quantidade}</td><td>${item.comIVA==='sim'?'23%':'Isento'}</td><td>${euro(item.total)}</td><td>${order.recordType==='platform_fee'?'<span class="muted">—</span>':`<a class="btn" href="/api/rotulos/orders/${encodeURIComponent(order.id)}/items/${index}/eps">EPS · ${item.quantidade} un.</a>`}</td></tr>`).join('')}</tbody></table>
+          <div class="summary"><div><small>Total</small><span class="money">${euro(order.total)}</span></div><div><small>Já pago</small><span class="money">${euro(order.totalPago)}</span></div><div><small>Em aberto</small><span class="money">${euro(order.saldoPendente)}</span></div>${order.recordType==='platform_fee'?'':`<a class="btn secondary" href="/api/rotulos/orders/${encodeURIComponent(order.id)}/eps">Baixar todos EPS</a>`}<button class="danger" data-delete="${order.id}">Excluir</button></div></div>`).join('')}
+        </article>`).join(''):'<div class="panel empty-state"><h3>Nenhum valor em aberto</h3><div class="muted">Quando um mês for pago, ele desaparece automaticamente desta lista.</div></div>';
       document.querySelectorAll('[data-status]').forEach(select=>select.onchange=()=>updateStatus(select.dataset.status,select.value));
-      document.querySelectorAll('[data-payment]').forEach(button=>button.onclick=()=>addPayment(button.dataset.payment));
+      document.querySelectorAll('[data-month-paid]').forEach(button=>button.onclick=()=>markMonthPaid(button.dataset.monthPaid,button.dataset.month));
       document.querySelectorAll('[data-delete]').forEach(button=>button.onclick=()=>deleteRecord(button.dataset.delete));
     }
     async function load(){
       try{
         const [customers,orders]=await Promise.all([api('/api/rotulos/customers'),api('/api/rotulos/orders')]);
-        state.customers=customers.customers;state.templates=customers.templates;state.orders=orders.orders;
-        renderPriceFields();renderCustomers();renderOrders();message('');
+        state.customers=customers.customers;state.templates=customers.templates;state.orders=orders.orders;state.months=orders.months||[];
+        renderPriceFields();renderCustomers();renderMonthFilter();renderOrders();message('');
       }catch(error){message(error.message,true)}
     }
     async function updateStatus(id,status){try{await api(`/api/rotulos/orders/${id}/status`,{method:'POST',body:JSON.stringify({status})});message('Estado atualizado.');await load()}catch(error){message(error.message,true)}}
-    async function addPayment(id){
-      const order=state.orders.find(item=>item.id===id);const suggested=Number(order?.saldoPendente||0).toFixed(2);
-      const value=prompt('Valor recebido:',suggested);if(value===null)return;
+    async function markMonthPaid(customerId,month){
+      const group=state.months.find(item=>item.customerId===customerId&&item.billingMonth===month);if(!group)return;
+      if(!confirm(`Confirmar o pagamento de ${euro(group.saldoPendente)} referente a ${monthLabel(month)} para ${group.customer}?\n\nDepois de confirmado, o mês deixará de aparecer no CRM e no app do cliente.`))return;
       const method=prompt('Forma de pagamento (transferencia, mbway, dinheiro…):','transferencia');if(method===null)return;
-      try{await api(`/api/rotulos/orders/${id}/payments`,{method:'POST',body:JSON.stringify({value,method})});message('Pagamento registado.');await load()}catch(error){message(error.message,true)}
+      try{await api(`/api/rotulos/months/${encodeURIComponent(customerId)}/${encodeURIComponent(month)}/paid`,{method:'POST',body:JSON.stringify({method})});message(`Mês de ${monthLabel(month)} marcado como pago.`);await load()}catch(error){message(error.message,true)}
     }
     async function deleteRecord(id){
       const record=state.orders.find(item=>item.id===id);
@@ -119,7 +133,7 @@
       document.querySelectorAll('[data-tab]').forEach(item=>item.classList.toggle('active',item===tab));
       document.getElementById('ordersTab').classList.toggle('hidden',tab.dataset.tab!=='orders');document.getElementById('customersTab').classList.toggle('hidden',tab.dataset.tab!=='customers');
     });
-    document.getElementById('refresh').onclick=load;load();
+    document.getElementById('monthFilter').onchange=renderOrders;document.getElementById('refresh').onclick=load;load();
   </script>
 </body>
 </html>
