@@ -480,6 +480,37 @@ test('classifica OS para colaborador com login sem expor precos e permite chat p
   assert.equal(blocked.response.status, 401);
 });
 
+test('redefine senha de colaborador legado no documento correto', async () => {
+  const publicId = `legacy-worker-${Date.now()}`;
+  const storageId = `legacy-storage-${Date.now()}`;
+  const username = `eloisa.${Date.now()}`;
+  await db.collection('production_workers').doc(storageId).set({
+    id: publicId,
+    name: 'Eloisa Legado',
+    username,
+    role: 'montagem',
+    active: true
+  });
+
+  const reset = await post(`/api/production/workers/${publicId}/credentials`, {
+    username,
+    password: 'nova-senha-segura-eloisa'
+  });
+  assert.equal(reset.response.status, 200);
+
+  const originalDocument = await db.collection('production_workers').doc(storageId).get();
+  const duplicateDocument = await db.collection('production_workers').doc(publicId).get();
+  assert.equal(originalDocument.exists, true);
+  assert.equal(Boolean(originalDocument.data().passwordHash), true);
+  assert.equal(duplicateDocument.exists, false);
+
+  const login = await post('/api/colaborador/login', {
+    username,
+    password: 'nova-senha-segura-eloisa'
+  });
+  assert.equal(login.response.status, 200);
+});
+
 test('cada colaborador visualiza somente as OS atribuidas a ele independentemente do perfil', async () => {
   const secondOrder = await post('/api/database/commit', { schema: 'pedido', pageId: 'test', payload: { numero: 'PED-PROD-2', cliente: 'Cliente Dois', produtos: [{ nome: 'Painel' }] } });
   const mounting = await post('/api/production/workers', { name: 'Montagem Dois', username: 'montagem.dois', password: 'senha-segura-789', role: 'montagem' });

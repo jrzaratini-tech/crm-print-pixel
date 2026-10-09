@@ -3787,7 +3787,16 @@ async function productionWorkers() {
     const data = doc.data();
     const worker = { ...data, id: data.id || doc.id, storageId: doc.id };
     const current = workers.get(worker.id);
-    if (!current || new Date(worker.updatedAt || worker.createdAt) > new Date(current.updatedAt || current.createdAt)) {
+    const timestamp = value => {
+      if (value && typeof value.toMillis === 'function') return value.toMillis();
+      const parsed = new Date(value || 0).getTime();
+      return Number.isFinite(parsed) ? parsed : 0;
+    };
+    const workerTimestamp = timestamp(worker.updatedAt || worker.createdAt);
+    const currentTimestamp = current ? timestamp(current.updatedAt || current.createdAt) : -1;
+    const workerIsCanonical = worker.storageId === worker.id;
+    const currentIsCanonical = current?.storageId === current?.id;
+    if (!current || workerTimestamp > currentTimestamp || (workerTimestamp === currentTimestamp && workerIsCanonical && !currentIsCanonical)) {
       workers.set(worker.id, worker);
     }
   });
@@ -3865,10 +3874,11 @@ app.post('/api/production/workers/:id/credentials', async (req, res) => {
     if (!/^[a-z0-9._-]{3,60}$/.test(username)) return res.status(400).json({ success: false, message: 'Informe um usuario valido.' });
     if (password.length < 8 || password.length > 120) return res.status(400).json({ success: false, message: 'Senha deve possuir entre 8 e 120 caracteres.' });
     if ((await productionWorkers()).some(item => item.id !== worker.id && item.username === username)) return res.status(409).json({ success: false, message: 'Este usuario ja esta cadastrado.' });
+    const storageId = worker.storageId || worker.id;
     const updated = { ...worker, username, ...productionPasswordFields(password), active: true, updatedAt: new Date().toISOString() };
     delete updated.storageId;
     await revokeWorkerSessions(worker.id);
-    await db.collection('production_workers').doc(worker.id).set(updated);
+    await db.collection('production_workers').doc(storageId).set(updated);
     res.json({ success: true, worker: safeProductionWorker(updated), appUrl: collaboratorUrl(req) });
   } catch (error) {
     console.error('Erro ao redefinir senha do colaborador:', error);
