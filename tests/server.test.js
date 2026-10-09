@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const { after, before, test } = require('node:test');
 const { app } = require('../server.js');
@@ -508,6 +509,33 @@ test('redefine senha de colaborador legado no documento correto', async () => {
     username,
     password: 'nova-senha-segura-eloisa'
   });
+  assert.equal(login.response.status, 200);
+});
+
+test('login prefere credencial redefinida quando ja existe duplicado legado', async () => {
+  const publicId = `legacy-duplicate-${Date.now()}`;
+  const username = `eloisa.duplicada.${Date.now()}`;
+  const password = 'senha-corrigida-eloisa';
+  const salt = crypto.randomBytes(16).toString('hex');
+  await db.collection('production_workers').doc(`old-storage-${Date.now()}`).set({
+    id: publicId,
+    name: 'Eloisa Duplicada',
+    username,
+    role: 'montagem',
+    active: true
+  });
+  await db.collection('production_workers').doc(publicId).set({
+    id: publicId,
+    name: 'Eloisa Duplicada',
+    username,
+    role: 'montagem',
+    active: true,
+    updatedAt: new Date().toISOString(),
+    passwordSalt: salt,
+    passwordHash: crypto.scryptSync(password, salt, 64).toString('hex')
+  });
+
+  const login = await post('/api/colaborador/login', { username, password });
   assert.equal(login.response.status, 200);
 });
 
