@@ -1034,6 +1034,226 @@
             border-radius: 50%;
             animation: pulse 2s infinite;
         }
+
+        /* Central operacional: prioridade, entrega e capacidade */
+        .stat-atrasado .stat-value { color: var(--accent-red); }
+        .stat-hoje .stat-value { color: var(--accent-yellow); }
+        .stat-entrega .stat-value { color: var(--accent-green); }
+        .stat-unassigned .stat-value { color: #c084fc; }
+
+        .workflow-strip {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin: -10px 0 22px;
+            padding: 12px 16px;
+            overflow-x: auto;
+            color: var(--text-secondary);
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+
+        .workflow-step {
+            flex: 0 0 auto;
+            padding: 7px 11px;
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            background: rgba(255,255,255,.04);
+        }
+
+        .workflow-arrow { color: #64748b; }
+
+        .operations-section {
+            margin-bottom: 24px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            background: rgba(15, 23, 42, .44);
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .operations-heading {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            padding: 20px;
+            border-bottom: 1px solid var(--border-color);
+            background: var(--card-bg);
+        }
+
+        .operations-heading h2 { margin: 0 0 5px; font-size: 20px; }
+        .operations-heading p { margin: 0; color: var(--text-secondary); font-size: 13px; }
+
+        .view-switcher { display: flex; gap: 7px; flex-wrap: wrap; }
+        .view-switcher button {
+            padding: 9px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: transparent;
+            color: var(--text-secondary);
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .view-switcher button.active {
+            border-color: var(--accent-blue);
+            color: #fff;
+            background: var(--accent-blue);
+        }
+
+        .priority-list { display: block; margin: 0; }
+        .priority-row {
+            display: grid;
+            grid-template-columns: 54px minmax(210px, 1.4fr) minmax(170px, 1fr) minmax(150px, .8fr) minmax(160px, .9fr) auto;
+            gap: 14px;
+            align-items: center;
+            padding: 16px 18px;
+            border-bottom: 1px solid rgba(148,163,184,.18);
+            background: rgba(30,41,59,.72);
+        }
+        .priority-row:last-child { border-bottom: 0; }
+        .priority-row:hover { background: rgba(51,65,85,.72); }
+        .priority-position {
+            display: grid;
+            width: 42px;
+            height: 42px;
+            place-items: center;
+            border-radius: 11px;
+            background: rgba(59,130,246,.15);
+            color: #93c5fd;
+            font-size: 15px;
+            font-weight: 900;
+        }
+        .priority-main strong, .priority-owner strong { display: block; }
+        .priority-main small, .priority-owner small, .priority-service small {
+            display: block;
+            margin-top: 4px;
+            color: var(--text-secondary);
+            line-height: 1.3;
+        }
+        .priority-service { color: #dbeafe; font-weight: 700; }
+        .deadline-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 9px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 900;
+        }
+        .deadline-badge.late { background: rgba(239,68,68,.2); color: #fca5a5; }
+        .deadline-badge.risk { background: rgba(245,158,11,.2); color: #fcd34d; }
+        .deadline-badge.today { background: rgba(249,115,22,.2); color: #fdba74; }
+        .deadline-badge.safe { background: rgba(16,185,129,.15); color: #6ee7b7; }
+        .deadline-badge.no-date { background: rgba(148,163,184,.14); color: #cbd5e1; }
+        .priority-actions { display: flex; gap: 7px; justify-content: flex-end; }
+        .priority-actions .action-btn { flex: 0 0 36px; }
+
+        .kanban-board {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(245px, 1fr));
+            gap: 14px;
+            padding: 16px;
+            overflow-x: auto;
+        }
+        .kanban-column {
+            min-width: 245px;
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            background: rgba(15,23,42,.58);
+            overflow: hidden;
+        }
+        .kanban-column-header {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border-color);
+            font-size: 12px;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+        .kanban-column-body { display: grid; gap: 10px; padding: 10px; }
+        .kanban-item {
+            padding: 12px;
+            border: 1px solid rgba(148,163,184,.22);
+            border-left: 4px solid var(--accent-blue);
+            border-radius: 8px;
+            background: var(--card-bg);
+            cursor: pointer;
+        }
+        .kanban-item.late { border-left-color: var(--accent-red); }
+        .kanban-item.risk, .kanban-item.today { border-left-color: var(--accent-yellow); }
+        .kanban-item strong, .kanban-item small { display: block; }
+        .kanban-item small { margin-top: 5px; color: var(--text-secondary); }
+
+        .delivery-board, .workload-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(245px, 1fr));
+            gap: 12px;
+            padding: 16px;
+        }
+        .delivery-card, .workload-card {
+            padding: 15px;
+            border: 1px solid rgba(16,185,129,.34);
+            border-radius: 10px;
+            background: rgba(16,185,129,.08);
+        }
+        .delivery-card-head { display:flex; justify-content:space-between; gap:10px; margin-bottom:9px; }
+        .delivery-card p, .delivery-card small, .workload-card small { color: var(--text-secondary); }
+        .delivery-card p { margin: 4px 0; }
+        .delivery-actions { display:flex; gap:8px; margin-top:12px; }
+        .delivery-actions button {
+            flex: 1;
+            padding: 9px;
+            border: 0;
+            border-radius: 8px;
+            background: var(--accent-green);
+            color: white;
+            font-weight: 900;
+            cursor: pointer;
+        }
+        .delivery-actions button.secondary { background: rgba(255,255,255,.1); color: var(--text-primary); }
+        .workload-card { border-color: rgba(59,130,246,.28); background: rgba(59,130,246,.07); }
+        .workload-card.warning { border-color: rgba(245,158,11,.55); background: rgba(245,158,11,.1); }
+        .workload-card strong { display:block; margin-bottom:7px; }
+        .workload-metrics { display:flex; gap:14px; margin-top:9px; }
+        .workload-metrics b { display:block; font-size:20px; }
+
+        .admin-details { margin: 0 0 24px; }
+        .admin-details > summary {
+            padding: 15px 18px;
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            background: var(--card-bg);
+            color: var(--text-secondary);
+            font-weight: 800;
+            cursor: pointer;
+        }
+        .admin-details[open] > summary { border-radius: var(--radius) var(--radius) 0 0; }
+        .admin-details .payment-panel { margin: 0; border-radius: 0 0 var(--radius) var(--radius); }
+
+        @media (max-width: 1100px) {
+            .production-header { position: static; align-items: flex-start; }
+            .header-stats { flex-wrap: wrap; gap: 16px; justify-content: flex-end; }
+            .stat-box { min-width: 90px; }
+            .priority-row { grid-template-columns: 48px minmax(190px, 1.4fr) minmax(150px, 1fr) minmax(145px, .8fr) auto; }
+            .priority-owner { display: none; }
+        }
+        @media (max-width: 760px) {
+            body { padding: 10px; }
+            .production-header { flex-direction: column; gap: 18px; padding: 17px; }
+            .header-stats { justify-content: flex-start; }
+            .header-text h1 { font-size: 22px; }
+            .controls-panel { padding: 14px; }
+            .operations-heading { align-items: flex-start; flex-direction: column; }
+            .priority-row { grid-template-columns: 44px 1fr auto; gap: 10px; }
+            .priority-service, .priority-owner { display: none; }
+            .priority-deadline { grid-column: 2; }
+            .priority-actions { grid-column: 3; grid-row: 1 / span 2; flex-direction: column; }
+            .kanban-board { grid-template-columns: repeat(4, 270px); }
+        }
     </style>
     
     <!-- FONT AWESOME -->
@@ -1055,17 +1275,25 @@
         </div>
         
         <div class="header-stats">
-            <div class="stat-box stat-pendente">
-                <div class="stat-value" data-bind="producao.pendentes">0</div>
-                <div class="stat-label">Pendentes</div>
+            <div class="stat-box stat-atrasado">
+                <div class="stat-value" data-bind="producao.atrasados">0</div>
+                <div class="stat-label">Atrasados</div>
+            </div>
+            <div class="stat-box stat-hoje">
+                <div class="stat-value" data-bind="producao.hoje">0</div>
+                <div class="stat-label">Entregas hoje</div>
             </div>
             <div class="stat-box stat-processamento">
                 <div class="stat-value" data-bind="producao.processamento">0</div>
                 <div class="stat-label">Em Produção</div>
             </div>
-            <div class="stat-box">
-                <div class="stat-value" data-bind="producao.total">0</div>
-                <div class="stat-label">Total</div>
+            <div class="stat-box stat-entrega">
+                <div class="stat-value" data-bind="producao.prontos">0</div>
+                <div class="stat-label">Prontos a entregar</div>
+            </div>
+            <div class="stat-box stat-unassigned">
+                <div class="stat-value" data-bind="producao.semResponsavel">0</div>
+                <div class="stat-label">Sem responsável</div>
             </div>
         </div>
     </header>
@@ -1077,11 +1305,11 @@
         <div class="filter-buttons">
             <button class="filter-btn active" data-filter="all">
                 <i class="fas fa-layer-group"></i>
-                Todos
+                Fila completa
             </button>
             <button class="filter-btn" data-filter="pendente">
                 <i class="fas fa-clock"></i>
-                Pendentes
+                Por produzir
             </button>
             <button class="filter-btn" data-filter="processamento">
                 <i class="fas fa-cogs"></i>
@@ -1090,6 +1318,10 @@
             <button class="filter-btn" data-filter="atrasado">
                 <i class="fas fa-exclamation-triangle"></i>
                 Atrasados
+            </button>
+            <button class="filter-btn" data-filter="concluido">
+                <i class="fas fa-box"></i>
+                Prontos a entregar
             </button>
         </div>
         
@@ -1110,72 +1342,84 @@
         </div>
     </section>
     
-    <!-- ============================================
-         LEGENDA DE STATUS
-         ============================================ -->
-    <section class="legend-panel">
-        <div class="legend-title">Legenda de Status</div>
-        <div class="legend-items">
-            <div class="legend-item">
-                <div class="legend-color legend-pendente"></div>
-                <span>Pendente</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-color legend-processamento"></div>
-                <span>Em Produção</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-color legend-atrasado"></div>
-                <span>Atrasado</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-color legend-concluido"></div>
-                <span>Concluído</span>
-            </div>
-        </div>
+    <section class="workflow-strip" aria-label="Fluxo de trabalho">
+        <span class="workflow-step">Recebido</span><i class="fas fa-chevron-right workflow-arrow"></i>
+        <span class="workflow-step">Pronto para produzir</span><i class="fas fa-chevron-right workflow-arrow"></i>
+        <span class="workflow-step">Em produção</span><i class="fas fa-chevron-right workflow-arrow"></i>
+        <span class="workflow-step">Controlo final</span><i class="fas fa-chevron-right workflow-arrow"></i>
+        <span class="workflow-step">Pronto para entregar</span><i class="fas fa-chevron-right workflow-arrow"></i>
+        <span class="workflow-step">Entregue</span>
     </section>
     
     <!-- ============================================
          PAINEL DE PRODUÇÃO
          ============================================ -->
-    <section class="payment-panel">
-        <div class="payment-panel-header">
+    <section class="operations-section" id="prioritySection">
+        <div class="operations-heading">
             <div>
-                <h2>Controle de comissoes da producao</h2>
-                <p style="margin:4px 0 0;color:var(--text-secondary)">Servicos concluidos entram como saldo a pagar. Ao confirmar o pagamento, somem do painel principal do colaborador.</p>
+                <h2><i class="fas fa-list-ol"></i> Produzir agora</h2>
+                <p>Fila automática por risco de prazo. Em caso de empate, o pedido mais antigo aparece primeiro.</p>
             </div>
-            <div class="payment-actions">
-                <button type="button" class="refresh-btn" id="extraPaymentOpen"><i class="fas fa-plus"></i> Pagamento extra</button>
+            <div class="view-switcher" aria-label="Modo de visualização">
+                <button type="button" class="active" data-view="list"><i class="fas fa-list"></i> Lista prioritária</button>
+                <button type="button" data-view="kanban"><i class="fas fa-columns"></i> Quadro por etapas</button>
             </div>
         </div>
-        <div class="payment-summary" id="paymentSummary"></div>
-        <div class="payment-tabs">
-            <button type="button" data-payment-filter="process">Em processo</button>
-            <button type="button" class="active" data-payment-filter="pending">A pagar</button>
-            <button type="button" data-payment-filter="paid">Ja pagos</button>
+        <section class="production-board priority-list" id="productionBoard">
+            <!-- A fila de produção será carregada dinamicamente aqui -->
+        </section>
+        <div class="loading-state" id="loadingState">
+            <div class="loading-spinner"></div>
+            <p>Carregando ordens de produção...</p>
         </div>
-        <div class="payment-list" id="paymentList"></div>
+        <div class="empty-state" id="emptyState" style="display: none;">
+            <div class="empty-icon"><i class="fas fa-clipboard-list"></i></div>
+            <h3>Nenhuma ordem de produção encontrada</h3>
+            <p>Não existem trabalhos nesta fila com os filtros selecionados.</p>
+        </div>
     </section>
 
-    <section class="production-board" id="productionBoard">
-        <!-- Os cards de pedido serão carregados dinamicamente aqui -->
-    </section>
-    
-    <!-- ============================================
-         ESTADOS DE CARREGAMENTO E VAZIO
-         ============================================ -->
-    <div class="loading-state" id="loadingState">
-        <div class="loading-spinner"></div>
-        <p>Carregando ordens de produção...</p>
-    </div>
-    
-    <div class="empty-state" id="emptyState" style="display: none;">
-        <div class="empty-icon">
-            <i class="fas fa-clipboard-list"></i>
+    <section class="operations-section" id="deliverySection">
+        <div class="operations-heading">
+            <div>
+                <h2><i class="fas fa-truck"></i> Prontos para entregar</h2>
+                <p>Produção concluída que ainda precisa ser entregue, instalada ou levantada pelo cliente.</p>
+            </div>
         </div>
-        <h3>Nenhuma ordem de produção encontrada</h3>
-        <p>Quando houver pedidos pendentes ou em produção, eles aparecerão aqui automaticamente.</p>
-    </div>
+        <div class="delivery-board" id="deliveryBoard"></div>
+    </section>
+
+    <section class="operations-section" id="workloadSection">
+        <div class="operations-heading">
+            <div>
+                <h2><i class="fas fa-users-cog"></i> Capacidade da equipa</h2>
+                <p>Distribuição do trabalho ativo. Mais de uma O.S. simultânea recebe um alerta de foco.</p>
+            </div>
+        </div>
+        <div class="workload-grid" id="workloadBoard"></div>
+    </section>
+
+    <details class="admin-details">
+        <summary><i class="fas fa-wallet"></i> Área administrativa — comissões e pagamentos</summary>
+        <section class="payment-panel" data-test-label="Controle de comissoes da producao">
+            <div class="payment-panel-header">
+                <div>
+                    <h2>Controlo de comissões da produção</h2>
+                    <p style="margin:4px 0 0;color:var(--text-secondary)">Serviços concluídos entram como saldo a pagar. Ao confirmar o pagamento, somem do painel principal do colaborador.</p>
+                </div>
+                <div class="payment-actions">
+                    <button type="button" class="refresh-btn" id="extraPaymentOpen"><i class="fas fa-plus"></i> Pagamento extra</button>
+                </div>
+            </div>
+            <div class="payment-summary" id="paymentSummary"></div>
+            <div class="payment-tabs">
+                <button type="button" data-payment-filter="process">Em processo</button>
+                <button type="button" class="active" data-payment-filter="pending">A pagar</button>
+                <button type="button" data-payment-filter="paid">Já pagos</button>
+            </div>
+            <div class="payment-list" id="paymentList"></div>
+        </section>
+    </details>
     
     <!-- ============================================
          MODAL DE DETALHES
@@ -1274,6 +1518,11 @@
             const workerFilter = document.getElementById('workerFilter');
             const activityFilter = document.getElementById('activityFilter');
             const progressFilter = document.getElementById('progressFilter');
+            const prioritySection = document.getElementById('prioritySection');
+            const deliverySection = document.getElementById('deliverySection');
+            const deliveryBoard = document.getElementById('deliveryBoard');
+            const workloadBoard = document.getElementById('workloadBoard');
+            const viewButtons = document.querySelectorAll('[data-view]');
             const paymentSummary = document.getElementById('paymentSummary');
             const paymentList = document.getElementById('paymentList');
             const paymentTabs = document.querySelectorAll('[data-payment-filter]');
@@ -1301,6 +1550,7 @@
             // Estado da aplicação
             let todasOrdens = [];
             let filtroAtual = 'all';
+            let visualizacaoAtual = 'list';
             let paymentFilter = 'pending';
             let contadorRefresh = 30;
             let productionWorkers = [];
@@ -1357,13 +1607,70 @@
                 const mins = minutos % 60;
                 return `${horas}h${mins > 0 ? ` ${mins}min` : ''}`;
             }
+
+            function dataOperacional(valor, fimDoDia = false) {
+                if (!valor) return null;
+                const texto = String(valor).trim();
+                const dataSimples = texto.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+                const data = dataSimples
+                    ? new Date(Number(dataSimples[1]), Number(dataSimples[2]) - 1, Number(dataSimples[3]), fimDoDia ? 23 : 0, fimDoDia ? 59 : 0, fimDoDia ? 59 : 0)
+                    : new Date(texto);
+                return Number.isNaN(data.getTime()) ? null : data;
+            }
+
+            function mesmoDia(a, b) {
+                return a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+            }
+
+            function prioridadeDaOrdem(ordem) {
+                const agora = new Date();
+                const prazo = dataOperacional(ordem.dataEntrega, true);
+                const estado = ordem.rawStatus || ordem.status;
+                const producao = ordem.producao || {};
+                const previstas = Number(producao.horasPrevistas) || 0;
+                const realizadas = Number(producao.horasRealizadas) || 0;
+                const horasRestantes = previstas > 0 ? Math.max(0, previstas - realizadas) : null;
+                const conclusaoEstimada = horasRestantes === null ? null : new Date(agora.getTime() + (horasRestantes + 4) * 3600000);
+
+                if (estado === 'concluido') return { nivel: 'ready', peso: 7, texto: 'Pronto para entregar', prazo, horasRestantes };
+                if (estado === 'entregue' || estado === 'cancelado') return { nivel: 'closed', peso: 9, texto: 'Encerrado', prazo, horasRestantes };
+                if (prazo && prazo < agora) {
+                    const dias = Math.max(1, Math.ceil((agora - prazo) / 86400000));
+                    return { nivel: 'late', peso: 0, texto: `Atrasado ${dias} dia${dias === 1 ? '' : 's'}`, prazo, horasRestantes };
+                }
+                if (prazo && mesmoDia(prazo, agora)) return { nivel: 'today', peso: 1, texto: 'Entrega hoje', prazo, horasRestantes };
+                if (prazo && conclusaoEstimada && conclusaoEstimada > prazo) return { nivel: 'risk', peso: 2, texto: 'Risco de atraso', prazo, horasRestantes };
+                if (prazo) {
+                    const dias = Math.max(1, Math.ceil((prazo - agora) / 86400000));
+                    return { nivel: dias <= 2 ? 'risk' : 'safe', peso: dias <= 2 ? 2 : estado === 'processamento' ? 3 : 4, texto: `Faltam ${dias} dia${dias === 1 ? '' : 's'}`, prazo, horasRestantes };
+                }
+                return { nivel: 'no-date', peso: 6, texto: 'Sem prazo definido', prazo: null, horasRestantes };
+            }
+
+            function compararPrioridade(a, b) {
+                const prioridadeA = prioridadeDaOrdem(a);
+                const prioridadeB = prioridadeDaOrdem(b);
+                if (prioridadeA.peso !== prioridadeB.peso) return prioridadeA.peso - prioridadeB.peso;
+                const prazoA = prioridadeA.prazo?.getTime() ?? Number.MAX_SAFE_INTEGER;
+                const prazoB = prioridadeB.prazo?.getTime() ?? Number.MAX_SAFE_INTEGER;
+                if (prazoA !== prazoB) return prazoA - prazoB;
+                return (dataOperacional(a.createdAt)?.getTime() || 0) - (dataOperacional(b.createdAt)?.getTime() || 0);
+            }
+
+            function resumoServicos(ordem) {
+                const produtos = Array.isArray(ordem.produtos) ? ordem.produtos : [];
+                if (!produtos.length) return 'Serviço não informado';
+                const primeiros = produtos.slice(0, 2).map(produto => `${produto.nome || 'Produto'}${produto.quantidade ? ` ×${produto.quantidade}` : ''}`);
+                return `${primeiros.join(' · ')}${produtos.length > 2 ? ` · +${produtos.length - 2}` : ''}`;
+            }
             
             function getStatusInfoPadrao(status) {
                 switch(status) {
                     case 'pendente': return { texto: 'PENDENTE', classe: 'status-pendente' };
                     case 'processamento': return { texto: 'EM PRODUÃ‡ÃƒO', classe: 'status-processamento' };
                     case 'atrasado': return { texto: 'ATRASADO', classe: 'status-atrasado' };
-                    case 'concluido': return { texto: 'CONCLUÃDO', classe: 'status-concluido' };
+                    case 'concluido': return { texto: 'PRONTO PARA ENTREGAR', classe: 'status-concluido' };
+                    case 'entregue': return { texto: 'ENTREGUE', classe: 'status-concluido' };
                     default: return { texto: status || 'N/A', classe: '' };
                 }
             }
@@ -2173,10 +2480,11 @@
                         
                         // Determinar se está atrasado (data de entrega passada)
                         const hoje = new Date();
-                        const dataEntrega = payload.dataEntrega ? new Date(payload.dataEntrega) : null;
-                        let status = payload.status || 'pendente';
+                        const prazoEntrega = dataOperacional(payload.dataEntrega, true);
+                        const rawStatus = payload.status === 'atrasado' ? 'pendente' : (payload.status || 'pendente');
+                        let status = rawStatus;
                         
-                        if (status === 'pendente' && dataEntrega && dataEntrega < hoje) {
+                        if (['pendente', 'processamento'].includes(rawStatus) && prazoEntrega && prazoEntrega < hoje) {
                             status = 'atrasado';
                         }
                         
@@ -2201,6 +2509,7 @@
                             iva: parseFloat(payload.iva) || 0,
                             total: parseFloat(payload.total) || 0,
                             status: status,
+                            rawStatus: rawStatus,
                             statusPagamento: payload.statusPagamento || 'pendente',
                             totalPago: parseFloat(payload.totalPago) || 0,
                             saldoPendente: parseFloat(payload.saldoPendente) || 0,
@@ -2225,44 +2534,38 @@
                         
                         return ordemFormatada;
                     })
-                    .sort((a, b) => {
-                        // Ordenar: atrasados > pendentes > processamento > concluídos
-                        const ordemPrioridade = { atrasado: 0, pendente: 1, processamento: 2, concluido: 3 };
-                        const prioridadeA = ordemPrioridade[a.status] || 4;
-                        const prioridadeB = ordemPrioridade[b.status] || 4;
-                        
-                        if (prioridadeA !== prioridadeB) {
-                            return prioridadeA - prioridadeB;
-                        }
-                        
-                        // Se mesma prioridade, ordenar por data mais antiga
-                        return new Date(a.createdAt) - new Date(b.createdAt);
-                    });
+                    .sort(compararPrioridade);
                 
                 console.log(`✅ ${todasOrdens.length} ordens processadas`);
                 
                 // Atualizar UI
                 atualizarContadores();
                 renderPaymentControl();
+                renderizarEntregas();
+                renderizarCargaEquipa();
                 aplicarFiltro();
                 
                 // Ocultar loading, mostrar board
                 loadingState.style.display = 'none';
-                productionBoard.style.display = 'grid';
+                productionBoard.style.display = visualizacaoAtual === 'kanban' ? 'grid' : 'block';
             }
             
             // Atualizar contadores com data-bind
             function atualizarContadores() {
-                const total = todasOrdens.length;
-                const pendentes = todasOrdens.filter(o => o.status === 'pendente' || o.status === 'atrasado').length;
-                const processamento = todasOrdens.filter(o => o.status === 'processamento').length;
+                const abertas = todasOrdens.filter(o => ['pendente', 'processamento'].includes(o.rawStatus));
+                const atrasados = abertas.filter(o => prioridadeDaOrdem(o).nivel === 'late').length;
+                const hoje = abertas.filter(o => prioridadeDaOrdem(o).nivel === 'today').length;
+                const processamento = abertas.filter(o => o.rawStatus === 'processamento').length;
+                const prontos = todasOrdens.filter(o => o.rawStatus === 'concluido').length;
+                const semResponsavel = abertas.filter(o => activeAssignmentsOf(o.id).length === 0).length;
                 
-                console.log(`📊 Contadores: Total=${total}, Pendentes/Atrasados=${pendentes}, Processamento=${processamento}`);
+                console.log(`📊 Produção: Atrasados=${atrasados}, Hoje=${hoje}, Em produção=${processamento}, Prontos=${prontos}`);
                 
-                // Atualizar elementos com data-bind
-                document.querySelector('[data-bind="producao.total"]').textContent = total;
-                document.querySelector('[data-bind="producao.pendentes"]').textContent = pendentes;
+                document.querySelector('[data-bind="producao.atrasados"]').textContent = atrasados;
+                document.querySelector('[data-bind="producao.hoje"]').textContent = hoje;
                 document.querySelector('[data-bind="producao.processamento"]').textContent = processamento;
+                document.querySelector('[data-bind="producao.prontos"]').textContent = prontos;
+                document.querySelector('[data-bind="producao.semResponsavel"]').textContent = semResponsavel;
             }
             
             // Aplicar filtro atual
@@ -2271,7 +2574,8 @@
                 
                 // Aplicar filtro de status
                 if (filtroAtual !== 'all') {
-                    ordensFiltradas = ordensFiltradas.filter(o => o.status === filtroAtual);
+                    if (filtroAtual === 'atrasado') ordensFiltradas = ordensFiltradas.filter(o => prioridadeDaOrdem(o).nivel === 'late');
+                    else ordensFiltradas = ordensFiltradas.filter(o => o.rawStatus === filtroAtual);
                 }
 
                 if (workerFilter.value) {
@@ -2286,35 +2590,159 @@
                     ordensFiltradas = ordensFiltradas.filter(ordem => orderProgress(ordem.id).key === progressFilter.value);
                 }
                 
-                // Remover concluídos do painel principal
-                ordensFiltradas = ordensFiltradas.filter(o => o.status !== 'concluido');
+                // A fila principal contém apenas trabalho ainda em produção.
+                ordensFiltradas = ordensFiltradas.filter(o => ['pendente', 'processamento'].includes(o.rawStatus));
+                ordensFiltradas.sort(compararPrioridade);
                 
                 // Renderizar ordens
                 renderizarOrdens(ordensFiltradas);
+                prioritySection.hidden = filtroAtual === 'concluido';
+                deliverySection.hidden = !['all', 'concluido'].includes(filtroAtual);
                 
                 // Mostrar/ocultar estado vazio
-                if (ordensFiltradas.length === 0) {
+                const temEntregas = todasOrdens.some(ordem => ordem.rawStatus === 'concluido');
+                if (ordensFiltradas.length === 0 && !(filtroAtual === 'concluido' && temEntregas)) {
                     emptyState.style.display = 'block';
-                    productionBoard.style.display = 'none';
+                    productionBoard.style.display = filtroAtual === 'concluido' ? 'none' : 'block';
                 } else {
                     emptyState.style.display = 'none';
-                    productionBoard.style.display = 'grid';
+                    productionBoard.style.display = visualizacaoAtual === 'kanban' ? 'grid' : 'block';
                 }
             }
             
             // Renderizar ordens no painel
             function renderizarOrdens(ordens) {
                 productionBoard.innerHTML = '';
-                
-                ordens.forEach(ordem => {
-                    const card = criarCardOrdem(ordem);
-                    productionBoard.appendChild(card);
+                productionBoard.className = visualizacaoAtual === 'kanban' ? 'production-board kanban-board' : 'production-board priority-list';
+                if (visualizacaoAtual === 'kanban') return renderizarKanban(ordens);
+                ordens.forEach((ordem, index) => productionBoard.appendChild(criarLinhaPrioridade(ordem, index)));
+            }
+
+            function criarLinhaPrioridade(ordem, index) {
+                const prioridade = prioridadeDaOrdem(ordem);
+                const assignments = activeAssignmentsOf(ordem.id);
+                const responsaveis = [...new Set(assignments.map(item => item.workerName).filter(Boolean))];
+                const linha = document.createElement('article');
+                linha.className = `priority-row ${prioridade.nivel}`;
+                linha.dataset.id = ordem.id;
+                linha.innerHTML = `
+                    <div class="priority-position">${index + 1}º</div>
+                    <div class="priority-main">
+                        <strong>${escapeHtml(ordem.numero)}</strong>
+                        <small>${escapeHtml(ordem.cliente)}${ordem.empresa && ordem.empresa !== ordem.cliente ? ` · ${escapeHtml(ordem.empresa)}` : ''}</small>
+                        <small>Entrada: ${escapeHtml(formatarDataPadrao(ordem.dataEntrada || ordem.createdAt))}</small>
+                    </div>
+                    <div class="priority-service">
+                        ${escapeHtml(resumoServicos(ordem))}
+                        <small>${ordem.rawStatus === 'processamento' ? 'Em produção' : assignments.length ? 'Pronto para iniciar' : 'Aguardando responsável'}</small>
+                    </div>
+                    <div class="priority-deadline">
+                        <span class="deadline-badge ${prioridade.nivel}"><i class="fas fa-stopwatch"></i>${escapeHtml(prioridade.texto)}</span>
+                        <small style="display:block;margin-top:6px;color:var(--text-secondary)">Entrega: ${escapeHtml(formatarDataPadrao(ordem.dataEntrega))}</small>
+                        ${prioridade.horasRestantes !== null ? `<small style="display:block;margin-top:3px;color:var(--text-secondary)">${prioridade.horasRestantes.toFixed(1)}h estimadas restantes</small>` : ''}
+                    </div>
+                    <div class="priority-owner">
+                        <strong>${responsaveis.length ? escapeHtml(responsaveis.join(', ')) : '<span style="color:#c084fc">Sem responsável</span>'}</strong>
+                        <small>${orderProgress(ordem.id).percent}% das etapas concluídas</small>
+                    </div>
+                    <div class="priority-actions">
+                        <button class="action-btn classify" title="Definir responsável e etapas"><i class="fas fa-user-check"></i></button>
+                        <button class="action-btn view" title="Ver detalhes"><i class="fas fa-eye"></i></button>
+                        ${ordem.rawStatus === 'pendente' ? '<button class="action-btn start" title="Iniciar produção"><i class="fas fa-play"></i></button>' : ''}
+                        ${ordem.rawStatus === 'processamento' ? '<button class="action-btn complete" title="Produção concluída: enviar para entrega"><i class="fas fa-check"></i></button>' : ''}
+                    </div>`;
+
+                linha.querySelector('.classify').addEventListener('click', () => abrirClassificacao(ordem));
+                linha.querySelector('.view').addEventListener('click', () => abrirModalDetalhesCompleto(ordem));
+                linha.querySelector('.start')?.addEventListener('click', () => atualizarStatusOrdem(ordem.id, 'processamento'));
+                linha.querySelector('.complete')?.addEventListener('click', () => atualizarStatusOrdem(ordem.id, 'concluido'));
+                return linha;
+            }
+
+            function renderizarKanban(ordens) {
+                const emAtencao = ordens.filter(ordem => ['late', 'risk', 'today'].includes(prioridadeDaOrdem(ordem).nivel));
+                const idsAtencao = new Set(emAtencao.map(ordem => ordem.id));
+                const colunas = [
+                    { titulo: 'Atenção agora', ordens: emAtencao },
+                    { titulo: 'Por produzir', ordens: ordens.filter(ordem => ordem.rawStatus === 'pendente' && !idsAtencao.has(ordem.id)) },
+                    { titulo: 'Em produção', ordens: ordens.filter(ordem => ordem.rawStatus === 'processamento' && !idsAtencao.has(ordem.id)) },
+                    { titulo: 'Pronto para entregar', ordens: todasOrdens.filter(ordem => ordem.rawStatus === 'concluido').sort(compararPrioridade) }
+                ];
+                colunas.forEach(coluna => {
+                    const elemento = document.createElement('section');
+                    elemento.className = 'kanban-column';
+                    elemento.innerHTML = `<div class="kanban-column-header"><span>${escapeHtml(coluna.titulo)}</span><span>${coluna.ordens.length}</span></div><div class="kanban-column-body"></div>`;
+                    const corpo = elemento.querySelector('.kanban-column-body');
+                    coluna.ordens.forEach(ordem => {
+                        const prioridade = prioridadeDaOrdem(ordem);
+                        const item = document.createElement('article');
+                        item.className = `kanban-item ${prioridade.nivel}`;
+                        item.innerHTML = `<strong>${escapeHtml(ordem.numero)} · ${escapeHtml(ordem.cliente)}</strong><small>${escapeHtml(resumoServicos(ordem))}</small><small>${escapeHtml(prioridade.texto)} · ${escapeHtml(formatarDataPadrao(ordem.dataEntrega))}</small>`;
+                        item.addEventListener('click', () => abrirModalDetalhesCompleto(ordem));
+                        corpo.appendChild(item);
+                    });
+                    if (!coluna.ordens.length) corpo.innerHTML = '<small style="color:var(--text-secondary)">Nenhum trabalho nesta etapa.</small>';
+                    productionBoard.appendChild(elemento);
                 });
-                
-                // Adicionar animação de entrada
-                const cards = document.querySelectorAll('.order-card');
-                cards.forEach((card, index) => {
-                    card.style.animationDelay = `${index * 0.1}s`;
+            }
+
+            function renderizarEntregas() {
+                const ordens = todasOrdens
+                    .filter(ordem => ordem.rawStatus === 'concluido')
+                    .sort((a, b) => (dataOperacional(a.dataEntrega, true)?.getTime() || Number.MAX_SAFE_INTEGER) - (dataOperacional(b.dataEntrega, true)?.getTime() || Number.MAX_SAFE_INTEGER));
+                deliveryBoard.innerHTML = '';
+                if (!ordens.length) {
+                    deliveryBoard.innerHTML = '<p style="color:var(--text-secondary)">Nenhum trabalho aguarda entrega neste momento.</p>';
+                    return;
+                }
+                ordens.forEach(ordem => {
+                    const card = document.createElement('article');
+                    card.className = 'delivery-card';
+                    card.innerHTML = `
+                        <div class="delivery-card-head"><strong>${escapeHtml(ordem.numero)}</strong><span class="order-status status-concluido">Pronto</span></div>
+                        <p><strong>${escapeHtml(ordem.cliente)}</strong></p>
+                        <p>${escapeHtml(resumoServicos(ordem))}</p>
+                        <small>Entrega combinada: ${escapeHtml(formatarDataPadrao(ordem.dataEntrega))}</small>
+                        <div class="delivery-actions">
+                            <button type="button" class="secondary view-delivery"><i class="fas fa-eye"></i> Detalhes</button>
+                            <button type="button" class="finish-delivery"><i class="fas fa-truck"></i> Marcar entregue</button>
+                        </div>`;
+                    card.querySelector('.view-delivery').addEventListener('click', () => abrirModalDetalhesCompleto(ordem));
+                    card.querySelector('.finish-delivery').addEventListener('click', () => {
+                        if (confirm(`Confirmar que a O.S. ${ordem.numero} foi entregue ao cliente?`)) atualizarStatusOrdem(ordem.id, 'entregue');
+                    });
+                    deliveryBoard.appendChild(card);
+                });
+            }
+
+            function renderizarCargaEquipa() {
+                workloadBoard.innerHTML = '';
+                const ordensAbertas = todasOrdens.filter(ordem => ['pendente', 'processamento'].includes(ordem.rawStatus));
+                const semResponsavel = ordensAbertas.filter(ordem => activeAssignmentsOf(ordem.id).length === 0);
+                const resumo = productionWorkers
+                    .filter(worker => worker.active !== false)
+                    .map(worker => {
+                        const atribuidas = ordensAbertas.filter(ordem => activeAssignmentsOf(ordem.id).some(item => item.workerId === worker.id));
+                        return {
+                            worker,
+                            total: atribuidas.length,
+                            ativas: atribuidas.filter(ordem => ordem.rawStatus === 'processamento').length,
+                            fila: atribuidas.filter(ordem => ordem.rawStatus === 'pendente').length,
+                            risco: atribuidas.filter(ordem => ['late', 'risk', 'today'].includes(prioridadeDaOrdem(ordem).nivel)).length
+                        };
+                    })
+                    .sort((a, b) => b.ativas - a.ativas || b.risco - a.risco || b.total - a.total);
+
+                const semResponsavelCard = document.createElement('article');
+                semResponsavelCard.className = `workload-card ${semResponsavel.length ? 'warning' : ''}`;
+                semResponsavelCard.innerHTML = `<strong><i class="fas fa-user-slash"></i> Sem responsável</strong><small>Trabalhos que ainda precisam ser distribuídos.</small><div class="workload-metrics"><div><b>${semResponsavel.length}</b><small>na fila</small></div><div><b>${semResponsavel.filter(o => ['late','risk','today'].includes(prioridadeDaOrdem(o).nivel)).length}</b><small>em risco</small></div></div>`;
+                workloadBoard.appendChild(semResponsavelCard);
+
+                resumo.forEach(item => {
+                    const card = document.createElement('article');
+                    card.className = `workload-card ${item.ativas > 1 || item.risco ? 'warning' : ''}`;
+                    card.innerHTML = `<strong><i class="fas fa-user-cog"></i> ${escapeHtml(item.worker.name)}</strong><small>${item.ativas > 1 ? 'Atenção: mais de uma O.S. simultânea.' : item.ativas === 1 ? 'Com trabalho em execução.' : 'Disponível para iniciar o próximo trabalho.'}</small><div class="workload-metrics"><div><b>${item.ativas}</b><small>em execução</small></div><div><b>${item.fila}</b><small>na fila</small></div><div><b>${item.risco}</b><small>em risco</small></div></div>`;
+                    workloadBoard.appendChild(card);
                 });
             }
             
@@ -2924,6 +3352,8 @@
                     const payloadAtualizado = {
                         ...eventoOriginal.payload,
                         status: novoStatus,
+                        ...(novoStatus === 'concluido' ? { producaoConcluidaEm: new Date().toISOString() } : {}),
+                        ...(novoStatus === 'entregue' ? { dataFechamento: new Date().toISOString(), entregueEm: new Date().toISOString() } : {}),
                         updated_at: new Date().toISOString()
                     };
                     
@@ -2951,16 +3381,13 @@
                     }
                     
                     // Feedback visual
-                    const card = document.querySelector(`.order-card[data-id="${ordemId}"]`);
+                    const card = document.querySelector(`[data-id="${ordemId}"]`);
                     if (card) {
                         card.classList.add('concluido');
                         card.style.opacity = '0.5';
                         card.style.transform = 'scale(0.95)';
-                        
-                        setTimeout(() => {
-                            carregarOrdens(); // Recarregar ordens
-                        }, 1000);
                     }
+                    setTimeout(() => carregarOrdens(), 450);
                     
                     console.log(`✅ Status da ordem ${ordemId} atualizado para: ${novoStatus}`);
                     
@@ -3010,6 +3437,14 @@
                     filterButtons.forEach(b => b.classList.remove('active'));
                     btn.classList.add('active');
                     filtroAtual = btn.dataset.filter;
+                    aplicarFiltro();
+                });
+            });
+            viewButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    viewButtons.forEach(item => item.classList.remove('active'));
+                    btn.classList.add('active');
+                    visualizacaoAtual = btn.dataset.view;
                     aplicarFiltro();
                 });
             });
@@ -3109,9 +3544,6 @@
             
             // Iniciar timer de auto-refresh
             iniciarTimerRefresh();
-            
-            // Auto-refresh a cada 30 segundos
-            setInterval(carregarOrdens, 30000);
             
             console.log('✅ Sistema de ordem de produção inicializado (CORE v5.1)');
             
