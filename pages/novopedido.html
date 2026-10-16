@@ -254,6 +254,7 @@
         
         .status-group {
             display: flex;
+            flex-wrap: wrap;
             gap: 20px;
             margin-top: 8px;
         }
@@ -851,6 +852,14 @@
                             <div class="status-option">
                                 <input type="radio" id="statusConcluido" name="status" value="concluido" data-bind="pedido.status">
                                 <label for="statusConcluido">Concluído</label>
+                            </div>
+                            <div class="status-option">
+                                <input type="radio" id="statusEntregue" name="status" value="entregue" data-bind="pedido.status">
+                                <label for="statusEntregue">Entregue</label>
+                            </div>
+                            <div class="status-option">
+                                <input type="radio" id="statusCancelado" name="status" value="cancelado" data-bind="pedido.status">
+                                <label for="statusCancelado">Cancelado</label>
                             </div>
                         </div>
                     </div>

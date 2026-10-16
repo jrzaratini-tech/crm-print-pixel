@@ -4663,7 +4663,11 @@ app.post('/api/database/commit', async (req, res) => {
       const docRef = db.collection('events').doc(id);
       const docSnap = await docRef.get();
       if (docSnap.exists) {
-        await docRef.set({ ...docSnap.data(), ...event, updated: true }, { merge: true });
+        const existingEvent = docSnap.data();
+        const mergedEvent = schema === 'pedido' && existingEvent.schema === 'pedido'
+          ? { ...existingEvent, ...event, payload: { ...(existingEvent.payload || {}), ...event.payload }, updated: true }
+          : { ...existingEvent, ...event, updated: true };
+        await docRef.set(mergedEvent, { merge: true });
         result = { id, action: 'updated', exists: true };
       } else {
         await docRef.set({ ...event, created_at: now });

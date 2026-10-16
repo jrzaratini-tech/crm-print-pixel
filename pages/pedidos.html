@@ -1542,6 +1542,8 @@
                                 <option value="pendente" ${pedido.status === 'pendente' ? 'selected' : ''}>Pendente</option>
                                 <option value="processamento" ${pedido.status === 'processamento' ? 'selected' : ''}>Em Processamento</option>
                                 <option value="concluido" ${pedido.status === 'concluido' ? 'selected' : ''}>Concluído</option>
+                                <option value="entregue" ${pedido.status === 'entregue' ? 'selected' : ''}>Entregue</option>
+                                <option value="cancelado" ${pedido.status === 'cancelado' ? 'selected' : ''}>Cancelado</option>
                             </select>
                         </div>
                     </div>
@@ -1629,6 +1631,8 @@
                         case 'pendente': return { texto: 'Pendente', classe: 'status-pendente' };
                         case 'processamento': return { texto: 'Em Processamento', classe: 'status-processamento' };
                         case 'concluido': return { texto: 'Concluído', classe: 'status-concluido' };
+                        case 'entregue': return { texto: 'Entregue', classe: 'status-concluido' };
+                        case 'cancelado': return { texto: 'Cancelado', classe: 'status-pendente' };
                         default: return { texto: status, classe: '' };
                     }
                 };
@@ -1902,6 +1906,11 @@
                     const payloadAtualizado = {
                         ...eventoMaisRecente.payload,
                         status: novoStatus,
+                        ...(novoStatus === 'concluido' && !eventoMaisRecente.payload?.producaoConcluidaEm ? { producaoConcluidaEm: new Date().toISOString() } : {}),
+                        ...(novoStatus === 'entregue' ? {
+                            dataFechamento: eventoMaisRecente.payload?.dataFechamento || new Date().toISOString(),
+                            entregueEm: eventoMaisRecente.payload?.entregueEm || new Date().toISOString()
+                        } : {}),
                         updated_at: new Date().toISOString()
                     };
                     

@@ -2108,6 +2108,17 @@
                 return assignmentsOf(orderId).filter(item => item.active !== false);
             }
 
+            function assignmentWorkerIds(assignment) {
+                const ids = Array.isArray(assignment?.workerIds) && assignment.workerIds.length
+                    ? assignment.workerIds
+                    : [assignment?.workerId];
+                return [...new Set(ids.filter(Boolean))];
+            }
+
+            function assignmentHasWorker(assignment, workerId) {
+                return assignmentWorkerIds(assignment).includes(workerId);
+            }
+
             function assignmentOf(orderId, productId = '') {
                 return productionAssignments.find(item => item.orderId === orderId && (item.productId || '') === productId && item.active !== false);
             }
@@ -2579,7 +2590,7 @@
                 }
 
                 if (workerFilter.value) {
-                    ordensFiltradas = ordensFiltradas.filter(ordem => activeAssignmentsOf(ordem.id).some(item => item.workerId === workerFilter.value));
+                    ordensFiltradas = ordensFiltradas.filter(ordem => activeAssignmentsOf(ordem.id).some(item => assignmentHasWorker(item, workerFilter.value)));
                 }
 
                 if (activityFilter.value) {
@@ -2722,7 +2733,7 @@
                 const resumo = productionWorkers
                     .filter(worker => worker.active !== false)
                     .map(worker => {
-                        const atribuidas = ordensAbertas.filter(ordem => activeAssignmentsOf(ordem.id).some(item => item.workerId === worker.id));
+                        const atribuidas = ordensAbertas.filter(ordem => activeAssignmentsOf(ordem.id).some(item => assignmentHasWorker(item, worker.id)));
                         return {
                             worker,
                             total: atribuidas.length,

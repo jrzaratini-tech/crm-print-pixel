@@ -183,6 +183,8 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(orderFormPageResult.body, /loadProductCatalog/);
   assert.match(orderFormPageResult.body, /product-delivered/);
   assert.match(orderFormPageResult.body, /pedido\.produtos\.\$\{index\}\.entregue/);
+  assert.match(orderFormPageResult.body, /value="entregue"/);
+  assert.match(orderFormPageResult.body, /value="cancelado"/);
   assert.match(orderFormPageResult.body, /window\.location\.href = 'pedidos\.html'/);
   assert.match(orderFormPageResult.body, /window\.addEventListener\('coreCommitSuccess'/);
   assert.match(orderFormPageResult.body, /setAttribute\('data-original-text', 'ATUALIZAR PEDIDO'\)/);
@@ -191,6 +193,8 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(orderFormPageResult.body, /item-iva-select/);
   assert.match(orderFormPageResult.body, /buyerSellerId/);
   assert.match(ordersPageResult.body, /excluirPedido/);
+  assert.match(ordersPageResult.body, /pedido\.status === 'entregue'/);
+  assert.match(ordersPageResult.body, /pedido\.status === 'cancelado'/);
   assert.match(ordersPageResult.body, /faturacao\.html\?orderId=/);
   assert.match(billingPageResult.body, /Faturação e pagamentos/);
   assert.match(billingPageResult.body, /Link de pagamento Stripe/);
@@ -326,6 +330,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(sellerScriptResult.body, /api\/vendedor\/orcamentos/);
   assert.match(productionPageResult.body, /classificationOverlay/);
   assert.match(productionPageResult.body, /workerFilter/);
+  assert.match(productionPageResult.body, /assignmentHasWorker\(item, workerFilter\.value\)/);
   assert.match(productionPageResult.body, /Desclassificar e devolver à fila/);
   assert.match(productionPageResult.body, /classificationProduct/);
   assert.match(productionPageResult.body, /Controle de comissoes da producao/);
@@ -1390,19 +1395,35 @@ test('rejeita uso do app movel sem dispositivo ativado', async () => {
 });
 
 test('salva, consulta com filtro por id e exclui registro', async () => {
-  const saved = await post('/api/database/commit', { schema: 'pedido', payload: { cliente: 'Teste', total: 123 }, pageId: 'test' });
-  assert.equal(saved.response.status, 200);
-  assert.ok(saved.body.id);
+  const savedId = `pedido-merge-${Date.now()}`;
+  await db.collection('events').doc(savedId).set({
+    schema: 'pedido',
+    payload: { cliente: 'Teste', total: 123, status: 'entregue', entregueEm: '2026-10-15T12:00:00.000Z' },
+    pageId: 'test',
+    deleted: false,
+    timestamp: new Date().toISOString()
+  });
 
-  const filtered = await post('/api/database/query', { schema: 'pedido', filters: { id: saved.body.id } });
+  const updated = await post('/api/database/commit', {
+    id: savedId,
+    schema: 'pedido',
+    payload: { cliente: 'Teste atualizado', total: 124 },
+    pageId: 'test-edit'
+  });
+  assert.equal(updated.response.status, 200);
+
+  const filtered = await post('/api/database/query', { schema: 'pedido', filters: { id: savedId } });
   assert.equal(filtered.response.status, 200);
   assert.equal(filtered.body.count, 1);
-  assert.equal(filtered.body.events[0].payload.cliente, 'Teste');
+  assert.equal(filtered.body.events[0].payload.cliente, 'Teste atualizado');
+  assert.equal(filtered.body.events[0].payload.total, 124);
+  assert.equal(filtered.body.events[0].payload.status, 'entregue');
+  assert.equal(filtered.body.events[0].payload.entregueEm, '2026-10-15T12:00:00.000Z');
 
-  const deleted = await post('/api/database/delete', { id: saved.body.id });
+  const deleted = await post('/api/database/delete', { id: savedId });
   assert.equal(deleted.response.status, 200);
 
-  const afterDelete = await post('/api/database/query', { schema: 'pedido', filters: { id: saved.body.id } });
+  const afterDelete = await post('/api/database/query', { schema: 'pedido', filters: { id: savedId } });
   assert.equal(afterDelete.body.count, 0);
 });
 
