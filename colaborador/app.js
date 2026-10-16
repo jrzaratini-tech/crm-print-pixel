@@ -57,6 +57,10 @@
     return orderStatus(assignment) === 'cancelado';
   }
 
+  function isOrderDelivered(assignment) {
+    return orderStatus(assignment) === 'entregue';
+  }
+
   function isPaid(assignment) {
     return assignment.paymentStatus === 'paid';
   }
@@ -65,9 +69,9 @@
     const unpaid = assignments.filter(item => !isPaid(item));
     return {
       open: unpaid.filter(item => !item.extraPayment && !isOrderCancelled(item) && !isOrderClosed(item) && !isDone(item)).sort(compareOperationalPriority),
-      ready: unpaid.filter(item => !item.extraPayment && isOrderClosed(item) && !isDone(item)).sort((first, second) => operationalInfo(first).weight - operationalInfo(second).weight),
+      ready: unpaid.filter(item => !item.extraPayment && orderStatus(item) === 'concluido' && !isDone(item)).sort((first, second) => operationalInfo(first).weight - operationalInfo(second).weight),
       receivable: unpaid.filter(item => item.extraPayment || (!isOrderCancelled(item) && isDone(item))),
-      paid: assignments.filter(item => isDone(item) && isPaid(item))
+      history: assignments.filter(item => isPaid(item) || isOrderCancelled(item) || (isOrderDelivered(item) && !isDone(item)))
     };
   }
 
@@ -125,8 +129,9 @@
     const card = document.createElement('article');
     const operation = operationalInfo(assignment);
     card.className = `order ${status} ${operation.kind === 'urgent' ? 'urgent' : ''}`;
-    const label = status === 'paid' ? 'Pago' : status === 'done' ? 'A receber' : status === 'ready' ? operation.label : operation.label;
-    const tagClass = status === 'paid' ? 'paid' : status === 'done' ? 'waiting' : status === 'ready' ? 'ready' : operation.kind === 'urgent' ? 'urgent' : '';
+    const historyLabel = isPaid(assignment) ? 'Pago' : isOrderCancelled(assignment) ? 'Cancelado' : operation.label;
+    const label = status === 'history' ? historyLabel : status === 'done' ? 'A receber' : operation.label;
+    const tagClass = status === 'history' ? (isPaid(assignment) ? 'paid' : 'ready') : status === 'done' ? 'waiting' : status === 'ready' ? 'ready' : operation.kind === 'urgent' ? 'urgent' : '';
     if (assignment.extraPayment) {
       card.innerHTML = `
       <div class="row">
@@ -138,9 +143,9 @@
       </div>
       <div class="meta">
         <span>Valor: ${money(assignment.commission)}</span>
-        <span>${status === 'paid' ? `Pago em ${new Date(assignment.paidAt).toLocaleDateString('pt-PT')}` : 'Aguardando pagamento'}</span>
+        <span>${isPaid(assignment) ? `Pago em ${new Date(assignment.paidAt).toLocaleDateString('pt-PT')}` : 'Aguardando pagamento'}</span>
       </div>
-      <button type="button">${status === 'paid' ? 'Abrir historico' : 'Ver detalhe'}</button>`;
+      <button type="button">${status === 'history' ? 'Abrir historico' : 'Ver detalhe'}</button>`;
       card.querySelector('button').addEventListener('click', () => openOrder(assignment.id));
       return card;
     }
@@ -158,9 +163,9 @@
         <span>Comissao total: ${money(assignment.commission)}</span>
         <span>Ja atribuido: ${money(assignedStepValue(assignment))}</span>
         <span>${assignment.steps.filter(step => step.done).length}/${assignment.steps.length} etapas</span>
-        <span>${status === 'paid' ? `Pago em ${new Date(assignment.paidAt).toLocaleDateString('pt-PT')}` : escapeHtml(order.empresa || '')}</span>
+        <span>${isPaid(assignment) ? `Pago em ${new Date(assignment.paidAt).toLocaleDateString('pt-PT')}` : escapeHtml(order.empresa || '')}</span>
       </div>
-      <button type="button">${status === 'paid' ? 'Abrir historico' : status === 'ready' ? 'Ver trabalho encerrado' : 'Abrir trabalho'}</button>`;
+      <button type="button">${status === 'history' ? 'Abrir historico' : status === 'ready' ? 'Ver trabalho pronto' : 'Abrir trabalho'}</button>`;
     card.querySelector('button').addEventListener('click', () => openOrder(assignment.id));
     return card;
   }
@@ -185,16 +190,16 @@
     $('openCount').textContent = grouped.open.length;
     $('readyCount').textContent = grouped.ready.length;
     $('doneCount').textContent = grouped.receivable.length;
-    $('paidCount').textContent = grouped.paid.length;
+    $('paidCount').textContent = grouped.history.length;
     $('assignedValue').textContent = money(sumCommission(activeAssignments));
     $('receivableValue').textContent = money(sumCommission(grouped.receivable));
     if (!activeAssignments.length) showNotice('Nenhum trabalho ativo foi direcionado para voce neste momento.');
     else $('notice').hidden = true;
     renderList('openList', grouped.open, 'open', 'Nenhum trabalho aguardando produção.');
     $('readySection').hidden = grouped.ready.length === 0;
-    renderList('readyList', grouped.ready, 'ready', 'Nenhum trabalho encerrado no CRM.');
+    renderList('readyList', grouped.ready, 'ready', 'Nenhum trabalho pronto para entrega.');
     renderList('receivableList', grouped.receivable, 'done', 'Nenhum trabalho concluido aguardando pagamento.');
-    renderList('paidList', grouped.paid, 'paid', 'Nenhum trabalho pago no historico.');
+    renderList('paidList', grouped.history, 'history', 'Nenhum trabalho no historico.');
   }
 
   async function load() {
