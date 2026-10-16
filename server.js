@@ -2426,7 +2426,9 @@ app.get('/api/colaborador/session', requireWorker, async (req, res) => {
       .map(doc => ({ id: doc.id, ...doc.data() }))
       .filter(item => {
         const workerIds = normalizeProductionWorkers(item.workerIds, item.workerId ? { id: item.workerId } : null);
-        return item.active !== false && workerIds.includes(req.productionWorker.id);
+        return item.active !== false
+          && money(item.commission) > 0
+          && workerIds.includes(req.productionWorker.id);
       })
       .map(async assignment => {
         const order = await getOrderEvent(assignment.orderId);

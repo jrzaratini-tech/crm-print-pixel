@@ -450,9 +450,23 @@ test('classifica OS para colaborador com login sem expor precos e permite chat p
   assert.equal(classified.response.status, 200);
   assert.equal(classified.body.assignment.commission, 75);
 
+  const zeroValueOrder = await post('/api/database/commit', {
+    schema: 'pedido',
+    pageId: 'test',
+    payload: { numero: 'PED-PROD-SEM-VALOR', cliente: 'Registro sem valor', produtos: [{ nome: 'Outro' }] }
+  });
+  const zeroValueAssignment = await post('/api/production/assignments', {
+    orderId: zeroValueOrder.body.id,
+    workerId: created.body.worker.id,
+    commission: 0,
+    steps: ['limpeza_embalagem']
+  });
+  assert.equal(zeroValueAssignment.response.status, 200);
+
   const session = await workerRequest('/api/colaborador/session', token);
   assert.equal(session.response.status, 200);
   assert.equal(session.body.assignments.length, 1);
+  assert.equal(session.body.assignments.some(item => item.orderId === zeroValueOrder.body.id), false);
   assert.equal(session.body.assignments[0].order.status, 'processamento');
   assert.equal(session.body.assignments[0].order.dataEntrada, '2026-10-15');
   assert.equal(session.body.assignments[0].order.produtos[0].nome, 'Letreiro');
