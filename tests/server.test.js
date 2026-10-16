@@ -408,6 +408,8 @@ test('classifica OS para colaborador com login sem expor precos e permite chat p
       numero: 'PED-PROD-1',
       cliente: 'Cliente Producao',
       empresa: 'Empresa Teste',
+      status: 'processamento',
+      dataEntrada: '2026-10-15',
       total: 999,
       subtotal: 800,
       produtos: [{ nome: 'Letreiro', tamanho: '100x50', quantidade: 1, valor: 999 }]
@@ -451,6 +453,8 @@ test('classifica OS para colaborador com login sem expor precos e permite chat p
   const session = await workerRequest('/api/colaborador/session', token);
   assert.equal(session.response.status, 200);
   assert.equal(session.body.assignments.length, 1);
+  assert.equal(session.body.assignments[0].order.status, 'processamento');
+  assert.equal(session.body.assignments[0].order.dataEntrada, '2026-10-15');
   assert.equal(session.body.assignments[0].order.produtos[0].nome, 'Letreiro');
   assert.equal('valor' in session.body.assignments[0].order.produtos[0], false);
   assert.equal('total' in session.body.assignments[0].order, false);

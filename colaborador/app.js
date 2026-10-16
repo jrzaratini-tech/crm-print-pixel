@@ -45,16 +45,67 @@
     return assignment.steps.length > 0 && assignment.steps.every(step => step.done);
   }
 
+  function orderStatus(assignment) {
+    return String(assignment.order?.status || 'pendente').toLowerCase();
+  }
+
+  function isOrderClosed(assignment) {
+    return ['concluido', 'entregue'].includes(orderStatus(assignment));
+  }
+
+  function isOrderCancelled(assignment) {
+    return orderStatus(assignment) === 'cancelado';
+  }
+
   function isPaid(assignment) {
     return assignment.paymentStatus === 'paid';
   }
 
   function groupAssignments() {
+    const unpaid = assignments.filter(item => !isPaid(item));
     return {
-      open: assignments.filter(item => !isDone(item)),
-      receivable: assignments.filter(item => isDone(item) && !isPaid(item)),
+      open: unpaid.filter(item => !item.extraPayment && !isOrderCancelled(item) && !isOrderClosed(item) && !isDone(item)).sort(compareOperationalPriority),
+      ready: unpaid.filter(item => !item.extraPayment && isOrderClosed(item) && !isDone(item)).sort((first, second) => operationalInfo(first).weight - operationalInfo(second).weight),
+      receivable: unpaid.filter(item => item.extraPayment || (!isOrderCancelled(item) && isDone(item))),
       paid: assignments.filter(item => isDone(item) && isPaid(item))
     };
+  }
+
+  function parseOperationalDate(value, endOfDay = false) {
+    if (!value) return null;
+    const match = String(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    const date = match
+      ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), endOfDay ? 23 : 0, endOfDay ? 59 : 0, endOfDay ? 59 : 0)
+      : new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  function sameDay(first, second) {
+    return first && second && first.getFullYear() === second.getFullYear() && first.getMonth() === second.getMonth() && first.getDate() === second.getDate();
+  }
+
+  function operationalInfo(assignment) {
+    const status = orderStatus(assignment);
+    if (status === 'concluido') return { weight: 6, kind: 'ready', label: 'Pronto para entregar' };
+    if (status === 'entregue') return { weight: 7, kind: 'ready', label: 'Entregue' };
+    if (status === 'cancelado') return { weight: 8, kind: 'ready', label: 'Cancelado' };
+    const now = new Date();
+    const due = parseOperationalDate(assignment.order?.dataEntrega, true);
+    if (due && due < now) {
+      const days = Math.max(1, Math.ceil((now - due) / 86400000));
+      return { weight: 0, kind: 'urgent', label: `Atrasado ${days} dia${days === 1 ? '' : 's'}`, due };
+    }
+    if (due && sameDay(due, now)) return { weight: 1, kind: 'urgent', label: 'Entrega hoje', due };
+    return { weight: status === 'processamento' ? 2 : 3, kind: 'open', label: status === 'processamento' ? 'Em produção' : 'Por produzir', due };
+  }
+
+  function compareOperationalPriority(first, second) {
+    const a = operationalInfo(first);
+    const b = operationalInfo(second);
+    if (a.weight !== b.weight) return a.weight - b.weight;
+    const dueDifference = (a.due?.getTime() ?? Number.MAX_SAFE_INTEGER) - (b.due?.getTime() ?? Number.MAX_SAFE_INTEGER);
+    if (dueDifference) return dueDifference;
+    return (parseOperationalDate(first.order?.dataEntrada)?.getTime() || 0) - (parseOperationalDate(second.order?.dataEntrada)?.getTime() || 0);
   }
 
   function sumCommission(list) {
@@ -72,9 +123,10 @@
   function renderCard(assignment, status) {
     const order = assignment.order;
     const card = document.createElement('article');
-    card.className = `order ${status}`;
-    const label = status === 'paid' ? 'Pago' : status === 'done' ? 'A receber' : 'Em andamento';
-    const tagClass = status === 'paid' ? 'paid' : status === 'done' ? 'waiting' : '';
+    const operation = operationalInfo(assignment);
+    card.className = `order ${status} ${operation.kind === 'urgent' ? 'urgent' : ''}`;
+    const label = status === 'paid' ? 'Pago' : status === 'done' ? 'A receber' : status === 'ready' ? operation.label : operation.label;
+    const tagClass = status === 'paid' ? 'paid' : status === 'done' ? 'waiting' : status === 'ready' ? 'ready' : operation.kind === 'urgent' ? 'urgent' : '';
     if (assignment.extraPayment) {
       card.innerHTML = `
       <div class="row">
@@ -102,12 +154,13 @@
       </div>
       <div class="meta">
         <span>Entrega: ${escapeHtml(order.dataEntrega || 'Nao definida')}</span>
+        <span>Estado no CRM: ${escapeHtml(operation.label)}</span>
         <span>Comissao total: ${money(assignment.commission)}</span>
         <span>Ja atribuido: ${money(assignedStepValue(assignment))}</span>
         <span>${assignment.steps.filter(step => step.done).length}/${assignment.steps.length} etapas</span>
         <span>${status === 'paid' ? `Pago em ${new Date(assignment.paidAt).toLocaleDateString('pt-PT')}` : escapeHtml(order.empresa || '')}</span>
       </div>
-      <button type="button">${status === 'paid' ? 'Abrir historico' : 'Abrir trabalho'}</button>`;
+      <button type="button">${status === 'paid' ? 'Abrir historico' : status === 'ready' ? 'Ver trabalho encerrado' : 'Abrir trabalho'}</button>`;
     card.querySelector('button').addEventListener('click', () => openOrder(assignment.id));
     return card;
   }
@@ -127,15 +180,19 @@
 
   function render() {
     const grouped = groupAssignments();
-    $('totalCount').textContent = assignments.length;
+    const activeAssignments = [...grouped.open, ...grouped.ready, ...grouped.receivable];
+    $('totalCount').textContent = activeAssignments.length;
     $('openCount').textContent = grouped.open.length;
+    $('readyCount').textContent = grouped.ready.length;
     $('doneCount').textContent = grouped.receivable.length;
     $('paidCount').textContent = grouped.paid.length;
-    $('assignedValue').textContent = money(sumCommission([...grouped.open, ...grouped.receivable]));
+    $('assignedValue').textContent = money(sumCommission(activeAssignments));
     $('receivableValue').textContent = money(sumCommission(grouped.receivable));
-    if (!assignments.length) showNotice('Nenhum trabalho foi direcionado para voce ate o momento.');
+    if (!activeAssignments.length) showNotice('Nenhum trabalho ativo foi direcionado para voce neste momento.');
     else $('notice').hidden = true;
-    renderList('openList', grouped.open, 'open', 'Nenhum trabalho em andamento.');
+    renderList('openList', grouped.open, 'open', 'Nenhum trabalho aguardando produção.');
+    $('readySection').hidden = grouped.ready.length === 0;
+    renderList('readyList', grouped.ready, 'ready', 'Nenhum trabalho encerrado no CRM.');
     renderList('receivableList', grouped.receivable, 'done', 'Nenhum trabalho concluido aguardando pagamento.');
     renderList('paidList', grouped.paid, 'paid', 'Nenhum trabalho pago no historico.');
   }
@@ -190,17 +247,20 @@
     const orderId = assignment.orderId;
     const order = assignment.order;
     const products = assignment.product ? [assignment.product] : order.produtos;
+    const operation = operationalInfo(assignment);
+    const workLocked = paid || isOrderClosed(assignment) || isOrderCancelled(assignment);
     $('orderDetail').innerHTML = `
       <h2>${escapeHtml(order.numero)} - ${escapeHtml(order.cliente)}</h2>
       <p>${escapeHtml(order.empresa)}</p>
       <div class="box">
         <b>Informacoes do trabalho</b>
         <p>Entrega: ${escapeHtml(order.dataEntrega || 'Nao definida')}</p>
+        <p>Estado no CRM: <strong>${escapeHtml(operation.label)}</strong></p>
         <p>Morada: ${escapeHtml(order.morada || 'Nao informada')}</p>
         <p>Contacto: ${escapeHtml(order.telemovel || 'Nao informado')}</p>
         <p>Comissao total atribuida: <strong>${money(assignment.commission)}</strong></p>
         <p>Ja marcado para voce: <strong>${money(assignedStepValue(assignment))}</strong></p>
-        <p>Status do pagamento: <strong>${paid ? `Pago em ${new Date(assignment.paidAt).toLocaleString('pt-PT')}` : isDone(assignment) ? 'Concluido e aguardando pagamento' : 'Em andamento'}</strong></p>
+        <p>Status do pagamento: <strong>${paid ? `Pago em ${new Date(assignment.paidAt).toLocaleString('pt-PT')}` : isDone(assignment) ? 'Concluido e aguardando pagamento' : isOrderClosed(assignment) ? 'Produção encerrada no CRM; etapas pendentes' : 'Em andamento'}</strong></p>
         <p>${escapeHtml(order.observacoes || '')}</p>
       </div>
       <div class="box">
@@ -213,7 +273,7 @@
           const lockedByOther = step.done && step.completedByWorkerId && step.completedByWorkerId !== currentWorker?.id;
           const owner = step.completedByWorkerName ? ` · feito por ${escapeHtml(step.completedByWorkerName)}` : '';
           return `<div class="step">
-          <label><input type="checkbox" data-step="${escapeHtml(step.id)}" ${step.done ? 'checked' : ''} ${paid || lockedByOther ? 'disabled' : ''}><span>${escapeHtml(step.label)}</span></label>
+          <label><input type="checkbox" data-step="${escapeHtml(step.id)}" ${step.done ? 'checked' : ''} ${workLocked || lockedByOther ? 'disabled' : ''}><span>${escapeHtml(step.label)}</span></label>
           <small>${Number(step.actualMinutes || 0)} min realizados · ${money(step.commissionValue || 0)}${owner}</small>
         </div>`;
         }).join('')}

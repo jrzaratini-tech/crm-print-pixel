@@ -1860,6 +1860,10 @@ function safeOrderForWorker(order, productId = '', includeAllProducts = false) {
     telemovel: text(payload.telemovel, 40),
     morada: text(payload.morada, 250),
     dataEntrega: text(payload.dataEntrega, 30),
+    dataEntrada: text(payload.dataEntrada || order?.created_at || order?.timestamp, 40),
+    status: text(payload.status || 'pendente', 40),
+    producaoConcluidaEm: text(payload.producaoConcluidaEm, 40),
+    entregueEm: text(payload.entregueEm || payload.dataFechamento, 40),
     observacoes: text(payload.observacoes, 800),
     produtos: visibleProducts.map(product => ({
       nome: text(product.nome || 'Produto', 160),
