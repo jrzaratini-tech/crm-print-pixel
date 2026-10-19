@@ -32,6 +32,18 @@ test('estado live renova OAuth e distingue falha temporaria de autorizacao expir
         ? { error: failure }
         : { access_token: 'new-test-access', refresh_token: 'new-test-refresh', expires_in: 3600 } };
     }
+    if (String(target).startsWith('https://api.moloni.pt/v1/documents/getPDFLink/')) {
+      return { ok: true, status: 200, json: async () => ({ url: 'https://www.moloni.pt/teste-fatura.pdf' }) };
+    }
+    if (String(target) === 'https://www.moloni.pt/teste-fatura.pdf') {
+      const bytes = new TextEncoder().encode('%PDF-1.4 ficheiro de teste');
+      return {
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'application/pdf', 'content-length': String(bytes.byteLength) }),
+        arrayBuffer: async () => bytes.buffer
+      };
+    }
     return originalFetch(target, options);
   };
   try {
@@ -42,6 +54,15 @@ test('estado live renova OAuth e distingue falha temporaria de autorizacao expir
     assert.equal(JSON.stringify(connected).includes('new-test-access'), false);
     await originalFetch(url);
     assert.equal(calls, 1);
+
+    await db.collection('moloni_documents').doc('pdf-test').set({
+      mode: 'live', state: 'closed', moloniDocumentId: '789', number: 'FT 2026/7'
+    });
+    const pdfResponse = await originalFetch(`http://127.0.0.1:${server.address().port}/api/moloni/documents/pdf-test/pdf`);
+    assert.equal(pdfResponse.status, 200);
+    assert.equal(pdfResponse.headers.get('content-type'), 'application/pdf');
+    assert.match(pdfResponse.headers.get('content-disposition'), /attachment; filename="FT-2026-7\.pdf"/);
+    assert.equal(Buffer.from(await pdfResponse.arrayBuffer()).subarray(0, 5).toString('ascii'), '%PDF-');
 
     await ref.set({ tokens: encryptedTokens() }, { merge: true });
     failure = 'temporarily_unavailable';

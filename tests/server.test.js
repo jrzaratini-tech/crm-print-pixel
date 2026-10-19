@@ -202,6 +202,8 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(dashboardPageResult.body, /notificationToggle/);
   assert.match(dashboardPageResult.body, /api\/notifications/);
   assert.match(billingPageResult.body, /api\/moloni\/documents\/preview/);
+  assert.match(billingPageResult.body, /Baixar PDF da fatura/);
+  assert.match(billingPageResult.body, /response\.blob\(\)/);
   assert.match(billingPageResult.body, /Modo de teste/);
   assert.match(billingPageResult.body, /button type="button" class="order/);
   assert.match(billingPageResult.body, /recommendationBox/);

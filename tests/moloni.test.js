@@ -219,3 +219,22 @@ test('reconhece refresh token Moloni expirado', () => {
   assert.equal(isMoloniAuthExpiredError({ details: { error: 'invalid_grant' } }), true);
   assert.equal(isMoloniAuthExpiredError(new Error('Erro devolvido pela API Moloni.')), false);
 });
+
+test('partilha renovacao concorrente e encaminha as opcoes da primeira chamada', async () => {
+  let calls = 0;
+  let received;
+  const provider = createMoloniTokenProvider(async options => {
+    calls += 1;
+    received = options;
+    await new Promise(resolve => setTimeout(resolve, 5));
+    return 'token-renovado';
+  });
+  const [first, second] = await Promise.all([
+    provider({ forceRefresh: true }),
+    provider()
+  ]);
+  assert.equal(first, 'token-renovado');
+  assert.equal(second, 'token-renovado');
+  assert.equal(calls, 1);
+  assert.equal(received.forceRefresh, true);
+});

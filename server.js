@@ -57,6 +57,8 @@ const STRIPE_CURRENCY = String(process.env.STRIPE_CURRENCY || 'eur').toLowerCase
 const STRIPE_RETURN_BASE_URL = process.env.STRIPE_RETURN_BASE_URL || '';
 const MAX_QUERY_LIMIT = 5000;
 const MAX_UPLOAD_BYTES = 500 * 1024;
+const MAX_MOLONI_PDF_BYTES = 20 * 1024 * 1024;
+const MOLONI_REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000;
 const UPLOAD_TTL_MS = 15 * 60 * 1000;
 const MOBILE_DEVICE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 const PRODUCTION_SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000;
@@ -533,7 +535,7 @@ async function exchangeMoloniGrant(params) {
   return body;
 }
 
-const moloniAccessToken = createMoloniTokenProvider(async () => {
+const moloniAccessToken = createMoloniTokenProvider(async ({ forceRefresh = false } = {}) => {
   const config = await moloniConfig();
   let tokens;
   try {
@@ -543,7 +545,7 @@ const moloniAccessToken = createMoloniTokenProvider(async () => {
   }
   if (!tokens?.access_token) throw new Error('A conta Moloni ainda nao esta ligada.');
   const expiresAt = Number(tokens.expires_at || 0);
-  if (expiresAt > Date.now() + 60 * 1000) return tokens.access_token;
+  if (!forceRefresh && expiresAt > Date.now() + 60 * 1000) return tokens.access_token;
   if (!tokens.refresh_token) throw new Error('A autorizacao Moloni expirou. Volte a ligar a conta.');
 
   let refreshed;
@@ -562,12 +564,68 @@ const moloniAccessToken = createMoloniTokenProvider(async () => {
     throw error;
   }
   const nextTokens = {
+    ...tokens,
     ...refreshed,
+    refresh_token: refreshed.refresh_token || tokens.refresh_token,
     expires_at: Date.now() + Number(refreshed.expires_in || 3600) * 1000
   };
-  await saveMoloniConfig({ tokens: encryptMoloniTokens(nextTokens), connectedAt: new Date().toISOString(), connectionError: '' });
+  await saveMoloniConfig({
+    tokens: encryptMoloniTokens(nextTokens),
+    connectedAt: config.connectedAt || new Date().toISOString(),
+    tokenRefreshedAt: new Date().toISOString(),
+    connectionError: ''
+  });
   return nextTokens.access_token;
 });
+
+async function maintainMoloniConnection() {
+  if (MOLONI_MODE !== 'live') return;
+  const config = await moloniConfig();
+  if (!config.tokens) return;
+  try {
+    await moloniAccessToken({ forceRefresh: true });
+  } catch (error) {
+    console.error('Falha na renovacao preventiva da ligacao Moloni:', error.message);
+  }
+}
+
+function startMoloniConnectionMaintenance() {
+  if (MOLONI_MODE !== 'live') return;
+  const firstRun = setTimeout(() => maintainMoloniConnection(), 30 * 1000);
+  const interval = setInterval(() => maintainMoloniConnection(), MOLONI_REFRESH_INTERVAL_MS);
+  firstRun.unref?.();
+  interval.unref?.();
+}
+
+function moloniPdfFilename(document = {}) {
+  const source = String(document.number || `${document.label || 'fatura'}-${document.orderNumber || document.moloniDocumentId || 'moloni'}`)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Za-z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 120);
+  return `${source || 'fatura-moloni'}.pdf`;
+}
+
+async function downloadMoloniPdf(url) {
+  const parsed = new URL(String(url || ''));
+  if (parsed.protocol !== 'https:') throw new Error('O Moloni devolveu uma ligacao de PDF invalida.');
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20 * 1000);
+  try {
+    const response = await fetch(parsed, { signal: controller.signal, redirect: 'follow' });
+    if (!response.ok) throw new Error(`O Moloni nao disponibilizou o PDF (HTTP ${response.status}).`);
+    const declaredSize = Number(response.headers.get('content-length') || 0);
+    if (declaredSize > MAX_MOLONI_PDF_BYTES) throw new Error('O PDF devolvido pelo Moloni excede o limite permitido.');
+    const buffer = Buffer.from(await response.arrayBuffer());
+    if (!buffer.length || buffer.length > MAX_MOLONI_PDF_BYTES || buffer.subarray(0, 5).toString('ascii') !== '%PDF-') {
+      throw new Error('O Moloni nao devolveu um ficheiro PDF valido.');
+    }
+    return buffer;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
 
 async function moloniOrder(orderId) {
   const snapshot = await db.collection('events').doc(String(orderId || '')).get();
@@ -3748,6 +3806,9 @@ app.get('/api/moloni/documents/:id/pdf', async (req, res) => {
     if (document.mode === 'mock') {
       return res.status(409).json({ success: false, message: 'Documentos de teste nao possuem PDF fiscal.' });
     }
+    if (document.state !== 'closed') {
+      return res.status(409).json({ success: false, message: 'Feche o documento no Moloni antes de baixar o PDF fiscal.' });
+    }
     const config = await moloniConfig();
     const client = new MoloniClient({ accessToken: await moloniAccessToken() });
     const result = await client.call('documents/getPDFLink', {
@@ -3755,8 +3816,17 @@ app.get('/api/moloni/documents/:id/pdf', async (req, res) => {
       document_id: Number(document.moloniDocumentId),
       signed: 1
     });
-    res.json({ success: true, url: result.url || result.link || result });
+    const pdfUrl = typeof result === 'string' ? result : result.url || result.link || '';
+    const pdf = await downloadMoloniPdf(pdfUrl);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': `attachment; filename="${moloniPdfFilename(document)}"`,
+      'Content-Length': String(pdf.length),
+      'Cache-Control': 'private, no-store, max-age=0'
+    });
+    res.send(pdf);
   } catch (error) {
+    console.error('Erro ao baixar PDF Moloni:', error.message);
     res.status(502).json({ success: false, message: error.message || 'Nao foi possivel obter o PDF.' });
   }
 });
@@ -4878,7 +4948,10 @@ app.use((error, req, res, next) => {
 });
 
 if (require.main === module) {
-  app.listen(PORT, () => console.log(`CRM PRINT PIXEL ONLINE - PORTA ${PORT}`));
+  app.listen(PORT, () => {
+    console.log(`CRM PRINT PIXEL ONLINE - PORTA ${PORT}`);
+    startMoloniConnectionMaintenance();
+  });
 }
 
 module.exports = { app, containsUnsafeMarkup, sanitizeForResponse, matchesFilters, normalizeLimit };

@@ -74,7 +74,9 @@ Documento fechado (`status=1`) pode comunicar/conciliar fiscalmente e não deve 
 
 - O navegador nunca recebe o `Client Secret` nem os tokens.
 - O access token é renovado automaticamente com refresh token.
-- Se o refresh token expirar, é necessário voltar a ligar a conta Moloni.
+- O CRM renova preventivamente os tokens Moloni a cada 12 horas enquanto o servidor estiver ativo. Como o refresh token do Moloni vale 14 dias, o serviço de produção deve permanecer ativo (ou ser acordado regularmente pelo health check da hospedagem).
+- Se a conta ficar mais de 14 dias sem qualquer renovação, é necessário voltar a ligar a conta Moloni uma vez; depois disso a renovação preventiva volta a manter a ligação.
+- PDFs de documentos fechados são baixados diretamente no CRM. O CRM pede uma ligação nova ao Moloni no momento do download e transmite o PDF como anexo, sem guardar nem expor a ligação temporária.
 - O CRM bloqueia emissão live se faltar empresa, séries, artigo ou método de pagamento.
 - Cada pedido só pode originar uma Fatura ou Fatura-Recibo válida.
 - Cada pagamento possui uma chave única para impedir recibos duplicados.

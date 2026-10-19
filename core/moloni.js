@@ -371,9 +371,9 @@ function isMoloniAuthExpiredError(error) {
 // Always release the promise after failure so the next request can retry.
 function createMoloniTokenProvider(loadToken) {
   let pending;
-  return function accessToken() {
+  return function accessToken(options = {}) {
     if (!pending) {
-      pending = Promise.resolve().then(loadToken).finally(() => { pending = null; });
+      pending = Promise.resolve().then(() => loadToken(options)).finally(() => { pending = null; });
     }
     return pending;
   };
