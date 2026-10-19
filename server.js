@@ -607,7 +607,23 @@ function moloniPdfFilename(document = {}) {
   return `${source || 'fatura-moloni'}.pdf`;
 }
 
-async function downloadMoloniPdf(url) {
+function moloniDirectPdfUrl(url, { documentId, email } = {}) {
+  const parsed = new URL(String(url || ''));
+  if (parsed.protocol !== 'https:') throw new Error('O Moloni devolveu uma ligacao de PDF invalida.');
+  const hash = parsed.searchParams.get('h');
+  if (!hash || !documentId || !email) return '';
+  const direct = new URL('https://www.moloni.pt/downloads/index.php');
+  parsed.searchParams.forEach((value, key) => direct.searchParams.set(key, value));
+  direct.searchParams.set('action', 'getDownload');
+  direct.searchParams.set('h', hash);
+  direct.searchParams.set('d', String(documentId));
+  direct.searchParams.set('e', String(email));
+  if (!direct.searchParams.has('i')) direct.searchParams.set('i', '1');
+  if (!direct.searchParams.has('t')) direct.searchParams.set('t', 'n');
+  return direct.toString();
+}
+
+async function fetchMoloniPdf(url) {
   const parsed = new URL(String(url || ''));
   if (parsed.protocol !== 'https:') throw new Error('O Moloni devolveu uma ligacao de PDF invalida.');
   const controller = new AbortController();
@@ -618,13 +634,28 @@ async function downloadMoloniPdf(url) {
     const declaredSize = Number(response.headers.get('content-length') || 0);
     if (declaredSize > MAX_MOLONI_PDF_BYTES) throw new Error('O PDF devolvido pelo Moloni excede o limite permitido.');
     const buffer = Buffer.from(await response.arrayBuffer());
-    if (!buffer.length || buffer.length > MAX_MOLONI_PDF_BYTES || buffer.subarray(0, 5).toString('ascii') !== '%PDF-') {
-      throw new Error('O Moloni nao devolveu um ficheiro PDF valido.');
-    }
-    return buffer;
+    if (!buffer.length || buffer.length > MAX_MOLONI_PDF_BYTES) throw new Error('O PDF devolvido pelo Moloni excede o limite permitido.');
+    return { buffer, valid: buffer.subarray(0, 1024).indexOf(Buffer.from('%PDF-')) >= 0 };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function downloadMoloniPdf(url, context = {}) {
+  const candidates = [String(url || '')];
+  const directUrl = moloniDirectPdfUrl(url, context);
+  if (directUrl && !candidates.includes(directUrl)) candidates.push(directUrl);
+  let lastError;
+  for (const candidate of candidates) {
+    try {
+      const result = await fetchMoloniPdf(candidate);
+      if (result.valid) return result.buffer;
+      lastError = new Error('O Moloni devolveu uma pagina de download em vez do PDF.');
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError || new Error('O Moloni nao devolveu um ficheiro PDF valido.');
 }
 
 async function moloniOrder(orderId) {
@@ -3817,7 +3848,11 @@ app.get('/api/moloni/documents/:id/pdf', async (req, res) => {
       signed: 1
     });
     const pdfUrl = typeof result === 'string' ? result : result.url || result.link || '';
-    const pdf = await downloadMoloniPdf(pdfUrl);
+    const profile = await client.call('users/getMe').catch(() => ({}));
+    const pdf = await downloadMoloniPdf(pdfUrl, {
+      documentId: document.moloniDocumentId,
+      email: profile.email
+    });
     res.set({
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="${moloniPdfFilename(document)}"`,

@@ -25,6 +25,7 @@ test('estado live renova OAuth e distingue falha temporaria de autorizacao expir
   const url = `http://127.0.0.1:${server.address().port}/api/moloni/status`;
   let calls = 0;
   let failure = '';
+  let directPdfUrl = '';
   global.fetch = async (target, options) => {
     if (String(target).startsWith('https://api.moloni.pt/v1/grant/')) {
       calls++;
@@ -33,9 +34,22 @@ test('estado live renova OAuth e distingue falha temporaria de autorizacao expir
         : { access_token: 'new-test-access', refresh_token: 'new-test-refresh', expires_in: 3600 } };
     }
     if (String(target).startsWith('https://api.moloni.pt/v1/documents/getPDFLink/')) {
-      return { ok: true, status: 200, json: async () => ({ url: 'https://www.moloni.pt/teste-fatura.pdf' }) };
+      return { ok: true, status: 200, json: async () => ({ url: 'https://www.moloni.pt/downloads/?h=hash-teste' }) };
     }
-    if (String(target) === 'https://www.moloni.pt/teste-fatura.pdf') {
+    if (String(target).startsWith('https://api.moloni.pt/v1/users/getMe/')) {
+      return { ok: true, status: 200, json: async () => ({ email: 'faturacao@printpixel.pt' }) };
+    }
+    if (String(target) === 'https://www.moloni.pt/downloads/?h=hash-teste') {
+      const bytes = new TextEncoder().encode('<!doctype html><title>Download Moloni</title>');
+      return {
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-type': 'text/html', 'content-length': String(bytes.byteLength) }),
+        arrayBuffer: async () => bytes.buffer
+      };
+    }
+    if (String(target).startsWith('https://www.moloni.pt/downloads/index.php?')) {
+      directPdfUrl = String(target);
       const bytes = new TextEncoder().encode('%PDF-1.4 ficheiro de teste');
       return {
         ok: true,
@@ -63,6 +77,11 @@ test('estado live renova OAuth e distingue falha temporaria de autorizacao expir
     assert.equal(pdfResponse.headers.get('content-type'), 'application/pdf');
     assert.match(pdfResponse.headers.get('content-disposition'), /attachment; filename="FT-2026-7\.pdf"/);
     assert.equal(Buffer.from(await pdfResponse.arrayBuffer()).subarray(0, 5).toString('ascii'), '%PDF-');
+    const direct = new URL(directPdfUrl);
+    assert.equal(direct.searchParams.get('action'), 'getDownload');
+    assert.equal(direct.searchParams.get('h'), 'hash-teste');
+    assert.equal(direct.searchParams.get('d'), '789');
+    assert.equal(direct.searchParams.get('e'), 'faturacao@printpixel.pt');
 
     await ref.set({ tokens: encryptedTokens() }, { merge: true });
     failure = 'temporarily_unavailable';
