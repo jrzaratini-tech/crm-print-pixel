@@ -57,11 +57,11 @@ const STRIPE_CURRENCY = String(process.env.STRIPE_CURRENCY || 'eur').toLowerCase
 const STRIPE_RETURN_BASE_URL = process.env.STRIPE_RETURN_BASE_URL || '';
 const MAX_QUERY_LIMIT = 5000;
 const MAX_UPLOAD_BYTES = 500 * 1024;
-const MAX_MOLONI_PDF_BYTES = 20 * 1024 * 1024;
 const MOLONI_REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000;
 const UPLOAD_TTL_MS = 15 * 60 * 1000;
 const MOBILE_DEVICE_TTL_MS = 90 * 24 * 60 * 60 * 1000;
 const PRODUCTION_SESSION_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+const CRM_SESSION_TTL_MS = 12 * 60 * 60 * 1000;
 const LABEL_PLATFORM_MONTHLY_FEE = 15;
 const LABEL_OPEN_BALANCE_START_MONTH = /^\d{4}-\d{2}$/.test(process.env.LABEL_OPEN_BALANCE_START_MONTH || '')
   ? process.env.LABEL_OPEN_BALANCE_START_MONTH
@@ -118,8 +118,37 @@ function safeEqual(left, right) {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
+function parseCookies(header) {
+  return Object.fromEntries(String(header || '').split(';').map(part => {
+    const separator = part.indexOf('=');
+    if (separator < 1) return null;
+    return [part.slice(0, separator).trim(), part.slice(separator + 1).trim()];
+  }).filter(Boolean));
+}
+
+function signCrmSession(username) {
+  const payload = Buffer.from(JSON.stringify({ username, expiresAt: Date.now() + CRM_SESSION_TTL_MS })).toString('base64url');
+  const signature = crypto.createHmac('sha256', CRM_PASSWORD).update(payload).digest('base64url');
+  return `${payload}.${signature}`;
+}
+
+function validCrmSession(token) {
+  try {
+    const [payload, signature] = String(token || '').split('.');
+    if (!payload || !signature) return false;
+    const expected = crypto.createHmac('sha256', CRM_PASSWORD).update(payload).digest('base64url');
+    if (!safeEqual(signature, expected)) return false;
+    const session = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    return safeEqual(session.username, CRM_USERNAME) && Number(session.expiresAt || 0) > Date.now();
+  } catch {
+    return false;
+  }
+}
+
 function requireAuth(req, res, next) {
   if (AUTH_DISABLED || (!IS_PRODUCTION && !CRM_USERNAME && !CRM_PASSWORD)) return next();
+
+  if (validCrmSession(parseCookies(req.headers.cookie).crm_session)) return next();
 
   const [scheme, credentials] = String(req.headers.authorization || '').split(' ');
   if (scheme === 'Basic' && credentials) {
@@ -127,8 +156,11 @@ function requireAuth(req, res, next) {
     if (safeEqual(username, CRM_USERNAME) && safeEqual(password, CRM_PASSWORD)) return next();
   }
 
-  res.set('WWW-Authenticate', 'Basic realm="CRM PrintPixel", charset="UTF-8"');
-  return res.status(401).send('Autenticação necessária.');
+  if (req.method === 'GET' && !req.path.startsWith('/api/')) {
+    const returnTo = encodeURIComponent(req.originalUrl.startsWith('/') ? req.originalUrl : '/');
+    return res.redirect(303, `/login?returnTo=${returnTo}`);
+  }
+  return res.status(401).json({ success: false, message: 'Autenticação necessária.' });
 }
 
 function requestRateLimit({ windowMs, max }) {
@@ -222,6 +254,7 @@ app.use(express.json({
     if (req.originalUrl === '/api/stripe/webhook') req.rawBody = Buffer.from(buffer);
   }
 }));
+app.use(express.urlencoded({ extended: false, limit: '10kb' }));
 app.use('/api', requestRateLimit({ windowMs: 60 * 1000, max: 240 }));
 
 function mobileSessionExpired(session) {
@@ -597,65 +630,13 @@ function startMoloniConnectionMaintenance() {
   interval.unref?.();
 }
 
-function moloniPdfFilename(document = {}) {
-  const source = String(document.number || `${document.label || 'fatura'}-${document.orderNumber || document.moloniDocumentId || 'moloni'}`)
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^A-Za-z0-9._-]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 120);
-  return `${source || 'fatura-moloni'}.pdf`;
-}
-
-function moloniDirectPdfUrl(url, { documentId, email } = {}) {
+function moloniDownloadUrl(url) {
   const parsed = new URL(String(url || ''));
   if (parsed.protocol !== 'https:') throw new Error('O Moloni devolveu uma ligacao de PDF invalida.');
-  const hash = parsed.searchParams.get('h');
-  if (!hash || !documentId || !email) return '';
-  const direct = new URL('https://www.moloni.pt/downloads/index.php');
-  parsed.searchParams.forEach((value, key) => direct.searchParams.set(key, value));
-  direct.searchParams.set('action', 'getDownload');
-  direct.searchParams.set('h', hash);
-  direct.searchParams.set('d', String(documentId));
-  direct.searchParams.set('e', String(email));
-  if (!direct.searchParams.has('i')) direct.searchParams.set('i', '1');
-  if (!direct.searchParams.has('t')) direct.searchParams.set('t', 'n');
-  return direct.toString();
-}
-
-async function fetchMoloniPdf(url) {
-  const parsed = new URL(String(url || ''));
-  if (parsed.protocol !== 'https:') throw new Error('O Moloni devolveu uma ligacao de PDF invalida.');
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 20 * 1000);
-  try {
-    const response = await fetch(parsed, { signal: controller.signal, redirect: 'follow' });
-    if (!response.ok) throw new Error(`O Moloni nao disponibilizou o PDF (HTTP ${response.status}).`);
-    const declaredSize = Number(response.headers.get('content-length') || 0);
-    if (declaredSize > MAX_MOLONI_PDF_BYTES) throw new Error('O PDF devolvido pelo Moloni excede o limite permitido.');
-    const buffer = Buffer.from(await response.arrayBuffer());
-    if (!buffer.length || buffer.length > MAX_MOLONI_PDF_BYTES) throw new Error('O PDF devolvido pelo Moloni excede o limite permitido.');
-    return { buffer, valid: buffer.subarray(0, 1024).indexOf(Buffer.from('%PDF-')) >= 0 };
-  } finally {
-    clearTimeout(timeout);
+  if (parsed.hostname !== 'moloni.pt' && !parsed.hostname.endsWith('.moloni.pt')) {
+    throw new Error('O Moloni devolveu um destino de download nao autorizado.');
   }
-}
-
-async function downloadMoloniPdf(url, context = {}) {
-  const candidates = [String(url || '')];
-  const directUrl = moloniDirectPdfUrl(url, context);
-  if (directUrl && !candidates.includes(directUrl)) candidates.push(directUrl);
-  let lastError;
-  for (const candidate of candidates) {
-    try {
-      const result = await fetchMoloniPdf(candidate);
-      if (result.valid) return result.buffer;
-      lastError = new Error('O Moloni devolveu uma pagina de download em vez do PDF.');
-    } catch (error) {
-      lastError = error;
-    }
-  }
-  throw lastError || new Error('O Moloni nao devolveu um ficheiro PDF valido.');
+  return parsed.toString();
 }
 
 async function moloniOrder(orderId) {
@@ -2842,6 +2823,46 @@ app.get('/api/moloni/oauth/callback', async (req, res) => {
   }
 });
 
+function safeLoginReturnTo(value) {
+  const target = String(value || '/');
+  return target.startsWith('/') && !target.startsWith('//') && !target.includes('\\') ? target.slice(0, 500) : '/';
+}
+
+function crmLoginPage(returnTo = '/', invalid = false) {
+  const target = safeLoginReturnTo(returnTo).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  return `<!doctype html>
+<html lang="pt-PT"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Entrar — CRM PrintPixel</title><style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#f4f7fb;color:#172033;font:15px/1.5 Inter,system-ui,sans-serif}.card{width:min(420px,calc(100% - 32px));background:#fff;border:1px solid #dfe5ef;border-radius:16px;padding:28px;box-shadow:0 18px 50px rgba(31,46,85,.12)}h1{margin:0 0 6px;font-size:25px}p{margin:0 0 22px;color:#65718a}label{display:block;font-weight:700;margin:14px 0 6px}input{width:100%;padding:12px;border:1px solid #cfd7e5;border-radius:9px;font:inherit}input:focus{outline:3px solid rgba(37,99,235,.14);border-color:#2563eb}button{width:100%;margin-top:20px;padding:12px;border:0;border-radius:10px;background:#2563eb;color:#fff;font:inherit;font-weight:700;cursor:pointer}.error{padding:10px 12px;border-radius:9px;background:#fef2f2;color:#b91c1c;margin-bottom:12px}</style></head>
+<body><main class="card"><h1>CRM PrintPixel</h1><p>Entre com as mesmas credenciais usadas no CRM.</p>${invalid ? '<div class="error">Utilizador ou palavra-passe incorretos.</div>' : ''}
+<form method="post" action="/login"><input type="hidden" name="returnTo" value="${target}"><label for="username">Utilizador</label><input id="username" name="username" autocomplete="username" required autofocus><label for="password">Palavra-passe</label><input id="password" name="password" type="password" autocomplete="current-password" required><button type="submit">Entrar com segurança</button></form></main></body></html>`;
+}
+
+app.get('/login', (req, res) => {
+  if (AUTH_DISABLED || (!IS_PRODUCTION && !CRM_USERNAME && !CRM_PASSWORD)) return res.redirect(303, safeLoginReturnTo(req.query.returnTo));
+  res.type('html').send(crmLoginPage(req.query.returnTo, req.query.error === '1'));
+});
+
+app.post('/login', requestRateLimit({ windowMs: 15 * 60 * 1000, max: 12 }), (req, res) => {
+  const returnTo = safeLoginReturnTo(req.body?.returnTo);
+  if (!safeEqual(req.body?.username, CRM_USERNAME) || !safeEqual(req.body?.password, CRM_PASSWORD)) {
+    return res.status(401).type('html').send(crmLoginPage(returnTo, true));
+  }
+  res.cookie('crm_session', signCrmSession(CRM_USERNAME), {
+    httpOnly: true,
+    secure: IS_PRODUCTION,
+    sameSite: 'strict',
+    maxAge: CRM_SESSION_TTL_MS,
+    path: '/'
+  });
+  return res.redirect(303, returnTo);
+});
+
+app.post('/logout', (req, res) => {
+  res.clearCookie('crm_session', { httpOnly: true, secure: IS_PRODUCTION, sameSite: 'strict', path: '/' });
+  res.redirect(303, '/login');
+});
+
 app.use(requireAuth);
 
 app.get('/api/rotulos/customers', async (req, res) => {
@@ -3848,18 +3869,10 @@ app.get('/api/moloni/documents/:id/pdf', async (req, res) => {
       signed: 1
     });
     const pdfUrl = typeof result === 'string' ? result : result.url || result.link || '';
-    const profile = await client.call('users/getMe').catch(() => ({}));
-    const pdf = await downloadMoloniPdf(pdfUrl, {
-      documentId: document.moloniDocumentId,
-      email: profile.email
-    });
-    res.set({
-      'Content-Type': 'application/pdf',
-      'Content-Disposition': `attachment; filename="${moloniPdfFilename(document)}"`,
-      'Content-Length': String(pdf.length),
-      'Cache-Control': 'private, no-store, max-age=0'
-    });
-    res.send(pdf);
+    // O URL do Moloni abre uma pagina intermedia que executa no navegador o download
+    // do PDF. Nao o transforme em blob no servidor: isso removeria o JavaScript da pagina.
+    res.set('Cache-Control', 'private, no-store, max-age=0');
+    res.redirect(303, moloniDownloadUrl(pdfUrl));
   } catch (error) {
     console.error('Erro ao baixar PDF Moloni:', error.message);
     res.status(502).json({ success: false, message: error.message || 'Nao foi possivel obter o PDF.' });

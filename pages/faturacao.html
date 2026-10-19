@@ -684,27 +684,15 @@
       async function downloadPdf(button) {
         const originalHtml = button.innerHTML;
         button.disabled = true;
-        button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> A baixar';
+        button.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> A preparar';
         try {
-          const response = await fetch(`/api/moloni/documents/${encodeURIComponent(button.dataset.id)}/pdf`);
-          if (!response.ok) {
-            const body = await response.json().catch(() => ({}));
-            throw new Error(body.message || 'Não foi possível baixar o PDF.');
-          }
-          const blob = await response.blob();
-          const disposition = response.headers.get('content-disposition') || '';
-          const filename = disposition.match(/filename="([^"]+)"/i)?.[1] || 'fatura-moloni.pdf';
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = filename;
-          document.body.appendChild(link);
-          link.click();
-          link.remove();
-          setTimeout(() => URL.revokeObjectURL(url), 1000);
-          message('PDF da fatura baixado pelo CRM.', 'success');
-        } catch (error) {
-          message(error.message, 'error');
+          const downloadWindow = window.open(
+            `/api/moloni/documents/${encodeURIComponent(button.dataset.id)}/pdf`,
+            '_blank'
+          );
+          if (!downloadWindow) throw new Error('O navegador bloqueou o download. Autorize pop-ups para este CRM e tente novamente.');
+          downloadWindow.opener = null;
+          message('Download solicitado ao Moloni numa ligação nova e segura.', 'success');
         } finally {
           button.disabled = false;
           button.innerHTML = originalHtml;
