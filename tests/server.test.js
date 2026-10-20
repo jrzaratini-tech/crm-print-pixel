@@ -105,6 +105,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   const productsPageResult = await request('/pages/produtos.html');
   const recipesPageResult = await request('/pages/receitas.html');
   const integrationsPageResult = await request('/pages/integracoes.html');
+  const settingsPageResult = await request('/pages/configuracoes.html');
   const fiscalClosePageResult = await request('/pages/fecho-fiscal.html');
   const learningPageResult = await request('/pages/aprendizagem.html');
   const ordersPageResult = await request('/pages/pedidos.html');
@@ -143,6 +144,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.equal(productsPageResult.response.status, 200);
   assert.equal(recipesPageResult.response.status, 200);
   assert.equal(integrationsPageResult.response.status, 200);
+  assert.equal(settingsPageResult.response.status, 200);
   assert.equal(fiscalClosePageResult.response.status, 200);
   assert.equal(learningPageResult.response.status, 200);
   assert.equal(ordersPageResult.response.status, 200);
@@ -175,12 +177,14 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(menuResult.body, /nav_produtos/);
   assert.match(menuResult.body, /nav_receitas/);
   assert.match(menuResult.body, /nav_integracoes/);
+  assert.match(menuResult.body, /nav_configuracoes/);
   assert.match(menuResult.body, /nav_faturacao/);
   assert.match(menuResult.body, /pages\/calculadora\.html/);
   assert.match(menuResult.body, /pages\/produtos\.html/);
   assert.match(menuResult.body, /pages\/receitas\.html/);
   assert.match(menuResult.body, /pages\/integracoes\.html/);
   assert.match(integrationsPageResult.body, /api\/integration-jobs/);
+  assert.match(settingsPageResult.body, /Administradores e auditoria/);
   assert.match(fiscalClosePageResult.body, /api\/fiscal\/quarters/);
   assert.match(learningPageResult.body, /api\/learning\/recommendations/);
   assert.match(menuResult.body, /pages\/rotulos\.html/);

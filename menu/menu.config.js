@@ -260,12 +260,23 @@
     },
 
     {
+        id: "nav_configuracoes",
+        name: "Configurações",
+        file: "pages/configuracoes.html",
+        type: "NEUTRAL",
+        pos: 14,
+        icon: "fa-cog",
+        hidden: false,
+        deleted: false
+    },
+
+    {
         id: "nav_utilizadores",
         name: "Utilizadores e Auditoria",
         file: "pages/utilizadores.html",
         type: "WRITE",
-        pos: 14,
-        hidden: false,
+        pos: 15,
+        hidden: true,
         deleted: false
     },
 
@@ -274,8 +285,8 @@
         name: "Integrações",
         file: "pages/integracoes.html",
         type: "WRITE",
-        pos: 15,
-        hidden: false,
+        pos: 16,
+        hidden: true,
         deleted: false
     }
 ];

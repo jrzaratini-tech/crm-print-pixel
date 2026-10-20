@@ -52,6 +52,7 @@ const PAGE_PERMISSIONS = Object.freeze({
   'links.html': 'users.manage',
   'ia.html': 'ai.use',
   'aprendizagem.html': 'management.read',
+  'configuracoes.html': 'users.manage',
   'utilizadores.html': 'users.manage',
   'integracoes.html': 'integrations.manage'
 });

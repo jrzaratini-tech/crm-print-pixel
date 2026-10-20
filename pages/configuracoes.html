@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <script src="../core/security.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configurações - PrintPixel</title>
+  <style>
+    :root{color-scheme:light;--ink:#172033;--muted:#667085;--line:#e1e7f0;--surface:#fff;--bg:#f4f6fa;--blue:#3157d5;--blue-soft:#eef3ff;--violet:#7658d7;--green:#087a55;--shadow:0 15px 40px rgba(23,32,51,.08)}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.55 Inter,"Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}a{color:inherit}main{max-width:1120px;margin:auto;padding:42px 24px 64px}.eyebrow{margin:0 0 8px;color:var(--blue);font-size:11px;font-weight:900;letter-spacing:.13em;text-transform:uppercase}.intro{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin-bottom:28px}.intro h1{margin:0;font-size:clamp(28px,4vw,40px);line-height:1.12;letter-spacing:-.035em}.intro p{max-width:680px;margin:10px 0 0;color:var(--muted);font-size:16px}.admin-badge{display:inline-flex;align-items:center;gap:8px;padding:9px 13px;border:1px solid #bfe7d5;border-radius:999px;background:#ebfaf3;color:var(--green);font-size:12px;font-weight:850;white-space:nowrap}.grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.card{position:relative;display:flex;min-height:260px;flex-direction:column;padding:25px;border:1px solid var(--line);border-radius:20px;background:var(--surface);box-shadow:var(--shadow);text-decoration:none;overflow:hidden;transition:transform .18s,border-color .18s,box-shadow .18s}.card:after{content:"";position:absolute;right:-34px;bottom:-50px;width:150px;height:150px;border-radius:50%;background:var(--soft)}.card:hover{transform:translateY(-3px);border-color:#bac7e3;box-shadow:0 20px 46px rgba(23,32,51,.12)}.card-icon{position:relative;z-index:1;width:48px;height:48px;display:grid;place-items:center;border-radius:15px;background:var(--soft);color:var(--accent);font-size:22px;font-weight:900}.card h2{position:relative;z-index:1;margin:20px 0 7px;font-size:21px;letter-spacing:-.02em}.card p{position:relative;z-index:1;margin:0;color:var(--muted)}.card-footer{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:auto;padding-top:25px;color:var(--accent);font-size:13px;font-weight:900}.users{--accent:var(--blue);--soft:var(--blue-soft)}.integrations{--accent:var(--violet);--soft:#f2edff}.notice{margin-top:20px;padding:18px 20px;border:1px solid var(--line);border-radius:16px;background:#fff;color:var(--muted)}.notice strong{color:var(--ink)}.notice ul{margin:9px 0 0;padding-left:20px}.notice li{margin:5px 0}@media(max-width:720px){main{padding:26px 15px}.intro{display:block}.admin-badge{margin-top:16px}.grid{grid-template-columns:1fr}.card{min-height:230px}}
+  </style>
+</head>
+<body data-page-id="configuracoes" data-page-type="READ">
+  <main>
+    <section class="intro">
+      <div><p class="eyebrow">Administração do sistema</p><h1>Configurações</h1><p>Ferramentas usadas ocasionalmente para manter o acesso, a segurança e as ligações externas do CRM.</p></div>
+      <span class="admin-badge">● Acesso administrativo</span>
+    </section>
+
+    <section class="grid" aria-label="Áreas de configuração">
+      <a class="card users" href="utilizadores.html">
+        <span class="card-icon" aria-hidden="true">◎</span>
+        <h2>Administradores e auditoria</h2>
+        <p>Gerir os dois acessos completos ao CRM, alterar palavras-passe e consultar o histórico de ações importantes.</p>
+        <span class="card-footer"><span>Abrir controlo administrativo</span><span aria-hidden="true">→</span></span>
+      </a>
+
+      <a class="card integrations" href="integracoes.html">
+        <span class="card-icon" aria-hidden="true">↔</span>
+        <h2>Integrações</h2>
+        <p>Acompanhar ligações com Shopify, Moloni e outros serviços, incluindo tarefas com falha que precisem de intervenção.</p>
+        <span class="card-footer"><span>Abrir integrações técnicas</span><span aria-hidden="true">→</span></span>
+      </a>
+    </section>
+
+    <section class="notice">
+      <strong>Como ficam os acessos</strong>
+      <ul>
+        <li>Você e a sua mulher continuam com acesso total ao CRM.</li>
+        <li>Os colaboradores continuam a entrar apenas no aplicativo individual e veem somente os trabalhos atribuídos.</li>
+        <li>A auditoria permanece automática e não exige trabalho diário.</li>
+      </ul>
+    </section>
+  </main>
+</body>
+</html>

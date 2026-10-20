@@ -760,10 +760,11 @@
                 const button = document.createElement('button');
                 button.id = item.id;
                 
-                let icon = 'fa-file';
+                let icon = item.icon || 'fa-file';
                 if (item.type === 'READ') icon = 'fa-chart-bar';
                 if (item.type === 'WRITE') icon = 'fa-edit';
                 if (item.type === 'NEUTRAL') icon = 'fa-eye';
+                if (item.icon) icon = item.icon;
                 
                 button.innerHTML = `<i class="fas ${icon}"></i><span>${item.name}</span>`;
                 button.onclick = () => nav(item.file);
