@@ -71,6 +71,8 @@ const CHATGPT_TOKEN_ENCRYPTION_KEY = process.env.CHATGPT_TOKEN_ENCRYPTION_KEY ||
 const SHOPIFY_WEBHOOK_SECRET = process.env.SHOPIFY_WEBHOOK_SECRET || '';
 const SHOPIFY_SHOP_DOMAIN = String(process.env.SHOPIFY_SHOP_DOMAIN || '').trim().toLowerCase();
 const SHOPIFY_ADMIN_ACCESS_TOKEN = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN || '';
+const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID || '';
+const SHOPIFY_CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET || '';
 const SHOPIFY_API_VERSION = process.env.SHOPIFY_API_VERSION || '2026-10';
 const FIREBASE_BACKUP_BUCKET = String(process.env.FIREBASE_BACKUP_BUCKET || '').trim();
 const MAX_QUERY_LIMIT = 5000;
@@ -131,6 +133,7 @@ const AI_CONFIG_DOC = db.collection('integrations').doc('chatgpt_plan');
 const ADMIN_USERS_COLLECTION = db.collection('admin_users');
 const AUDIT_COLLECTION = db.collection('audit_events');
 const INTEGRATION_JOBS_COLLECTION = db.collection('integration_jobs');
+const SHOPIFY_CONFIG_DOC = db.collection('integrations').doc('shopify');
 
 if (IS_PRODUCTION && !AUTH_DISABLED && (!CRM_USERNAME || !CRM_PASSWORD)) {
   throw new Error('Configure CRM_USERNAME e CRM_PASSWORD antes de iniciar o CRM em produção.');
@@ -3353,8 +3356,9 @@ app.post('/api/ai/import-credentials', async (req, res) => {
 
 app.post('/api/shopify/webhook', async (req, res) => {
   try {
-    if (!SHOPIFY_WEBHOOK_SECRET) return res.status(503).json({ success: false, message: 'Integração Shopify ainda não configurada.' });
-    if (!SHOPIFY.verifyWebhook(req.rawBody, req.get('x-shopify-hmac-sha256'), SHOPIFY_WEBHOOK_SECRET)) {
+    const signingSecret = SHOPIFY_WEBHOOK_SECRET || SHOPIFY_CLIENT_SECRET;
+    if (!signingSecret) return res.status(503).json({ success: false, message: 'Integração Shopify ainda não configurada.' });
+    if (!SHOPIFY.verifyWebhook(req.rawBody, req.get('x-shopify-hmac-sha256'), signingSecret)) {
       return res.status(401).json({ success: false, message: 'Assinatura Shopify inválida.' });
     }
     const metadata = SHOPIFY.webhookMetadata(req.headers);
@@ -3661,17 +3665,28 @@ app.get('/api/integration-jobs', requireCrmPermission('integrations.manage'), as
   }
 });
 
-app.get('/api/shopify/status', requireCrmPermission('integrations.manage'), (req, res) => {
-  res.json({
-    success: true,
-    configured: Boolean(SHOPIFY_WEBHOOK_SECRET && SHOPIFY_SHOP_DOMAIN),
-    webhookConfigured: Boolean(SHOPIFY_WEBHOOK_SECRET),
-    shopDomainConfigured: Boolean(SHOPIFY_SHOP_DOMAIN),
-    adminApiConfigured: Boolean(SHOPIFY_ADMIN_ACCESS_TOKEN),
-    apiVersion: SHOPIFY_API_VERSION,
-    shopDomain: SHOPIFY_SHOP_DOMAIN || '',
-    webhookPath: '/api/shopify/webhook'
-  });
+app.get('/api/shopify/status', requireCrmPermission('integrations.manage'), async (req, res) => {
+  try {
+    const saved = await SHOPIFY_CONFIG_DOC.get();
+    const state = saved.exists ? saved.data() : {};
+    const webhookConfigured = Boolean(SHOPIFY_WEBHOOK_SECRET || SHOPIFY_CLIENT_SECRET);
+    const adminApiConfigured = Boolean(SHOPIFY_ADMIN_ACCESS_TOKEN || (SHOPIFY_CLIENT_ID && SHOPIFY_CLIENT_SECRET));
+    res.json({
+      success: true,
+      configured: Boolean(webhookConfigured && SHOPIFY_SHOP_DOMAIN && adminApiConfigured),
+      operational: Boolean(state.verifiedAt && state.webhookSubscriptionId),
+      webhookConfigured,
+      shopDomainConfigured: Boolean(SHOPIFY_SHOP_DOMAIN),
+      adminApiConfigured,
+      authenticationMode: SHOPIFY_ADMIN_ACCESS_TOKEN ? 'static_token' : (SHOPIFY_CLIENT_ID && SHOPIFY_CLIENT_SECRET ? 'client_credentials' : 'not_configured'),
+      apiVersion: SHOPIFY_API_VERSION,
+      shopDomain: SHOPIFY_SHOP_DOMAIN || '',
+      webhookPath: '/api/shopify/webhook',
+      verifiedAt: state.verifiedAt || ''
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Não foi possível consultar a configuração Shopify.' });
+  }
 });
 
 app.get('/api/system/readiness', requireCrmPermission('integrations.manage'), async (req, res) => {
@@ -3680,17 +3695,20 @@ app.get('/api/system/readiness', requireCrmPermission('integrations.manage'), as
     const moloni = moloniPublicStatus(moloniConfigValue);
     const stripe = stripePublicStatus();
     const ai = AI_POLICY.publicAiStatus(aiConfigValue, { signInConfigured: chatGptConnectionConfigured() });
+    const shopifySnapshot = await SHOPIFY_CONFIG_DOC.get();
+    const shopifyState = shopifySnapshot.exists ? shopifySnapshot.data() : {};
     const shopify = {
-      webhookConfigured: Boolean(SHOPIFY_WEBHOOK_SECRET),
+      webhookConfigured: Boolean(SHOPIFY_WEBHOOK_SECRET || SHOPIFY_CLIENT_SECRET),
       shopDomainConfigured: Boolean(SHOPIFY_SHOP_DOMAIN),
-      adminApiConfigured: Boolean(SHOPIFY_ADMIN_ACCESS_TOKEN)
+      adminApiConfigured: Boolean(SHOPIFY_ADMIN_ACCESS_TOKEN || (SHOPIFY_CLIENT_ID && SHOPIFY_CLIENT_SECRET)),
+      verified: Boolean(shopifyState.verifiedAt && shopifyState.webhookSubscriptionId)
     };
     const items = [
       { id: 'database', label: 'Base de dados', configured: Boolean(process.env.FIREBASE_SERVICE_ACCOUNT || process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 || process.env.FIREBASE_SERVICE_ACCOUNT_FILE), operational: true, detail: 'Firestore ligado e a responder.' },
       { id: 'ai', label: 'Gestor IA', configured: ai.signInConfigured, operational: ai.connected && ai.enabled, detail: ai.connected ? `${ai.model} · raciocínio ${ai.reasoningEffort}` : 'Ligue a conta ChatGPT autorizada.' },
       { id: 'moloni', label: 'Moloni', configured: moloni.credentialsConfigured, operational: moloni.readyForLive, detail: moloni.readyForLive ? 'Conta e parâmetros prontos para faturação.' : 'Concluir ligação e parâmetros de faturação.' },
       { id: 'stripe', label: 'Pagamentos', configured: stripe.configured, operational: stripe.ready && stripe.webhookConfigured, detail: stripe.ready && stripe.webhookConfigured ? 'Stripe e webhook configurados.' : 'Configurar chave e webhook Stripe.' },
-      { id: 'shopify', label: 'Loja online', configured: shopify.webhookConfigured && shopify.shopDomainConfigured, operational: shopify.webhookConfigured && shopify.shopDomainConfigured && shopify.adminApiConfigured, detail: shopify.webhookConfigured && shopify.shopDomainConfigured && shopify.adminApiConfigured ? 'Shopify pronta para receber e reconciliar pedidos.' : 'Faltam domínio, segredo do webhook e token Admin Shopify.' },
+      { id: 'shopify', label: 'Loja online', configured: shopify.webhookConfigured && shopify.shopDomainConfigured && shopify.adminApiConfigured, operational: shopify.verified, action: shopify.webhookConfigured && shopify.shopDomainConfigured && shopify.adminApiConfigured && !shopify.verified ? 'shopify_setup' : '', detail: shopify.verified ? 'Shopify pronta para receber e reconciliar pedidos.' : (shopify.webhookConfigured && shopify.shopDomainConfigured && shopify.adminApiConfigured ? 'Credenciais prontas; falta validar a ligação e registar o webhook.' : 'Faltam domínio e credenciais da aplicação Shopify.') },
       { id: 'backup', label: 'Backup externo', configured: Boolean(FIREBASE_BACKUP_BUCKET), operational: Boolean(FIREBASE_BACKUP_BUCKET), detail: FIREBASE_BACKUP_BUCKET ? 'Bucket privado configurado.' : 'Configurar um bucket privado e executar um restauro de prova.' }
     ];
     const operational = items.filter(item => item.operational).length;
@@ -3705,16 +3723,66 @@ app.get('/api/system/readiness', requireCrmPermission('integrations.manage'), as
   }
 });
 
+let shopifyTokenCache = { accessToken: '', expiresAt: 0 };
+
+async function shopifyAccessToken() {
+  if (SHOPIFY_ADMIN_ACCESS_TOKEN) return SHOPIFY_ADMIN_ACCESS_TOKEN;
+  if (!SHOPIFY_CLIENT_ID || !SHOPIFY_CLIENT_SECRET || !SHOPIFY.validShopDomain(SHOPIFY_SHOP_DOMAIN)) {
+    throw new Error('As credenciais da aplicação Shopify ainda não estão configuradas.');
+  }
+  if (shopifyTokenCache.accessToken && Date.now() < shopifyTokenCache.expiresAt - 60 * 1000) return shopifyTokenCache.accessToken;
+  const response = await fetch(`https://${SHOPIFY_SHOP_DOMAIN}/admin/oauth/access_token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'client_credentials', client_id: SHOPIFY_CLIENT_ID, client_secret: SHOPIFY_CLIENT_SECRET })
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || !body.access_token) throw new Error(body.error_description || body.error || `A Shopify recusou a autenticação (${response.status}).`);
+  shopifyTokenCache = { accessToken: body.access_token, expiresAt: Date.now() + Math.max(60, Number(body.expires_in || 86400)) * 1000 };
+  return shopifyTokenCache.accessToken;
+}
+
 async function shopifyGraphql(query, variables = {}) {
-  if (!SHOPIFY_ADMIN_ACCESS_TOKEN || !SHOPIFY.validShopDomain(SHOPIFY_SHOP_DOMAIN)) throw new Error('A API administrativa Shopify ainda não está configurada.');
+  if (!SHOPIFY.validShopDomain(SHOPIFY_SHOP_DOMAIN)) throw new Error('O domínio administrativo Shopify ainda não está configurado.');
   const response = await fetch(`https://${SHOPIFY_SHOP_DOMAIN}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': SHOPIFY_ADMIN_ACCESS_TOKEN },
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': await shopifyAccessToken() },
     body: JSON.stringify({ query, variables })
   });
   const data = await response.json();
   if (!response.ok || data.errors?.length) throw new Error(data.errors?.[0]?.message || `Shopify respondeu com HTTP ${response.status}.`);
   return data.data;
 }
+
+app.post('/api/shopify/setup', requireCrmPermission('integrations.manage'), async (req, res) => {
+  try {
+    const callbackUrl = `${publicBaseUrl(req)}/api/shopify/webhook`;
+    const query = `query ShopifySetup{shop{name myshopifyDomain} webhookSubscriptions(first:100,topics:[ORDERS_PAID]){nodes{id callbackUrl topic}}}`;
+    const current = await shopifyGraphql(query);
+    let subscription = (current.webhookSubscriptions?.nodes || []).find(item => item.callbackUrl === callbackUrl && item.topic === 'ORDERS_PAID');
+    if (!subscription) {
+      const mutation = `mutation CreateOrdersPaidWebhook($callbackUrl:URL!){webhookSubscriptionCreate(topic:ORDERS_PAID,webhookSubscription:{callbackUrl:$callbackUrl,format:JSON}){webhookSubscription{id callbackUrl topic} userErrors{field message}}}`;
+      const created = await shopifyGraphql(mutation, { callbackUrl });
+      const errors = created.webhookSubscriptionCreate?.userErrors || [];
+      if (errors.length) throw new Error(errors.map(item => item.message).join(' '));
+      subscription = created.webhookSubscriptionCreate?.webhookSubscription;
+    }
+    if (!subscription?.id) throw new Error('A Shopify não confirmou o webhook de pedidos pagos.');
+    const state = {
+      shopName: text(current.shop?.name, 180),
+      shopDomain: text(current.shop?.myshopifyDomain || SHOPIFY_SHOP_DOMAIN, 255),
+      webhookSubscriptionId: text(subscription.id, 255),
+      webhookTopic: 'ORDERS_PAID',
+      callbackUrl,
+      verifiedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    await SHOPIFY_CONFIG_DOC.set(state, { merge: true });
+    await recordAudit(req, 'shopify.setup', { entityType: 'integration', entityId: 'shopify', after: state });
+    res.json({ success: true, operational: true, shopName: state.shopName, topic: state.webhookTopic, verifiedAt: state.verifiedAt });
+  } catch (error) {
+    res.status(503).json({ success: false, message: error.message || 'Não foi possível ativar a integração Shopify.' });
+  }
+});
 
 async function shopifyOrdersSince(fromIso) {
   const orders = [];
