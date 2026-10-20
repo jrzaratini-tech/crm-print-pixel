@@ -644,6 +644,21 @@ test('gestor IA produz briefing determinístico e resposta com fontes', async ()
   assert.deepEqual(empty.body.conversation.messages, []);
 });
 
+test('gestor IA responde diretamente o faturamento exibido no dashboard', async () => {
+  await post('/api/ai/conversation/reset', {});
+  const now = new Date();
+  await db.collection('events').doc('ai-dashboard-revenue').set({
+    schema: 'pedido', created_at: now.toISOString(), deleted: false,
+    payload: { numero: 'AI-DASHBOARD', cliente: 'Teste dashboard', subtotal: 100, iva: 23, total: 123, status: 'entregue' }
+  });
+  const answer = await post('/api/ai/ask', { question: 'Quanto era o faturamento que estava mostrando no dashboard?' });
+  assert.equal(answer.response.status, 200);
+  assert.equal(answer.body.direct, true);
+  assert.equal(answer.body.answer.metric, 'dashboard.currentMonth.revenue');
+  assert.match(answer.body.answer.answer, /líquido/);
+  assert.match(answer.body.answer.answer, /bruto/);
+});
+
 test('prontidão do ecossistema identifica ativações externas sem expor segredos', async () => {
   const readiness = await request('/api/system/readiness');
   assert.equal(readiness.response.status, 200);

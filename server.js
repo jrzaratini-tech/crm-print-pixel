@@ -4307,14 +4307,16 @@ async function buildAuthorizedAiKnowledge(data, focus, quoteMode = false) {
 }
 
 function deterministicAiAnswer(question, focus, briefing, knowledge) {
-  const wantsList = /lista|liste|quais|detalh|identifi|mostr/.test(String(question || '').toLowerCase());
+  const baseAnswer = AI_MANAGER.answerQuestion(`${focus}\n${question}`, briefing);
+  if (String(baseAnswer.metric || '').startsWith('dashboard.')) return baseAnswer;
+  const wantsList = /\b(lista|liste|quais|detalhe|detalhes|identifique|mostre)\b/.test(String(question || '').toLowerCase());
   const source = knowledge.pedidosSemFatura || knowledge.pedidosAtrasados;
   if (wantsList && Array.isArray(source)) {
     if (!source.length) return { understood: true, metric: 'records', value: 0, answer: 'Não encontrei registos correspondentes nos dados atuais do CRM.', sources: [] };
     const lines = source.map((order, index) => `${index + 1}. ${order.numero} — ${order.cliente} — ${order.status}${order.dataEntrega ? ` — entrega ${order.dataEntrega.slice(0, 10)}` : ''} — ${order.total.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })}`);
     return { understood: true, metric: 'records', value: source.length, answer: `Encontrei ${source.length} registo(s):\n${lines.join('\n')}`, sources: source.map(order => ({ schema: 'pedido', id: order.id })) };
   }
-  return AI_MANAGER.answerQuestion(`${focus}\n${question}`, briefing);
+  return baseAnswer;
 }
 
 app.get('/api/ai/briefing', async (req, res) => {
