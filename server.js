@@ -11,6 +11,7 @@ const CHATGPT_PLAN = require('./core/chatgpt-plan.js');
 const AI_QUOTE = require('./core/ai-quote.js');
 const ADMIN_ACCESS = require('./core/admin-access.js');
 const ENTITY_LINKS = require('./core/entity-links.js');
+const TECHNICAL_RECIPES = require('./core/technical-recipes.js');
 const {
   MoloniClient,
   buildDocumentPreview,
@@ -503,7 +504,7 @@ app.use(express.json({
   }
 }));
 app.use(express.urlencoded({ extended: false, limit: '10kb' }));
-app.use('/api', requestRateLimit({ windowMs: 60 * 1000, max: 240 }));
+app.use('/api', requestRateLimit({ windowMs: 60 * 1000, max: IS_PRODUCTION ? 240 : 2000 }));
 
 function mobileSessionExpired(session) {
   return !session || Date.now() > new Date(session.expiresAt || 0).getTime();
@@ -1957,6 +1958,63 @@ async function productCatalog(includeInactive = false) {
   return products
     .filter(product => includeInactive || product.ativo !== false)
     .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt'));
+}
+
+async function technicalRecipeCatalog() {
+  const snapshot = await db.collection('technical_recipes').get();
+  return snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }))
+    .sort((a, b) => String(a.scopeKey || '').localeCompare(String(b.scopeKey || '')) || Number(b.version || 0) - Number(a.version || 0));
+}
+
+async function externalMappingCatalog(includeInactive = false) {
+  const snapshot = await db.collection('external_mappings').get();
+  return snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }))
+    .filter(mapping => includeInactive || mapping.active !== false)
+    .sort((a, b) => String(a.source || '').localeCompare(String(b.source || '')) || String(a.externalKey || '').localeCompare(String(b.externalKey || '')));
+}
+
+function recipeActor(req) {
+  return req.crmUser?.username || req.crmUser?.name || 'system';
+}
+
+async function bindTechnicalRecipeSnapshots(schema, payload = {}, existingPayload = {}) {
+  if (!['pedido', 'orcamento'].includes(schema) || !Array.isArray(payload.produtos)) return payload;
+  const [recipes, products] = await Promise.all([technicalRecipeCatalog(), productCatalog(true)]);
+  if (!recipes.length) return payload;
+  const exactRecipes = new Map(recipes.map(recipe => [recipe.id, recipe]));
+  const activeByProduct = new Map(recipes.filter(recipe => recipe.status === 'active' && recipe.productId).map(recipe => [recipe.productId, recipe]));
+  const activeByFamily = new Map(recipes.filter(recipe => recipe.status === 'active' && recipe.family).map(recipe => [String(recipe.family).toLowerCase(), recipe]));
+  const productsByName = new Map(products.map(product => [String(product.nome || '').trim().toLowerCase(), product]));
+  const existingProducts = Array.isArray(existingPayload.produtos) ? existingPayload.produtos : [];
+
+  return {
+    ...payload,
+    produtos: payload.produtos.map((product, index) => {
+      const previous = existingProducts[index] || {};
+      const catalogProduct = products.find(item => item.id === product.productId)
+        || productsByName.get(String(product.nome || '').trim().toLowerCase());
+      const requestedRecipeId = product.recipeRef?.id || product.recipeId;
+      const sameHistoricalProduct = (previous.productId && previous.productId === (product.productId || catalogProduct?.id))
+        || previous.nome === product.nome;
+      const preservedSnapshot = !requestedRecipeId && previous.recipeSnapshot && sameHistoricalProduct
+        ? previous.recipeSnapshot
+        : null;
+      const recipe = requestedRecipeId
+        ? exactRecipes.get(requestedRecipeId)
+        : activeByProduct.get(catalogProduct?.id || product.productId)
+          || activeByFamily.get(String(catalogProduct?.categoria || product.familia || product.categoria || '').toLowerCase());
+      const recipeSnapshot = preservedSnapshot || TECHNICAL_RECIPES.snapshot(recipe);
+      if (!recipeSnapshot) return catalogProduct?.id && !product.productId ? { ...product, productId: catalogProduct.id } : product;
+      return {
+        ...product,
+        productId: product.productId || catalogProduct?.id || recipeSnapshot.productId || '',
+        recipeRef: { id: recipeSnapshot.id, version: recipeSnapshot.version, checksum: recipeSnapshot.checksum },
+        recipeSnapshot
+      };
+    })
+  };
 }
 
 async function sellers(includeInactive = false) {
@@ -3436,7 +3494,7 @@ function apiPermissionForRequest(req) {
   if (pathName.startsWith('/moloni/')) return write ? 'fiscal.write' : 'fiscal.read';
   if (pathName.startsWith('/stripe/')) return write ? 'finance.write' : 'finance.read';
   if (pathName.startsWith('/production/')) return write ? 'production.write' : 'production.read';
-  if (pathName.startsWith('/products') || pathName.startsWith('/suppliers')) return write ? 'catalog.write' : 'catalog.read';
+  if (pathName.startsWith('/products') || pathName.startsWith('/suppliers') || pathName.startsWith('/recipes') || pathName.startsWith('/external-mappings')) return write ? 'catalog.write' : 'catalog.read';
   if (pathName.startsWith('/expenses') || pathName.startsWith('/sales/') || pathName.startsWith('/sellers')) return write ? 'finance.write' : 'finance.read';
   if (pathName.startsWith('/management/')) return 'management.read';
   if (pathName.startsWith('/mobile/inbox') || pathName.startsWith('/importacao-fiscal') || pathName.startsWith('/upload/')) return write ? 'fiscal.write' : 'fiscal.read';
@@ -4974,6 +5032,127 @@ app.post('/api/products/:id/delete', async (req, res) => {
   }
 });
 
+app.get('/api/recipes', async (req, res) => {
+  try {
+    const recipes = await technicalRecipeCatalog();
+    res.json({ success: true, recipes: recipes.map(sanitizeForResponse) });
+  } catch (error) {
+    console.error('Erro ao listar receitas técnicas:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível carregar as receitas técnicas.' });
+  }
+});
+
+app.post('/api/recipes', async (req, res) => {
+  try {
+    const recipes = await technicalRecipeCatalog();
+    const base = req.body?.basedOnId ? recipes.find(recipe => recipe.id === req.body.basedOnId) : null;
+    if (req.body?.basedOnId && !base) return res.status(404).json({ success: false, message: 'A versão base da receita não foi encontrada.' });
+    const candidate = TECHNICAL_RECIPES.normalizeRecipe({ ...(base || {}), ...(req.body || {}) }, {
+      version: 1,
+      status: 'draft',
+      basedOnId: base?.id || '',
+      createdBy: recipeActor(req)
+    });
+    const versions = recipes.filter(recipe => TECHNICAL_RECIPES.scopeKey(recipe) === candidate.scopeKey);
+    const nextVersion = Math.max(0, ...versions.map(recipe => Number(recipe.version || 0))) + 1;
+    const recipe = TECHNICAL_RECIPES.normalizeRecipe({ ...(base || {}), ...(req.body || {}) }, {
+      id: `recipe-${productSlug(candidate.productId || candidate.family || candidate.name)}-v${nextVersion}`,
+      version: nextVersion,
+      status: 'draft',
+      basedOnId: base?.id || '',
+      createdBy: recipeActor(req)
+    });
+    const errors = TECHNICAL_RECIPES.validateRecipe(recipe);
+    if (errors.length || containsUnsafeMarkup(recipe)) return res.status(400).json({ success: false, message: errors[0] || 'Receita técnica inválida.', errors });
+    await db.collection('technical_recipes').doc(recipe.id).set(recipe);
+    await recordAudit(req, 'recipe.version.create', { entityType: 'technical_recipe', entityId: recipe.id, after: recipe });
+    res.json({ success: true, recipe: sanitizeForResponse(recipe) });
+  } catch (error) {
+    console.error('Erro ao criar versão da receita:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível criar a versão da receita.' });
+  }
+});
+
+app.post('/api/recipes/:id/activate', async (req, res) => {
+  try {
+    const recipes = await technicalRecipeCatalog();
+    const target = recipes.find(recipe => recipe.id === req.params.id);
+    if (!target) return res.status(404).json({ success: false, message: 'Receita técnica não encontrada.' });
+    const now = new Date().toISOString();
+    const sameScope = recipes.filter(recipe => recipe.scopeKey === target.scopeKey && recipe.id !== target.id && recipe.status === 'active');
+    await Promise.all(sameScope.map(recipe => db.collection('technical_recipes').doc(recipe.id).set({
+      ...recipe,
+      status: 'retired',
+      retiredAt: now,
+      updatedAt: now
+    })));
+    const active = { ...target, status: 'active', activatedAt: now, activatedBy: recipeActor(req), updatedAt: now };
+    await db.collection('technical_recipes').doc(active.id).set(active);
+    await recordAudit(req, 'recipe.version.activate', {
+      entityType: 'technical_recipe',
+      entityId: active.id,
+      before: target,
+      after: active,
+      metadata: { retiredRecipeIds: sameScope.map(recipe => recipe.id) }
+    });
+    res.json({ success: true, recipe: sanitizeForResponse(active), retired: sameScope.length });
+  } catch (error) {
+    console.error('Erro ao ativar receita:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível ativar a receita técnica.' });
+  }
+});
+
+app.get('/api/external-mappings', async (req, res) => {
+  try {
+    const includeInactive = req.query.includeInactive === 'true';
+    res.json({ success: true, mappings: (await externalMappingCatalog(includeInactive)).map(sanitizeForResponse) });
+  } catch (error) {
+    console.error('Erro ao listar mapeamentos externos:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível carregar os mapeamentos externos.' });
+  }
+});
+
+app.get('/api/external-mappings/resolve', async (req, res) => {
+  try {
+    const source = productSlug(req.query.source);
+    const externalType = productSlug(req.query.externalType || 'product');
+    const externalKey = text(req.query.externalKey, 200).toLowerCase();
+    const mapping = (await externalMappingCatalog()).find(item => item.source === source
+      && item.externalType === externalType
+      && String(item.externalKey || '').toLowerCase() === externalKey);
+    if (!mapping) return res.status(404).json({ success: false, message: 'Mapeamento externo não encontrado.' });
+    const recipe = mapping.recipeId ? (await technicalRecipeCatalog()).find(item => item.id === mapping.recipeId) : null;
+    res.json({ success: true, mapping: sanitizeForResponse(mapping), recipe: recipe ? sanitizeForResponse(recipe) : null });
+  } catch (error) {
+    console.error('Erro ao resolver mapeamento externo:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível resolver o mapeamento externo.' });
+  }
+});
+
+app.post('/api/external-mappings', async (req, res) => {
+  try {
+    const mappings = await externalMappingCatalog(true);
+    const provisional = TECHNICAL_RECIPES.normalizeMapping(req.body || {});
+    const existing = mappings.find(item => item.id === (req.body?.id || provisional.id)) || null;
+    const mapping = TECHNICAL_RECIPES.normalizeMapping({ ...(existing || {}), ...(req.body || {}) }, { id: existing?.id || provisional.id });
+    const errors = TECHNICAL_RECIPES.validateMapping(mapping);
+    if (errors.length || containsUnsafeMarkup(mapping)) return res.status(400).json({ success: false, message: errors[0] || 'Mapeamento externo inválido.', errors });
+    if (mapping.recipeId) {
+      const recipe = (await technicalRecipeCatalog()).find(item => item.id === mapping.recipeId);
+      if (!recipe) return res.status(400).json({ success: false, message: 'A receita indicada não existe.' });
+      mapping.recipeVersion = Number(recipe.version || 1);
+    }
+    await db.collection('external_mappings').doc(mapping.id).set(mapping);
+    await recordAudit(req, existing ? 'external_mapping.update' : 'external_mapping.create', {
+      entityType: 'external_mapping', entityId: mapping.id, before: existing, after: mapping
+    });
+    res.json({ success: true, mapping: sanitizeForResponse(mapping) });
+  } catch (error) {
+    console.error('Erro ao salvar mapeamento externo:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível salvar o mapeamento externo.' });
+  }
+});
+
 function expenseNeedsClassification(payload = {}) {
   if (payload.salaryOnly || text(payload.categoria, 80).toUpperCase() === 'SALÁRIO') return false;
   const fornecedor = text(payload.fornecedor, 160);
@@ -5601,13 +5780,16 @@ app.post('/api/database/commit', async (req, res) => {
     if (containsUnsafeMarkup(payload)) return res.status(400).json({ error: 'Conteúdo HTML potencialmente inseguro não é permitido.' });
 
     const now = new Date().toISOString();
+    const recordId = id || `evt_${crypto.randomUUID().replace(/-/g, '')}`;
+    const existingSnapshot = id ? await db.collection('events').doc(recordId).get() : null;
+    const existingEvent = existingSnapshot?.exists ? existingSnapshot.data() : null;
     const classification = schema === 'despesa'
       ? await classifyExpensePayloadByKnownSupplier(payload, now)
       : { payload };
-    const recordId = id || `evt_${crypto.randomUUID().replace(/-/g, '')}`;
+    const enrichedPayload = await bindTechnicalRecipeSnapshots(schema, classification.payload, existingEvent?.payload || {});
     const event = {
       schema,
-      payload: classification.payload,
+      payload: enrichedPayload,
       pageId: typeof pageId === 'string' ? pageId.slice(0, 100) : 'unknown',
       timestamp: now,
       deleted: false,
@@ -5619,9 +5801,7 @@ app.post('/api/database/commit', async (req, res) => {
     let auditAfter = event;
     if (id) {
       const docRef = db.collection('events').doc(recordId);
-      const docSnap = await docRef.get();
-      if (docSnap.exists) {
-        const existingEvent = docSnap.data();
+      if (existingSnapshot.exists) {
         auditBefore = existingEvent;
         const mergedEventBase = schema === 'pedido' && existingEvent.schema === 'pedido'
           ? { ...existingEvent, ...event, payload: { ...(existingEvent.payload || {}), ...event.payload }, updated: true }

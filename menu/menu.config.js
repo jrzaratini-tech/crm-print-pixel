@@ -190,6 +190,16 @@
     },
 
     {
+        id: "nav_receitas",
+        name: "Receitas Técnicas",
+        file: "pages/receitas.html",
+        type: "WRITE",
+        pos: 12.15,
+        hidden: false,
+        deleted: false
+    },
+
+    {
         id: "nav_fornecedores",
         name: "Fornecedores",
         file: "pages/fornecedores.html",

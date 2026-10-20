@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <script src="../core/security.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Receitas Técnicas - PrintPixel</title>
+  <style>
+    * { box-sizing: border-box; font-family: 'Segoe UI', system-ui, sans-serif; }
+    body { margin: 0; padding: 24px; background: #f8fafc; color: #0f172a; }
+    main { max-width: 1500px; margin: auto; }
+    h1 { margin: 0; color: #1a237e; font-size: 30px; }
+    h2 { margin: 0 0 14px; }
+    .subtitle { margin: 6px 0 0; color: #64748b; line-height: 1.5; }
+    .notice { margin: 18px 0; padding: 14px 16px; border-radius: 10px; background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; }
+    .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; align-items: start; }
+    .panel { margin-bottom: 20px; padding: 20px; background: white; border: 1px solid #e2e8f0; border-radius: 14px; box-shadow: 0 8px 28px rgba(15,23,42,.05); }
+    .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; }
+    label { grid-column: span 6; color: #334155; font-size: 13px; font-weight: 800; }
+    label.full { grid-column: span 12; }
+    input, select, textarea { width: 100%; margin-top: 6px; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; background: white; color: #0f172a; }
+    textarea { min-height: 92px; resize: vertical; font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
+    .hint { display: block; margin-top: 5px; color: #64748b; font-size: 11px; font-weight: 500; }
+    .actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 14px; flex-wrap: wrap; }
+    button { border: 0; border-radius: 8px; padding: 9px 12px; color: white; font-weight: 800; cursor: pointer; }
+    .primary { background: #2563eb; } .success { background: #059669; } .secondary { background: #475569; }
+    .table-wrap { overflow-x: auto; border: 1px solid #e2e8f0; border-radius: 10px; }
+    table { width: 100%; border-collapse: collapse; min-width: 800px; }
+    th, td { padding: 11px; border-bottom: 1px solid #e2e8f0; text-align: left; font-size: 13px; vertical-align: top; }
+    th { background: #f1f5f9; color: #334155; }
+    tr:last-child td { border-bottom: 0; }
+    .tag { display: inline-flex; padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: 900; background: #e2e8f0; }
+    .active { background: #dcfce7; color: #166534; } .draft { background: #fef3c7; color: #92400e; } .retired { background: #e2e8f0; color: #475569; }
+    .message { min-height: 22px; margin-top: 10px; font-weight: 800; } .message.error { color: #dc2626; } .message.ok { color: #059669; }
+    .empty { text-align: center; padding: 26px; color: #64748b; }
+    .compact { white-space: nowrap; }
+    @media (max-width: 950px) { body { padding: 14px; } .columns { grid-template-columns: 1fr; } }
+    @media (max-width: 650px) { label { grid-column: span 12; } }
+  </style>
+</head>
+<body data-page-id="receitas" data-page-type="WRITE">
+  <main>
+    <h1>Receitas Técnicas e Mapeamentos</h1>
+    <p class="subtitle">Defina materiais, etapas e parâmetros por produto. Cada gravação cria uma versão nova e os pedidos preservam a versão usada.</p>
+    <div class="notice"><strong>Regra de segurança:</strong> uma receita ativa nunca é editada. Use “Nova versão”, confira o rascunho e só então ative-o.</div>
+
+    <div class="columns">
+      <section class="panel">
+        <h2 id="recipeTitle">Nova receita</h2>
+        <input type="hidden" id="basedOnId">
+        <div class="grid">
+          <label>Produto interno
+            <select id="recipeProduct"><option value="">Sem produto específico</option></select>
+          </label>
+          <label>Família
+            <input id="recipeFamily" maxlength="120" placeholder="Ex: Neon LED">
+          </label>
+          <label class="full">Nome da receita
+            <input id="recipeName" maxlength="160" placeholder="Ex: Neon em base acrílica">
+          </label>
+          <label class="full">Materiais — um por linha
+            <textarea id="recipeMaterials" placeholder="materialId | quantidade | unidade | desperdício %"></textarea>
+            <span class="hint">Ex.: preset:acrilico_6mm | 1.2 | m2 | 10</span>
+          </label>
+          <label class="full">Etapas — uma por linha
+            <textarea id="recipeSteps" placeholder="Nome da etapa | minutos previstos"></textarea>
+            <span class="hint">Ex.: Aplicar e soldar LED | 90</span>
+          </label>
+          <label class="full">Parâmetros em JSON (opcional)
+            <textarea id="recipeParameters" placeholder='{"larguraObrigatoria":true,"alturaObrigatoria":true}'></textarea>
+          </label>
+        </div>
+        <div class="actions"><button class="secondary" id="clearRecipe">LIMPAR</button><button class="success" id="saveRecipe">CRIAR RASCUNHO</button></div>
+        <div id="recipeMessage" class="message"></div>
+      </section>
+
+      <section class="panel">
+        <h2>Mapeamento externo</h2>
+        <p class="subtitle">Traduz o SKU/ID vindo do site ou de uma integração para o produto e a receita corretos.</p>
+        <input type="hidden" id="mappingId">
+        <div class="grid" style="margin-top:14px">
+          <label>Origem
+            <select id="mappingSource"><option value="site">Site</option><option value="moloni">Moloni</option><option value="stripe">Stripe</option><option value="shopify">Shopify</option><option value="woocommerce">WooCommerce</option><option value="manual">Manual</option></select>
+          </label>
+          <label>Tipo externo
+            <select id="mappingType"><option value="product">Produto</option><option value="variant">Variante</option><option value="service">Serviço</option></select>
+          </label>
+          <label class="full">SKU ou ID externo
+            <input id="mappingKey" maxlength="200" placeholder="Ex: NEON-BASE-6MM">
+          </label>
+          <label>Produto interno
+            <select id="mappingProduct"><option value="">Selecione</option></select>
+          </label>
+          <label>Versão da receita
+            <select id="mappingRecipe"><option value="">Sem receita</option></select>
+          </label>
+          <label class="full">Observações
+            <input id="mappingNotes" maxlength="500" placeholder="Opcional">
+          </label>
+        </div>
+        <div class="actions"><button class="secondary" id="clearMapping">LIMPAR</button><button class="primary" id="saveMapping">SALVAR MAPEAMENTO</button></div>
+        <div id="mappingMessage" class="message"></div>
+      </section>
+    </div>
+
+    <section class="panel">
+      <h2>Histórico de receitas</h2>
+      <div class="table-wrap"><table><thead><tr><th>Escopo</th><th>Versão</th><th>Conteúdo</th><th>Estado</th><th>Ações</th></tr></thead><tbody id="recipesBody"></tbody></table></div>
+    </section>
+    <section class="panel">
+      <h2>Catálogo de mapeamentos</h2>
+      <div class="table-wrap"><table><thead><tr><th>Origem</th><th>Chave externa</th><th>Produto</th><th>Receita</th><th>Ação</th></tr></thead><tbody id="mappingsBody"></tbody></table></div>
+    </section>
+  </main>
+  <script>
+    let products = [], recipes = [], mappings = [];
+    const $ = id => document.getElementById(id);
+    const esc = value => String(value || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const message = (id, value, error = false) => { $(id).textContent = value; $(id).className = `message ${error ? 'error' : 'ok'}`; };
+    const splitLines = value => String(value || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+
+    function materialLines(items = []) { return items.map(item => `${item.materialId || item.name} | ${item.quantity || 0} | ${item.unit || 'un'} | ${item.wastePercent || 0}`).join('\n'); }
+    function stepLines(items = []) { return items.map(item => `${item.label} | ${item.estimatedMinutes || 0}`).join('\n'); }
+    function parseMaterials() { return splitLines($('recipeMaterials').value).map(line => { const [materialId, quantity, unit, wastePercent] = line.split('|').map(v => v.trim()); return { materialId, quantity: Number(quantity || 0), unit: unit || 'un', wastePercent: Number(wastePercent || 0) }; }); }
+    function parseSteps() { return splitLines($('recipeSteps').value).map(line => { const [label, estimatedMinutes] = line.split('|').map(v => v.trim()); return { label, estimatedMinutes: Number(estimatedMinutes || 0), required: true }; }); }
+    function productName(id) { return products.find(item => item.id === id)?.nome || id || '-'; }
+
+    function refreshOptions() {
+      const productOptions = products.map(item => `<option value="${esc(item.id)}">${esc(item.nome)}</option>`).join('');
+      $('recipeProduct').innerHTML = '<option value="">Sem produto específico</option>' + productOptions;
+      $('mappingProduct').innerHTML = '<option value="">Selecione</option>' + productOptions;
+      $('mappingRecipe').innerHTML = '<option value="">Sem receita</option>' + recipes.map(item => `<option value="${esc(item.id)}">${esc(item.name)} · v${item.version} · ${item.status}</option>`).join('');
+    }
+
+    function render() {
+      refreshOptions();
+      $('recipesBody').innerHTML = recipes.length ? recipes.map(recipe => `<tr>
+        <td><strong>${esc(recipe.productId ? productName(recipe.productId) : recipe.family)}</strong><br><small>${esc(recipe.family || recipe.scopeKey)}</small></td>
+        <td class="compact">v${recipe.version}<br><small>${esc(String(recipe.checksum || '').slice(0, 10))}</small></td>
+        <td>${recipe.materials.length} materiais · ${recipe.steps.length} etapas</td>
+        <td><span class="tag ${recipe.status}">${recipe.status}</span></td>
+        <td class="compact"><button class="primary" onclick="newVersion('${esc(recipe.id)}')">Nova versão</button> ${recipe.status !== 'active' ? `<button class="success" onclick="activateRecipe('${esc(recipe.id)}')">Ativar</button>` : ''}</td>
+      </tr>`).join('') : '<tr><td colspan="5" class="empty">Nenhuma receita cadastrada.</td></tr>';
+      $('mappingsBody').innerHTML = mappings.length ? mappings.map(item => `<tr>
+        <td><span class="tag">${esc(item.source)}</span> ${esc(item.externalType)}</td><td><strong>${esc(item.externalKey)}</strong></td>
+        <td>${esc(productName(item.productId))}</td><td>${esc(recipes.find(recipe => recipe.id === item.recipeId)?.name || '-')} ${item.recipeVersion ? `v${item.recipeVersion}` : ''}</td>
+        <td><button class="primary" onclick="editMapping('${esc(item.id)}')">Editar</button></td></tr>`).join('') : '<tr><td colspan="5" class="empty">Nenhum mapeamento cadastrado.</td></tr>';
+    }
+
+    async function loadAll() {
+      const [p, r, m] = await Promise.all([fetch('/api/products'), fetch('/api/recipes'), fetch('/api/external-mappings?includeInactive=true')]);
+      const [pd, rd, md] = await Promise.all([p.json(), r.json(), m.json()]);
+      if (!p.ok || !r.ok || !m.ok) throw new Error(pd.message || rd.message || md.message || 'Falha ao carregar dados.');
+      products = pd.products || []; recipes = rd.recipes || []; mappings = md.mappings || []; render();
+    }
+
+    function clearRecipe() { $('basedOnId').value=''; $('recipeProduct').value=''; $('recipeFamily').value=''; $('recipeName').value=''; $('recipeMaterials').value=''; $('recipeSteps').value=''; $('recipeParameters').value=''; $('recipeTitle').textContent='Nova receita'; }
+    window.newVersion = id => { const item = recipes.find(recipe => recipe.id === id); if (!item) return; $('basedOnId').value=item.id; $('recipeProduct').value=item.productId || ''; $('recipeFamily').value=item.family || ''; $('recipeName').value=item.name || ''; $('recipeMaterials').value=materialLines(item.materials); $('recipeSteps').value=stepLines(item.steps); $('recipeParameters').value=JSON.stringify(item.parameters || {}, null, 2); $('recipeTitle').textContent=`Nova versão de ${item.name} (v${item.version})`; window.scrollTo({top:0,behavior:'smooth'}); };
+    window.activateRecipe = async id => { if (!confirm('Ativar esta versão? A versão ativa anterior será aposentada, sem alterar pedidos antigos.')) return; const response=await fetch(`/api/recipes/${encodeURIComponent(id)}/activate`,{method:'POST'}); const data=await response.json(); if(!response.ok) return message('recipeMessage',data.message||'Falha ao ativar.',true); message('recipeMessage','Receita ativada.'); await loadAll(); };
+
+    function clearMapping() { $('mappingId').value=''; $('mappingSource').value='site'; $('mappingType').value='product'; $('mappingKey').value=''; $('mappingProduct').value=''; $('mappingRecipe').value=''; $('mappingNotes').value=''; }
+    window.editMapping = id => { const item=mappings.find(mapping=>mapping.id===id); if(!item)return; $('mappingId').value=item.id; $('mappingSource').value=item.source; $('mappingType').value=item.externalType; $('mappingKey').value=item.externalKey; $('mappingProduct').value=item.productId || ''; $('mappingRecipe').value=item.recipeId || ''; $('mappingNotes').value=item.notes || ''; window.scrollTo({top:0,behavior:'smooth'}); };
+
+    $('clearRecipe').addEventListener('click', clearRecipe);
+    $('clearMapping').addEventListener('click', clearMapping);
+    $('saveRecipe').addEventListener('click', async () => {
+      let parameters={}; try { parameters=$('recipeParameters').value.trim()?JSON.parse($('recipeParameters').value):{}; } catch { return message('recipeMessage','O JSON dos parâmetros é inválido.',true); }
+      const payload={basedOnId:$('basedOnId').value,productId:$('recipeProduct').value,family:$('recipeFamily').value.trim(),name:$('recipeName').value.trim(),materials:parseMaterials(),steps:parseSteps(),parameters};
+      const response=await fetch('/api/recipes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); const data=await response.json();
+      if(!response.ok) return message('recipeMessage',data.message||'Falha ao criar versão.',true); clearRecipe(); message('recipeMessage',`Rascunho v${data.recipe.version} criado. Revise e ative quando estiver pronto.`); await loadAll();
+    });
+    $('saveMapping').addEventListener('click', async () => {
+      const payload={id:$('mappingId').value,source:$('mappingSource').value,externalType:$('mappingType').value,externalKey:$('mappingKey').value.trim(),productId:$('mappingProduct').value,recipeId:$('mappingRecipe').value,notes:$('mappingNotes').value.trim(),active:true};
+      const response=await fetch('/api/external-mappings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}); const data=await response.json();
+      if(!response.ok) return message('mappingMessage',data.message||'Falha ao salvar.',true); clearMapping(); message('mappingMessage','Mapeamento salvo.'); await loadAll();
+    });
+    loadAll().catch(error => message('recipeMessage', error.message, true));
+  </script>
+</body>
+</html>

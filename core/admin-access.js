@@ -4,14 +4,14 @@ const ROLE_PERMISSIONS = Object.freeze({
   administracao: ['*'],
   gestao: [
     'dashboard.read', 'orders.read', 'orders.write', 'quotes.read', 'quotes.write',
-    'production.read', 'production.write', 'finance.read', 'catalog.read',
+    'production.read', 'production.write', 'finance.read', 'catalog.read', 'catalog.write',
     'management.read', 'ai.use', 'audit.read'
   ],
   comercial: ['dashboard.read', 'orders.read', 'orders.write', 'quotes.read', 'quotes.write', 'catalog.read', 'ai.use'],
   producao: ['orders.read', 'production.read', 'production.write', 'catalog.read'],
   financeiro: ['dashboard.read', 'orders.read', 'finance.read', 'finance.write', 'fiscal.read', 'fiscal.write', 'catalog.read'],
   contabilista: ['dashboard.read', 'finance.read', 'fiscal.read', 'audit.read'],
-  tecnico: ['system.manage', 'users.manage', 'audit.read', 'integrations.manage']
+  tecnico: ['system.manage', 'users.manage', 'audit.read', 'integrations.manage', 'catalog.read', 'catalog.write']
 });
 
 const ROLE_LABELS = Object.freeze({
@@ -44,6 +44,7 @@ const PAGE_PERMISSIONS = Object.freeze({
   'faturacao.html': 'fiscal.write',
   'materiais.html': 'catalog.read',
   'produtos.html': 'catalog.read',
+  'receitas.html': 'catalog.read',
   'fornecedores.html': 'catalog.read',
   'comissoes.html': 'finance.read',
   'rotulos.html': 'orders.read',

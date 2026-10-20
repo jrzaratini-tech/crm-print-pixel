@@ -6,6 +6,14 @@ Este documento cumpre o entregável previsto para a Fase 0 do Contrato de Desenv
 
 A decisão recomendada é preservar os módulos operacionais existentes e evoluir o sistema por incrementos testados. Funcionalidades já publicadas não serão consideradas concluídas apenas por existirem: cada fase terá de cumprir os critérios contratuais de rastreabilidade, permissões, prevenção de duplicações, testes e validação humana.
 
+### Progresso de execução da Fase 1
+
+- Concluído: identidades administrativas individuais, perfis e permissões.
+- Concluído: auditoria central das ações administrativas e operacionais críticas.
+- Concluído: identificadores canónicos e vínculos normalizados entre orçamento, pedido, pagamento, produção, Stripe e Moloni.
+- Concluído: receitas técnicas versionadas, ativação controlada, snapshot imutável em pedidos/orçamentos e catálogo de mapeamentos externos.
+- Próximo incremento: fila persistente e idempotente para integrações e tarefas assíncronas.
+
 ## 2 Inventário técnico atual
 
 ### 2.1 Aplicação e alojamento

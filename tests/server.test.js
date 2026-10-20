@@ -102,6 +102,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   const orderBudgetPageResult = await request('/pages/novoorcamento.html');
   const calculatorPageResult = await request('/pages/calculadora.html');
   const productsPageResult = await request('/pages/produtos.html');
+  const recipesPageResult = await request('/pages/receitas.html');
   const ordersPageResult = await request('/pages/pedidos.html');
   const billingPageResult = await request('/pages/faturacao.html');
   const dashboardPageResult = await request('/pages/dashboard.html');
@@ -136,6 +137,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.equal(orderBudgetPageResult.response.status, 200);
   assert.equal(calculatorPageResult.response.status, 200);
   assert.equal(productsPageResult.response.status, 200);
+  assert.equal(recipesPageResult.response.status, 200);
   assert.equal(ordersPageResult.response.status, 200);
   assert.equal(billingPageResult.response.status, 200);
   assert.equal(dashboardPageResult.response.status, 200);
@@ -164,9 +166,11 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(managementModuleResult.body, /painelGestao/);
   assert.match(menuResult.body, /nav_calculadora/);
   assert.match(menuResult.body, /nav_produtos/);
+  assert.match(menuResult.body, /nav_receitas/);
   assert.match(menuResult.body, /nav_faturacao/);
   assert.match(menuResult.body, /pages\/calculadora\.html/);
   assert.match(menuResult.body, /pages\/produtos\.html/);
+  assert.match(menuResult.body, /pages\/receitas\.html/);
   assert.match(menuResult.body, /pages\/rotulos\.html/);
   assert.match(menuResult.body, /pages\/ia\.html/);
   assert.match(aiPageResult.body, /GPT-5\.6 Sol/);
@@ -183,6 +187,8 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(productsPageResult.body, /api\/products/);
   assert.match(productsPageResult.body, /tipoProduto/);
   assert.match(productsPageResult.body, /precoVenda/);
+  assert.match(recipesPageResult.body, /Receitas Técnicas e Mapeamentos/);
+  assert.match(recipesPageResult.body, /api\/external-mappings/);
   assert.match(productsPageResult.body, /Produto loja \/ preco fixo/);
   assert.match(orderFormPageResult.body, /delivery-btn/);
   assert.match(orderFormPageResult.body, /loadProductCatalog/);
@@ -410,6 +416,73 @@ test('gerencia catalogo de produtos para pedidos e orcamentos', async () => {
   const afterDelete = await request('/api/products');
   assert.equal(afterDelete.body.products.some(product => product.id === created.body.product.id), false);
   assert.equal(afterDelete.body.products.some(product => product.id === storeProduct.body.product.id), false);
+});
+
+test('versiona receitas, ativa uma versão, resolve mapeamento e preserva snapshot no pedido', async () => {
+  const product = await post('/api/products', {
+    nome: 'Neon Versionado Teste',
+    categoria: 'Neon LED',
+    tipoProduto: 'fabricacao'
+  });
+  assert.equal(product.response.status, 200);
+
+  const first = await post('/api/recipes', {
+    productId: product.body.product.id,
+    family: 'Neon LED',
+    name: 'Receita Neon Teste',
+    materials: [{ materialId: 'preset:acrilico_6mm', quantity: 1, unit: 'm2', wastePercent: 8 }],
+    steps: [{ label: 'Aplicar LED', estimatedMinutes: 60 }]
+  });
+  assert.equal(first.response.status, 200);
+  assert.equal(first.body.recipe.version, 1);
+  assert.equal(first.body.recipe.status, 'draft');
+
+  const activatedFirst = await post(`/api/recipes/${first.body.recipe.id}/activate`, {});
+  assert.equal(activatedFirst.response.status, 200);
+  assert.equal(activatedFirst.body.recipe.status, 'active');
+
+  const order = await post('/api/database/commit', {
+    schema: 'pedido',
+    pageId: 'test',
+    payload: { numero: 'PED-RECIPE-SNAPSHOT', cliente: 'Cliente Receita', produtos: [{ nome: 'Neon Versionado Teste', quantidade: 1 }] }
+  });
+  assert.equal(order.response.status, 200);
+  assert.equal(order.body.event.payload.produtos[0].recipeRef.id, first.body.recipe.id);
+  assert.equal(order.body.event.payload.produtos[0].recipeSnapshot.version, 1);
+
+  const second = await post('/api/recipes', {
+    basedOnId: first.body.recipe.id,
+    productId: product.body.product.id,
+    family: 'Neon LED',
+    name: 'Receita Neon Teste',
+    materials: [{ materialId: 'preset:acrilico_6mm', quantity: 1.4, unit: 'm2', wastePercent: 10 }],
+    steps: [{ label: 'Aplicar LED', estimatedMinutes: 75 }]
+  });
+  assert.equal(second.body.recipe.version, 2);
+  await post(`/api/recipes/${second.body.recipe.id}/activate`, {});
+
+  const listed = await request('/api/recipes');
+  assert.equal(listed.body.recipes.find(item => item.id === first.body.recipe.id).status, 'retired');
+  assert.equal(listed.body.recipes.find(item => item.id === second.body.recipe.id).status, 'active');
+
+  const mapping = await post('/api/external-mappings', {
+    source: 'site', externalType: 'variant', externalKey: 'NEON-VERSIONADO-01',
+    productId: product.body.product.id, recipeId: second.body.recipe.id
+  });
+  assert.equal(mapping.response.status, 200);
+  assert.equal(mapping.body.mapping.recipeVersion, 2);
+  const resolved = await request('/api/external-mappings/resolve?source=site&externalType=variant&externalKey=NEON-VERSIONADO-01');
+  assert.equal(resolved.response.status, 200);
+  assert.equal(resolved.body.recipe.id, second.body.recipe.id);
+
+  const updatedOrder = await post('/api/database/commit', {
+    id: order.body.id,
+    schema: 'pedido',
+    pageId: 'test',
+    payload: { produtos: [{ nome: 'Neon Versionado Teste', quantidade: 2 }] }
+  });
+  assert.equal(updatedOrder.body.event.payload.produtos[0].recipeSnapshot.version, 1);
+  assert.equal(updatedOrder.body.event.payload.produtos[0].recipeRef.id, first.body.recipe.id);
 });
 
 test('classifica OS para colaborador com login sem expor precos e permite chat privado', async () => {
