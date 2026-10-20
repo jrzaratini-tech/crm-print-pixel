@@ -72,6 +72,7 @@ const SHOPIFY_WEBHOOK_SECRET = process.env.SHOPIFY_WEBHOOK_SECRET || '';
 const SHOPIFY_SHOP_DOMAIN = String(process.env.SHOPIFY_SHOP_DOMAIN || '').trim().toLowerCase();
 const SHOPIFY_ADMIN_ACCESS_TOKEN = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN || '';
 const SHOPIFY_API_VERSION = process.env.SHOPIFY_API_VERSION || '2026-10';
+const FIREBASE_BACKUP_BUCKET = String(process.env.FIREBASE_BACKUP_BUCKET || '').trim();
 const MAX_QUERY_LIMIT = 5000;
 const MAX_UPLOAD_BYTES = 500 * 1024;
 const MOLONI_REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000;
@@ -3671,6 +3672,37 @@ app.get('/api/shopify/status', requireCrmPermission('integrations.manage'), (req
     shopDomain: SHOPIFY_SHOP_DOMAIN || '',
     webhookPath: '/api/shopify/webhook'
   });
+});
+
+app.get('/api/system/readiness', requireCrmPermission('integrations.manage'), async (req, res) => {
+  try {
+    const [moloniConfigValue, aiConfigValue] = await Promise.all([moloniConfig(), aiConfiguration()]);
+    const moloni = moloniPublicStatus(moloniConfigValue);
+    const stripe = stripePublicStatus();
+    const ai = AI_POLICY.publicAiStatus(aiConfigValue, { signInConfigured: chatGptConnectionConfigured() });
+    const shopify = {
+      webhookConfigured: Boolean(SHOPIFY_WEBHOOK_SECRET),
+      shopDomainConfigured: Boolean(SHOPIFY_SHOP_DOMAIN),
+      adminApiConfigured: Boolean(SHOPIFY_ADMIN_ACCESS_TOKEN)
+    };
+    const items = [
+      { id: 'database', label: 'Base de dados', configured: Boolean(process.env.FIREBASE_SERVICE_ACCOUNT || process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 || process.env.FIREBASE_SERVICE_ACCOUNT_FILE), operational: true, detail: 'Firestore ligado e a responder.' },
+      { id: 'ai', label: 'Gestor IA', configured: ai.signInConfigured, operational: ai.connected && ai.enabled, detail: ai.connected ? `${ai.model} · raciocínio ${ai.reasoningEffort}` : 'Ligue a conta ChatGPT autorizada.' },
+      { id: 'moloni', label: 'Moloni', configured: moloni.credentialsConfigured, operational: moloni.readyForLive, detail: moloni.readyForLive ? 'Conta e parâmetros prontos para faturação.' : 'Concluir ligação e parâmetros de faturação.' },
+      { id: 'stripe', label: 'Pagamentos', configured: stripe.configured, operational: stripe.ready && stripe.webhookConfigured, detail: stripe.ready && stripe.webhookConfigured ? 'Stripe e webhook configurados.' : 'Configurar chave e webhook Stripe.' },
+      { id: 'shopify', label: 'Loja online', configured: shopify.webhookConfigured && shopify.shopDomainConfigured, operational: shopify.webhookConfigured && shopify.shopDomainConfigured && shopify.adminApiConfigured, detail: shopify.webhookConfigured && shopify.shopDomainConfigured && shopify.adminApiConfigured ? 'Shopify pronta para receber e reconciliar pedidos.' : 'Faltam domínio, segredo do webhook e token Admin Shopify.' },
+      { id: 'backup', label: 'Backup externo', configured: Boolean(FIREBASE_BACKUP_BUCKET), operational: Boolean(FIREBASE_BACKUP_BUCKET), detail: FIREBASE_BACKUP_BUCKET ? 'Bucket privado configurado.' : 'Configurar um bucket privado e executar um restauro de prova.' }
+    ];
+    const operational = items.filter(item => item.operational).length;
+    res.json({
+      success: true,
+      generatedAt: new Date().toISOString(),
+      summary: { operational, total: items.length, pending: items.length - operational },
+      items
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Não foi possível verificar a prontidão do ecossistema.' });
+  }
 });
 
 async function shopifyGraphql(query, variables = {}) {

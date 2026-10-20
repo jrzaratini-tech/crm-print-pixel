@@ -644,6 +644,15 @@ test('gestor IA produz briefing determinístico e resposta com fontes', async ()
   assert.deepEqual(empty.body.conversation.messages, []);
 });
 
+test('prontidão do ecossistema identifica ativações externas sem expor segredos', async () => {
+  const readiness = await request('/api/system/readiness');
+  assert.equal(readiness.response.status, 200);
+  assert.equal(readiness.body.summary.total, 6);
+  assert.ok(readiness.body.items.some(item => item.id === 'database' && item.operational));
+  assert.ok(readiness.body.items.some(item => item.id === 'shopify'));
+  assert.equal(JSON.stringify(readiness.body).includes('test-shopify-secret'), false);
+});
+
 test('classifica OS para colaborador com login sem expor precos e permite chat privado', async () => {
   const order = await post('/api/database/commit', {
     schema: 'pedido',
