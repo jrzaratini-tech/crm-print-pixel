@@ -1,8 +1,55 @@
 'use strict';
 
+const FINANCEIRO = require('./financeiro.js');
+
 function text(value) { return String(value || '').trim(); }
 function date(value) { if (!value) return null; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? null : parsed; }
 function money(value) { const parsed = Number(value); return Number.isFinite(parsed) ? Math.round(parsed * 100) / 100 : 0; }
+
+function eventDate(event = {}) {
+  const payload = event.payload || {};
+  const value = event.schema === 'pedido' && payload.dataPedido
+    ? payload.dataPedido
+    : event.schema === 'despesa' && (payload.dataCompra || payload.dataDespesa || payload.dataFatura)
+      ? (payload.dataCompra || payload.dataDespesa || payload.dataFatura)
+      : event.schema === 'fatura_venda' && payload.dataFatura
+        ? payload.dataFatura
+        : (event.created_at || payload.dataCriacao || event.timestamp || event.createdAt);
+  return date(value);
+}
+
+function periodRange(now, mode) {
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  if (mode === 'previousMonth') return { start: new Date(year, month - 1, 1), end: new Date(year, month, 0, 23, 59, 59, 999) };
+  if (mode === 'quarter') return { start: new Date(year, month - 3, 1), end: new Date(year, month, 0, 23, 59, 59, 999) };
+  if (mode === 'year') return { start: new Date(year, 0, 1), end: new Date(year, month, now.getDate(), 23, 59, 59, 999) };
+  if (mode === 'all') return { start: new Date(0), end: new Date(8640000000000000) };
+  return { start: new Date(year, month, 1), end: new Date(year, month, now.getDate(), 23, 59, 59, 999) };
+}
+
+function dashboardPeriod(events, now, mode) {
+  const range = periodRange(now, mode);
+  const orders = events.filter(event => event.schema === 'pedido' && eventDate(event) && eventDate(event) >= range.start && eventDate(event) <= range.end);
+  const expenses = events.filter(event => event.schema === 'despesa' && eventDate(event) && eventDate(event) >= range.start && eventDate(event) <= range.end);
+  return {
+    netRevenue: money(orders.reduce((sum, event) => sum + FINANCEIRO.faturamentoSemIva(event.payload || {}), 0)),
+    grossRevenue: money(orders.reduce((sum, event) => sum + FINANCEIRO.totalComIva(event.payload || {}), 0)),
+    expenses: money(expenses.reduce((sum, event) => sum + FINANCEIRO.numero(event.payload?.valorTotal ?? event.payload?.total ?? event.payload?.valorBruto ?? event.payload?.valor), 0)),
+    orderCount: orders.length,
+    sourceIds: orders.map(event => event.id)
+  };
+}
+
+function dashboardSnapshot(events, now) {
+  return {
+    currentMonth: dashboardPeriod(events, now, 'currentMonth'),
+    previousMonth: dashboardPeriod(events, now, 'previousMonth'),
+    lastCompleteQuarter: dashboardPeriod(events, now, 'quarter'),
+    currentYear: dashboardPeriod(events, now, 'year'),
+    allTime: dashboardPeriod(events, now, 'all')
+  };
+}
 
 function buildBriefing(input = {}, options = {}) {
   const now = date(options.now) || new Date();
@@ -24,6 +71,7 @@ function buildBriefing(input = {}, options = {}) {
   const failedJobs = jobs.filter(job => job.status === 'failed');
   const activeAssignments = assignments.filter(item => item.paymentStatus !== 'paid');
   const pendingExpenses = expenses.filter(event => /pending|a classificar/i.test(text(`${event.payload?.classificationStatus} ${event.payload?.categoria}`)));
+  const dashboard = dashboardSnapshot(events, now);
 
   const alerts = [];
   lateOrders.forEach(event => alerts.push({ severity: 'high', type: 'delay', message: `${event.payload?.numero || event.id} está atrasado.`, source: { schema: 'pedido', id: event.id } }));
@@ -41,6 +89,7 @@ function buildBriefing(input = {}, options = {}) {
       openIntegrationExceptions: exceptions.length,
       openOrderValue: money(openOrders.reduce((sum, event) => sum + money(event.payload?.total), 0))
     },
+    dashboard,
     alerts: alerts.slice(0, 100),
     summary: alerts.length
       ? `${alerts.filter(item => item.severity === 'high').length} alerta(s) prioritário(s) e ${alerts.length} alerta(s) no total exigem atenção.`
@@ -52,6 +101,22 @@ function buildBriefing(input = {}, options = {}) {
 function answerQuestion(question, briefing) {
   const value = text(question).toLowerCase();
   let metric = '';
+  if (/(quanto|qual|valor|total|mostra|dashboard|painel).*(fatur|receita|vendas)|(faturamento|faturação|receita|vendas).*(quanto|qual|valor|total|dashboard|painel)/.test(value)) {
+    const periodKey = /m[eê]s anterior|ultimo mes|último mês/.test(value) ? 'previousMonth'
+      : /trimestre/.test(value) ? 'lastCompleteQuarter'
+        : /ano/.test(value) ? 'currentYear'
+          : /todo|total histor|sempre/.test(value) ? 'allTime'
+            : 'currentMonth';
+    const period = briefing.dashboard?.[periodKey] || { netRevenue: 0, grossRevenue: 0, orderCount: 0, sourceIds: [] };
+    const labels = { currentMonth: 'mês atual', previousMonth: 'mês anterior', lastCompleteQuarter: 'último trimestre completo', currentYear: 'ano atual', allTime: 'todo o período' };
+    return {
+      understood: true,
+      metric: `dashboard.${periodKey}.revenue`,
+      value: period.grossRevenue,
+      answer: `No dashboard, o faturamento de ${labels[periodKey]} é ${period.netRevenue.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })} líquido e ${period.grossRevenue.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })} bruto, calculado a partir de ${period.orderCount} pedido(s).`,
+      sources: (period.sourceIds || []).map(id => ({ schema: 'pedido', id }))
+    };
+  }
   if (/meu dia|começar|comecar|resumo geral|situação geral|situacao geral|organiza/.test(value)) {
     const metrics = briefing.metrics;
     const opening = briefing.alerts.length ? briefing.summary : 'Não existem alertas operacionais pendentes.';
@@ -73,7 +138,7 @@ function answerQuestion(question, briefing) {
     };
   }
   if (/atras|prazo/.test(value)) metric = 'lateOrders';
-  else if (/fatur|fatura/.test(value)) metric = 'uninvoicedOrders';
+  else if (/sem fatur|falta fatur|por fatur|pedido.*fatura|fatura.*pedido/.test(value)) metric = 'uninvoicedOrders';
   else if (/stock|material|comprar/.test(value)) metric = 'lowStockMaterials';
   else if (/integra|shopify|erro|falha/.test(value)) metric = 'failedIntegrations';
   else if (/orçamento|orcamento|proposta/.test(value)) metric = 'openQuotes';

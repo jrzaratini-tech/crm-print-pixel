@@ -4252,7 +4252,8 @@ async function buildAuthorizedAiKnowledge(data, focus, quoteMode = false) {
       fornecedores: suppliers.length,
       documentosFiscais: fiscalDocuments.length,
       producao: data.assignments.length
-    }
+    },
+    dashboard: data.briefing.dashboard
   };
   const limit = values => values.slice(0, 150);
   const sortByDate = values => [...values].sort((a, b) => String(b.dataEntrega || b.dataEntrada || b.data || '').localeCompare(String(a.dataEntrega || a.dataEntrada || a.data || '')));
@@ -4378,7 +4379,7 @@ app.post('/api/ai/ask', requestRateLimit({ windowMs: 15 * 60 * 1000, max: 40 }),
     // Listas factuais devem vir diretamente do CRM: são mais rápidas, exatas e
     // não consomem o limite da conta ChatGPT. O modelo continua responsável por
     // análise, diálogo, imagens e perguntas que exigem raciocínio.
-    if (!quoteMode && deterministicAnswer.understood && deterministicAnswer.metric === 'records') {
+    if (!quoteMode && deterministicAnswer.understood && (deterministicAnswer.metric === 'records' || String(deterministicAnswer.metric || '').startsWith('dashboard.'))) {
       const assistantMessage = { role: 'assistant', content: deterministicAnswer.answer, hadImage: false, createdAt: new Date().toISOString() };
       await saveAiConversation(req, { messages: [...savedConversation.messages, userMessage, assistantMessage], mode: 'manager' });
       await recordAudit(req, 'ai.manager.question', { entityType: 'ai_usage', entityId: crypto.randomUUID(), metadata: { understood: true, metric: 'records', mode: 'crm_direct' } });
@@ -4390,6 +4391,7 @@ app.post('/api/ai/ask', requestRateLimit({ windowMs: 15 * 60 * 1000, max: 40 }),
       const operationalContext = {
         generatedAt: briefing.generatedAt,
         metrics: briefing.metrics,
+        dashboard: briefing.dashboard,
         summary: briefing.summary,
         alerts: briefing.alerts.slice(0, 20).map(alert => ({ severity: alert.severity, type: alert.type, message: alert.message })),
         recordsConsulted: briefing.sources,

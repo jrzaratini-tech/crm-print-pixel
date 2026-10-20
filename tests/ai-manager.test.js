@@ -39,3 +39,27 @@ test('organiza o dia com uma visão geral segura quando a IA não está ligada',
   assert.equal(overview.metric, 'dailyOverview');
   assert.match(overview.answer, /1 pedido\(s\)/);
 });
+
+test('responde o faturamento mostrado no dashboard com líquido e bruto do mês atual', () => {
+  const briefing = MANAGER.buildBriefing({ events: [
+    { id: 'p1', schema: 'pedido', created_at: '2026-10-05T10:00:00.000Z', payload: { subtotal: 100, total: 123, iva: 23 } },
+    { id: 'p2', schema: 'pedido', created_at: '2026-09-28T10:00:00.000Z', payload: { subtotal: 200, total: 246, iva: 46 } }
+  ] }, { now: '2026-10-20T10:00:00.000Z' });
+  const answer = MANAGER.answerQuestion('Quanto era o faturamento que estava mostrando no dashboard?', briefing);
+  assert.equal(answer.understood, true);
+  assert.equal(answer.metric, 'dashboard.currentMonth.revenue');
+  assert.equal(answer.value, 123);
+  assert.match(answer.answer, /100,00\s*€/);
+  assert.match(answer.answer, /123,00\s*€/);
+  assert.deepEqual(answer.sources, [{ schema: 'pedido', id: 'p1' }]);
+});
+
+test('distingue faturamento de pedidos ainda sem fatura', () => {
+  const briefing = MANAGER.buildBriefing({ events: [
+    { id: 'p1', schema: 'pedido', created_at: '2026-10-05T10:00:00.000Z', payload: { total: 123, status: 'processamento' } }
+  ] }, { now: '2026-10-20T10:00:00.000Z' });
+  const revenue = MANAGER.answerQuestion('Qual é o faturamento do mês?', briefing);
+  const pending = MANAGER.answerQuestion('Quais pedidos ainda estão sem faturar?', briefing);
+  assert.equal(revenue.metric, 'dashboard.currentMonth.revenue');
+  assert.equal(pending.metric, 'uninvoicedOrders');
+});
