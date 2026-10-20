@@ -4,6 +4,19 @@
 
 O desenvolvimento local do ecossistema inteligente foi consolidado por incrementos e validado pela bateria automatizada do projeto. A aprovação técnica significa que o código cumpriu os testes automatizados; não substitui a aceitação operacional da PrintPixel, a validação do contabilista ou a ativação das contas externas.
 
+### Verificação de produção em 20 de outubro de 2026
+
+- versão `45cb8a66` publicada com sucesso no Render;
+- 156 testes automatizados aprovados, sem falhas;
+- Firestore, Gestor IA, Moloni e Stripe confirmados como operacionais pelo painel de prontidão;
+- conta ChatGPT ligada e política fixa em `gpt-5.6-sol`, raciocínio `medium`, sem fallback pago;
+- conversa persistente validada e consulta de 150 pedidos sem faturação entregue diretamente pelo CRM em cerca de cinco segundos;
+- loja pública identificada em `printpixelstudio.com`, com personalizador em `personalizar.printpixelstudio.com` e campos técnicos de medida, acabamento, quantidade e arte;
+- conector Shopify está implementado, mas a ativação real continua bloqueada pelas credenciais da loja;
+- backup externo continua bloqueado pela ausência de um bucket privado configurado.
+
+O painel **Configurações → Integrações** apresenta atualmente **4 de 6 componentes operacionais** e indica as duas ativações externas pendentes sem revelar segredos.
+
 | Fase | Entrega implementada | Estado técnico | Dependência para operação real |
 | --- | --- | --- | --- |
 | 0 | Diagnóstico, arquitetura e backlog | Concluído | Confirmação contínua das prioridades pela gestão |
@@ -11,8 +24,8 @@ O desenvolvimento local do ecossistema inteligente foi consolidado por increment
 | 2 | Webhooks Shopify, idempotência, mapeamento, exceções e reconciliação | Aprovado em testes | Credenciais da loja, webhook e inventário do personalizador |
 | 3 | Receitas, reservas, capacidade e controlo de qualidade obrigatório | Aprovado em testes | Parametrizar horários, recursos e receitas reais restantes |
 | 4 | Apuramento, bloqueios, fecho auditado e dossier trimestral | Aprovado em testes | Validação e confirmação de contabilista certificado |
-| 5 | Orçamentista com catálogo real, estrutura, confiança e revisão humana | Aprovado em testes | Ligar a conta ChatGPT autorizada e validar casos reais anonimizados |
-| 6 | Resumo diário, perguntas rastreáveis, alertas e permissões | Aprovado em testes | Ligar a conta ChatGPT para funções generativas; núcleo determinístico já opera sem custo variável |
+| 5 | Orçamentista com catálogo real, estrutura, confiança e revisão humana | Ativo em produção | Validar uma amostra de casos reais por família e manter revisão humana |
+| 6 | Resumo diário, perguntas rastreáveis, alertas, memória e permissões | Ativo em produção | Acompanhar a utilização real e corrigir respostas com feedback humano |
 | 7 | Aprendizagem por amostra, confiança, aprovação, versão e reversão | Aprovado em testes | Acumular pelo menos cinco trabalhos válidos por família |
 | 8 | Matriz de aceitação, contingência, formação e plano de entrada | Preparado | Aceitação humana, operação paralela e ativação externa |
 
@@ -78,9 +91,8 @@ Para concluir a ativação real são necessários:
 1. domínio `*.myshopify.com`, segredo do webhook e token da aplicação Shopify;
 2. lista de variantes/SKUs e exemplo real do payload do personalizador;
 3. configuração de bucket privado de backup e credencial Firebase/Google;
-4. ligação OAuth da conta ChatGPT autorizada pela PrintPixel;
-5. nome e validação do contabilista certificado;
-6. aceite da gestão após o período de operação paralela.
+4. nome e validação do contabilista certificado;
+5. aceite da gestão após o período de operação paralela.
 
 ## 8. Auto de aceitação
 
