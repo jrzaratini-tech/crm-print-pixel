@@ -612,6 +612,7 @@ test('prepara dossier fiscal e exige validação nominal antes do fecho trimestr
 });
 
 test('gestor IA produz briefing determinístico e resposta com fontes', async () => {
+  await post('/api/ai/conversation/reset', {});
   const briefing = await request('/api/ai/briefing');
   assert.equal(briefing.response.status, 200);
   assert.ok(briefing.body.briefing.metrics);
@@ -621,6 +622,22 @@ test('gestor IA produz briefing determinístico e resposta com fontes', async ()
   assert.equal(answer.body.deterministic, true);
   assert.equal(answer.body.answer.understood, true);
   assert.ok(Array.isArray(answer.body.answer.sources));
+
+  const list = await post('/api/ai/ask', { question: 'Mostre agora a lista detalhada.' });
+  assert.equal(list.response.status, 200);
+  assert.equal(list.body.answer.understood, true);
+  assert.match(list.body.answer.answer, /registo|não encontrei/i);
+
+  const restored = await request('/api/ai/conversation');
+  assert.equal(restored.response.status, 200);
+  assert.equal(restored.body.conversation.messages.length, 4);
+  assert.equal(restored.body.conversation.messages[0].role, 'user');
+  assert.equal(restored.body.conversation.messages[3].role, 'assistant');
+
+  const reset = await post('/api/ai/conversation/reset', {});
+  assert.equal(reset.response.status, 200);
+  const empty = await request('/api/ai/conversation');
+  assert.deepEqual(empty.body.conversation.messages, []);
 });
 
 test('classifica OS para colaborador com login sem expor precos e permite chat privado', async () => {

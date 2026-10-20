@@ -1,7 +1,7 @@
 'use strict';
 
 function text(value) { return String(value || '').trim(); }
-function date(value) { const parsed = new Date(value || 0); return Number.isNaN(parsed.getTime()) ? null : parsed; }
+function date(value) { if (!value) return null; const parsed = new Date(value); return Number.isNaN(parsed.getTime()) ? null : parsed; }
 function money(value) { const parsed = Number(value); return Number.isFinite(parsed) ? Math.round(parsed * 100) / 100 : 0; }
 
 function buildBriefing(input = {}, options = {}) {
