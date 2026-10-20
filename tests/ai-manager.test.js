@@ -31,3 +31,11 @@ test('resume prioridades e responde com linguagem de gestão', () => {
   assert.match(priorities.answer, /alerta/i);
   assert.match(MANAGER.answerQuestion('Existem encomendas atrasadas?', briefing).answer, /fora do prazo/i);
 });
+
+test('organiza o dia com uma visão geral segura quando a IA não está ligada', () => {
+  const briefing = MANAGER.buildBriefing({ events: [{ id: 'p1', schema: 'pedido', payload: { status: 'processamento', total: 150 } }] }, { now: '2026-10-20T10:00:00.000Z' });
+  const overview = MANAGER.answerQuestion('Analise o meu dia e diga por onde devo começar.', briefing);
+  assert.equal(overview.understood, true);
+  assert.equal(overview.metric, 'dailyOverview');
+  assert.match(overview.answer, /1 pedido\(s\)/);
+});

@@ -3992,16 +3992,63 @@ app.get('/api/ai/briefing', async (req, res) => {
   }
 });
 
-app.post('/api/ai/ask', async (req, res) => {
+app.post('/api/ai/ask', requestRateLimit({ windowMs: 15 * 60 * 1000, max: 40 }), async (req, res) => {
   try {
     const question = text(req.body?.question, 500);
     if (question.length < 3) return res.status(400).json({ success: false, message: 'Escreva uma pergunta sobre a operação.' });
     const briefing = await authorizedAiBriefing(req);
-    const answer = AI_MANAGER.answerQuestion(question, briefing);
-    await recordAudit(req, 'ai.manager.question', { entityType: 'ai_usage', entityId: crypto.randomUUID(), metadata: { understood: answer.understood, metric: answer.metric || '' } });
-    res.json({ success: true, answer: sanitizeForResponse(answer), generatedAt: briefing.generatedAt, deterministic: true });
+    const deterministicAnswer = AI_MANAGER.answerQuestion(question, briefing);
+    const config = await aiConfiguration();
+    const policy = AI_POLICY.normalizeAiPolicy(config.policy || {});
+    const conversation = Array.isArray(req.body?.conversation) ? req.body.conversation.slice(-10).map(item => ({
+      role: item?.role === 'assistant' ? 'assistant' : 'user',
+      content: text(item?.content, 1200)
+    })).filter(item => item.content) : [];
+
+    if (policy.enabled && config.credentials) {
+      const accessToken = await chatGptAccessToken();
+      const operationalContext = {
+        generatedAt: briefing.generatedAt,
+        metrics: briefing.metrics,
+        summary: briefing.summary,
+        alerts: briefing.alerts.slice(0, 20).map(alert => ({ severity: alert.severity, type: alert.type, message: alert.message })),
+        recordsConsulted: briefing.sources
+      };
+      const input = conversation.length ? conversation : [{ role: 'user', content: question }];
+      if (!input.some((item, index) => index === input.length - 1 && item.role === 'user' && item.content === question)) {
+        input.push({ role: 'user', content: question });
+      }
+      input[input.length - 1] = {
+        ...input[input.length - 1],
+        content: `${input[input.length - 1].content}\n\nDADOS ATUAIS AUTORIZADOS DO CRM:\n${JSON.stringify(operationalContext)}`
+      };
+      const output = await CHATGPT_PLAN.createResponse({
+        accessToken,
+        model: policy.model,
+        reasoningEffort: policy.reasoningEffort,
+        input,
+        instructions: [
+          'Você é o Gestor IA da PrintPixel, integrado no CRM de uma empresa de comunicação visual, LED neon, logótipos para montras e impressão 3D.',
+          'Converse em português europeu, de forma natural, direta, prestável e profissional.',
+          'Use os dados atuais do CRM incluídos na última mensagem. Nunca invente números, clientes, estados, prazos ou preços.',
+          'Considere o histórico da conversa para responder a perguntas de seguimento.',
+          'Quando houver dados suficientes, explique a situação, destaque a prioridade e proponha a próxima ação prática.',
+          'Se a pergunta exigir dados que não estão no contexto, diga claramente o que falta e indique onde isso deve ser consultado no CRM.',
+          'Não afirme que guardou, enviou, faturou, apagou ou alterou algo: ações de escrita exigem confirmação humana e endpoint próprio.',
+          'Evite linguagem técnica sobre modelos, endpoints, JSON ou respostas determinísticas.'
+        ].join(' ')
+      });
+      const answer = { understood: true, answer: text(output, 6000), sources: briefing.alerts.map(alert => alert.source).slice(0, 20) };
+      await recordAudit(req, 'ai.manager.question', { entityType: 'ai_usage', entityId: crypto.randomUUID(), metadata: { understood: true, mode: 'chat', turns: conversation.length } });
+      return res.json({ success: true, answer: sanitizeForResponse(answer), generatedAt: briefing.generatedAt, deterministic: false, model: policy.model });
+    }
+
+    await recordAudit(req, 'ai.manager.question', { entityType: 'ai_usage', entityId: crypto.randomUUID(), metadata: { understood: deterministicAnswer.understood, metric: deterministicAnswer.metric || '', mode: 'safe_fallback' } });
+    res.json({ success: true, answer: sanitizeForResponse(deterministicAnswer), generatedAt: briefing.generatedAt, deterministic: true, fallback: true });
   } catch (error) {
-    res.status(500).json({ success: false, message: 'Não foi possível responder com os dados autorizados.' });
+    console.error('Erro no diálogo do Gestor IA:', error.message);
+    const status = error.code?.startsWith('subscription_sharing_') ? 429 : 502;
+    res.status(status).json({ success: false, code: error.code || '', message: error.message || 'Não foi possível responder com os dados autorizados.' });
   }
 });
 

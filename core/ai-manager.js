@@ -52,6 +52,17 @@ function buildBriefing(input = {}, options = {}) {
 function answerQuestion(question, briefing) {
   const value = text(question).toLowerCase();
   let metric = '';
+  if (/meu dia|começar|comecar|resumo geral|situação geral|situacao geral|organiza/.test(value)) {
+    const metrics = briefing.metrics;
+    const opening = briefing.alerts.length ? briefing.summary : 'Não existem alertas operacionais pendentes.';
+    return {
+      understood: true,
+      metric: 'dailyOverview',
+      value: briefing.alerts.length,
+      answer: `${opening} Estão em acompanhamento ${metrics.openOrders} pedido(s), ${metrics.activeAssignments} trabalho(s) em produção, ${metrics.openQuotes} orçamento(s) em aberto e ${metrics.uninvoicedOrders} pedido(s) sem faturação registada.`,
+      sources: briefing.alerts.map(alert => alert.source)
+    };
+  }
   if (/prioridad|atenção|atencao/.test(value)) {
     return {
       understood: true,
