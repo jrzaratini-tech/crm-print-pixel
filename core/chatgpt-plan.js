@@ -16,8 +16,18 @@ function randomValue(bytes = 32) {
   return crypto.randomBytes(bytes).toString('base64url');
 }
 
+function validHostId(value) {
+  return /^urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ''))
+    || /^urn:ietf:params:oauth:jwk-thumbprint:[A-Za-z0-9_-]{20,}$/.test(String(value || ''));
+}
+
+function newHostId() {
+  return `urn:uuid:${crypto.randomUUID()}`;
+}
+
 function createAuthorizationAttempt({ hostId, redirectUri, appName, clientId = 'dynamic_agent_client', idTokenHint = '', loginHint = '' }) {
   if (!hostId || !redirectUri || !appName) throw new Error('hostId, redirectUri e appName são obrigatórios.');
+  if (!validHostId(hostId)) throw new Error('ext_agent_host_id deve usar um UUID URN ou JWK thumbprint URN válido.');
   const state = randomValue();
   const nonce = randomValue();
   const codeVerifier = randomValue(64);
@@ -210,6 +220,8 @@ module.exports = {
   hasPlanUsageScope,
   listModels,
   randomValue,
+  newHostId,
+  validHostId,
   refreshCredentials,
   verifyIdToken
 };

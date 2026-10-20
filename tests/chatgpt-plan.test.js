@@ -6,7 +6,7 @@ const CHATGPT_PLAN = require('../core/chatgpt-plan.js');
 
 test('cria autorização oficial com PKCE, callback local e escopos do plano', () => {
   const attempt = CHATGPT_PLAN.createAuthorizationAttempt({
-    hostId: 'host-printpixel',
+    hostId: 'urn:uuid:123e4567-e89b-42d3-a456-426614174000',
     redirectUri: 'http://127.0.0.1:1455/auth/callback',
     appName: 'PrintPixel CRM'
   });
@@ -17,6 +17,12 @@ test('cria autorização oficial com PKCE, callback local e escopos do plano', (
   assert.match(url.searchParams.get('scope'), /chatgpt\.tokens\.use\.direct/);
   assert.equal(url.searchParams.get('code_challenge_method'), 'S256');
   assert.ok(attempt.codeVerifier.length > 50);
+});
+
+test('gera e valida identificador oficial do host OAuth', () => {
+  const hostId = CHATGPT_PLAN.newHostId();
+  assert.equal(CHATGPT_PLAN.validHostId(hostId), true);
+  assert.equal(CHATGPT_PLAN.validHostId('host-printpixel'), false);
 });
 
 test('cifra credenciais e recusa uma chave diferente', () => {

@@ -26,8 +26,9 @@ function openBrowser(url) {
 
 function stableHostId() {
   const file = path.join(__dirname, '..', '.chatgpt-host-id');
-  if (fs.existsSync(file)) return fs.readFileSync(file, 'utf8').trim();
-  const value = CHATGPT_PLAN.randomValue(24);
+  const existing = fs.existsSync(file) ? fs.readFileSync(file, 'utf8').trim() : '';
+  if (CHATGPT_PLAN.validHostId(existing)) return existing;
+  const value = CHATGPT_PLAN.newHostId();
   fs.writeFileSync(file, `${value}\n`, { encoding: 'utf8', mode: 0o600 });
   return value;
 }
