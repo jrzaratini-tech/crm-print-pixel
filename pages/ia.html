@@ -257,9 +257,8 @@
       elements.briefingMetrics.innerHTML = Object.entries(labels).map(([key,label]) => { const tone=tones[key]||['#3157d5','#eef3ff']; return `<article class="metric-card" style="--metric-color:${tone[0]};--metric-soft:${tone[1]}"><div class="metric-top"><span class="metric-label">${escapeHtml(label)}</span><span class="metric-icon" aria-hidden="true">${icons[key]}</span></div><div class="metric-value">${Number(briefing.metrics[key]||0)}</div><div class="metric-hint">${escapeHtml(hints[key])}</div></article>`; }).join('');
       elements.priorityCount.textContent = briefing.alerts.length ? `${briefing.alerts.length} pendente${briefing.alerts.length===1?'':'s'}` : 'Tudo em dia';
       elements.briefingAlerts.innerHTML = briefing.alerts.length
-        ? briefing.alerts.slice(0,10).map(alert=>`<article class="priority-item"><span class="priority-marker" aria-hidden="true"></span><div><p>${escapeHtml(alert.message)}</p><div class="meta">${escapeHtml(alert.source.schema||alert.source.collection||'registo')} · ${escapeHtml(alert.source.id)}</div></div></article>`).join('')
+        ? briefing.alerts.slice(0,10).map(alert=>`<article class="priority-item" title="${escapeHtml(alert.source.id)}"><span class="priority-marker" aria-hidden="true"></span><div><p>${escapeHtml(alert.message)}</p><div class="meta">Origem: ${escapeHtml(alert.source.schema||alert.source.collection||'registo')}</div></div></article>`).join('')
         : '<div class="empty-state"><strong>Sem alertas pendentes</strong><p>A operação não apresenta exceções neste momento.</p></div>';
-      elements.nextAction.textContent = briefing.summary || 'Visão operacional atualizada.';
     }
 
     elements.refreshBriefingButton.addEventListener('click',()=>loadBriefing().catch(error=>{elements.briefingAlerts.textContent=error.message}));
