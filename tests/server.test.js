@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const { after, before, test } = require('node:test');
+process.env.SHOPIFY_WEBHOOK_SECRET ||= 'test-shopify-secret';
 const { app } = require('../server.js');
 const { db } = require('../firebase.js');
 const ROTULOS = require('../core/rotulos.js');
@@ -103,6 +104,9 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   const calculatorPageResult = await request('/pages/calculadora.html');
   const productsPageResult = await request('/pages/produtos.html');
   const recipesPageResult = await request('/pages/receitas.html');
+  const integrationsPageResult = await request('/pages/integracoes.html');
+  const fiscalClosePageResult = await request('/pages/fecho-fiscal.html');
+  const learningPageResult = await request('/pages/aprendizagem.html');
   const ordersPageResult = await request('/pages/pedidos.html');
   const billingPageResult = await request('/pages/faturacao.html');
   const dashboardPageResult = await request('/pages/dashboard.html');
@@ -138,6 +142,9 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.equal(calculatorPageResult.response.status, 200);
   assert.equal(productsPageResult.response.status, 200);
   assert.equal(recipesPageResult.response.status, 200);
+  assert.equal(integrationsPageResult.response.status, 200);
+  assert.equal(fiscalClosePageResult.response.status, 200);
+  assert.equal(learningPageResult.response.status, 200);
   assert.equal(ordersPageResult.response.status, 200);
   assert.equal(billingPageResult.response.status, 200);
   assert.equal(dashboardPageResult.response.status, 200);
@@ -167,10 +174,15 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(menuResult.body, /nav_calculadora/);
   assert.match(menuResult.body, /nav_produtos/);
   assert.match(menuResult.body, /nav_receitas/);
+  assert.match(menuResult.body, /nav_integracoes/);
   assert.match(menuResult.body, /nav_faturacao/);
   assert.match(menuResult.body, /pages\/calculadora\.html/);
   assert.match(menuResult.body, /pages\/produtos\.html/);
   assert.match(menuResult.body, /pages\/receitas\.html/);
+  assert.match(menuResult.body, /pages\/integracoes\.html/);
+  assert.match(integrationsPageResult.body, /api\/integration-jobs/);
+  assert.match(fiscalClosePageResult.body, /api\/fiscal\/quarters/);
+  assert.match(learningPageResult.body, /api\/learning\/recommendations/);
   assert.match(menuResult.body, /pages\/rotulos\.html/);
   assert.match(menuResult.body, /pages\/ia\.html/);
   assert.match(aiPageResult.body, /GPT-5\.6 Sol/);
@@ -485,6 +497,132 @@ test('versiona receitas, ativa uma versão, resolve mapeamento e preserva snapsh
   assert.equal(updatedOrder.body.event.payload.produtos[0].recipeRef.id, first.body.recipe.id);
 });
 
+test('fila de integrações impede duplicações e permite recuperar falhas', async () => {
+  const payload = {
+    source: 'shopify', operation: 'order.created', idempotencyKey: 'evt-order-1001',
+    correlationId: 'pedido-1001', payload: { externalOrderId: 1001 }, maxAttempts: 4
+  };
+  const created = await post('/api/integration-jobs/enqueue', payload);
+  assert.equal(created.response.status, 201);
+  assert.equal(created.body.duplicate, false);
+  assert.equal(created.body.job.status, 'pending');
+
+  const duplicate = await post('/api/integration-jobs/enqueue', payload);
+  assert.equal(duplicate.response.status, 200);
+  assert.equal(duplicate.body.duplicate, true);
+  assert.equal(duplicate.body.job.id, created.body.job.id);
+
+  await db.collection('integration_jobs').doc(created.body.job.id).set({
+    ...created.body.job, status: 'failed', attempt: 4, lastError: 'teste', completedAt: new Date().toISOString()
+  });
+  const retried = await post(`/api/integration-jobs/${created.body.job.id}/retry`, {});
+  assert.equal(retried.response.status, 200);
+  assert.equal(retried.body.job.status, 'pending');
+  assert.equal(retried.body.job.attempt, 0);
+
+  const listed = await request('/api/integration-jobs?source=shopify');
+  assert.equal(listed.response.status, 200);
+  assert.equal(listed.body.jobs.some(job => job.id === created.body.job.id), true);
+
+  const cancelled = await post(`/api/integration-jobs/${created.body.job.id}/cancel`, {});
+  assert.equal(cancelled.response.status, 200);
+  assert.equal(cancelled.body.job.status, 'cancelled');
+});
+
+test('webhook Shopify valida assinatura, persiste antes de responder e ignora duplicado', async () => {
+  const raw = JSON.stringify({ id: 501, name: '#501', financial_status: 'paid', line_items: [] });
+  const signature = crypto.createHmac('sha256', process.env.SHOPIFY_WEBHOOK_SECRET).update(raw).digest('base64');
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Shopify-Hmac-Sha256': signature,
+    'X-Shopify-Webhook-Id': 'webhook-501',
+    'X-Shopify-Event-Id': 'event-501',
+    'X-Shopify-Topic': 'orders/paid',
+    'X-Shopify-Shop-Domain': 'print-pixel.myshopify.com',
+    'X-Shopify-API-Version': '2026-10'
+  };
+  const first = await request('/api/shopify/webhook', { method: 'POST', headers, body: raw });
+  assert.equal(first.response.status, 202);
+  assert.equal(first.body.duplicate, false);
+  const event = await db.collection('integration_events').doc('shopify-webhook-501').get();
+  assert.equal(event.exists, true);
+  const job = await db.collection('integration_jobs').doc(first.body.jobId).get();
+  assert.equal(job.exists, true);
+  assert.equal(job.data().status, 'pending');
+
+  const processedException = await post(`/api/integration-jobs/${first.body.jobId}/process`, {});
+  assert.equal(processedException.response.status, 200);
+  assert.equal(processedException.body.job.status, 'succeeded');
+  assert.equal(processedException.body.job.result.outcome, 'exception');
+  const exceptions = await request('/api/integration-exceptions?source=shopify&status=open');
+  assert.equal(exceptions.response.status, 200);
+  assert.equal(exceptions.body.exceptions.some(item => item.externalOrderId === '501'), true);
+  const reprocessed = await post(`/api/integration-exceptions/shopify-exception-501/reprocess`, { notes: 'Teste' });
+  assert.equal(reprocessed.response.status, 201);
+  assert.equal(reprocessed.body.job.status, 'pending');
+
+  const duplicate = await request('/api/shopify/webhook', { method: 'POST', headers, body: raw });
+  assert.equal(duplicate.response.status, 200);
+  assert.equal(duplicate.body.duplicate, true);
+
+  const invalid = await request('/api/shopify/webhook', { method: 'POST', headers: { ...headers, 'X-Shopify-Hmac-Sha256': 'invalid' }, body: raw });
+  assert.equal(invalid.response.status, 401);
+
+  await db.collection('external_mappings').doc('mapping-shopify-neon').set({
+    id: 'mapping-shopify-neon', source: 'shopify', externalType: 'variant', externalKey: 'NEON-01',
+    productId: 'default-neon-led', recipeId: '', active: true
+  });
+  const paidOrder = JSON.stringify({
+    id: 502, name: '#502', financial_status: 'paid', currency: 'EUR', subtotal_price: '100.00', total_tax: '23.00', total_price: '123.00',
+    customer: { first_name: 'Cliente', last_name: 'Shopify' },
+    line_items: [{ id: 1, product_id: 2, variant_id: 3, sku: 'NEON-01', name: 'Neon LED', quantity: 1, price: '100.00', properties: [{ name: 'Ficheiro', value: 'https://cdn.example/art.svg' }] }]
+  });
+  const paidHeaders = { ...headers, 'X-Shopify-Hmac-Sha256': crypto.createHmac('sha256', process.env.SHOPIFY_WEBHOOK_SECRET).update(paidOrder).digest('base64'), 'X-Shopify-Webhook-Id': 'webhook-502', 'X-Shopify-Event-Id': 'event-502' };
+  const accepted = await request('/api/shopify/webhook', { method: 'POST', headers: paidHeaders, body: paidOrder });
+  assert.equal(accepted.response.status, 202);
+  const processed = await post(`/api/integration-jobs/${accepted.body.jobId}/process`, {});
+  assert.equal(processed.response.status, 200);
+  assert.equal(processed.body.job.result.outcome, 'order_created');
+  const order = await db.collection('events').doc('shopify-order-502').get();
+  assert.equal(order.exists, true);
+  assert.equal(order.data().payload.produtos[0].productId, 'default-neon-led');
+  assert.equal(order.data().payload.total, 123);
+});
+
+test('prepara dossier fiscal e exige validação nominal antes do fecho trimestral', async () => {
+  await db.collection('events').doc('fiscal-sale-2031-q1').set({
+    schema: 'fatura_venda', created_at: '2031-02-10T12:00:00.000Z', deleted: false,
+    payload: { dataFatura: '2031-02-10', numeroFatura: 'FT 2031/1', subtotal: 1000, iva: 230, total: 1230 }
+  });
+  const preview = await request('/api/fiscal/quarters/2031-Q1');
+  assert.equal(preview.response.status, 200);
+  assert.equal(preview.body.report.summary.ivaVendas, 230);
+  assert.equal(preview.body.report.readyToClose, true);
+
+  const rejected = await post('/api/fiscal/quarters/2031-Q1/close', { accountantConfirmed: false });
+  assert.equal(rejected.response.status, 400);
+  const closed = await post('/api/fiscal/quarters/2031-Q1/close', { accountantConfirmed: true, accountantName: 'Contabilista de Teste', notes: 'Valores validados.' });
+  assert.equal(closed.response.status, 201);
+  assert.equal(closed.body.closure.status, 'closed');
+  assert.ok(closed.body.closure.checksum);
+
+  const exported = await request('/api/fiscal/quarters/2031-Q1/export');
+  assert.equal(exported.response.status, 200);
+  assert.match(exported.response.headers.get('content-disposition'), /dossier-iva-2031-Q1/);
+});
+
+test('gestor IA produz briefing determinístico e resposta com fontes', async () => {
+  const briefing = await request('/api/ai/briefing');
+  assert.equal(briefing.response.status, 200);
+  assert.ok(briefing.body.briefing.metrics);
+  assert.ok(Array.isArray(briefing.body.briefing.alerts));
+  const answer = await post('/api/ai/ask', { question: 'Quantos pedidos estão atrasados?' });
+  assert.equal(answer.response.status, 200);
+  assert.equal(answer.body.deterministic, true);
+  assert.equal(answer.body.answer.understood, true);
+  assert.ok(Array.isArray(answer.body.answer.sources));
+});
+
 test('classifica OS para colaborador com login sem expor precos e permite chat privado', async () => {
   const order = await post('/api/database/commit', {
     schema: 'pedido',
@@ -667,6 +805,13 @@ test('controla pagamento de comissao e move trabalho pago para historico do cola
 
   await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas`, { stepId: 'montagem_da_estrutura', done: true }, login.body.token);
   await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas`, { stepId: 'limpeza_embalagem', done: true }, login.body.token);
+  const qualityWithoutEvidence = await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas`, { stepId: 'controlo_qualidade', done: true }, login.body.token);
+  assert.equal(qualityWithoutEvidence.response.status, 400);
+  const quality = await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas`, {
+    stepId: 'controlo_qualidade', done: true,
+    qualityEvidence: { visual: true, dimensions: true, functionality: true, cleanliness: true, note: 'Peça conferida e aprovada.' }
+  }, login.body.token);
+  assert.equal(quality.response.status, 200);
 
   const paid = await post(`/api/production/assignments/${order.body.id}/payment`, { paidBy: 'Responsavel financeiro' });
   assert.equal(paid.response.status, 200);
@@ -851,6 +996,10 @@ test('aponta tempo real, baixa estoque e gera visao gerencial', async () => {
   const worker = await post('/api/production/workers', { name: 'Apontador Tempo', username: 'apontador.tempo', password: 'senha-segura-tempo', role: 'montagem' });
   const login = await post('/api/colaborador/login', { username: 'apontador.tempo', password: 'senha-segura-tempo' });
   await post('/api/production/assignments', { orderId: order.body.id, productId: 'item_0', workerId: worker.body.worker.id, commission: 25, steps: ['aplicar_e_soldar_led'] });
+  const reserved = await db.collection('stock_reservations').doc(`${order.body.id}__item_0`).get();
+  assert.equal(reserved.exists, true);
+  assert.equal(reserved.data().status, 'reserved');
+  assert.equal(reserved.data().items[0].materialId, material.body.id);
 
   const started = await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas/tempo`, { productId: 'item_0', stepId: 'aplicar_e_soldar_led', action: 'start' }, login.body.token);
   assert.equal(started.response.status, 200);
@@ -859,9 +1008,15 @@ test('aponta tempo real, baixa estoque e gera visao gerencial', async () => {
   assert.ok(stopped.body.assignment.timeLogs[0].minutes >= 1);
 
   await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas`, { productId: 'item_0', stepId: 'aplicar_e_soldar_led', done: true }, login.body.token);
+  await workerPost(`/api/colaborador/ordens/${order.body.id}/etapas`, {
+    productId: 'item_0', stepId: 'controlo_qualidade', done: true,
+    qualityEvidence: { visual: true, dimensions: true, functionality: true, cleanliness: true, note: 'Qualidade conferida no teste.' }
+  }, login.body.token);
   const paid = await post(`/api/production/assignments/${order.body.id}/payment`, { productId: 'item_0', paidBy: 'Financeiro' });
   assert.equal(paid.response.status, 200);
   assert.equal(paid.body.stockMovements.length, 1);
+  const consumed = await db.collection('stock_reservations').doc(`${order.body.id}__item_0`).get();
+  assert.equal(consumed.data().status, 'consumed');
 
   const stock = await post('/api/database/query', { schema: 'estoque_movimento', limit: 20 });
   assert.ok(stock.body.events.some(event => event.payload.orderId === order.body.id && event.payload.quantidade < 0));

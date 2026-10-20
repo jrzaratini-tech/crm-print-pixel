@@ -8,6 +8,11 @@ test('define perfis administrativos com menor privilégio', () => {
   assert.equal(ACCESS.hasPermission({ role: 'comercial' }, 'fiscal.write'), false);
   assert.equal(ACCESS.pagePermission('/pages/faturacao.html'), 'fiscal.write');
   assert.equal(ACCESS.pagePermission('/pages/orcamentos.html'), 'quotes.read');
+  assert.equal(ACCESS.pagePermission('/pages/integracoes.html'), 'integrations.manage');
+  assert.equal(ACCESS.pagePermission('/pages/fecho-fiscal.html'), 'fiscal.read');
+  assert.equal(ACCESS.pagePermission('/pages/aprendizagem.html'), 'management.read');
+  assert.equal(ACCESS.hasPermission({ role: 'contabilista' }, 'fiscal.close'), true);
+  assert.equal(ACCESS.hasPermission({ role: 'contabilista' }, 'fiscal.write'), false);
 });
 
 test('protege palavras-passe administrativas e não expõe hashes', () => {

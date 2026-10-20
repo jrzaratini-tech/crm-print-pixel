@@ -9,8 +9,8 @@ const ROLE_PERMISSIONS = Object.freeze({
   ],
   comercial: ['dashboard.read', 'orders.read', 'orders.write', 'quotes.read', 'quotes.write', 'catalog.read', 'ai.use'],
   producao: ['orders.read', 'production.read', 'production.write', 'catalog.read'],
-  financeiro: ['dashboard.read', 'orders.read', 'finance.read', 'finance.write', 'fiscal.read', 'fiscal.write', 'catalog.read'],
-  contabilista: ['dashboard.read', 'finance.read', 'fiscal.read', 'audit.read'],
+  financeiro: ['dashboard.read', 'orders.read', 'finance.read', 'finance.write', 'fiscal.read', 'fiscal.write', 'fiscal.close', 'catalog.read'],
+  contabilista: ['dashboard.read', 'finance.read', 'fiscal.read', 'fiscal.close', 'audit.read'],
   tecnico: ['system.manage', 'users.manage', 'audit.read', 'integrations.manage', 'catalog.read', 'catalog.write']
 });
 
@@ -42,6 +42,7 @@ const PAGE_PERMISSIONS = Object.freeze({
   'contabilidade.html': 'fiscal.read',
   'verificacao.html': 'fiscal.read',
   'faturacao.html': 'fiscal.write',
+  'fecho-fiscal.html': 'fiscal.read',
   'materiais.html': 'catalog.read',
   'produtos.html': 'catalog.read',
   'receitas.html': 'catalog.read',
@@ -50,7 +51,9 @@ const PAGE_PERMISSIONS = Object.freeze({
   'rotulos.html': 'orders.read',
   'links.html': 'users.manage',
   'ia.html': 'ai.use',
-  'utilizadores.html': 'users.manage'
+  'aprendizagem.html': 'management.read',
+  'utilizadores.html': 'users.manage',
+  'integracoes.html': 'integrations.manage'
 });
 
 function normalizeUsername(value) {

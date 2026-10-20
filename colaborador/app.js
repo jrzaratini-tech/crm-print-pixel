@@ -295,7 +295,13 @@
         event.target.checked = false;
         return;
       }
-      await api(`/api/colaborador/ordens/${encodeURIComponent(orderId)}/etapas`, { method: 'POST', body: JSON.stringify({ productId: assignment.productId, stepId: event.target.dataset.step, done: event.target.checked }) });
+      let qualityEvidence;
+      if (event.target.checked && stepId === 'controlo_qualidade') {
+        const note = prompt('Confirme que verificou acabamento visual, medidas, funcionamento/segurança e limpeza. Registe uma observação:');
+        if (!note || note.trim().length < 5) { event.target.checked = false; return; }
+        qualityEvidence = { visual: true, dimensions: true, functionality: true, cleanliness: true, note: note.trim() };
+      }
+      await api(`/api/colaborador/ordens/${encodeURIComponent(orderId)}/etapas`, { method: 'POST', body: JSON.stringify({ productId: assignment.productId, stepId: event.target.dataset.step, done: event.target.checked, qualityEvidence }) });
       await load();
     }));
     if (!paid) {

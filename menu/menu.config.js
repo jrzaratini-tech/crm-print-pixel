@@ -150,6 +150,26 @@
     },
 
     {
+        id: "nav_aprendizagem",
+        name: "Aprendizagem",
+        file: "pages/aprendizagem.html",
+        type: "READ",
+        pos: 9.3,
+        hidden: false,
+        deleted: false
+    },
+
+    {
+        id: "nav_fecho_fiscal",
+        name: "Fecho Fiscal",
+        file: "pages/fecho-fiscal.html",
+        type: "WRITE",
+        pos: 9.4,
+        hidden: false,
+        deleted: false
+    },
+
+    {
         id: "nav_financas",
         name: "Finanças",
         file: "pages/financas.html",
@@ -245,6 +265,16 @@
         file: "pages/utilizadores.html",
         type: "WRITE",
         pos: 14,
+        hidden: false,
+        deleted: false
+    },
+
+    {
+        id: "nav_integracoes",
+        name: "Integrações",
+        file: "pages/integracoes.html",
+        type: "WRITE",
+        pos: 15,
         hidden: false,
         deleted: false
     }

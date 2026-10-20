@@ -6,13 +6,16 @@ Este documento cumpre o entregável previsto para a Fase 0 do Contrato de Desenv
 
 A decisão recomendada é preservar os módulos operacionais existentes e evoluir o sistema por incrementos testados. Funcionalidades já publicadas não serão consideradas concluídas apenas por existirem: cada fase terá de cumprir os critérios contratuais de rastreabilidade, permissões, prevenção de duplicações, testes e validação humana.
 
-### Progresso de execução da Fase 1
+### Progresso de execução
 
 - Concluído: identidades administrativas individuais, perfis e permissões.
 - Concluído: auditoria central das ações administrativas e operacionais críticas.
 - Concluído: identificadores canónicos e vínculos normalizados entre orçamento, pedido, pagamento, produção, Stripe e Moloni.
 - Concluído: receitas técnicas versionadas, ativação controlada, snapshot imutável em pedidos/orçamentos e catálogo de mapeamentos externos.
-- Próximo incremento: fila persistente e idempotente para integrações e tarefas assíncronas.
+- Concluído: fila persistente e idempotente, painel de integrações, política de backup/restauro e revisão de dependências.
+- Concluído em ambiente de testes: conectores Shopify, produção com reservas/qualidade/capacidade, fecho fiscal, Gestor IA e aprendizagem supervisionada.
+- Preparado: plano formal de aceitação e entrada em produção em `FASE_8_ACEITACAO_E_ENTRADA_PRODUCAO.md`.
+- Pendente de terceiros: credenciais Shopify e ChatGPT, bucket de backup, validação do contabilista e aceite operacional da gestão.
 
 ## 2 Inventário técnico atual
 
@@ -23,7 +26,7 @@ A decisão recomendada é preservar os módulos operacionais existentes e evolui
 - Interface web composta por páginas HTML e JavaScript, com áreas próprias para administração, produção, vendedor, dispositivos móveis e portal de rótulos.
 - Repositório Git com histórico de versões e publicação a partir da branch `main`.
 - Testes automatizados executados com o test runner nativo do Node.js.
-- Estado verificado no diagnóstico: 13 ficheiros de teste e 122 casos automatizados aprovados.
+- Estado inicial verificado no diagnóstico: 13 ficheiros de teste e 122 casos automatizados aprovados. A contagem atual deve ser confirmada pela execução de `npm test` antes de cada publicação.
 
 ### 2.2 Módulos funcionais identificados
 

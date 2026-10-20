@@ -12,6 +12,11 @@ const AI_QUOTE = require('./core/ai-quote.js');
 const ADMIN_ACCESS = require('./core/admin-access.js');
 const ENTITY_LINKS = require('./core/entity-links.js');
 const TECHNICAL_RECIPES = require('./core/technical-recipes.js');
+const INTEGRATION_QUEUE = require('./core/integration-queue.js');
+const SHOPIFY = require('./core/shopify.js');
+const AI_MANAGER = require('./core/ai-manager.js');
+const LEARNING = require('./core/learning.js');
+const SCHEDULING = require('./core/scheduling.js');
 const {
   MoloniClient,
   buildDocumentPreview,
@@ -63,6 +68,10 @@ const STRIPE_CURRENCY = String(process.env.STRIPE_CURRENCY || 'eur').toLowerCase
 const STRIPE_RETURN_BASE_URL = process.env.STRIPE_RETURN_BASE_URL || '';
 const CHATGPT_SIGN_IN_ENABLED = process.env.CHATGPT_SIGN_IN_ENABLED === 'true';
 const CHATGPT_TOKEN_ENCRYPTION_KEY = process.env.CHATGPT_TOKEN_ENCRYPTION_KEY || CRM_PASSWORD || '';
+const SHOPIFY_WEBHOOK_SECRET = process.env.SHOPIFY_WEBHOOK_SECRET || '';
+const SHOPIFY_SHOP_DOMAIN = String(process.env.SHOPIFY_SHOP_DOMAIN || '').trim().toLowerCase();
+const SHOPIFY_ADMIN_ACCESS_TOKEN = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN || '';
+const SHOPIFY_API_VERSION = process.env.SHOPIFY_API_VERSION || '2026-10';
 const MAX_QUERY_LIMIT = 5000;
 const MAX_UPLOAD_BYTES = 500 * 1024;
 const MOLONI_REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000;
@@ -87,6 +96,7 @@ const PRODUCTION_PROCESS_CATALOG = [
   { label: 'Pedra + Silicone', difficulty: 2 },
   { label: 'Corte laser', difficulty: 3 },
   { label: 'Montagem face', difficulty: 2 },
+  { id: 'controlo_qualidade', label: 'Controlo de qualidade', difficulty: 4 },
   { label: 'Pintura prata / ouro', difficulty: 3 },
   { label: 'Borracha neon', difficulty: 1 },
   { id: 'colar_as_tampas', label: 'Colar tampa 1', difficulty: 4 },
@@ -119,6 +129,7 @@ const DEFAULT_PRODUCTS = [
 const AI_CONFIG_DOC = db.collection('integrations').doc('chatgpt_plan');
 const ADMIN_USERS_COLLECTION = db.collection('admin_users');
 const AUDIT_COLLECTION = db.collection('audit_events');
+const INTEGRATION_JOBS_COLLECTION = db.collection('integration_jobs');
 
 if (IS_PRODUCTION && !AUTH_DISABLED && (!CRM_USERNAME || !CRM_PASSWORD)) {
   throw new Error('Configure CRM_USERNAME e CRM_PASSWORD antes de iniciar o CRM em produção.');
@@ -500,7 +511,7 @@ app.use((req, res, next) => {
 app.use(express.json({
   limit: '1mb',
   verify: (req, res, buffer) => {
-    if (req.originalUrl === '/api/stripe/webhook') req.rawBody = Buffer.from(buffer);
+    if (req.originalUrl === '/api/stripe/webhook' || req.originalUrl === '/api/shopify/webhook') req.rawBody = Buffer.from(buffer);
   }
 }));
 app.use(express.urlencoded({ extended: false, limit: '10kb' }));
@@ -1685,6 +1696,7 @@ function productionAssignmentWorkers(workerIds = [], allWorkers = [], fallback =
 
 function normalizeProductionSteps(selected = [], previous = [], commission = 0) {
   const selectedIds = new Set((Array.isArray(selected) ? selected : []).map(value => productionStepId(value.id || value)));
+  if (selectedIds.size) selectedIds.add('controlo_qualidade');
   const steps = PRODUCTION_PROCESS_CATALOG
     .map(step => productionStepMeta(step))
     .filter(Boolean)
@@ -2365,6 +2377,29 @@ async function issueStockForAssignment(orderId, productId, assignment, now) {
   return created;
 }
 
+async function reserveStockForAssignment(orderId, productId, assignment, now) {
+  const order = await getOrderEvent(orderId);
+  if (!order) return null;
+  const products = productId ? [rawProductForAssignment(order, productId)].filter(Boolean) : (order.payload?.produtos || []);
+  const materiais = await materialsCatalog();
+  const items = [];
+  for (const product of products) {
+    const ficha = GESTAO.calcularFichaProduto(product, materiais);
+    for (const detalhe of ficha.detalhes) {
+      if (!detalhe.materialId || String(detalhe.materialId).startsWith('preset:')) continue;
+      const quantity = Math.abs(money(detalhe.calculo.consumo) * Math.max(1, money(product.quantidade) || 1));
+      if (quantity) items.push({ materialId: detalhe.materialId, materialName: detalhe.material?.nome || detalhe.materialId, quantity, unit: detalhe.calculo.unidade });
+    }
+  }
+  const reservationId = productionAssignmentId(orderId, productId);
+  const reservation = {
+    id: reservationId, orderId, productId, assignmentId: reservationId,
+    status: 'reserved', items, createdAt: now, updatedAt: now
+  };
+  await db.collection('stock_reservations').doc(reservationId).set(reservation);
+  return reservation;
+}
+
 app.get('/scan-fatura.html', (req, res) => res.sendFile(path.join(__dirname, 'scan-fatura.html')));
 app.use('/mobile', express.static(path.join(__dirname, 'mobile'), { index: 'index.html', fallthrough: false }));
 app.use('/colaborador', express.static(path.join(__dirname, 'colaborador'), { index: 'index.html', fallthrough: false }));
@@ -2843,6 +2878,13 @@ app.post('/api/colaborador/ordens/:id/etapas', requireWorker, async (req, res) =
     const now = new Date().toISOString();
     const currentStep = assignment.steps.find(step => step.id === stepId);
     const requestedDone = Boolean(req.body?.done);
+    if (requestedDone && stepId === 'controlo_qualidade') {
+      const evidence = req.body?.qualityEvidence || {};
+      const checks = ['visual', 'dimensions', 'functionality', 'cleanliness'];
+      if (!checks.every(key => evidence[key] === true) || text(evidence.note, 1000).length < 5) {
+        return res.status(400).json({ success: false, message: 'Confirme os quatro controlos e registe uma observação de qualidade.' });
+      }
+    }
     if (requestedDone && currentStep?.done && currentStep.completedByWorkerId && currentStep.completedByWorkerId !== req.productionWorker.id) {
       return res.status(409).json({ success: false, message: 'Esta etapa ja foi concluida por outro colaborador.' });
     }
@@ -2855,7 +2897,12 @@ app.post('/api/colaborador/ordens/:id/etapas', requireWorker, async (req, res) =
         done: requestedDone,
         completedAt: requestedDone ? now : null,
         completedByWorkerId: requestedDone ? req.productionWorker.id : '',
-        completedByWorkerName: requestedDone ? req.productionWorker.name : ''
+        completedByWorkerName: requestedDone ? req.productionWorker.name : '',
+        qualityEvidence: requestedDone && stepId === 'controlo_qualidade' ? {
+          visual: true, dimensions: true, functionality: true, cleanliness: true,
+          note: text(req.body?.qualityEvidence?.note, 1000),
+          recordedAt: now, recordedByWorkerId: req.productionWorker.id, recordedByWorkerName: req.productionWorker.name
+        } : (requestedDone ? step.qualityEvidence || null : null)
       }
       : step);
     const history = [
@@ -3303,6 +3350,39 @@ app.post('/api/ai/import-credentials', async (req, res) => {
   }
 });
 
+app.post('/api/shopify/webhook', async (req, res) => {
+  try {
+    if (!SHOPIFY_WEBHOOK_SECRET) return res.status(503).json({ success: false, message: 'Integração Shopify ainda não configurada.' });
+    if (!SHOPIFY.verifyWebhook(req.rawBody, req.get('x-shopify-hmac-sha256'), SHOPIFY_WEBHOOK_SECRET)) {
+      return res.status(401).json({ success: false, message: 'Assinatura Shopify inválida.' });
+    }
+    const metadata = SHOPIFY.webhookMetadata(req.headers);
+    if (!metadata.webhookId || !SHOPIFY.validShopDomain(metadata.shopDomain)) {
+      return res.status(400).json({ success: false, message: 'Cabeçalhos Shopify incompletos ou inválidos.' });
+    }
+    if (SHOPIFY_SHOP_DOMAIN && metadata.shopDomain !== SHOPIFY_SHOP_DOMAIN) {
+      return res.status(403).json({ success: false, message: 'A entrega pertence a outra loja Shopify.' });
+    }
+    const eventRef = db.collection('integration_events').doc(`shopify-${metadata.webhookId}`);
+    const previous = await eventRef.get();
+    if (previous.exists) return res.json({ success: true, received: true, duplicate: true });
+    const now = new Date().toISOString();
+    await eventRef.set({
+      source: 'shopify', ...metadata, payload: req.body || {}, receivedAt: now, status: 'received'
+    });
+    const job = INTEGRATION_QUEUE.normalizeJob({
+      source: 'shopify', operation: metadata.topic || 'webhook', idempotencyKey: metadata.webhookId,
+      correlationId: metadata.eventId || text(req.body?.id, 160),
+      payload: { eventId: `shopify-${metadata.webhookId}`, shopDomain: metadata.shopDomain, topic: metadata.topic }
+    }, { now });
+    await INTEGRATION_JOBS_COLLECTION.doc(job.id).set(job);
+    res.status(202).json({ success: true, received: true, duplicate: false, jobId: job.id });
+  } catch (error) {
+    console.error('Erro no webhook Shopify:', error);
+    res.status(400).json({ success: false, message: 'Webhook Shopify inválido.' });
+  }
+});
+
 app.use(requireAuth);
 
 app.get('/api/admin/session', (req, res) => {
@@ -3473,6 +3553,359 @@ app.post('/api/admin/data-integrity/normalize', requireCrmPermission('system.man
   }
 });
 
+async function integrationJobById(id) {
+  if (!isSafeIdentifier(id, 160)) return null;
+  const snapshot = await INTEGRATION_JOBS_COLLECTION.doc(id).get();
+  return snapshot.exists ? { id: snapshot.id, ...snapshot.data() } : null;
+}
+
+async function processShopifyJob(id, workerId = 'shopify-worker') {
+  const current = await integrationJobById(id);
+  if (!current) throw new Error('Tarefa Shopify não encontrada.');
+  if (current.status === 'succeeded') return current;
+  const claimed = INTEGRATION_QUEUE.claim(current, { workerId, leaseSeconds: 300 });
+  if (!claimed) return current;
+  await INTEGRATION_JOBS_COLLECTION.doc(claimed.id).set(claimed);
+  try {
+    const eventId = text(claimed.payload?.eventId, 200);
+    const eventSnapshot = eventId ? await db.collection('integration_events').doc(eventId).get() : null;
+    if (!eventSnapshot?.exists) throw new Error('Evento Shopify associado não foi encontrado.');
+    const event = { id: eventSnapshot.id, ...eventSnapshot.data() };
+    const order = SHOPIFY.normalizeOrder(event.payload || {}, event);
+    const mappings = (await externalMappingCatalog())
+      .filter(mapping => mapping.source === 'shopify' && mapping.active !== false)
+      .reduce((map, mapping) => {
+        map.set(String(mapping.externalKey || '').toLowerCase(), mapping);
+        return map;
+      }, new Map());
+    const exceptions = SHOPIFY.orderExceptions(order, mappings);
+    const now = new Date().toISOString();
+    if (exceptions.length) {
+      const exceptionId = `shopify-exception-${order.externalOrderId || event.webhookId}`;
+      await db.collection('integration_exceptions').doc(exceptionId).set({
+        id: exceptionId, source: 'shopify', externalOrderId: order.externalOrderId,
+        orderNumber: order.name || order.orderNumber, status: 'open', reasons: exceptions,
+        eventId: event.id, jobId: claimed.id, createdAt: now, updatedAt: now
+      }, { merge: true });
+      const succeeded = INTEGRATION_QUEUE.succeed(claimed, { outcome: 'exception', exceptionId, exceptionCount: exceptions.length }, { now });
+      await Promise.all([
+        INTEGRATION_JOBS_COLLECTION.doc(succeeded.id).set(succeeded),
+        db.collection('integration_events').doc(event.id).set({ status: 'exception', exceptionId, processedAt: now }, { merge: true })
+      ]);
+      return succeeded;
+    }
+
+    const crmOrderId = `shopify-order-${order.externalOrderId}`;
+    const existingSnapshot = await db.collection('events').doc(crmOrderId).get();
+    const existingEvent = existingSnapshot.exists ? existingSnapshot.data() : {};
+    let payload = SHOPIFY.toCrmOrder(order, mappings, { now });
+    payload = await bindTechnicalRecipeSnapshots('pedido', payload, existingEvent.payload || {});
+    const savedEvent = ENTITY_LINKS.normalizeEvent(crmOrderId, {
+      ...existingEvent,
+      schema: 'pedido', payload, pageId: 'shopify', timestamp: existingEvent.timestamp || now,
+      created_at: existingEvent.created_at || now, updated_at: now, deleted: false
+    });
+    await db.collection('events').doc(crmOrderId).set(savedEvent);
+    const succeeded = INTEGRATION_QUEUE.succeed(claimed, { outcome: 'order_created', crmOrderId }, { now });
+    const exceptionId = `shopify-exception-${order.externalOrderId || event.webhookId}`;
+    const exceptionSnapshot = await db.collection('integration_exceptions').doc(exceptionId).get();
+    const completionWrites = [
+      INTEGRATION_JOBS_COLLECTION.doc(succeeded.id).set(succeeded),
+      db.collection('integration_events').doc(event.id).set({ status: 'processed', crmOrderId, processedAt: now }, { merge: true })
+    ];
+    if (exceptionSnapshot.exists) completionWrites.push(db.collection('integration_exceptions').doc(exceptionId).set({ status: 'resolved', resolvedAt: now, crmOrderId, updatedAt: now }, { merge: true }));
+    await Promise.all(completionWrites);
+    return succeeded;
+  } catch (error) {
+    const failed = INTEGRATION_QUEUE.fail(claimed, error);
+    await INTEGRATION_JOBS_COLLECTION.doc(failed.id).set(failed);
+    throw error;
+  }
+}
+
+async function runShopifyQueue(limit = 10) {
+  const snapshot = await INTEGRATION_JOBS_COLLECTION.get();
+  const jobs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+    .filter(job => job.source === 'shopify' && INTEGRATION_QUEUE.isRunnable(job))
+    .sort((a, b) => Number(b.priority || 0) - Number(a.priority || 0) || new Date(a.createdAt || 0) - new Date(b.createdAt || 0))
+    .slice(0, limit);
+  const results = [];
+  for (const job of jobs) {
+    try { results.push(await processShopifyJob(job.id)); }
+    catch (error) { console.error(`Falha ao processar tarefa Shopify ${job.id}:`, error.message); }
+  }
+  return results;
+}
+
+app.get('/api/integration-jobs', requireCrmPermission('integrations.manage'), async (req, res) => {
+  try {
+    const status = INTEGRATION_QUEUE.STATUSES.has(req.query.status) ? req.query.status : '';
+    const source = text(req.query.source, 80).toLowerCase();
+    const limit = Math.min(normalizeLimit(req.query.limit), 500);
+    const snapshot = await INTEGRATION_JOBS_COLLECTION.get();
+    const jobs = snapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() }))
+      .filter(job => !status || job.status === status)
+      .filter(job => !source || job.source === source)
+      .sort((a, b) => Number(b.priority || 0) - Number(a.priority || 0) || new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
+      .slice(0, limit);
+    const counts = Array.from(INTEGRATION_QUEUE.STATUSES).reduce((result, item) => {
+      result[item] = snapshot.docs.filter(doc => doc.data()?.status === item).length;
+      return result;
+    }, {});
+    res.json({ success: true, count: jobs.length, counts, jobs: sanitizeForResponse(jobs) });
+  } catch (error) {
+    console.error('Erro ao listar tarefas de integração:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível carregar a fila de integrações.' });
+  }
+});
+
+app.get('/api/shopify/status', requireCrmPermission('integrations.manage'), (req, res) => {
+  res.json({
+    success: true,
+    configured: Boolean(SHOPIFY_WEBHOOK_SECRET && SHOPIFY_SHOP_DOMAIN),
+    webhookConfigured: Boolean(SHOPIFY_WEBHOOK_SECRET),
+    shopDomainConfigured: Boolean(SHOPIFY_SHOP_DOMAIN),
+    adminApiConfigured: Boolean(SHOPIFY_ADMIN_ACCESS_TOKEN),
+    apiVersion: SHOPIFY_API_VERSION,
+    shopDomain: SHOPIFY_SHOP_DOMAIN || '',
+    webhookPath: '/api/shopify/webhook'
+  });
+});
+
+async function shopifyGraphql(query, variables = {}) {
+  if (!SHOPIFY_ADMIN_ACCESS_TOKEN || !SHOPIFY.validShopDomain(SHOPIFY_SHOP_DOMAIN)) throw new Error('A API administrativa Shopify ainda não está configurada.');
+  const response = await fetch(`https://${SHOPIFY_SHOP_DOMAIN}/admin/api/${SHOPIFY_API_VERSION}/graphql.json`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Shopify-Access-Token': SHOPIFY_ADMIN_ACCESS_TOKEN },
+    body: JSON.stringify({ query, variables })
+  });
+  const data = await response.json();
+  if (!response.ok || data.errors?.length) throw new Error(data.errors?.[0]?.message || `Shopify respondeu com HTTP ${response.status}.`);
+  return data.data;
+}
+
+async function shopifyOrdersSince(fromIso) {
+  const orders = [];
+  let cursor = null;
+  const query = `query ReconcileOrders($cursor:String,$filter:String!){orders(first:100,after:$cursor,query:$filter,sortKey:UPDATED_AT){nodes{id name updatedAt displayFinancialStatus currentTotalPriceSet{shopMoney{amount currencyCode}}}pageInfo{hasNextPage endCursor}}}`;
+  do {
+    const data = await shopifyGraphql(query, { cursor, filter: `updated_at:>=${fromIso}` });
+    const connection = data.orders;
+    orders.push(...connection.nodes.map(order => ({
+      externalOrderId: String(order.id || '').split('/').pop(), name: order.name,
+      total: Number(order.currentTotalPriceSet?.shopMoney?.amount || 0),
+      currency: order.currentTotalPriceSet?.shopMoney?.currencyCode || '',
+      financialStatus: String(order.displayFinancialStatus || '').toLowerCase(), updatedAt: order.updatedAt
+    })));
+    cursor = connection.pageInfo?.hasNextPage ? connection.pageInfo.endCursor : null;
+  } while (cursor && orders.length < 5000);
+  return orders;
+}
+
+async function runShopifyReconciliation(days = 1) {
+  const safeDays = Math.min(31, Math.max(1, Math.round(Number(days || 1))));
+  const from = new Date(Date.now() - safeDays * 24 * 60 * 60 * 1000);
+  const [shopifyOrders, events] = await Promise.all([shopifyOrdersSince(from.toISOString()), db.collection('events').get()]);
+  const crmOrders = events.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+    .filter(event => event.schema === 'pedido' && event.payload?.source === 'shopify' && new Date(event.updated_at || event.timestamp || 0) >= from)
+    .map(event => event.payload);
+  const report = { ...SHOPIFY.reconcileOrders(shopifyOrders, crmOrders), from: from.toISOString(), to: new Date().toISOString() };
+  const id = `shopify-reconciliation-${report.to.slice(0, 10)}`;
+  await db.collection('integration_reconciliations').doc(id).set({ id, source: 'shopify', ...report, updatedAt: report.to });
+  return report;
+}
+
+app.post('/api/shopify/reconcile', requireCrmPermission('integrations.manage'), async (req, res) => {
+  try {
+    const report = await runShopifyReconciliation(req.body?.days);
+    await recordAudit(req, 'shopify.reconcile', { entityType: 'integration', entityId: 'shopify', after: report });
+    res.json({ success: true, report: sanitizeForResponse(report) });
+  } catch (error) {
+    res.status(503).json({ success: false, message: error.message || 'Não foi possível reconciliar a Shopify.' });
+  }
+});
+
+function fiscalQuarterReference(period) {
+  const match = /^(\d{4})-Q([1-4])$/.exec(String(period || '').toUpperCase());
+  if (!match) return null;
+  return new Date(Number(match[1]), (Number(match[2]) - 1) * 3, 15, 12, 0, 0);
+}
+
+async function fiscalQuarterReport(period) {
+  const reference = fiscalQuarterReference(period);
+  if (!reference) throw new Error('Período inválido. Utilize AAAA-Q1 até AAAA-Q4.');
+  const snapshot = await db.collection('events').get();
+  const events = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  const summary = require('./core/financeiro.js').resumoIvaTrimestral(events, reference, {
+    nifEmpresa: CRM_COMPANY_NIF,
+    validarNifDesde: new Date('2026-07-01T00:00:00.000Z')
+  });
+  const blockers = [];
+  if (summary.comprasPorClassificar) blockers.push(`${summary.comprasPorClassificar} compra(s) por classificar`);
+  if (summary.comprasNifInvalido) blockers.push(`${summary.comprasNifInvalido} compra(s) com NIF ausente ou divergente`);
+  if (summary.fonteVendas === 'sem_documentos_fiscais') blockers.push('Sem documentos fiscais de venda no período');
+  return { period: String(period).toUpperCase(), summary, blockers, readyToClose: blockers.length === 0 };
+}
+
+app.get('/api/fiscal/quarters/:period', requireCrmPermission('fiscal.read'), async (req, res) => {
+  try {
+    const report = await fiscalQuarterReport(req.params.period);
+    const closure = await db.collection('fiscal_closures').doc(report.period).get();
+    res.json({ success: true, report: sanitizeForResponse(report), closure: closure.exists ? sanitizeForResponse(closure.data()) : null });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message });
+  }
+});
+
+app.post('/api/fiscal/quarters/:period/close', requireCrmPermission('fiscal.close'), async (req, res) => {
+  try {
+    const report = await fiscalQuarterReport(req.params.period);
+    if (!report.readyToClose) return res.status(409).json({ success: false, message: 'Resolva as exceções fiscais antes de fechar o trimestre.', blockers: report.blockers });
+    const accountantName = text(req.body?.accountantName, 160);
+    if (req.body?.accountantConfirmed !== true || accountantName.length < 3) {
+      return res.status(400).json({ success: false, message: 'É necessária a confirmação nominal do contabilista certificado.' });
+    }
+    const existing = await db.collection('fiscal_closures').doc(report.period).get();
+    if (existing.exists && existing.data().status === 'closed') return res.status(409).json({ success: false, message: 'Este trimestre já está fechado.' });
+    const now = new Date().toISOString();
+    const closure = {
+      id: report.period, status: 'closed', report,
+      accountantName, accountantNotes: text(req.body?.notes, 1000),
+      closedAt: now, closedBy: recipeActor(req), checksum: crypto.createHash('sha256').update(JSON.stringify(report)).digest('hex')
+    };
+    await db.collection('fiscal_closures').doc(report.period).set(closure);
+    await recordAudit(req, 'fiscal.quarter.close', { entityType: 'fiscal_closure', entityId: report.period, after: closure });
+    res.status(201).json({ success: true, closure: sanitizeForResponse(closure) });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message || 'Não foi possível fechar o trimestre.' });
+  }
+});
+
+app.get('/api/fiscal/quarters/:period/export', requireCrmPermission('fiscal.read'), async (req, res) => {
+  try {
+    const report = await fiscalQuarterReport(req.params.period);
+    const closure = await db.collection('fiscal_closures').doc(report.period).get();
+    const snapshot = await db.collection('events').get();
+    const start = report.summary.inicio.toISOString();
+    const end = report.summary.fim.toISOString();
+    const records = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(event => {
+      const date = new Date(event.payload?.dataFatura || event.payload?.dataCompra || event.payload?.dataDespesa || event.created_at || event.timestamp || 0);
+      return !event.deleted && date >= new Date(start) && date <= new Date(end) && ['fatura_venda', 'despesa', 'pedido'].includes(event.schema);
+    });
+    const dossier = { generatedAt: new Date().toISOString(), report, closure: closure.exists ? closure.data() : null, records };
+    const filename = `dossier-iva-${report.period}.json`;
+    res.set({ 'Content-Type': 'application/json; charset=utf-8', 'Content-Disposition': `attachment; filename="${filename}"`, 'Cache-Control': 'private, no-store' });
+    res.send(JSON.stringify(dossier, null, 2));
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message || 'Não foi possível exportar o dossier fiscal.' });
+  }
+});
+
+app.get('/api/integration-exceptions', requireCrmPermission('integrations.manage'), async (req, res) => {
+  try {
+    const status = text(req.query.status, 40).toLowerCase();
+    const source = text(req.query.source, 80).toLowerCase();
+    const snapshot = await db.collection('integration_exceptions').get();
+    const exceptions = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
+      .filter(item => !status || item.status === status)
+      .filter(item => !source || item.source === source)
+      .sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0))
+      .slice(0, Math.min(normalizeLimit(req.query.limit), 500));
+    res.json({ success: true, count: exceptions.length, exceptions: sanitizeForResponse(exceptions) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Não foi possível carregar as exceções de integração.' });
+  }
+});
+
+app.post('/api/integration-exceptions/:id/reprocess', requireCrmPermission('integrations.manage'), async (req, res) => {
+  try {
+    const id = text(req.params.id, 160);
+    const snapshot = isSafeIdentifier(id, 160) ? await db.collection('integration_exceptions').doc(id).get() : null;
+    if (!snapshot?.exists) return res.status(404).json({ success: false, message: 'Exceção não encontrada.' });
+    const exception = { id: snapshot.id, ...snapshot.data() };
+    const eventSnapshot = await db.collection('integration_events').doc(exception.eventId).get();
+    if (!eventSnapshot.exists) return res.status(409).json({ success: false, message: 'O evento original não está disponível.' });
+    const event = eventSnapshot.data();
+    const revision = Number(exception.reprocessCount || 0) + 1;
+    const now = new Date().toISOString();
+    const job = INTEGRATION_QUEUE.normalizeJob({
+      source: exception.source, operation: event.topic || 'reprocess',
+      idempotencyKey: `${event.webhookId}:reprocess:${revision}`,
+      correlationId: event.eventId || exception.externalOrderId,
+      payload: { eventId: exception.eventId, shopDomain: event.shopDomain, topic: event.topic }
+    }, { now });
+    await Promise.all([
+      INTEGRATION_JOBS_COLLECTION.doc(job.id).set(job),
+      db.collection('integration_exceptions').doc(id).set({ status: 'reprocessing', reprocessCount: revision, reprocessJobId: job.id, resolutionNotes: text(req.body?.notes, 500), updatedAt: now }, { merge: true })
+    ]);
+    await recordAudit(req, 'integration.exception.reprocess', { entityType: 'integration_exception', entityId: id, before: exception, after: { status: 'reprocessing', jobId: job.id } });
+    res.status(201).json({ success: true, job: sanitizeForResponse(job) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Não foi possível reenviar a exceção para processamento.' });
+  }
+});
+
+app.post('/api/integration-jobs/enqueue', requireCrmPermission('integrations.manage'), async (req, res) => {
+  try {
+    const candidate = INTEGRATION_QUEUE.normalizeJob(req.body || {});
+    const errors = INTEGRATION_QUEUE.validateJob(candidate);
+    if (errors.length) return res.status(400).json({ success: false, message: errors[0], errors });
+    const existing = await integrationJobById(candidate.id);
+    if (existing) return res.json({ success: true, duplicate: true, job: sanitizeForResponse(existing) });
+    await INTEGRATION_JOBS_COLLECTION.doc(candidate.id).set(candidate);
+    await recordAudit(req, 'integration.job.enqueue', {
+      entityType: 'integration_job', entityId: candidate.id,
+      after: { source: candidate.source, operation: candidate.operation, status: candidate.status, correlationId: candidate.correlationId }
+    });
+    res.status(201).json({ success: true, duplicate: false, job: sanitizeForResponse(candidate) });
+  } catch (error) {
+    console.error('Erro ao adicionar tarefa à fila:', error);
+    res.status(400).json({ success: false, message: error.message || 'Não foi possível adicionar a tarefa à fila.' });
+  }
+});
+
+app.post('/api/integration-jobs/:id/retry', requireCrmPermission('integrations.manage'), async (req, res) => {
+  try {
+    const current = await integrationJobById(req.params.id);
+    if (!current) return res.status(404).json({ success: false, message: 'Tarefa de integração não encontrada.' });
+    const retried = INTEGRATION_QUEUE.retry(current);
+    if (!retried) return res.status(409).json({ success: false, message: 'Esta tarefa não está num estado que permita nova tentativa.' });
+    await INTEGRATION_JOBS_COLLECTION.doc(retried.id).set(retried);
+    await recordAudit(req, 'integration.job.retry', { entityType: 'integration_job', entityId: retried.id, before: current, after: retried });
+    res.json({ success: true, job: sanitizeForResponse(retried) });
+  } catch (error) {
+    console.error('Erro ao repetir tarefa de integração:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível repetir a tarefa.' });
+  }
+});
+
+app.post('/api/integration-jobs/:id/cancel', requireCrmPermission('integrations.manage'), async (req, res) => {
+  try {
+    const current = await integrationJobById(req.params.id);
+    if (!current) return res.status(404).json({ success: false, message: 'Tarefa de integração não encontrada.' });
+    const cancelled = INTEGRATION_QUEUE.cancel(current);
+    if (!cancelled) return res.status(409).json({ success: false, message: 'Esta tarefa já foi concluída ou cancelada.' });
+    await INTEGRATION_JOBS_COLLECTION.doc(cancelled.id).set(cancelled);
+    await recordAudit(req, 'integration.job.cancel', { entityType: 'integration_job', entityId: cancelled.id, before: current, after: cancelled });
+    res.json({ success: true, job: sanitizeForResponse(cancelled) });
+  } catch (error) {
+    console.error('Erro ao cancelar tarefa de integração:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível cancelar a tarefa.' });
+  }
+});
+
+app.post('/api/integration-jobs/:id/process', requireCrmPermission('integrations.manage'), async (req, res) => {
+  try {
+    const job = await processShopifyJob(req.params.id, `manual:${recipeActor(req)}`);
+    res.json({ success: true, job: sanitizeForResponse(job) });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message || 'Não foi possível processar a tarefa.' });
+  }
+});
+
+const shopifyQueueTimer = setInterval(() => runShopifyQueue().catch(error => console.error('Erro na fila Shopify:', error.message)), 15 * 1000);
+shopifyQueueTimer.unref?.();
+
 function databaseSchemaPermission(schema, write = false) {
   const normalized = String(schema || '').toLowerCase();
   if (normalized === 'all') return 'management.read';
@@ -3497,6 +3930,7 @@ function apiPermissionForRequest(req) {
   if (pathName.startsWith('/products') || pathName.startsWith('/suppliers') || pathName.startsWith('/recipes') || pathName.startsWith('/external-mappings')) return write ? 'catalog.write' : 'catalog.read';
   if (pathName.startsWith('/expenses') || pathName.startsWith('/sales/') || pathName.startsWith('/sellers')) return write ? 'finance.write' : 'finance.read';
   if (pathName.startsWith('/management/')) return 'management.read';
+  if (pathName.startsWith('/learning/')) return write ? 'system.manage' : 'management.read';
   if (pathName.startsWith('/mobile/inbox') || pathName.startsWith('/importacao-fiscal') || pathName.startsWith('/upload/')) return write ? 'fiscal.write' : 'fiscal.read';
   if (pathName.startsWith('/rotulos/')) return write ? 'orders.write' : 'orders.read';
   if (pathName === '/database/query') return databaseSchemaPermission(req.body?.schema || 'all', false);
@@ -3525,6 +3959,85 @@ app.get('/api/ai/status', async (req, res) => {
   } catch (error) {
     console.error('Erro ao consultar configuração da IA:', error);
     res.status(500).json({ success: false, message: 'Não foi possível consultar a configuração da IA.' });
+  }
+});
+
+async function authorizedAiBriefing(req) {
+  const [eventSnapshot, assignmentSnapshot, jobSnapshot, exceptionSnapshot] = await Promise.all([
+    db.collection('events').get(), db.collection('production_assignments').get(),
+    INTEGRATION_JOBS_COLLECTION.get(), db.collection('integration_exceptions').get()
+  ]);
+  const can = permission => ADMIN_ACCESS.hasPermission(req.crmUser, permission);
+  const events = eventSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(event => {
+    if (event.schema === 'pedido') return can('orders.read');
+    if (event.schema === 'orcamento') return can('quotes.read');
+    if (event.schema === 'despesa') return can('finance.read');
+    if (event.schema === 'material') return can('catalog.read');
+    return false;
+  });
+  return AI_MANAGER.buildBriefing({
+    events,
+    assignments: can('production.read') ? assignmentSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) : [],
+    materials: can('catalog.read') ? events.filter(event => event.schema === 'material').map(event => ({ id: event.id, ...event.payload })) : [],
+    jobs: can('integrations.manage') ? jobSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) : [],
+    exceptions: can('integrations.manage') ? exceptionSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) : []
+  });
+}
+
+app.get('/api/ai/briefing', async (req, res) => {
+  try {
+    res.json({ success: true, briefing: sanitizeForResponse(await authorizedAiBriefing(req)) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Não foi possível preparar o resumo diário.' });
+  }
+});
+
+app.post('/api/ai/ask', async (req, res) => {
+  try {
+    const question = text(req.body?.question, 500);
+    if (question.length < 3) return res.status(400).json({ success: false, message: 'Escreva uma pergunta sobre a operação.' });
+    const briefing = await authorizedAiBriefing(req);
+    const answer = AI_MANAGER.answerQuestion(question, briefing);
+    await recordAudit(req, 'ai.manager.question', { entityType: 'ai_usage', entityId: crypto.randomUUID(), metadata: { understood: answer.understood, metric: answer.metric || '' } });
+    res.json({ success: true, answer: sanitizeForResponse(answer), generatedAt: briefing.generatedAt, deterministic: true });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Não foi possível responder com os dados autorizados.' });
+  }
+});
+
+async function learningRecommendations() {
+  const snapshot = await db.collection('production_assignments').get();
+  const records = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).map(assignment => ({
+    id: assignment.id,
+    family: assignment.productName || 'Produção geral',
+    estimatedMinutes: (assignment.steps || []).reduce((sum, step) => sum + Number(step.tempoPrevistoMin || 0), 0),
+    actualMinutes: (assignment.steps || []).reduce((sum, step) => sum + Number(step.actualMinutes || 0), 0)
+  }));
+  return LEARNING.recommendations(records, { minimumSample: 5 });
+}
+
+app.get('/api/learning/recommendations', async (req, res) => {
+  try {
+    const [recommendations, approvals] = await Promise.all([learningRecommendations(), db.collection('learning_approvals').get()]);
+    res.json({ success: true, recommendations: sanitizeForResponse(recommendations), approvals: sanitizeForResponse(approvals.docs.map(doc => ({ id: doc.id, ...doc.data() }))) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Não foi possível calcular as recomendações de aprendizagem.' });
+  }
+});
+
+app.post('/api/learning/recommendations/:id/decision', async (req, res) => {
+  try {
+    const recommendation = (await learningRecommendations()).find(item => item.id === req.params.id);
+    if (!recommendation) return res.status(404).json({ success: false, message: 'Recomendação não encontrada ou sem dados suficientes.' });
+    const snapshot = await db.collection('learning_approvals').get();
+    const versions = snapshot.docs.map(doc => doc.data()).filter(item => item.recommendationId === recommendation.id);
+    const version = Math.max(0, ...versions.map(item => Number(item.version || 0))) + 1;
+    const decision = LEARNING.approval(recommendation, req.body || {}, { version, approvedBy: recipeActor(req) });
+    await db.collection('learning_approvals').doc(decision.id).set(decision);
+    await recordAudit(req, 'learning.recommendation.decision', { entityType: 'learning_recommendation', entityId: recommendation.id, after: decision });
+    res.status(201).json({ success: true, decision: sanitizeForResponse(decision), appliedAutomatically: false });
+  } catch (error) {
+    res.status(400).json({ success: false, message: error.message || 'Não foi possível registar a decisão.' });
   }
 });
 
@@ -5364,6 +5877,27 @@ app.get('/api/production/assignments', async (req, res) => {
   res.json({ success: true, assignments: assignments.map(item => sanitizeForResponse(item)) });
 });
 
+app.get('/api/production/capacity', async (req, res) => {
+  try {
+    const snapshot = await db.collection('production_assignments').get();
+    const active = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(item => item.active !== false && item.paymentStatus !== 'paid');
+    const jobs = await Promise.all(active.map(async assignment => {
+      const order = await getOrderEvent(assignment.orderId);
+      const remainingMinutes = (assignment.steps || []).filter(step => !step.done).reduce((sum, step) => sum + Math.max(0, Number(step.tempoPrevistoMin || 0) - Number(step.actualMinutes || 0)), 0);
+      return {
+        id: assignment.id, orderId: assignment.orderId, productId: assignment.productId,
+        label: `${order?.payload?.numero || assignment.orderId} · ${assignment.productName || 'Produção'}`,
+        workerId: assignment.workerId || 'unassigned', resourceId: assignment.workerId || 'unassigned',
+        dueDate: order?.payload?.dataEntrega || '', remainingMinutes
+      };
+    }));
+    const dailyMinutes = Math.min(720, Math.max(60, Number(req.query.dailyMinutes || 480)));
+    res.json({ success: true, plan: sanitizeForResponse(SCHEDULING.capacityPlan(jobs, { start: req.query.from || new Date(), dailyMinutes })) });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Não foi possível calcular a capacidade de produção.' });
+  }
+});
+
 app.get('/api/production/assignments/:id', async (req, res) => {
   const assignmentDoc = await db.collection('production_assignments').doc(String(req.params.id || '')).get();
   res.json({ success: true, assignment: assignmentDoc.exists ? sanitizeForResponse({ id: req.params.id, ...assignmentDoc.data() }) : null });
@@ -5429,6 +5963,7 @@ app.post('/api/production/assignments', async (req, res) => {
         })
       ].slice(-100),
       active: true,
+      qualityRequired: true,
       createdAt: old.createdAt || now,
       updatedAt: now
     };
@@ -5436,7 +5971,8 @@ app.post('/api/production/assignments', async (req, res) => {
     assignment.steps = normalizeProductionSteps(req.body?.steps, old.steps, commission);
     if (!assignment.steps.length) return res.status(400).json({ success: false, message: 'Selecione ao menos uma etapa.' });
     await db.collection('production_assignments').doc(assignmentId).set(assignment);
-    res.json({ success: true, assignment: sanitizeForResponse(assignment) });
+    const reservation = await reserveStockForAssignment(orderId, productId, assignment, now);
+    res.json({ success: true, assignment: sanitizeForResponse(assignment), reservation: sanitizeForResponse(reservation) });
   } catch (error) {
     console.error('Erro ao classificar OS:', error);
     res.status(500).json({ success: false, message: 'Nao foi possivel classificar a OS.' });
@@ -5456,6 +5992,10 @@ app.post('/api/production/assignments/:id/payment', async (req, res) => {
     const steps = Array.isArray(assignment.steps) ? assignment.steps : [];
     if (!steps.length || steps.some(step => !step.done)) {
       return res.status(400).json({ success: false, message: 'Conclua todas as etapas antes de marcar a comissao como paga.' });
+    }
+    const qualityStep = steps.find(step => step.id === 'controlo_qualidade');
+    if (assignment.qualityRequired && (!qualityStep?.done || !qualityStep.qualityEvidence)) {
+      return res.status(400).json({ success: false, message: 'O controlo de qualidade obrigatório ainda não foi registado.' });
     }
     if (money(assignment.commission) <= 0) {
       return res.status(400).json({ success: false, message: 'Este servico nao possui comissao para pagar.' });
@@ -5498,6 +6038,7 @@ app.post('/api/production/assignments/:id/payment', async (req, res) => {
       productId
     });
     const stockMovements = await issueStockForAssignment(orderId, productId, updated, now);
+    await db.collection('stock_reservations').doc(assignmentId).set({ status: 'consumed', consumedAt: now, updatedAt: now }, { merge: true });
     res.json({ success: true, assignment: sanitizeForResponse({ id: assignmentId, ...updated }), stockMovements, expenseId });
   } catch (error) {
     console.error('Erro ao marcar comissao como paga:', error);
@@ -5640,6 +6181,7 @@ app.post('/api/production/assignments/:id/unassign', async (req, res) => {
       updatedAt: now
     };
     await db.collection('production_assignments').doc(assignmentId).set(assignment);
+    await db.collection('stock_reservations').doc(assignmentId).set({ status: 'released', releasedAt: now, updatedAt: now }, { merge: true });
     res.json({ success: true, assignment: sanitizeForResponse(assignment), message: 'O.S. devolvida para a fila de producao.' });
   } catch (error) {
     console.error('Erro ao desclassificar OS:', error);

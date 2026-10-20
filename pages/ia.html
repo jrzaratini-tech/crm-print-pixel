@@ -60,6 +60,18 @@
     </section>
 
     <section class="panel" style="margin-top:16px">
+      <h2>Resumo diário da operação</h2>
+      <p class="subtitle">Indicadores determinísticos do CRM, com fontes rastreáveis e filtrados pelas suas permissões.</p>
+      <div class="grid" id="briefingMetrics"></div>
+      <div class="result visible" id="briefingAlerts">A carregar resumo...</div>
+      <div class="form" style="margin-top:16px">
+        <label class="field"><strong>Perguntar aos dados</strong><textarea id="managerQuestion" rows="2" maxlength="500" placeholder="Ex.: Quantos pedidos estão atrasados?"></textarea></label>
+        <div class="actions"><button class="btn" id="askManagerButton" type="button">Consultar</button><button class="btn secondary" id="refreshBriefingButton" type="button">Atualizar resumo</button></div>
+        <div class="result" id="managerAnswer"></div>
+      </div>
+    </section>
+
+    <section class="panel" style="margin-top:16px">
       <h2>Orçamento assistido por imagem</h2>
       <p class="subtitle">Envie uma referência e explique o pedido. A IA prepara o produto, as dúvidas técnicas e uma estimativa baseada no histórico real.</p>
       <div class="quote-layout">
@@ -102,7 +114,13 @@
       quoteDescription: document.getElementById('quoteDescription'),
       quoteImage: document.getElementById('quoteImage'),
       quotePreview: document.getElementById('quotePreview'),
-      quoteResult: document.getElementById('quoteResult')
+      quoteResult: document.getElementById('quoteResult'),
+      briefingMetrics: document.getElementById('briefingMetrics'),
+      briefingAlerts: document.getElementById('briefingAlerts'),
+      managerQuestion: document.getElementById('managerQuestion'),
+      managerAnswer: document.getElementById('managerAnswer'),
+      askManagerButton: document.getElementById('askManagerButton'),
+      refreshBriefingButton: document.getElementById('refreshBriefingButton')
     };
     let quoteImageDataUrl = '';
     let latestQuoteAnalysis = null;
@@ -212,6 +230,16 @@
       return String(value || '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
     }
 
+    async function loadBriefing() {
+      const { briefing } = await api('/api/ai/briefing');
+      const labels = { openOrders:'Pedidos abertos',lateOrders:'Atrasados',openQuotes:'Orçamentos abertos',activeAssignments:'Produção ativa',uninvoicedOrders:'Sem faturar',lowStockMaterials:'Stock baixo',failedIntegrations:'Falhas de integração',openIntegrationExceptions:'Exceções' };
+      elements.briefingMetrics.innerHTML = Object.entries(labels).map(([key,label]) => `<article class="card"><span class="label">${escapeHtml(label)}</span><div class="value">${Number(briefing.metrics[key]||0)}</div></article>`).join('');
+      elements.briefingAlerts.innerHTML = `<strong>${escapeHtml(briefing.summary)}</strong>${briefing.alerts.length?`<ul>${briefing.alerts.slice(0,20).map(alert=>`<li>${escapeHtml(alert.message)} <span class="meta">${escapeHtml(alert.source.schema||alert.source.collection||'registo')} · ${escapeHtml(alert.source.id)}</span></li>`).join('')}</ul>`:'<p class="meta">Sem alertas pendentes.</p>'}`;
+    }
+
+    elements.refreshBriefingButton.addEventListener('click',()=>loadBriefing().catch(error=>{elements.briefingAlerts.textContent=error.message}));
+    elements.askManagerButton.addEventListener('click',async()=>{try{const result=await api('/api/ai/ask',{method:'POST',body:JSON.stringify({question:elements.managerQuestion.value})});elements.managerAnswer.innerHTML=`<strong>${escapeHtml(result.answer.answer)}</strong><p class="meta">${result.answer.sources.length} fonte(s) associada(s). Resposta determinística: ${result.deterministic?'sim':'não'}.</p>`;elements.managerAnswer.classList.add('visible')}catch(error){elements.managerAnswer.textContent=error.message;elements.managerAnswer.classList.add('visible')}});
+
     function compressImage(file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -290,6 +318,7 @@
       }
     });
 
+    loadBriefing().catch(error => { elements.briefingAlerts.textContent = error.message; });
     loadStatus().catch(error => {
       elements.message.className = 'message error';
       elements.message.textContent = error.message;
