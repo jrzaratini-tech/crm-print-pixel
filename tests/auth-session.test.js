@@ -40,7 +40,13 @@ test('login web cria sessao segura para navegadores sem HTTP Basic', async () =>
   const accepted = await fetch(`${baseUrl}/login`, {
     method: 'POST',
     redirect: 'manual',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      Host: 'crm-print-pixel.onrender.com',
+      Origin: 'https://crm-print-pixel.onrender.com',
+      'X-Forwarded-Host': 'crm-print-pixel.onrender.com',
+      'X-Forwarded-Proto': 'https'
+    },
     body: new URLSearchParams({
       username: 'admin-teste',
       password: 'palavra-passe-segura-teste',

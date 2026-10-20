@@ -246,15 +246,18 @@ app.use((req, res, next) => {
   });
   next();
 });
-app.use(cors({
+app.use((req, res, next) => cors({
   origin(origin, callback) {
+    const forwardedHost = String(req.get('x-forwarded-host') || '').split(',')[0].trim();
+    const ownOrigin = `${req.protocol}://${forwardedHost || req.get('host')}`;
     const localDevelopmentOrigin = !IS_PRODUCTION && /^https?:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.test(origin || '');
-    if (!origin || localDevelopmentOrigin || allowedOrigins.includes(origin)) return callback(null, true);
+    const sameOrigin = Boolean(origin) && origin.toLowerCase() === ownOrigin.toLowerCase();
+    if (!origin || sameOrigin || localDevelopmentOrigin || allowedOrigins.includes(origin)) return callback(null, true);
     return callback(new Error('Origem não autorizada pelo CORS.'));
   },
   methods: ['GET', 'POST'],
   allowedHeaders: ['Authorization', 'Content-Type']
-}));
+})(req, res, next));
 app.use(express.json({
   limit: '1mb',
   verify: (req, res, buffer) => {
