@@ -187,6 +187,7 @@ function parseResponseStream(text) {
 function parseDetailedResponseStream(text) {
   let outputText = '';
   let completedResponse = null;
+  const completedItems = [];
   for (const block of String(text || '').split(/\r?\n\r?\n/)) {
     const data = block.split(/\r?\n/).filter(line => line.startsWith('data:')).map(line => line.slice(5).trim()).join('\n');
     if (!data || data === '[DONE]') continue;
@@ -194,6 +195,7 @@ function parseDetailedResponseStream(text) {
     try { event = JSON.parse(data); } catch { continue; }
     if (event.type === 'response.output_text.delta') outputText += event.delta || '';
     if (event.type === 'response.output_text.done' && !outputText) outputText = event.text || '';
+    if (event.type === 'response.output_item.done' && event.item) completedItems[Number(event.output_index) || 0] = event.item;
     if (event.type === 'response.completed') completedResponse = event.response || {};
     if (event.type === 'response.failed') {
       const error = new Error(event.response?.error?.message || 'A resposta da IA falhou.');
@@ -203,7 +205,8 @@ function parseDetailedResponseStream(text) {
     if (event.type === 'response.incomplete') throw new Error('A resposta da IA ficou incompleta.');
   }
   if (!completedResponse) throw new Error('A ligação terminou antes da confirmação da resposta.');
-  const output = Array.isArray(completedResponse.output) ? completedResponse.output : [];
+  const streamedOutput = completedItems.filter(Boolean);
+  const output = streamedOutput.length ? streamedOutput : (Array.isArray(completedResponse.output) ? completedResponse.output : []);
   if (!outputText) {
     outputText = output.flatMap(item => Array.isArray(item?.content) ? item.content : [])
       .filter(item => item?.type === 'output_text')
@@ -255,7 +258,8 @@ async function createToolResponse({ accessToken, model, reasoningEffort, input, 
       ...(instructions ? { instructions: String(instructions) } : {}),
       tools,
       tool_choice: 'auto',
-      parallel_tool_calls: true
+      parallel_tool_calls: true,
+      include: ['reasoning.encrypted_content']
     }, accessToken, timeoutMs, fetchImpl);
     const calls = response.output.filter(item => item?.type === 'function_call');
     if (!calls.length) {

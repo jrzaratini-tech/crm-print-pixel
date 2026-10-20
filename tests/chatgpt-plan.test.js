@@ -93,10 +93,14 @@ test('deixa o modelo escolher uma ferramenta e devolve o resultado para a respos
     assert.equal(body.stream, true);
     assert.equal(body.store, false);
     assert.equal(body.tool_choice, 'auto');
+    assert.deepEqual(body.include, ['reasoning.encrypted_content']);
     if (requestCount === 1) {
-      const completed = { type: 'response.completed', response: { output: [{ type: 'function_call', call_id: 'call_1', name: 'get_dashboard_metrics', arguments: '{"period":"current_month"}' }] } };
-      return { ok: true, text: async () => `data: ${JSON.stringify(completed)}\n\n` };
+      const reasoning = { type: 'response.output_item.done', output_index: 0, item: { type: 'reasoning', id: 'rs_1', encrypted_content: 'encrypted-reasoning' } };
+      const functionCall = { type: 'response.output_item.done', output_index: 1, item: { type: 'function_call', call_id: 'call_1', name: 'get_dashboard_metrics', arguments: '{"period":"current_month"}' } };
+      const completed = { type: 'response.completed', response: { output: [] } };
+      return { ok: true, text: async () => [reasoning, functionCall, completed].map(event => `data: ${JSON.stringify(event)}`).join('\n\n') };
     }
+    assert.ok(body.input.some(item => item.type === 'reasoning' && item.encrypted_content === 'encrypted-reasoning'));
     assert.ok(body.input.some(item => item.type === 'function_call_output' && item.call_id === 'call_1'));
     const events = [
       'data: {"type":"response.output_text.delta","delta":"O faturamento é 123 €."}',
