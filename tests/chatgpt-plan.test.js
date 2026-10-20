@@ -108,3 +108,14 @@ test('deixa o modelo escolher uma ferramenta e devolve o resultado para a respos
   assert.deepEqual(executed, [{ name: 'get_dashboard_metrics', args: { period: 'current_month' } }]);
   assert.deepEqual(result.usedTools.map(item => item.name), ['get_dashboard_metrics']);
 });
+
+test('recupera o texto final quando o plano o envia apenas no evento de conclusão', async () => {
+  const completed = {
+    type: 'response.completed',
+    response: { output: [{ type: 'message', content: [{ type: 'output_text', text: 'Resposta final do CRM.' }] }] }
+  };
+  const result = await CHATGPT_PLAN.createToolResponse({
+    accessToken: 'token', model: 'gpt-5.6-sol', reasoningEffort: 'medium', input: 'teste', tools: [], executeTool: async () => ({})
+  }, async () => ({ ok: true, text: async () => `data: ${JSON.stringify(completed)}\n\n` }));
+  assert.equal(result.text, 'Resposta final do CRM.');
+});

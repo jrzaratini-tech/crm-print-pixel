@@ -193,6 +193,7 @@ function parseDetailedResponseStream(text) {
     let event;
     try { event = JSON.parse(data); } catch { continue; }
     if (event.type === 'response.output_text.delta') outputText += event.delta || '';
+    if (event.type === 'response.output_text.done' && !outputText) outputText = event.text || '';
     if (event.type === 'response.completed') completedResponse = event.response || {};
     if (event.type === 'response.failed') {
       const error = new Error(event.response?.error?.message || 'A resposta da IA falhou.');
@@ -202,7 +203,14 @@ function parseDetailedResponseStream(text) {
     if (event.type === 'response.incomplete') throw new Error('A resposta da IA ficou incompleta.');
   }
   if (!completedResponse) throw new Error('A ligação terminou antes da confirmação da resposta.');
-  return { text: outputText, output: Array.isArray(completedResponse.output) ? completedResponse.output : [] };
+  const output = Array.isArray(completedResponse.output) ? completedResponse.output : [];
+  if (!outputText) {
+    outputText = output.flatMap(item => Array.isArray(item?.content) ? item.content : [])
+      .filter(item => item?.type === 'output_text')
+      .map(item => item.text || '')
+      .join('');
+  }
+  return { text: outputText, output };
 }
 
 async function streamedResponse(body, accessToken, timeoutMs, fetchImpl) {
@@ -250,7 +258,10 @@ async function createToolResponse({ accessToken, model, reasoningEffort, input, 
       parallel_tool_calls: true
     }, accessToken, timeoutMs, fetchImpl);
     const calls = response.output.filter(item => item?.type === 'function_call');
-    if (!calls.length) return { text: response.text, usedTools };
+    if (!calls.length) {
+      if (!String(response.text || '').trim()) throw new Error('A IA concluiu sem produzir uma resposta em texto.');
+      return { text: response.text, usedTools };
+    }
     if (round === maxToolRounds) throw new Error('A IA excedeu o limite de consultas ao CRM nesta resposta.');
     workingInput.push(...response.output);
     for (const call of calls) {
