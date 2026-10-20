@@ -42,9 +42,7 @@ test('login web cria sessao segura para navegadores sem HTTP Basic', async () =>
     redirect: 'manual',
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded',
-      Host: 'crm-print-pixel.onrender.com',
-      Origin: 'https://crm-print-pixel.onrender.com',
-      'X-Forwarded-Host': 'crm-print-pixel.onrender.com'
+      Origin: 'https://navegador-integrado.invalid'
     },
     body: new URLSearchParams({
       username: 'admin-teste',
@@ -58,6 +56,11 @@ test('login web cria sessao segura para navegadores sem HTTP Basic', async () =>
   assert.match(cookie, /^crm_session=/);
   assert.match(cookie, /HttpOnly/i);
   assert.match(cookie, /SameSite=Strict/i);
+
+  const blockedExternalApi = await fetch(`${baseUrl}/api/rotulos/public/session`, {
+    headers: { Origin: 'https://origem-externa.invalid' }
+  });
+  assert.equal(blockedExternalApi.status, 500);
 
   const authenticated = await fetch(`${baseUrl}/pages/faturacao.html`, {
     headers: { Cookie: cookie.split(';')[0] }
