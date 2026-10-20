@@ -63,3 +63,14 @@ test('distingue faturamento de pedidos ainda sem fatura', () => {
   assert.equal(revenue.metric, 'dashboard.currentMonth.revenue');
   assert.equal(pending.metric, 'uninvoicedOrders');
 });
+
+test('responde os restantes cartões financeiros do dashboard', () => {
+  const briefing = MANAGER.buildBriefing({ events: [
+    { id: 'p1', schema: 'pedido', created_at: '2026-10-05T10:00:00.000Z', payload: { total: 123, totalPago: 23, status: 'processamento' } },
+    { id: 'd1', schema: 'despesa', created_at: '2026-10-06T10:00:00.000Z', payload: { valorTotal: 80, valorPago: 20, statusPagamento: 'pendente' } }
+  ] }, { now: '2026-10-20T10:00:00.000Z' });
+  assert.equal(MANAGER.answerQuestion('Quanto mostra em despesas no dashboard?', briefing).value, 80);
+  assert.equal(MANAGER.answerQuestion('Qual é o restante a receber?', briefing).value, 100);
+  assert.equal(MANAGER.answerQuestion('Quanto existe para pagar?', briefing).value, 60);
+  assert.equal(MANAGER.answerQuestion('Quantos pedidos ativos mostra o painel?', briefing).value, 1);
+});

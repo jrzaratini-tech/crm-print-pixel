@@ -32,22 +32,52 @@ function dashboardPeriod(events, now, mode) {
   const range = periodRange(now, mode);
   const orders = events.filter(event => event.schema === 'pedido' && eventDate(event) && eventDate(event) >= range.start && eventDate(event) <= range.end);
   const expenses = events.filter(event => event.schema === 'despesa' && eventDate(event) && eventDate(event) >= range.start && eventDate(event) <= range.end);
+  const activeOrders = orders.filter(event => /^(pendente|processamento|produção|producao)$/i.test(text(event.payload?.status)));
+  const completedOrders = orders.filter(event => /^(concluido|concluído|entregue|finalizado)$/i.test(text(event.payload?.status)));
   return {
     netRevenue: money(orders.reduce((sum, event) => sum + FINANCEIRO.faturamentoSemIva(event.payload || {}), 0)),
     grossRevenue: money(orders.reduce((sum, event) => sum + FINANCEIRO.totalComIva(event.payload || {}), 0)),
     expenses: money(expenses.reduce((sum, event) => sum + FINANCEIRO.numero(event.payload?.valorTotal ?? event.payload?.total ?? event.payload?.valorBruto ?? event.payload?.valor), 0)),
     orderCount: orders.length,
-    sourceIds: orders.map(event => event.id)
+    activeOrders: activeOrders.length,
+    completedOrders: completedOrders.length,
+    sourceIds: orders.map(event => event.id),
+    expenseSourceIds: expenses.map(event => event.id),
+    activeOrderSourceIds: activeOrders.map(event => event.id)
   };
 }
 
 function dashboardSnapshot(events, now) {
+  const orders = events.filter(event => event.schema === 'pedido');
+  const expenses = events.filter(event => event.schema === 'despesa');
+  const receivable = orders.reduce((sum, event) => {
+    const payload = event.payload || {};
+    const total = FINANCEIRO.totalComIva(payload);
+    const savedBalance = payload.saldoRestante ?? payload.saldoPendente;
+    const paid = FINANCEIRO.numero(payload.totalPago ?? payload.valorPago ?? payload.pago);
+    return sum + Math.max(0, savedBalance !== undefined && savedBalance !== null && savedBalance !== '' ? FINANCEIRO.numero(savedBalance) : total - paid);
+  }, 0);
+  const payable = expenses.reduce((sum, event) => {
+    const payload = event.payload || {};
+    if (/^(pago|paga|paid|liquidado|finalizado)$/i.test(text(payload.statusPagamento || payload.status))) return sum;
+    const savedBalance = payload.saldoRestante ?? payload.saldoPendente;
+    const total = FINANCEIRO.numero(payload.valorTotal ?? payload.total ?? payload.valorBruto ?? payload.valor);
+    const paidFromList = Array.isArray(payload.pagamentos) ? payload.pagamentos.reduce((subtotal, payment) => subtotal + FINANCEIRO.numero(payment.valor ?? payment.valorPago ?? payment.total), 0) : 0;
+    const paid = paidFromList || FINANCEIRO.numero(payload.totalPago ?? payload.valorPago ?? payload.pago);
+    return sum + Math.max(0, savedBalance !== undefined && savedBalance !== null && savedBalance !== '' ? FINANCEIRO.numero(savedBalance) : total - paid);
+  }, 0);
   return {
     currentMonth: dashboardPeriod(events, now, 'currentMonth'),
     previousMonth: dashboardPeriod(events, now, 'previousMonth'),
     lastCompleteQuarter: dashboardPeriod(events, now, 'quarter'),
     currentYear: dashboardPeriod(events, now, 'year'),
-    allTime: dashboardPeriod(events, now, 'all')
+    allTime: dashboardPeriod(events, now, 'all'),
+    accounts: {
+      receivable: money(receivable),
+      payable: money(payable),
+      receivableSourceIds: orders.map(event => event.id),
+      payableSourceIds: expenses.map(event => event.id)
+    }
   };
 }
 
@@ -116,6 +146,22 @@ function answerQuestion(question, briefing) {
       answer: `No dashboard, o faturamento de ${labels[periodKey]} é ${period.netRevenue.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })} líquido e ${period.grossRevenue.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })} bruto, calculado a partir de ${period.orderCount} pedido(s).`,
       sources: (period.sourceIds || []).map(id => ({ schema: 'pedido', id }))
     };
+  }
+  if (/(quanto|qual|valor|total|mostra|dashboard|painel).*(despes)|(despes).*(quanto|qual|valor|total|dashboard|painel)/.test(value)) {
+    const period = briefing.dashboard?.currentMonth || { expenses: 0, expenseSourceIds: [] };
+    return { understood: true, metric: 'dashboard.currentMonth.expenses', value: period.expenses, answer: `As despesas mostradas no dashboard para o mês atual totalizam ${period.expenses.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })}.`, sources: (period.expenseSourceIds || []).map(id => ({ schema: 'despesa', id })) };
+  }
+  if (/restante a receber|contas? a receber|quanto.*receber|receber.*quanto/.test(value)) {
+    const accounts = briefing.dashboard?.accounts || { receivable: 0, receivableSourceIds: [] };
+    return { understood: true, metric: 'dashboard.accounts.receivable', value: accounts.receivable, answer: `O restante a receber mostrado no dashboard é ${accounts.receivable.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })}.`, sources: (accounts.receivableSourceIds || []).map(id => ({ schema: 'pedido', id })) };
+  }
+  if (/restante a pagar|contas? a pagar|quanto.*pagar|pagar.*quanto/.test(value)) {
+    const accounts = briefing.dashboard?.accounts || { payable: 0, payableSourceIds: [] };
+    return { understood: true, metric: 'dashboard.accounts.payable', value: accounts.payable, answer: `O restante a pagar mostrado no dashboard é ${accounts.payable.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })}.`, sources: (accounts.payableSourceIds || []).map(id => ({ schema: 'despesa', id })) };
+  }
+  if (/quantos?.*(pedidos? ativos?)|pedidos? ativos?.*(quantos?|dashboard|painel)/.test(value)) {
+    const period = briefing.dashboard?.currentMonth || { activeOrders: 0, activeOrderSourceIds: [] };
+    return { understood: true, metric: 'dashboard.currentMonth.activeOrders', value: period.activeOrders, answer: `O dashboard mostra ${period.activeOrders} pedido(s) ativo(s) no mês atual.`, sources: (period.activeOrderSourceIds || []).map(id => ({ schema: 'pedido', id })) };
   }
   if (/meu dia|começar|comecar|resumo geral|situação geral|situacao geral|organiza/.test(value)) {
     const metrics = briefing.metrics;
