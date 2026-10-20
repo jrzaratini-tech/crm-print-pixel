@@ -73,3 +73,38 @@ test('interrompe uma resposta da IA que ultrapassa o tempo limite', async () => 
     error => error.code === 'ai_response_timeout'
   );
 });
+
+test('deixa o modelo escolher uma ferramenta e devolve o resultado para a resposta final', async () => {
+  let requestCount = 0;
+  const executed = [];
+  const result = await CHATGPT_PLAN.createToolResponse({
+    accessToken: 'token',
+    model: 'gpt-5.6-sol',
+    reasoningEffort: 'medium',
+    input: [{ role: 'user', content: 'Qual é o faturamento?' }],
+    tools: [{ type: 'function', name: 'get_dashboard_metrics', parameters: { type: 'object', properties: {} } }],
+    executeTool: async (name, args) => {
+      executed.push({ name, args });
+      return { grossRevenue: 123 };
+    }
+  }, async (url, options) => {
+    requestCount += 1;
+    const body = JSON.parse(options.body);
+    assert.equal(body.stream, true);
+    assert.equal(body.store, false);
+    assert.equal(body.tool_choice, 'auto');
+    if (requestCount === 1) {
+      const completed = { type: 'response.completed', response: { output: [{ type: 'function_call', call_id: 'call_1', name: 'get_dashboard_metrics', arguments: '{"period":"current_month"}' }] } };
+      return { ok: true, text: async () => `data: ${JSON.stringify(completed)}\n\n` };
+    }
+    assert.ok(body.input.some(item => item.type === 'function_call_output' && item.call_id === 'call_1'));
+    const events = [
+      'data: {"type":"response.output_text.delta","delta":"O faturamento é 123 €."}',
+      'data: {"type":"response.completed","response":{"output":[{"type":"message"}]}}'
+    ].join('\n\n');
+    return { ok: true, text: async () => events };
+  });
+  assert.equal(result.text, 'O faturamento é 123 €.');
+  assert.deepEqual(executed, [{ name: 'get_dashboard_metrics', args: { period: 'current_month' } }]);
+  assert.deepEqual(result.usedTools.map(item => item.name), ['get_dashboard_metrics']);
+});

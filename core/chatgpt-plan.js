@@ -184,6 +184,95 @@ function parseResponseStream(text) {
   return output;
 }
 
+function parseDetailedResponseStream(text) {
+  let outputText = '';
+  let completedResponse = null;
+  for (const block of String(text || '').split(/\r?\n\r?\n/)) {
+    const data = block.split(/\r?\n/).filter(line => line.startsWith('data:')).map(line => line.slice(5).trim()).join('\n');
+    if (!data || data === '[DONE]') continue;
+    let event;
+    try { event = JSON.parse(data); } catch { continue; }
+    if (event.type === 'response.output_text.delta') outputText += event.delta || '';
+    if (event.type === 'response.completed') completedResponse = event.response || {};
+    if (event.type === 'response.failed') {
+      const error = new Error(event.response?.error?.message || 'A resposta da IA falhou.');
+      error.code = event.response?.error?.code || 'response_failed';
+      throw error;
+    }
+    if (event.type === 'response.incomplete') throw new Error('A resposta da IA ficou incompleta.');
+  }
+  if (!completedResponse) throw new Error('A ligação terminou antes da confirmação da resposta.');
+  return { text: outputText, output: Array.isArray(completedResponse.output) ? completedResponse.output : [] };
+}
+
+async function streamedResponse(body, accessToken, timeoutMs, fetchImpl) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Math.max(10, Number(timeoutMs) || 55000));
+  try {
+    const response = await fetchImpl(`${RESOURCE}/responses`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...body, store: false, stream: true }),
+      signal: controller.signal
+    });
+    const responseText = await response.text();
+    if (!response.ok) {
+      let message = 'A OpenAI recusou o pedido.';
+      try { message = JSON.parse(responseText).error?.message || message; } catch {}
+      const error = new Error(message);
+      error.status = response.status;
+      throw error;
+    }
+    return parseDetailedResponseStream(responseText);
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      const timeoutError = new Error('A IA demorou demasiado a responder. Tente novamente.');
+      timeoutError.code = 'ai_response_timeout';
+      throw timeoutError;
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function createToolResponse({ accessToken, model, reasoningEffort, input, instructions = '', tools = [], executeTool, timeoutMs = 55000, maxToolRounds = 6 }, fetchImpl = fetch) {
+  const workingInput = Array.isArray(input) ? [...input] : [{ role: 'user', content: String(input || '') }];
+  const usedTools = [];
+  for (let round = 0; round <= maxToolRounds; round += 1) {
+    const response = await streamedResponse({
+      model,
+      reasoning: { effort: reasoningEffort },
+      input: workingInput,
+      ...(instructions ? { instructions: String(instructions) } : {}),
+      tools,
+      tool_choice: 'auto',
+      parallel_tool_calls: true
+    }, accessToken, timeoutMs, fetchImpl);
+    const calls = response.output.filter(item => item?.type === 'function_call');
+    if (!calls.length) return { text: response.text, usedTools };
+    if (round === maxToolRounds) throw new Error('A IA excedeu o limite de consultas ao CRM nesta resposta.');
+    workingInput.push(...response.output);
+    for (const call of calls) {
+      let args = {};
+      try { args = JSON.parse(call.arguments || '{}'); } catch {}
+      let result;
+      try {
+        result = await executeTool(call.name, args);
+      } catch (error) {
+        result = { success: false, error: error.message || 'Falha ao consultar o CRM.' };
+      }
+      usedTools.push({ name: call.name, arguments: args });
+      workingInput.push({
+        type: 'function_call_output',
+        call_id: call.call_id,
+        output: JSON.stringify(result)
+      });
+    }
+  }
+  throw new Error('A IA não concluiu a resposta.');
+}
+
 async function createResponse({ accessToken, model, reasoningEffort, input, instructions = '', timeoutMs = 55000 }, fetchImpl = fetch) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), Math.max(10, Number(timeoutMs) || 55000));
@@ -228,6 +317,7 @@ module.exports = {
   SCOPES,
   createAuthorizationAttempt,
   createResponse,
+  createToolResponse,
   decryptCredentials,
   encryptCredentials,
   exchangeAuthorizationCode,

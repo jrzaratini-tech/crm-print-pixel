@@ -644,7 +644,7 @@ test('gestor IA produz briefing determinístico e resposta com fontes', async ()
   assert.deepEqual(empty.body.conversation.messages, []);
 });
 
-test('gestor IA responde diretamente o faturamento exibido no dashboard', async () => {
+test('gestor IA mantém resposta segura do dashboard apenas quando o modelo não está ligado', async () => {
   await post('/api/ai/conversation/reset', {});
   const now = new Date();
   await db.collection('events').doc('ai-dashboard-revenue').set({
@@ -653,7 +653,7 @@ test('gestor IA responde diretamente o faturamento exibido no dashboard', async 
   });
   const answer = await post('/api/ai/ask', { question: 'Quanto era o faturamento que estava mostrando no dashboard?' });
   assert.equal(answer.response.status, 200);
-  assert.equal(answer.body.direct, true);
+  assert.equal(answer.body.fallback, true);
   assert.equal(answer.body.answer.metric, 'dashboard.currentMonth.revenue');
   assert.match(answer.body.answer.answer, /líquido/);
   assert.match(answer.body.answer.answer, /bruto/);
