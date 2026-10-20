@@ -44,8 +44,7 @@ test('login web cria sessao segura para navegadores sem HTTP Basic', async () =>
       'Content-Type': 'application/x-www-form-urlencoded',
       Host: 'crm-print-pixel.onrender.com',
       Origin: 'https://crm-print-pixel.onrender.com',
-      'X-Forwarded-Host': 'crm-print-pixel.onrender.com',
-      'X-Forwarded-Proto': 'https'
+      'X-Forwarded-Host': 'crm-print-pixel.onrender.com'
     },
     body: new URLSearchParams({
       username: 'admin-teste',

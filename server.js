@@ -249,9 +249,15 @@ app.use((req, res, next) => {
 app.use((req, res, next) => cors({
   origin(origin, callback) {
     const forwardedHost = String(req.get('x-forwarded-host') || '').split(',')[0].trim();
-    const ownOrigin = `${req.protocol}://${forwardedHost || req.get('host')}`;
+    const requestHost = forwardedHost || String(req.get('host') || '').trim();
+    let originHost = '';
+    try {
+      originHost = new URL(origin).host;
+    } catch {
+      originHost = '';
+    }
     const localDevelopmentOrigin = !IS_PRODUCTION && /^https?:\/\/(?:127\.0\.0\.1|localhost)(?::\d+)?$/i.test(origin || '');
-    const sameOrigin = Boolean(origin) && origin.toLowerCase() === ownOrigin.toLowerCase();
+    const sameOrigin = Boolean(originHost) && originHost.toLowerCase() === requestHost.toLowerCase();
     if (!origin || sameOrigin || localDevelopmentOrigin || allowedOrigins.includes(origin)) return callback(null, true);
     return callback(new Error('Origem não autorizada pelo CORS.'));
   },
