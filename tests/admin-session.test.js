@@ -55,6 +55,7 @@ test('cria identidade individual, aplica perfil e regista auditoria', async () =
     deleted: false
   });
   await db.collection('production_assignments').doc('order-legacy-link__item_0').set({ orderId: 'order-legacy-link', productId: 'item_0' });
+  await db.collection('stripe_payment_links').doc('stripe-legacy-link').set({ orderId: 'payment-legacy-wrong', orderNumber: 'PED-LINK-1' });
 
   const integrityPreview = await request('/api/admin/data-integrity', adminLogin.cookie);
   assert.equal(integrityPreview.response.status, 200);
@@ -67,11 +68,19 @@ test('cria identidade individual, aplica perfil e regista auditoria', async () =
   const linkedQuote = await db.collection('events').doc('quote-legacy-link').get();
   const linkedOrder = await db.collection('events').doc('order-legacy-link').get();
   const linkedProduction = await db.collection('production_assignments').doc('order-legacy-link__item_0').get();
+  const linkedStripe = await db.collection('stripe_payment_links').doc('stripe-legacy-link').get();
   assert.equal(linkedQuote.data().payload.pedidoId, 'order-legacy-link');
   assert.equal(linkedQuote.data().links.orderUrn, 'crm:pedido:order-legacy-link');
   assert.equal(linkedOrder.data().links.quoteId, 'quote-legacy-link');
   assert.match(linkedOrder.data().payload.pagamentos[0].id, /^pay_/);
   assert.equal(linkedProduction.data().links.orderId, 'order-legacy-link');
+  assert.equal(linkedStripe.data().orderId, 'order-legacy-link');
+  assert.equal(linkedStripe.data().links.orderId, 'order-legacy-link');
+
+  const integrityAfter = await request('/api/admin/data-integrity', adminLogin.cookie);
+  const pendingExternal = Object.values(integrityAfter.body.report.external).reduce((sum, item) => sum + item.changes, 0);
+  assert.equal(integrityAfter.body.report.events.changes, 0);
+  assert.equal(pendingExternal, 0);
 
   const created = await request('/api/admin/users', adminLogin.cookie, {
     method: 'POST',

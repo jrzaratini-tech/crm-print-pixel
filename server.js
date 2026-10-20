@@ -340,8 +340,17 @@ async function recordAudit(req, action, details = {}) {
   }
 }
 
+function comparableValue(value) {
+  if (Array.isArray(value)) return value.map(comparableValue);
+  if (value && typeof value.toDate === 'function') return value.toDate().toISOString();
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.keys(value).sort().map(key => [key, comparableValue(value[key])]));
+  }
+  return value;
+}
+
 function sameJson(left, right) {
-  return JSON.stringify(left) === JSON.stringify(right);
+  return JSON.stringify(comparableValue(left)) === JSON.stringify(comparableValue(right));
 }
 
 async function normalizeDataLinks({ apply = false } = {}) {
@@ -396,18 +405,28 @@ async function normalizeDataLinks({ apply = false } = {}) {
     ['moloni_documents', 'documento_fiscal']
   ];
   const external = {};
+  let inferredExternalOrderLinks = 0;
   for (const [collectionName, entityType] of externalCollections) {
     const snapshot = await db.collection(collectionName).get();
     let changes = 0;
     for (const doc of snapshot.docs) {
       const record = doc.data();
-      const links = ENTITY_LINKS.externalLinks(entityType, doc.id, record);
+      const currentOrderId = ENTITY_LINKS.cleanId(record.orderId || record.pedidoId);
+      const numberedMatches = ordersByNumber.get(String(record.orderNumber || record.pedidoNumero || '').trim()) || [];
+      const inferredOrderId = !orderIds.has(currentOrderId) && numberedMatches.length === 1 ? numberedMatches[0] : '';
+      const normalizedRecord = inferredOrderId ? { ...record, orderId: inferredOrderId } : record;
+      if (inferredOrderId) inferredExternalOrderLinks += 1;
+      const links = ENTITY_LINKS.externalLinks(entityType, doc.id, normalizedRecord);
       if (links.orderId && !orderIds.has(links.orderId)) {
         brokenLinks.push({ collection: collectionName, id: doc.id, type: entityType, orderId: links.orderId });
       }
-      if (!sameJson(record.links || {}, links)) {
+      if (inferredOrderId || !sameJson(record.links || {}, links)) {
         changes += 1;
-        if (apply) await db.collection(collectionName).doc(doc.id).set({ links, linkUpdatedAt: new Date().toISOString() }, { merge: true });
+        if (apply) await db.collection(collectionName).doc(doc.id).set({
+          ...(inferredOrderId ? { orderId: inferredOrderId } : {}),
+          links,
+          linkUpdatedAt: new Date().toISOString()
+        }, { merge: true });
       }
     }
     external[collectionName] = { records: snapshot.size, changes };
@@ -417,6 +436,7 @@ async function normalizeDataLinks({ apply = false } = {}) {
     linkVersion: ENTITY_LINKS.LINK_VERSION,
     mode: apply ? 'applied' : 'preview',
     events: { records: rawEvents.length, changes: eventChanges, inferredQuoteOrderLinks },
+    inferredExternalOrderLinks,
     external,
     brokenLinks: brokenLinks.slice(0, 100),
     brokenLinkCount: brokenLinks.length
