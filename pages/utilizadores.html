@@ -41,6 +41,14 @@
   </div>
 
   <section class="card">
+    <h2>Integridade dos vínculos</h2>
+    <p>Confere as ligações técnicas entre orçamentos, pedidos, pagamentos, produção, Stripe e documentos Moloni.</p>
+    <div id="integrityReport">A analisar...</div>
+    <button id="normalizeLinks" type="button" style="margin-top:14px">Normalizar registos pendentes</button>
+    <div id="integrityMessage" class="message" role="status"></div>
+  </section>
+
+  <section class="card">
     <h2>Trilha de auditoria</h2>
     <form id="auditForm" class="filters">
       <div><label for="action">Ação exata</label><input id="action" placeholder="Ex.: auth.login"></div>
@@ -110,6 +118,18 @@
     message($('auditMessage'), `${result.count} evento(s) apresentado(s).`);
   }
 
+  function renderIntegrity(report) {
+    const externalChanges = Object.values(report.external || {}).reduce((sum, item) => sum + Number(item.changes || 0), 0);
+    $('integrityReport').innerHTML = `<strong>Versão dos vínculos:</strong> ${escapeHtml(report.linkVersion)} · <strong>Eventos pendentes:</strong> ${escapeHtml(report.events?.changes || 0)} · <strong>Integrações pendentes:</strong> ${escapeHtml(externalChanges)} · <strong>Vínculos quebrados:</strong> ${escapeHtml(report.brokenLinkCount || 0)}`;
+    $('normalizeLinks').disabled = Number(report.events?.changes || 0) + externalChanges === 0;
+  }
+
+  async function loadIntegrity() {
+    const result = await api('/api/admin/data-integrity');
+    renderIntegrity(result.report);
+    return result.report;
+  }
+
   $('userForm').addEventListener('submit', async event => {
     event.preventDefault();
     try {
@@ -141,7 +161,16 @@
   });
 
   $('auditForm').addEventListener('submit', event => { event.preventDefault(); loadAudit().catch(error => message($('auditMessage'), error.message, true)); });
-  Promise.all([loadUsers(), loadAudit()]).catch(error => { message($('userMessage'), error.message, true); message($('auditMessage'), error.message, true); });
+  $('normalizeLinks').addEventListener('click', async () => {
+    if (!confirm('Normalizar agora os identificadores e vínculos pendentes? A operação é idempotente e ficará registada na auditoria.')) return;
+    try {
+      const result = await api('/api/admin/data-integrity/normalize', { method: 'POST', body: '{}' });
+      renderIntegrity(result.report);
+      message($('integrityMessage'), 'Vínculos normalizados e auditados com sucesso.');
+      await Promise.all([loadIntegrity(), loadAudit()]);
+    } catch (error) { message($('integrityMessage'), error.message, true); }
+  });
+  Promise.all([loadUsers(), loadAudit(), loadIntegrity()]).catch(error => { message($('userMessage'), error.message, true); message($('auditMessage'), error.message, true); message($('integrityMessage'), error.message, true); });
 </script>
 </body>
 </html>

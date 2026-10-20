@@ -1569,6 +1569,7 @@
                 if (!response.ok) {
                     throw new Error('Erro ao criar pedido');
                 }
+                const pedidoCriado = await response.json();
                 
                 // 🔥 CORREÇÃO: Marcar orçamento como convertido com pedidoNumero
                 const updateResponse = await fetch('/api/database/commit', {
@@ -1577,10 +1578,12 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
+                        id: orcamentoAtual.id,
                         schema: 'orcamento',
                         payload: {
                             ...orcamentoAtual,
                             status: 'convertido',
+                            pedidoId: pedidoCriado.id,
                             pedidoNumero: numeroPedido,
                             dataConversao: new Date().toISOString().split('T')[0]
                         },
@@ -1733,6 +1736,7 @@
                 if (!response.ok) {
                     throw new Error('Erro ao criar pedido');
                 }
+                const pedidoCriado = await response.json();
                 
                 // Atualizar orçamento para convertido
                 const updateResponse = await fetch('/api/database/commit', {
@@ -1741,10 +1745,12 @@
                         'Content-Type': 'application/json',
                     },
                     body: JSON.stringify({
+                        id: orcamento.id,
                         schema: 'orcamento',
                         payload: {
                             ...orcamento,
                             status: 'convertido',
+                            pedidoId: pedidoCriado.id,
                             pedidoNumero: numeroPedido,
                             dataConversao: new Date().toISOString().split('T')[0]
                         },

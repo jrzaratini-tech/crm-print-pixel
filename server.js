@@ -10,6 +10,7 @@ const AI_POLICY = require('./core/ai-policy.js');
 const CHATGPT_PLAN = require('./core/chatgpt-plan.js');
 const AI_QUOTE = require('./core/ai-quote.js');
 const ADMIN_ACCESS = require('./core/admin-access.js');
+const ENTITY_LINKS = require('./core/entity-links.js');
 const {
   MoloniClient,
   buildDocumentPreview,
@@ -339,6 +340,89 @@ async function recordAudit(req, action, details = {}) {
   }
 }
 
+function sameJson(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+async function normalizeDataLinks({ apply = false } = {}) {
+  const eventSnapshot = await db.collection('events').get();
+  const rawEvents = eventSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+  const orderIds = new Set(rawEvents.filter(event => event.schema === 'pedido').map(event => event.id));
+  const ordersByNumber = new Map();
+  rawEvents.filter(event => event.schema === 'pedido').forEach(event => {
+    const number = String(event.payload?.numero || '').trim();
+    if (!number) return;
+    const matches = ordersByNumber.get(number) || [];
+    matches.push(event.id);
+    ordersByNumber.set(number, matches);
+  });
+  const quoteToOrder = new Map();
+  rawEvents.filter(event => event.schema === 'pedido').forEach(event => {
+    const quoteId = ENTITY_LINKS.cleanId(event.payload?.orcamentoId || event.payload?.quoteId);
+    if (quoteId) quoteToOrder.set(quoteId, event.id);
+  });
+
+  let eventChanges = 0;
+  let inferredQuoteOrderLinks = 0;
+  const brokenLinks = [];
+  for (const event of rawEvents) {
+    const payload = { ...(event.payload || {}) };
+    if (event.schema === 'orcamento' && !payload.pedidoId) {
+      const linkedOrderId = quoteToOrder.get(event.id);
+      const numberedMatches = ordersByNumber.get(String(payload.pedidoNumero || '').trim()) || [];
+      const inferred = linkedOrderId || (numberedMatches.length === 1 ? numberedMatches[0] : '');
+      if (inferred) {
+        payload.pedidoId = inferred;
+        inferredQuoteOrderLinks += 1;
+      }
+    }
+    const normalized = ENTITY_LINKS.normalizeEvent(event.id, { ...event, payload });
+    if (normalized.links.orderId && !orderIds.has(normalized.links.orderId) && event.schema !== 'pedido') {
+      brokenLinks.push({ collection: 'events', id: event.id, type: event.schema, orderId: normalized.links.orderId });
+    }
+    const stored = { ...event };
+    delete stored.id;
+    const next = { ...normalized };
+    delete next.id;
+    if (!sameJson(stored, next)) {
+      eventChanges += 1;
+      if (apply) await db.collection('events').doc(event.id).set(next);
+    }
+  }
+
+  const externalCollections = [
+    ['production_assignments', 'producao'],
+    ['stripe_payment_links', 'stripe_pagamento'],
+    ['moloni_documents', 'documento_fiscal']
+  ];
+  const external = {};
+  for (const [collectionName, entityType] of externalCollections) {
+    const snapshot = await db.collection(collectionName).get();
+    let changes = 0;
+    for (const doc of snapshot.docs) {
+      const record = doc.data();
+      const links = ENTITY_LINKS.externalLinks(entityType, doc.id, record);
+      if (links.orderId && !orderIds.has(links.orderId)) {
+        brokenLinks.push({ collection: collectionName, id: doc.id, type: entityType, orderId: links.orderId });
+      }
+      if (!sameJson(record.links || {}, links)) {
+        changes += 1;
+        if (apply) await db.collection(collectionName).doc(doc.id).set({ links, linkUpdatedAt: new Date().toISOString() }, { merge: true });
+      }
+    }
+    external[collectionName] = { records: snapshot.size, changes };
+  }
+
+  return {
+    linkVersion: ENTITY_LINKS.LINK_VERSION,
+    mode: apply ? 'applied' : 'preview',
+    events: { records: rawEvents.length, changes: eventChanges, inferredQuoteOrderLinks },
+    external,
+    brokenLinks: brokenLinks.slice(0, 100),
+    brokenLinkCount: brokenLinks.length
+  };
+}
+
 function matchesFilters(id, data, filters) {
   return Object.entries(filters || {}).every(([key, expected]) => {
     if (key === 'id') return id === expected;
@@ -636,8 +720,9 @@ async function ensureLabelPlatformFee(customer, reference = new Date()) {
     updated_at: now.toISOString(),
     deleted: false
   };
-  await ref.set(event);
-  return { id, ...event };
+  const normalizedEvent = ENTITY_LINKS.normalizeEvent(id, event);
+  await ref.set(normalizedEvent);
+  return { id, ...normalizedEvent };
 }
 
 async function ensureAllLabelPlatformFees(customers) {
@@ -1021,12 +1106,14 @@ async function registerStripePaymentFromSession(session = {}) {
     const statusPagamento = totalPago <= 0 ? 'pendente' : saldoPendente > 0.009 ? 'parcial' : 'pago';
     updatedPayload = { ...payload, pagamentos: payments, totalPago, saldoPendente, statusPagamento };
 
-    transaction.set(orderRef, {
+    const normalizedOrder = ENTITY_LINKS.normalizeEvent(orderId, {
+      ...orderSnapshot.data(),
       payload: updatedPayload,
       updated: true,
       updated_at: now,
       timestamp: orderSnapshot.data().timestamp || now
-    }, { merge: true });
+    });
+    transaction.set(orderRef, normalizedOrder, { merge: true });
     transaction.set(linkRef, {
       ...link,
       orderId,
@@ -1960,7 +2047,7 @@ async function ensureProductionPaymentExpense({ id, type, workerId, workerName, 
     workerId: text(workerId, 120),
     workerName: cleanWorkerName
   };
-  await db.collection('events').doc(eventId).set({
+  await db.collection('events').doc(eventId).set(ENTITY_LINKS.normalizeEvent(eventId, {
     schema: 'despesa',
     pageId: 'ordemproducao',
     timestamp: paidAt,
@@ -1968,7 +2055,7 @@ async function ensureProductionPaymentExpense({ id, type, workerId, workerName, 
     updated_at: now,
     deleted: false,
     payload
-  }, { merge: true });
+  }), { merge: true });
   return eventId;
 }
 
@@ -2172,7 +2259,7 @@ async function issueStockForAssignment(orderId, productId, assignment, now) {
       const quantidadeProduto = Math.max(1, money(product.quantidade) || 1);
       const quantidade = -Math.abs(money(detalhe.calculo.consumo) * quantidadeProduto);
       if (!quantidade) continue;
-      await movementRef.set({
+      await movementRef.set(ENTITY_LINKS.normalizeEvent(movementId, {
         schema: 'estoque_movimento',
         pageId: 'ordemproducao',
         timestamp: now,
@@ -2192,7 +2279,7 @@ async function issueStockForAssignment(orderId, productId, assignment, now) {
           workerId: assignment.workerId,
           workerName: assignment.workerName
         }
-      });
+      }));
       created.push(movementId);
     }
   }
@@ -2325,8 +2412,9 @@ app.post('/api/rotulos/public/orders', requestRateLimit({ windowMs: 15 * 60 * 10
       updated_at: now.toISOString(),
       deleted: false
     };
-    const ref = await db.collection('events').add(event);
-    res.status(201).json({ success: true, order: labelOrderPublic(ref.id, payload) });
+    const id = `evt_${crypto.randomUUID().replace(/-/g, '')}`;
+    await db.collection('events').doc(id).set(ENTITY_LINKS.normalizeEvent(id, event));
+    res.status(201).json({ success: true, order: labelOrderPublic(id, payload) });
   } catch (error) {
     const isInputError = /Preencha corretamente|deve ser múltipla de 15/.test(error.message);
     if (!isInputError) console.error('Erro ao criar pedido de rótulos:', error);
@@ -3283,6 +3371,30 @@ app.get('/api/admin/audit', requireCrmPermission('audit.read'), async (req, res)
   }
 });
 
+app.get('/api/admin/data-integrity', requireCrmPermission('system.manage'), async (req, res) => {
+  try {
+    res.json({ success: true, report: await normalizeDataLinks({ apply: false }) });
+  } catch (error) {
+    console.error('Erro ao analisar vínculos de dados:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível analisar os vínculos entre os módulos.' });
+  }
+});
+
+app.post('/api/admin/data-integrity/normalize', requireCrmPermission('system.manage'), async (req, res) => {
+  try {
+    const report = await normalizeDataLinks({ apply: true });
+    await recordAudit(req, 'data.links.normalize', {
+      entityType: 'system',
+      entityId: 'data-links-v1',
+      after: report
+    });
+    res.json({ success: true, report });
+  } catch (error) {
+    console.error('Erro ao normalizar vínculos de dados:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível normalizar os vínculos entre os módulos.' });
+  }
+});
+
 function databaseSchemaPermission(schema, write = false) {
   const normalized = String(schema || '').toLowerCase();
   if (normalized === 'all') return 'management.read';
@@ -3797,7 +3909,7 @@ app.post('/api/rotulos/orders/:id/payments', async (req, res) => {
       totalPago,
       saldoPendente: money(Math.max(0, money(current.payload.total) - totalPago))
     };
-    await ref.set({ ...current, payload, timestamp: new Date().toISOString(), updated_at: new Date().toISOString() });
+    await ref.set(ENTITY_LINKS.normalizeEvent(id, { ...current, payload, timestamp: new Date().toISOString(), updated_at: new Date().toISOString() }));
     res.json({ success: true, totalPago, saldoPendente: payload.saldoPendente });
   } catch (error) {
     console.error('Erro ao registar pagamento de rótulos:', error);
@@ -3847,7 +3959,7 @@ app.post('/api/rotulos/months/:customerId/:month/paid', async (req, res) => {
       });
       const totalPago = money(labelPaymentTotal({ pagamentos: payments }));
       paidValue = money(paidValue + pending);
-      await db.collection('events').doc(event.id).set({
+      await db.collection('events').doc(event.id).set(ENTITY_LINKS.normalizeEvent(event.id, {
         ...event,
         payload: {
           ...payload,
@@ -3859,7 +3971,7 @@ app.post('/api/rotulos/months/:customerId/:month/paid', async (req, res) => {
         },
         timestamp: now,
         updated_at: now
-      });
+      }));
     }));
     res.json({ success: true, customerId, month, paidValue, recordsPaid: records.length });
   } catch (error) {
@@ -4116,6 +4228,7 @@ app.post('/api/stripe/payment-links', async (req, res) => {
       createdAt: now,
       updatedAt: now
     };
+    pending.links = ENTITY_LINKS.externalLinks('stripe_pagamento', id, pending);
     await db.collection('stripe_payment_links').doc(id).set(pending);
 
     let session;
@@ -4489,6 +4602,7 @@ app.post('/api/moloni/documents', async (req, res) => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
+    pending.links = ENTITY_LINKS.externalLinks('documento_fiscal', id, pending);
     await documentRef.set(pending);
 
     let result;
@@ -5119,6 +5233,7 @@ app.post('/api/production/assignments', async (req, res) => {
       createdAt: old.createdAt || now,
       updatedAt: now
     };
+    assignment.links = ENTITY_LINKS.externalLinks('producao', assignmentId, assignment);
     assignment.steps = normalizeProductionSteps(req.body?.steps, old.steps, commission);
     if (!assignment.steps.length) return res.status(400).json({ success: false, message: 'Selecione ao menos uma etapa.' });
     await db.collection('production_assignments').doc(assignmentId).set(assignment);
@@ -5469,6 +5584,7 @@ app.post('/api/database/commit', async (req, res) => {
     const classification = schema === 'despesa'
       ? await classifyExpensePayloadByKnownSupplier(payload, now)
       : { payload };
+    const recordId = id || `evt_${crypto.randomUUID().replace(/-/g, '')}`;
     const event = {
       schema,
       payload: classification.payload,
@@ -5482,26 +5598,27 @@ app.post('/api/database/commit', async (req, res) => {
     let auditBefore = null;
     let auditAfter = event;
     if (id) {
-      const docRef = db.collection('events').doc(id);
+      const docRef = db.collection('events').doc(recordId);
       const docSnap = await docRef.get();
       if (docSnap.exists) {
         const existingEvent = docSnap.data();
         auditBefore = existingEvent;
-        const mergedEvent = schema === 'pedido' && existingEvent.schema === 'pedido'
+        const mergedEventBase = schema === 'pedido' && existingEvent.schema === 'pedido'
           ? { ...existingEvent, ...event, payload: { ...(existingEvent.payload || {}), ...event.payload }, updated: true }
           : { ...existingEvent, ...event, updated: true };
+        const mergedEvent = ENTITY_LINKS.normalizeEvent(recordId, mergedEventBase);
         await docRef.set(mergedEvent, { merge: true });
         auditAfter = mergedEvent;
-        result = { id, action: 'updated', exists: true };
+        result = { id: recordId, action: 'updated', exists: true };
       } else {
-        await docRef.set({ ...event, created_at: now });
-        auditAfter = { ...event, created_at: now };
-        result = { id, action: 'created_new', exists: false };
+        auditAfter = ENTITY_LINKS.normalizeEvent(recordId, { ...event, created_at: now });
+        await docRef.set(auditAfter);
+        result = { id: recordId, action: 'created_new', exists: false };
       }
     } else {
-      const docRef = await db.collection('events').add({ ...event, created_at: now });
-      auditAfter = { ...event, created_at: now };
-      result = { id: docRef.id, action: 'created', exists: false };
+      auditAfter = ENTITY_LINKS.normalizeEvent(recordId, { ...event, created_at: now });
+      await db.collection('events').doc(recordId).set(auditAfter);
+      result = { id: recordId, action: 'created', exists: false };
     }
 
     await recordAudit(req, `data.${result.action}`, {
@@ -5511,7 +5628,7 @@ app.post('/api/database/commit', async (req, res) => {
       after: auditAfter,
       metadata: { pageId: event.pageId }
     });
-    res.json({ status: 'success', success: true, message: 'Evento salvo no Firebase', autoClassified: Boolean(classification.classified), ...result, event });
+    res.json({ status: 'success', success: true, message: 'Evento salvo no Firebase', autoClassified: Boolean(classification.classified), ...result, event: auditAfter });
   } catch (error) {
     console.error('Erro ao salvar:', error);
     res.status(500).json({ error: 'Não foi possível salvar o registro.' });
@@ -5532,7 +5649,8 @@ app.post('/api/database/query', async (req, res) => {
     snapshot.forEach(doc => {
       const data = doc.data();
       if (!data.deleted && (schema === 'all' || data.schema === schema) && matchesFilters(doc.id, data, filters)) {
-        events.push({ id: doc.id, ...data, payload: sanitizeForResponse(data.payload) });
+        const normalized = ENTITY_LINKS.normalizeEvent(doc.id, data);
+        events.push({ id: doc.id, ...normalized, payload: sanitizeForResponse(normalized.payload) });
       }
     });
     events.sort((a, b) => new Date(b.timestamp || b.created_at || 0) - new Date(a.timestamp || a.created_at || 0));
