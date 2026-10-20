@@ -11,6 +11,10 @@ function argument(name) {
   return index >= 0 ? String(process.argv[index + 1] || '') : '';
 }
 
+function hasFlag(name) {
+  return process.argv.includes(`--${name}`);
+}
+
 function openBrowser(url) {
   let executable = 'xdg-open';
   let args = [url];
@@ -22,6 +26,21 @@ function openBrowser(url) {
   }
   const child = spawn(executable, args, { detached: true, stdio: 'ignore' });
   child.unref();
+}
+
+function errorMessage(error) {
+  const primary = String(error?.message || error || 'Erro desconhecido.');
+  const cause = String(error?.cause?.message || '').trim();
+  return cause && cause !== primary ? `${primary} (${cause})` : primary;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
 }
 
 function stableHostId() {
@@ -82,8 +101,9 @@ async function main() {
       res.end('<!doctype html><meta charset="utf-8"><title>Ligação concluída</title><body style="font:18px system-ui;padding:40px"><h1>Ligação concluída</h1><p>A conta ChatGPT Pro foi ligada ao CRM PrintPixel. Pode fechar esta janela.</p></body>');
       finish.resolve(result);
     } catch (error) {
+      const diagnostic = errorMessage(error);
       res.writeHead(400, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end('<!doctype html><meta charset="utf-8"><title>Falha na ligação</title><body style="font:18px system-ui;padding:40px"><h1>Falha na ligação</h1><p>Volte ao terminal para consultar o erro.</p></body>');
+      res.end(`<!doctype html><meta charset="utf-8"><title>Falha na ligação</title><body style="font:18px system-ui;padding:40px"><h1>Falha na ligação</h1><p>${escapeHtml(diagnostic)}</p><p>Pode fechar esta janela e tentar novamente pelo CRM.</p></body>`);
       finish.reject(error);
     }
   });
@@ -100,7 +120,7 @@ async function main() {
   });
   console.log('A abrir a autorização oficial da OpenAI no navegador...');
   console.log(`Se o navegador não abrir, visite:\n${attempt.url}`);
-  openBrowser(attempt.url);
+  if (!hasFlag('no-open')) openBrowser(attempt.url);
 
   const timeout = setTimeout(() => finish.reject(new Error('A autorização expirou após 10 minutos. Gere um novo código no CRM.')), 10 * 60 * 1000);
   try {
@@ -113,6 +133,6 @@ async function main() {
 }
 
 main().catch(error => {
-  console.error(`Falha: ${error.message}`);
+  console.error(`Falha: ${errorMessage(error)}`);
   process.exitCode = 1;
 });
