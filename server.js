@@ -4253,6 +4253,16 @@ app.post('/api/ai/ask', requestRateLimit({ windowMs: 15 * 60 * 1000, max: 40 }),
       createdAt: new Date().toISOString()
     };
 
+    // Listas factuais devem vir diretamente do CRM: são mais rápidas, exatas e
+    // não consomem o limite da conta ChatGPT. O modelo continua responsável por
+    // análise, diálogo, imagens e perguntas que exigem raciocínio.
+    if (!quoteMode && deterministicAnswer.understood && deterministicAnswer.metric === 'records') {
+      const assistantMessage = { role: 'assistant', content: deterministicAnswer.answer, hadImage: false, createdAt: new Date().toISOString() };
+      await saveAiConversation(req, { messages: [...savedConversation.messages, userMessage, assistantMessage], mode: 'manager' });
+      await recordAudit(req, 'ai.manager.question', { entityType: 'ai_usage', entityId: crypto.randomUUID(), metadata: { understood: true, metric: 'records', mode: 'crm_direct' } });
+      return res.json({ success: true, answer: sanitizeForResponse(deterministicAnswer), generatedAt: briefing.generatedAt, deterministic: true, direct: true, mode: 'manager' });
+    }
+
     if (policy.enabled && config.credentials) {
       const accessToken = await chatGptAccessToken();
       const operationalContext = {

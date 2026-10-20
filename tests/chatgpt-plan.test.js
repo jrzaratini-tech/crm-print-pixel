@@ -54,3 +54,22 @@ test('só conclui uma resposta quando o stream envia response.completed', async 
   });
   assert.equal(output, 'Ligação validada.');
 });
+
+test('interrompe uma resposta da IA que ultrapassa o tempo limite', async () => {
+  await assert.rejects(
+    CHATGPT_PLAN.createResponse({
+      accessToken: 'token',
+      model: 'gpt-5.6-sol',
+      reasoningEffort: 'medium',
+      input: 'teste',
+      timeoutMs: 10
+    }, async (url, options) => new Promise((resolve, reject) => {
+      options.signal.addEventListener('abort', () => {
+        const error = new Error('aborted');
+        error.name = 'AbortError';
+        reject(error);
+      });
+    })),
+    error => error.code === 'ai_response_timeout'
+  );
+});

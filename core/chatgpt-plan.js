@@ -184,28 +184,42 @@ function parseResponseStream(text) {
   return output;
 }
 
-async function createResponse({ accessToken, model, reasoningEffort, input, instructions = '' }, fetchImpl = fetch) {
-  const response = await fetchImpl(`${RESOURCE}/responses`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model,
-      reasoning: { effort: reasoningEffort },
-      input: Array.isArray(input) ? input : [{ role: 'user', content: String(input || '') }],
-      ...(instructions ? { instructions: String(instructions) } : {}),
-      store: false,
-      stream: true
-    })
-  });
-  const text = await response.text();
-  if (!response.ok) {
-    let message = 'A OpenAI recusou o pedido.';
-    try { message = JSON.parse(text).error?.message || message; } catch {}
-    const error = new Error(message);
-    error.status = response.status;
+async function createResponse({ accessToken, model, reasoningEffort, input, instructions = '', timeoutMs = 55000 }, fetchImpl = fetch) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), Math.max(10, Number(timeoutMs) || 55000));
+  try {
+    const response = await fetchImpl(`${RESOURCE}/responses`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        reasoning: { effort: reasoningEffort },
+        input: Array.isArray(input) ? input : [{ role: 'user', content: String(input || '') }],
+        ...(instructions ? { instructions: String(instructions) } : {}),
+        store: false,
+        stream: true
+      }),
+      signal: controller.signal
+    });
+    const text = await response.text();
+    if (!response.ok) {
+      let message = 'A OpenAI recusou o pedido.';
+      try { message = JSON.parse(text).error?.message || message; } catch {}
+      const error = new Error(message);
+      error.status = response.status;
+      throw error;
+    }
+    return parseResponseStream(text);
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      const timeoutError = new Error('A IA demorou demasiado a responder. Tente novamente.');
+      timeoutError.code = 'ai_response_timeout';
+      throw timeoutError;
+    }
     throw error;
+  } finally {
+    clearTimeout(timeout);
   }
-  return parseResponseStream(text);
 }
 
 module.exports = {
