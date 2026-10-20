@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+  <script src="../core/security.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestor IA - PrintPixel</title>
+  <style>
+    :root{color-scheme:light;--primary:#1a237e;--primary-soft:#eef2ff;--text:#172033;--muted:#667085;--border:#dfe5ef;--success:#087443;--warning:#a15c00;--danger:#b42318}
+    *{box-sizing:border-box}body{margin:0;padding:24px;background:#f5f7fb;color:var(--text);font:15px/1.5 Inter,Segoe UI,system-ui,sans-serif}.container{max-width:1100px;margin:auto}h1,h2{margin-top:0}h1{margin-bottom:4px;color:var(--primary)}.subtitle{margin-top:0;color:var(--muted)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin:24px 0}.card,.panel{padding:20px;border:1px solid var(--border);border-radius:14px;background:#fff;box-shadow:0 5px 20px rgba(16,24,40,.05)}.label{display:block;margin-bottom:6px;color:var(--muted);font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}.value{font-size:20px;font-weight:800}.status{display:inline-flex;align-items:center;gap:8px;margin-top:10px;padding:6px 10px;border-radius:999px;background:#fff7e6;color:var(--warning);font-weight:700}.status.connected{background:#ecfdf3;color:var(--success)}.dot{width:8px;height:8px;border-radius:50%;background:currentColor}.locked{color:var(--muted);font-size:13px}.form{display:grid;gap:18px}.field{display:grid;gap:7px}.field input[type=number]{max-width:180px;padding:11px;border:1px solid #c9d2e1;border-radius:9px;font:inherit}.field textarea,.field input[type=file]{width:100%;padding:11px;border:1px solid #c9d2e1;border-radius:9px;background:#fff;font:inherit}.switch{display:flex;align-items:center;gap:10px;font-weight:700}.switch input{width:20px;height:20px}.actions{display:flex;flex-wrap:wrap;gap:10px}.btn{width:max-content;border:0;border-radius:9px;padding:11px 16px;background:var(--primary);color:#fff;font:inherit;font-weight:800;cursor:pointer}.btn.secondary{background:#e9edff;color:#24308f}.btn.danger{background:#fff0ef;color:var(--danger)}.btn:disabled{opacity:.55;cursor:wait}.message{min-height:24px;margin-top:14px;font-weight:700}.message.ok{color:var(--success)}.message.error{color:var(--danger)}.policy{margin:0;padding-left:21px}.policy li{margin:7px 0}.next{margin-top:16px;padding:14px 16px;border-radius:10px;background:var(--primary-soft);color:#303f9f}.meta{margin-top:8px;color:var(--muted);font-size:13px}.connector{margin-top:16px;padding:16px;border:1px dashed #aab6d2;border-radius:12px}.connector p{margin:0 0 12px}.command{display:none;margin:12px 0 0;padding:12px;border-radius:8px;background:#111827;color:#e5e7eb;white-space:pre-wrap;word-break:break-all;font:13px/1.5 Consolas,monospace}.command.visible{display:block}.quote-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,.8fr);gap:18px}.preview{display:none;max-width:100%;max-height:280px;margin-top:10px;border-radius:10px;border:1px solid var(--border)}.preview.visible{display:block}.result{display:none;padding:16px;border-radius:12px;background:#f8fafc;border:1px solid var(--border)}.result.visible{display:block}.result h3{margin:0 0 8px}.result ul{margin:7px 0;padding-left:20px}.price{font-size:20px;font-weight:800;color:var(--success)}a{color:#303f9f}@media(max-width:760px){body{padding:14px}.value{font-size:18px}.quote-layout{grid-template-columns:1fr}}
+  </style>
+</head>
+<body data-page-id="ia" data-page-type="WRITE">
+  <main class="container">
+    <h1>Gestor IA</h1>
+    <p class="subtitle">Política central da inteligência artificial do CRM PrintPixel.</p>
+
+    <section class="grid" aria-label="Estado da inteligência artificial">
+      <article class="card">
+        <span class="label">Modelo padrão</span>
+        <div class="value" id="model">GPT-5.6 Sol</div>
+        <div class="locked">Definição bloqueada por contrato</div>
+      </article>
+      <article class="card">
+        <span class="label">Raciocínio</span>
+        <div class="value" id="reasoning">Médio</div>
+        <div class="locked">Aplicado ao texto e ao Codex</div>
+      </article>
+      <article class="card">
+        <span class="label">Conta ChatGPT Pro</span>
+        <div class="status" id="connectionStatus"><span class="dot"></span><span>A verificar</span></div>
+        <div class="meta" id="accountLabel"></div>
+      </article>
+    </section>
+
+    <section class="panel">
+      <h2>Controlo de utilização</h2>
+      <form class="form" id="policyForm">
+        <label class="switch"><input id="enabled" type="checkbox"> Permitir utilização da IA no CRM</label>
+        <label class="field" for="weeklyLimit">
+          <strong>Meta interna semanal do CRM</strong>
+          <span class="locked">Referência de gestão. O limite efetivo da aplicação é definido nas Definições do ChatGPT.</span>
+          <input id="weeklyLimit" type="number" min="1" max="100" step="1" required>
+        </label>
+        <button class="btn" id="saveButton" type="submit">Guardar política</button>
+      </form>
+      <div class="message" id="message" role="status"></div>
+      <div class="next" id="nextAction">A consultar a configuração.</div>
+      <div class="connector">
+        <p><strong>Ligação oficial ao plano ChatGPT Pro</strong></p>
+        <p class="locked">O login abre no seu computador e transfere a sessão para o CRM por um código único válido durante 10 minutos. Nenhuma chave de API paga é usada.</p>
+        <div class="actions">
+          <button class="btn" id="connectButton" type="button">Gerar ligação</button>
+          <button class="btn secondary" id="testButton" type="button">Testar GPT-5.6 Sol</button>
+          <button class="btn danger" id="disconnectButton" type="button">Desligar conta</button>
+        </div>
+        <pre class="command" id="connectCommand"></pre>
+        <p class="meta">O consumo real e os limites da aplicação podem ser consultados em <a href="https://chatgpt.com/#settings/usage" target="_blank" rel="noreferrer">Definições do ChatGPT → Utilização</a>.</p>
+      </div>
+    </section>
+
+    <section class="panel" style="margin-top:16px">
+      <h2>Orçamento assistido por imagem</h2>
+      <p class="subtitle">Envie uma referência e explique o pedido. A IA prepara o produto, as dúvidas técnicas e uma estimativa baseada no histórico real.</p>
+      <div class="quote-layout">
+        <div class="form">
+          <label class="field" for="quoteDescription"><strong>Descrição do cliente</strong><textarea id="quoteDescription" rows="5" maxlength="3000" placeholder="Ex.: logo para montra, 80 cm de largura, iluminação branca quente, instalação incluída..."></textarea></label>
+          <label class="field" for="quoteImage"><strong>Imagem de referência</strong><input id="quoteImage" type="file" accept="image/jpeg,image/png,image/webp"><span class="locked">A imagem é reduzida no navegador antes do envio.</span></label>
+          <img class="preview" id="quotePreview" alt="Pré-visualização da referência">
+          <div class="actions"><button class="btn" id="analyzeQuoteButton" type="button">Analisar pedido</button></div>
+        </div>
+        <div class="result" id="quoteResult" aria-live="polite"></div>
+      </div>
+    </section>
+
+    <section class="panel" style="margin-top:16px">
+      <h2>Regras permanentes</h2>
+      <ul class="policy">
+        <li>O CRM não troca silenciosamente para outro modelo.</li>
+        <li>API paga, créditos adicionais e recarga automática permanecem desativados.</li>
+        <li>Faturas, preços, IVA, compras e comunicações externas exigem confirmação humana.</li>
+        <li>O Codex receberá apenas as permissões necessárias para cada tarefa.</li>
+      </ul>
+    </section>
+  </main>
+  <script>
+    const elements = {
+      model: document.getElementById('model'),
+      reasoning: document.getElementById('reasoning'),
+      enabled: document.getElementById('enabled'),
+      weeklyLimit: document.getElementById('weeklyLimit'),
+      connectionStatus: document.getElementById('connectionStatus'),
+      accountLabel: document.getElementById('accountLabel'),
+      nextAction: document.getElementById('nextAction'),
+      message: document.getElementById('message'),
+      saveButton: document.getElementById('saveButton'),
+      connectButton: document.getElementById('connectButton'),
+      testButton: document.getElementById('testButton'),
+      disconnectButton: document.getElementById('disconnectButton'),
+      connectCommand: document.getElementById('connectCommand'),
+      analyzeQuoteButton: document.getElementById('analyzeQuoteButton'),
+      quoteDescription: document.getElementById('quoteDescription'),
+      quoteImage: document.getElementById('quoteImage'),
+      quotePreview: document.getElementById('quotePreview'),
+      quoteResult: document.getElementById('quoteResult')
+    };
+    let quoteImageDataUrl = '';
+    let latestQuoteAnalysis = null;
+
+    async function api(path, options = {}) {
+      const response = await fetch(path, {
+        ...options,
+        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body.message || 'Não foi possível concluir a operação.');
+      return body;
+    }
+
+    function render(status) {
+      elements.model.textContent = status.model === 'gpt-5.6-sol' ? 'GPT-5.6 Sol' : status.model;
+      elements.reasoning.textContent = status.reasoningEffort === 'medium' ? 'Médio' : status.reasoningEffort;
+      elements.enabled.checked = status.enabled;
+      elements.weeklyLimit.value = status.weeklyLimitPercentage;
+      elements.connectionStatus.classList.toggle('connected', status.connected);
+      elements.connectionStatus.lastElementChild.textContent = status.connected ? 'Ligada' : 'Ainda não ligada';
+      elements.accountLabel.textContent = status.accountLabel || (status.signInConfigured ? 'Integração preparada' : 'A aguardar configuração OAuth');
+      elements.nextAction.textContent = status.nextAction;
+      elements.connectButton.disabled = !status.signInConfigured || status.connected;
+      elements.testButton.disabled = !status.connected;
+      elements.disconnectButton.disabled = !status.connected;
+      elements.analyzeQuoteButton.disabled = !status.connected || !status.enabled;
+    }
+
+    async function loadStatus() {
+      render(await api('/api/ai/status'));
+    }
+
+    document.getElementById('policyForm').addEventListener('submit', async event => {
+      event.preventDefault();
+      elements.saveButton.disabled = true;
+      elements.message.className = 'message';
+      elements.message.textContent = 'A guardar...';
+      try {
+        const status = await api('/api/ai/settings', {
+          method: 'POST',
+          body: JSON.stringify({
+            enabled: elements.enabled.checked,
+            weeklyLimitPercentage: Number(elements.weeklyLimit.value)
+          })
+        });
+        render(status);
+        elements.message.className = 'message ok';
+        elements.message.textContent = 'Política guardada com segurança.';
+      } catch (error) {
+        elements.message.className = 'message error';
+        elements.message.textContent = error.message;
+      } finally {
+        elements.saveButton.disabled = false;
+      }
+    });
+
+    elements.connectButton.addEventListener('click', async () => {
+      elements.connectButton.disabled = true;
+      elements.message.className = 'message';
+      elements.message.textContent = 'A gerar código seguro...';
+      try {
+        const result = await api('/api/ai/connect-code', { method: 'POST', body: '{}' });
+        elements.connectCommand.textContent = result.command;
+        elements.connectCommand.classList.add('visible');
+        elements.message.className = 'message ok';
+        elements.message.textContent = 'Copie o comando abaixo e execute-o no terminal desta pasta. Depois atualize esta página.';
+      } catch (error) {
+        elements.message.className = 'message error';
+        elements.message.textContent = error.message;
+        elements.connectButton.disabled = false;
+      }
+    });
+
+    elements.testButton.addEventListener('click', async () => {
+      elements.testButton.disabled = true;
+      elements.message.className = 'message';
+      elements.message.textContent = 'A validar o modelo e a ligação...';
+      try {
+        const result = await api('/api/ai/test', { method: 'POST', body: '{}' });
+        elements.message.className = 'message ok';
+        elements.message.textContent = `${result.model} (${result.reasoningEffort}): ${result.output}`;
+      } catch (error) {
+        elements.message.className = 'message error';
+        elements.message.textContent = error.message;
+      } finally {
+        elements.testButton.disabled = false;
+      }
+    });
+
+    elements.disconnectButton.addEventListener('click', async () => {
+      if (!confirm('Desligar a conta ChatGPT deste CRM?')) return;
+      elements.disconnectButton.disabled = true;
+      try {
+        await api('/api/ai/disconnect', { method: 'POST', body: '{}' });
+        elements.connectCommand.classList.remove('visible');
+        await loadStatus();
+        elements.message.className = 'message ok';
+        elements.message.textContent = 'Conta desligada do CRM.';
+      } catch (error) {
+        elements.message.className = 'message error';
+        elements.message.textContent = error.message;
+      }
+    });
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
+    }
+
+    function compressImage(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onerror = () => reject(new Error('Não foi possível ler a imagem.'));
+        reader.onload = () => {
+          const image = new Image();
+          image.onerror = () => reject(new Error('A imagem selecionada não é válida.'));
+          image.onload = () => {
+            const maximum = 1200;
+            const scale = Math.min(1, maximum / Math.max(image.width, image.height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(image.width * scale));
+            canvas.height = Math.max(1, Math.round(image.height * scale));
+            canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
+            let data = canvas.toDataURL('image/jpeg', .76);
+            if (data.length > 900000) data = canvas.toDataURL('image/jpeg', .55);
+            if (data.length > 950000) return reject(new Error('A imagem continua demasiado grande. Escolha uma imagem menor.'));
+            resolve(data);
+          };
+          image.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    elements.quoteImage.addEventListener('change', async () => {
+      const file = elements.quoteImage.files[0];
+      if (!file) return;
+      try {
+        quoteImageDataUrl = await compressImage(file);
+        elements.quotePreview.src = quoteImageDataUrl;
+        elements.quotePreview.classList.add('visible');
+      } catch (error) {
+        quoteImageDataUrl = '';
+        elements.quotePreview.classList.remove('visible');
+        elements.message.className = 'message error';
+        elements.message.textContent = error.message;
+      }
+    });
+
+    function renderQuoteAnalysis(result) {
+      latestQuoteAnalysis = result;
+      const analysis = result.analysis;
+      const dimensions = [analysis.dimensions.widthCm && `${analysis.dimensions.widthCm} cm largura`, analysis.dimensions.heightCm && `${analysis.dimensions.heightCm} cm altura`, analysis.dimensions.depthCm && `${analysis.dimensions.depthCm} cm profundidade`].filter(Boolean).join(' × ') || 'Por confirmar';
+      const estimate = result.estimate.available
+        ? `<div class="price">${Number(result.estimate.unitPrice).toLocaleString('pt-PT', {style:'currency',currency:'EUR'})} / unidade</div><div class="meta">Mediana de ${result.estimate.sampleCount} registo(s); intervalo histórico ${Number(result.estimate.rangeMin).toLocaleString('pt-PT', {style:'currency',currency:'EUR'})}–${Number(result.estimate.rangeMax).toLocaleString('pt-PT', {style:'currency',currency:'EUR'})}.</div>`
+        : '<div class="meta">Sem histórico suficiente para sugerir preço. O valor ficará em branco para revisão.</div>';
+      const items = values => values.length ? `<ul>${values.map(value => `<li>${escapeHtml(value)}</li>`).join('')}</ul>` : '<div class="meta">Nenhum item indicado.</div>';
+      elements.quoteResult.innerHTML = `<h3>${escapeHtml(analysis.catalogMatch)}</h3><p>${escapeHtml(analysis.summary)}</p><p><strong>Medidas:</strong> ${escapeHtml(dimensions)} · <strong>Quantidade:</strong> ${analysis.quantity} · <strong>Confiança:</strong> ${Math.round(analysis.confidence * 100)}%</p>${estimate}<p><strong>Materiais prováveis</strong></p>${items(analysis.materials)}<p><strong>Perguntas antes de fechar</strong></p>${items(analysis.questions)}<div class="actions"><button class="btn" id="useQuoteDraft" type="button">Levar para novo orçamento</button></div><div class="meta">A proposta exige confirmação humana antes de guardar ou enviar.</div>`;
+      elements.quoteResult.classList.add('visible');
+      document.getElementById('useQuoteDraft').addEventListener('click', () => {
+        sessionStorage.setItem('aiQuoteDraft', JSON.stringify(latestQuoteAnalysis));
+        window.location.href = 'novoorcamento.html?aiDraft=1';
+      });
+    }
+
+    elements.analyzeQuoteButton.addEventListener('click', async () => {
+      if (!elements.quoteDescription.value.trim() && !quoteImageDataUrl) {
+        elements.message.className = 'message error';
+        elements.message.textContent = 'Adicione uma descrição ou uma imagem.';
+        return;
+      }
+      elements.analyzeQuoteButton.disabled = true;
+      elements.message.className = 'message';
+      elements.message.textContent = 'A analisar produto, materiais e histórico...';
+      try {
+        const result = await api('/api/ai/quote-analyze', { method: 'POST', body: JSON.stringify({ description: elements.quoteDescription.value, imageDataUrl: quoteImageDataUrl }) });
+        renderQuoteAnalysis(result);
+        elements.message.className = 'message ok';
+        elements.message.textContent = 'Análise concluída. Confirme as perguntas antes de fechar o preço.';
+      } catch (error) {
+        elements.message.className = 'message error';
+        elements.message.textContent = error.message;
+      } finally {
+        elements.analyzeQuoteButton.disabled = false;
+      }
+    });
+
+    loadStatus().catch(error => {
+      elements.message.className = 'message error';
+      elements.message.textContent = error.message;
+    });
+  </script>
+</body>
+</html>

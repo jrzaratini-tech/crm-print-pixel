@@ -140,6 +140,16 @@
     },
 
     {
+        id: "nav_ia",
+        name: "Gestor IA",
+        file: "pages/ia.html",
+        type: "WRITE",
+        pos: 9.2,
+        hidden: false,
+        deleted: false
+    },
+
+    {
         id: "nav_financas",
         name: "Finanças",
         file: "pages/financas.html",

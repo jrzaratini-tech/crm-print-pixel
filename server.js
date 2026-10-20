@@ -6,6 +6,9 @@ const { db } = require('./firebase.js');
 const QR_FISCAL = require('./core/qr-fiscal.js');
 const GESTAO = require('./core/gestao.js');
 const ROTULOS = require('./core/rotulos.js');
+const AI_POLICY = require('./core/ai-policy.js');
+const CHATGPT_PLAN = require('./core/chatgpt-plan.js');
+const AI_QUOTE = require('./core/ai-quote.js');
 const {
   MoloniClient,
   buildDocumentPreview,
@@ -55,6 +58,8 @@ const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY || '';
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET || '';
 const STRIPE_CURRENCY = String(process.env.STRIPE_CURRENCY || 'eur').toLowerCase();
 const STRIPE_RETURN_BASE_URL = process.env.STRIPE_RETURN_BASE_URL || '';
+const CHATGPT_SIGN_IN_ENABLED = process.env.CHATGPT_SIGN_IN_ENABLED === 'true';
+const CHATGPT_TOKEN_ENCRYPTION_KEY = process.env.CHATGPT_TOKEN_ENCRYPTION_KEY || CRM_PASSWORD || '';
 const MAX_QUERY_LIMIT = 5000;
 const MAX_UPLOAD_BYTES = 500 * 1024;
 const MOLONI_REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000;
@@ -107,6 +112,8 @@ const DEFAULT_PRODUCTS = [
   'Caixa de Luz',
   'Outro'
 ];
+
+const AI_CONFIG_DOC = db.collection('integrations').doc('chatgpt_plan');
 
 if (IS_PRODUCTION && !AUTH_DISABLED && (!CRM_USERNAME || !CRM_PASSWORD)) {
   throw new Error('Configure CRM_USERNAME e CRM_PASSWORD antes de iniciar o CRM em produção.');
@@ -2863,7 +2870,333 @@ app.post('/logout', (req, res) => {
   res.redirect(303, '/login');
 });
 
+async function aiConfiguration() {
+  const snapshot = await AI_CONFIG_DOC.get();
+  return snapshot.exists ? snapshot.data() : {};
+}
+
+function chatGptConnectionConfigured() {
+  return CHATGPT_SIGN_IN_ENABLED && CHATGPT_TOKEN_ENCRYPTION_KEY.length >= 24;
+}
+
+function hashChatGptImportCode(value) {
+  return crypto.createHash('sha256').update(String(value || '')).digest('hex');
+}
+
+function encryptedChatGptCredentials(config) {
+  try {
+    return CHATGPT_PLAN.decryptCredentials(config.credentials, CHATGPT_TOKEN_ENCRYPTION_KEY);
+  } catch {
+    throw new Error('As credenciais ChatGPT guardadas já não podem ser abertas neste servidor. Volte a ligar a conta.');
+  }
+}
+
+async function chatGptAccessToken() {
+  const config = await aiConfiguration();
+  let credentials = encryptedChatGptCredentials(config);
+  if (!credentials?.access_token) throw new Error('A conta ChatGPT Pro ainda não está ligada.');
+  if (Number(credentials.expires_at || 0) > Date.now() + 2 * 60 * 1000) return credentials.access_token;
+  if (!credentials.refresh_token || !credentials.client_id) throw new Error('A sessão ChatGPT expirou. Volte a ligar a conta.');
+
+  const refreshed = await CHATGPT_PLAN.refreshCredentials({
+    clientId: credentials.client_id,
+    refreshToken: credentials.refresh_token
+  });
+  credentials = {
+    ...credentials,
+    ...refreshed,
+    client_id: credentials.client_id,
+    refresh_token: refreshed.refresh_token || credentials.refresh_token,
+    expires_at: Date.now() + Number(refreshed.expires_in || 3600) * 1000
+  };
+  if (!CHATGPT_PLAN.hasPlanUsageScope(credentials)) throw new Error('A conta não autorizou o uso do plano ChatGPT no CRM.');
+  await AI_CONFIG_DOC.set({
+    credentials: CHATGPT_PLAN.encryptCredentials(credentials, CHATGPT_TOKEN_ENCRYPTION_KEY),
+    tokenRefreshedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  }, { merge: true });
+  return credentials.access_token;
+}
+
+// O fluxo oficial usa callback local. Este endpoint recebe a sessão já validada
+// pelo conector local e exige um código aleatório, de utilização única e curta duração.
+app.post('/api/ai/import-credentials', async (req, res) => {
+  try {
+    if (!chatGptConnectionConfigured()) {
+      return res.status(503).json({ success: false, message: 'A ligação ChatGPT ainda não está ativada no servidor.' });
+    }
+    const config = await aiConfiguration();
+    const suppliedHash = hashChatGptImportCode(req.body?.importCode);
+    const expectedHash = String(config.pendingImport?.codeHash || '');
+    const expiresAt = Number(config.pendingImport?.expiresAt || 0);
+    if (!expectedHash || expiresAt <= Date.now() || !safeEqual(suppliedHash, expectedHash)) {
+      return res.status(401).json({ success: false, message: 'Código de ligação inválido ou expirado.' });
+    }
+
+    await AI_CONFIG_DOC.set({ pendingImport: null, updatedAt: new Date().toISOString() }, { merge: true });
+    const incoming = req.body?.credentials || {};
+    const clientId = text(incoming.client_id, 200);
+    if (!clientId.startsWith('oaiapp_') || !incoming.id_token || !incoming.access_token || !incoming.refresh_token) {
+      return res.status(400).json({ success: false, message: 'A sessão devolvida pela OpenAI está incompleta.' });
+    }
+    if (!CHATGPT_PLAN.hasPlanUsageScope(incoming)) {
+      return res.status(400).json({ success: false, message: 'O uso do plano ChatGPT não foi autorizado nesta ligação.' });
+    }
+    const claims = await CHATGPT_PLAN.verifyIdToken(incoming.id_token, {
+      clientId,
+      nonce: text(req.body?.nonce, 200)
+    });
+    const credentials = {
+      access_token: incoming.access_token,
+      refresh_token: incoming.refresh_token,
+      id_token: incoming.id_token,
+      token_type: incoming.token_type || 'Bearer',
+      scope: incoming.scope,
+      expires_in: Number(incoming.expires_in || 3600),
+      earliest_refresh_at: incoming.earliest_refresh_at || null,
+      expires_at: Date.now() + Number(incoming.expires_in || 3600) * 1000,
+      client_id: clientId
+    };
+    const authorizedAt = new Date().toISOString();
+    await AI_CONFIG_DOC.set({
+      credentials: CHATGPT_PLAN.encryptCredentials(credentials, CHATGPT_TOKEN_ENCRYPTION_KEY),
+      connection: {
+        authorizedAt,
+        revokedAt: null,
+        accountLabel: text(claims.email || claims.name || 'Conta ChatGPT Pro', 200),
+        subject: claims.sub,
+        clientId
+      },
+      updatedAt: authorizedAt
+    }, { merge: true });
+    return res.json({ success: true, message: 'Conta ChatGPT Pro ligada ao CRM com segurança.' });
+  } catch (error) {
+    console.error('Erro ao importar ligação ChatGPT:', error.message);
+    return res.status(400).json({ success: false, message: error.message || 'Não foi possível importar a ligação ChatGPT.' });
+  }
+});
+
 app.use(requireAuth);
+
+app.get('/api/ai/status', async (req, res) => {
+  try {
+    const config = await aiConfiguration();
+    res.json({
+      success: true,
+      ...AI_POLICY.publicAiStatus(config, {
+        signInConfigured: chatGptConnectionConfigured()
+      })
+    });
+  } catch (error) {
+    console.error('Erro ao consultar configuração da IA:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível consultar a configuração da IA.' });
+  }
+});
+
+app.post('/api/ai/settings', async (req, res) => {
+  try {
+    const errors = AI_POLICY.validateAiPolicyUpdate(req.body || {});
+    if (errors.length) return res.status(400).json({ success: false, message: errors[0], errors });
+
+    const current = await aiConfiguration();
+    const policy = AI_POLICY.normalizeAiPolicy({
+      ...(current.policy || {}),
+      enabled: req.body?.enabled ?? current.policy?.enabled,
+      weeklyLimitPercentage: req.body?.weeklyLimitPercentage ?? current.policy?.weeklyLimitPercentage
+    });
+    const updatedAt = new Date().toISOString();
+    await AI_CONFIG_DOC.set({ policy, updatedAt }, { merge: true });
+
+    res.json({
+      success: true,
+      updatedAt,
+      ...AI_POLICY.publicAiStatus({ ...current, policy }, {
+        signInConfigured: chatGptConnectionConfigured()
+      })
+    });
+  } catch (error) {
+    console.error('Erro ao guardar configuração da IA:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível guardar a configuração da IA.' });
+  }
+});
+
+app.post('/api/ai/connect-code', async (req, res) => {
+  try {
+    if (!chatGptConnectionConfigured()) {
+      return res.status(503).json({
+        success: false,
+        message: 'Ative CHATGPT_SIGN_IN_ENABLED e configure CHATGPT_TOKEN_ENCRYPTION_KEY no servidor.'
+      });
+    }
+    const importCode = CHATGPT_PLAN.randomValue(32);
+    const expiresAt = Date.now() + 10 * 60 * 1000;
+    const crmUrl = publicBaseUrl(req);
+    await AI_CONFIG_DOC.set({
+      pendingImport: { codeHash: hashChatGptImportCode(importCode), expiresAt },
+      serverHostId: (await aiConfiguration()).serverHostId || crypto.randomUUID(),
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+    res.json({
+      success: true,
+      importCode,
+      expiresAt: new Date(expiresAt).toISOString(),
+      crmUrl,
+      command: `npm run ai:connect -- --crm-url "${crmUrl}" --import-code "${importCode}"`
+    });
+  } catch (error) {
+    console.error('Erro ao criar código de ligação ChatGPT:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível criar o código de ligação.' });
+  }
+});
+
+app.get('/api/ai/models', async (req, res) => {
+  try {
+    const accessToken = await chatGptAccessToken();
+    const models = await CHATGPT_PLAN.listModels(accessToken);
+    const required = AI_POLICY.DEFAULT_AI_POLICY.model;
+    const selected = models.find(model => model.slug === required);
+    res.json({
+      success: true,
+      requiredModel: required,
+      available: Boolean(selected),
+      displayName: selected?.display_name || '',
+      models: models.map(model => ({ slug: model.slug, displayName: model.display_name }))
+    });
+  } catch (error) {
+    console.error('Erro ao validar modelos ChatGPT:', error.message);
+    res.status(502).json({ success: false, message: error.message || 'Não foi possível validar os modelos da conta.' });
+  }
+});
+
+app.post('/api/ai/test', async (req, res) => {
+  try {
+    const config = await aiConfiguration();
+    const policy = AI_POLICY.normalizeAiPolicy(config.policy || {});
+    if (!policy.enabled) return res.status(403).json({ success: false, message: 'A IA está desativada pela política do CRM.' });
+    const accessToken = await chatGptAccessToken();
+    const models = await CHATGPT_PLAN.listModels(accessToken);
+    if (!models.some(model => model.slug === policy.model)) {
+      return res.status(409).json({
+        success: false,
+        message: `${policy.model} não está disponível nesta conta. O CRM não fará troca automática de modelo.`
+      });
+    }
+    const output = await CHATGPT_PLAN.createResponse({
+      accessToken,
+      model: policy.model,
+      reasoningEffort: policy.reasoningEffort,
+      input: [{ role: 'user', content: 'Responda em português europeu, numa frase curta: ligação do Gestor IA validada.' }]
+    });
+    res.json({ success: true, model: policy.model, reasoningEffort: policy.reasoningEffort, output });
+  } catch (error) {
+    console.error('Erro no teste ChatGPT:', error.message);
+    const status = error.code?.startsWith('subscription_sharing_') ? 429 : 502;
+    res.status(status).json({ success: false, code: error.code || '', message: error.message || 'O teste da IA falhou.' });
+  }
+});
+
+app.post('/api/ai/quote-analyze', requestRateLimit({ windowMs: 15 * 60 * 1000, max: 12 }), async (req, res) => {
+  try {
+    const config = await aiConfiguration();
+    const policy = AI_POLICY.normalizeAiPolicy(config.policy || {});
+    if (!policy.enabled) return res.status(403).json({ success: false, message: 'A IA está desativada pela política do CRM.' });
+
+    const description = text(req.body?.description, 3000);
+    const imageDataUrl = String(req.body?.imageDataUrl || '');
+    if (!description && !imageDataUrl) {
+      return res.status(400).json({ success: false, message: 'Adicione uma descrição ou uma imagem do pedido.' });
+    }
+    if (imageDataUrl) {
+      const match = imageDataUrl.match(/^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/);
+      if (!match) return res.status(400).json({ success: false, message: 'Use uma imagem JPEG, PNG ou WebP válida.' });
+      const bytes = Buffer.byteLength(match[2], 'base64');
+      if (bytes > 700 * 1024) return res.status(413).json({ success: false, message: 'A imagem é demasiado grande. Reduza-a para menos de 700 KB.' });
+    }
+
+    const catalog = await productCatalog(false);
+    const prompt = AI_QUOTE.quotePrompt({ description, catalog });
+    const content = [{ type: 'input_text', text: prompt }];
+    if (imageDataUrl) content.push({ type: 'input_image', image_url: imageDataUrl, detail: 'high' });
+    const accessToken = await chatGptAccessToken();
+    const output = await CHATGPT_PLAN.createResponse({
+      accessToken,
+      model: policy.model,
+      reasoningEffort: policy.reasoningEffort,
+      input: [{ role: 'user', content }],
+      instructions: 'Atue como analista técnico conservador. Não invente preços nem dados ausentes. Responda exclusivamente com JSON válido.'
+    });
+    const analysis = AI_QUOTE.normalizeAnalysis(AI_QUOTE.extractJson(output), catalog);
+    const eventSnapshot = await db.collection('events').get();
+    const events = eventSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const estimate = AI_QUOTE.historicalEstimate(events, analysis.catalogMatch);
+    analysis.draftProduct.valor = estimate.available ? estimate.unitPrice : 0;
+    const analysisId = `aiq-${Date.now()}-${crypto.randomBytes(5).toString('hex')}`;
+    const createdAt = new Date().toISOString();
+    await db.collection('ai_quote_analyses').doc(analysisId).set({
+      analysisId,
+      description,
+      hadImage: Boolean(imageDataUrl),
+      analysis,
+      estimate,
+      model: policy.model,
+      reasoningEffort: policy.reasoningEffort,
+      status: 'proposed',
+      createdAt,
+      updatedAt: createdAt
+    });
+    res.json({
+      success: true,
+      analysisId,
+      model: policy.model,
+      reasoningEffort: policy.reasoningEffort,
+      analysis: sanitizeForResponse(analysis),
+      estimate,
+      requiresHumanConfirmation: true
+    });
+  } catch (error) {
+    console.error('Erro na análise de orçamento com IA:', error.message);
+    const status = error.code?.startsWith('subscription_sharing_') ? 429 : 502;
+    res.status(status).json({ success: false, code: error.code || '', message: error.message || 'Não foi possível analisar o pedido.' });
+  }
+});
+
+app.post('/api/ai/quote-feedback', async (req, res) => {
+  try {
+    const analysisId = text(req.body?.analysisId, 100);
+    if (!/^aiq-[A-Za-z0-9-]+$/.test(analysisId)) return res.status(400).json({ success: false, message: 'Análise inválida.' });
+    const snapshot = await db.collection('ai_quote_analyses').doc(analysisId).get();
+    if (!snapshot.exists) return res.status(404).json({ success: false, message: 'Análise não encontrada.' });
+    const status = ['accepted', 'corrected', 'rejected'].includes(req.body?.status) ? req.body.status : 'accepted';
+    await db.collection('ai_quote_analyses').doc(analysisId).set({
+      status,
+      finalProduct: text(req.body?.finalProduct, 160),
+      finalUnitPrice: Math.max(0, Number(req.body?.finalUnitPrice) || 0),
+      feedback: text(req.body?.feedback, 1000),
+      updatedAt: new Date().toISOString()
+    }, { merge: true });
+    res.json({ success: true, message: 'Correção guardada para melhorar as próximas análises.' });
+  } catch (error) {
+    console.error('Erro ao guardar aprendizagem do orçamento:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível guardar a correção.' });
+  }
+});
+
+app.post('/api/ai/disconnect', async (req, res) => {
+  try {
+    const config = await aiConfiguration();
+    const disconnectedAt = new Date().toISOString();
+    await AI_CONFIG_DOC.set({
+      credentials: null,
+      pendingImport: null,
+      connection: { ...(config.connection || {}), revokedAt: disconnectedAt },
+      updatedAt: disconnectedAt
+    }, { merge: true });
+    res.json({ success: true, message: 'Conta ChatGPT desligada localmente do CRM.' });
+  } catch (error) {
+    console.error('Erro ao desligar ChatGPT:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível desligar a conta ChatGPT.' });
+  }
+});
 
 app.get('/api/rotulos/customers', async (req, res) => {
   try {

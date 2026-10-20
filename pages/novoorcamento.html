@@ -822,6 +822,7 @@
         let technicalProductRow = null;
         let currentSellerQuoteStatus = '';
         let currentBudgetStatus = '';
+        let currentAiAnalysisId = '';
         
         // Referências DOM
         const productsTableBody = document.getElementById('productsTableBody');
@@ -859,6 +860,34 @@
             if (selected && !options.includes(selected)) options.unshift(selected);
             const escapeOption = value => String(value || '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
             return options.map(product => `<option value="${escapeOption(product)}" ${selected === product ? 'selected' : ''}>${escapeOption(product)}</option>`).join('');
+        }
+
+        function applyAiQuoteDraft() {
+            if (new URLSearchParams(window.location.search).get('aiDraft') !== '1') return false;
+            let draft;
+            try {
+                draft = JSON.parse(sessionStorage.getItem('aiQuoteDraft') || 'null');
+            } catch {
+                draft = null;
+            }
+            if (!draft?.analysis?.draftProduct) return false;
+            sessionStorage.removeItem('aiQuoteDraft');
+            currentAiAnalysisId = draft.analysisId || '';
+            const analysis = draft.analysis;
+            const product = {
+                ...analysis.draftProduct,
+                observacoes: [
+                    analysis.summary,
+                    analysis.materials?.length ? `Materiais prováveis: ${analysis.materials.join(', ')}` : '',
+                    analysis.questions?.length ? `Confirmar: ${analysis.questions.join('; ')}` : '',
+                    'Rascunho preparado pela IA — confirmar medidas, materiais e preço.'
+                ].filter(Boolean).join('\n')
+            };
+            addProductRow(product);
+            document.getElementById('observacoes').value = `Análise IA ${currentAiAnalysisId}. Exige revisão humana antes do envio.`;
+            calculateTotals();
+            mostrarMensagem('Rascunho da IA aplicado. Confirme medidas, ficha técnica e preço antes de guardar.', 'warning');
+            return true;
         }
 
         function storeProductOptions(selectedId = '') {
@@ -1728,7 +1757,7 @@
                 await loadOrcamentoForEdit(editId);
             } else {
                 // Adicionar primeiro produto
-                addProductRow();
+                if (!applyAiQuoteDraft()) addProductRow();
                 calculateTotals();
             }
             
@@ -1741,6 +1770,20 @@
                     saveBtn.textContent = '✓ SALVO!';
                     
                     mostrarMensagem(`Orçamento ${isEditMode ? 'atualizado' : 'criado'} com sucesso!`, 'success');
+                    if (currentAiAnalysisId) {
+                        const firstRow = document.querySelector('#productsTableBody tr');
+                        fetch('/api/ai/quote-feedback', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                analysisId: currentAiAnalysisId,
+                                status: 'accepted',
+                                finalProduct: firstRow?.querySelector('.product-select')?.value || '',
+                                finalUnitPrice: parseFloat(firstRow?.querySelector('.valor-input')?.value) || 0,
+                                feedback: 'Rascunho revisto e guardado como orçamento.'
+                            })
+                        }).catch(error => console.warn('Não foi possível guardar a aprendizagem da IA:', error));
+                    }
                     
                     setTimeout(() => {
                         if (confirm(`Orçamento ${isEditMode ? 'atualizado' : 'criado'} com sucesso! Deseja criar um novo orçamento?`)) {
@@ -1881,6 +1924,7 @@
                     // 🔥 CORREÇÃO: Manter o pedidoNumero se já existir (para edição)
                     pedidoNumero: isEditMode ? (await getPedidoNumeroFromOrcamento(currentOrcamentoId)) : ''
                 };
+                if (currentAiAnalysisId) dadosOrcamento.aiAnalysisId = currentAiAnalysisId;
                 
                 // Adicionar id se for edição
                 if (isEditMode && currentOrcamentoId) {

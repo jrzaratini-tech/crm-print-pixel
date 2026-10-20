@@ -120,6 +120,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   const workerStylesResult = await request('/colaborador/styles.css');
   const workerScriptResult = await request('/colaborador/app.js');
   const labelsAdminPageResult = await request('/pages/rotulos.html');
+  const aiPageResult = await request('/pages/ia.html');
   const labelsPortalResult = await request('/rotulos/');
   const labelsPreviewResult = await request('/rotulos/previews/proteico-grande.webp');
   assert.equal(moduleResult.response.status, 200);
@@ -153,6 +154,7 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.equal(workerStylesResult.response.status, 200);
   assert.equal(workerScriptResult.response.status, 200);
   assert.equal(labelsAdminPageResult.response.status, 200);
+  assert.equal(aiPageResult.response.status, 200);
   assert.equal(labelsPortalResult.response.status, 200);
   assert.equal(labelsPreviewResult.response.status, 200);
   assert.match(moduleResult.body, /calcularFicha/);
@@ -166,6 +168,9 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(menuResult.body, /pages\/calculadora\.html/);
   assert.match(menuResult.body, /pages\/produtos\.html/);
   assert.match(menuResult.body, /pages\/rotulos\.html/);
+  assert.match(menuResult.body, /pages\/ia\.html/);
+  assert.match(aiPageResult.body, /GPT-5\.6 Sol/);
+  assert.match(aiPageResult.body, /api\/ai\/status/);
   assert.match(labelsAdminPageResult.body, /Portal de Rótulos/);
   assert.match(labelsAdminPageResult.body, /api\/rotulos\/orders/);
   assert.match(labelsAdminPageResult.body, /Baixar todos EPS/);
