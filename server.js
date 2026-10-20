@@ -9,6 +9,7 @@ const ROTULOS = require('./core/rotulos.js');
 const AI_POLICY = require('./core/ai-policy.js');
 const CHATGPT_PLAN = require('./core/chatgpt-plan.js');
 const AI_QUOTE = require('./core/ai-quote.js');
+const ADMIN_ACCESS = require('./core/admin-access.js');
 const {
   MoloniClient,
   buildDocumentPreview,
@@ -114,6 +115,8 @@ const DEFAULT_PRODUCTS = [
 ];
 
 const AI_CONFIG_DOC = db.collection('integrations').doc('chatgpt_plan');
+const ADMIN_USERS_COLLECTION = db.collection('admin_users');
+const AUDIT_COLLECTION = db.collection('audit_events');
 
 if (IS_PRODUCTION && !AUTH_DISABLED && (!CRM_USERNAME || !CRM_PASSWORD)) {
   throw new Error('Configure CRM_USERNAME e CRM_PASSWORD antes de iniciar o CRM em produção.');
@@ -133,41 +136,107 @@ function parseCookies(header) {
   }).filter(Boolean));
 }
 
-function signCrmSession(username) {
-  const payload = Buffer.from(JSON.stringify({ username, expiresAt: Date.now() + CRM_SESSION_TTL_MS })).toString('base64url');
+function legacyAdminUser() {
+  return ADMIN_ACCESS.publicUser({
+    id: 'environment-admin',
+    name: 'Administrador principal',
+    username: CRM_USERNAME || 'desenvolvimento',
+    role: 'administracao',
+    active: true,
+    source: 'environment',
+    authVersion: 1
+  });
+}
+
+function signCrmSession(user) {
+  const payload = Buffer.from(JSON.stringify({
+    userId: user.id,
+    username: user.username,
+    name: user.name,
+    role: user.role,
+    source: user.source || 'managed',
+    authVersion: Number(user.authVersion || 1),
+    expiresAt: Date.now() + CRM_SESSION_TTL_MS
+  })).toString('base64url');
   const signature = crypto.createHmac('sha256', CRM_PASSWORD).update(payload).digest('base64url');
   return `${payload}.${signature}`;
 }
 
-function validCrmSession(token) {
+function verifiedCrmSession(token) {
   try {
     const [payload, signature] = String(token || '').split('.');
-    if (!payload || !signature) return false;
+    if (!payload || !signature) return null;
     const expected = crypto.createHmac('sha256', CRM_PASSWORD).update(payload).digest('base64url');
-    if (!safeEqual(signature, expected)) return false;
+    if (!safeEqual(signature, expected)) return null;
     const session = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
-    return safeEqual(session.username, CRM_USERNAME) && Number(session.expiresAt || 0) > Date.now();
+    if (Number(session.expiresAt || 0) <= Date.now()) return null;
+    return session;
   } catch {
-    return false;
+    return null;
   }
 }
 
-function requireAuth(req, res, next) {
-  if (AUTH_DISABLED || (!IS_PRODUCTION && !CRM_USERNAME && !CRM_PASSWORD)) return next();
+async function allAdminUsers() {
+  const snapshot = await ADMIN_USERS_COLLECTION.get();
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+}
 
-  if (validCrmSession(parseCookies(req.headers.cookie).crm_session)) return next();
+async function adminUserByUsername(username) {
+  const normalized = ADMIN_ACCESS.normalizeUsername(username);
+  return (await allAdminUsers()).find(user => ADMIN_ACCESS.normalizeUsername(user.username) === normalized) || null;
+}
 
-  const [scheme, credentials] = String(req.headers.authorization || '').split(' ');
-  if (scheme === 'Basic' && credentials) {
-    const [username, password] = Buffer.from(credentials, 'base64').toString('utf8').split(':');
-    if (safeEqual(username, CRM_USERNAME) && safeEqual(password, CRM_PASSWORD)) return next();
+async function resolvedSessionUser(session) {
+  if (!session) return null;
+  if (session.source === 'environment' || session.userId === 'environment-admin') {
+    return safeEqual(session.username, CRM_USERNAME) ? legacyAdminUser() : null;
   }
+  if (!isSafeIdentifier(session.userId, 200)) return null;
+  const snapshot = await ADMIN_USERS_COLLECTION.doc(session.userId).get();
+  if (!snapshot.exists) return null;
+  const user = { id: snapshot.id, ...snapshot.data(), source: 'managed' };
+  if (user.active === false || Number(user.authVersion || 1) !== Number(session.authVersion || 1)) return null;
+  return ADMIN_ACCESS.publicUser(user);
+}
 
-  if (req.method === 'GET' && !req.path.startsWith('/api/')) {
-    const returnTo = encodeURIComponent(req.originalUrl.startsWith('/') ? req.originalUrl : '/');
-    return res.redirect(303, `/login?returnTo=${returnTo}`);
+async function requireAuth(req, res, next) {
+  try {
+    if (AUTH_DISABLED || (!IS_PRODUCTION && !CRM_USERNAME && !CRM_PASSWORD)) {
+      req.crmUser = legacyAdminUser();
+      return next();
+    }
+
+    const sessionUser = await resolvedSessionUser(verifiedCrmSession(parseCookies(req.headers.cookie).crm_session));
+    if (sessionUser) {
+      req.crmUser = sessionUser;
+      return next();
+    }
+
+    const [scheme, credentials] = String(req.headers.authorization || '').split(' ');
+    if (scheme === 'Basic' && credentials) {
+      const [username, password] = Buffer.from(credentials, 'base64').toString('utf8').split(':');
+      if (safeEqual(username, CRM_USERNAME) && safeEqual(password, CRM_PASSWORD)) {
+        req.crmUser = legacyAdminUser();
+        return next();
+      }
+    }
+
+    if (req.method === 'GET' && !req.path.startsWith('/api/')) {
+      const returnTo = encodeURIComponent(req.originalUrl.startsWith('/') ? req.originalUrl : '/');
+      return res.redirect(303, `/login?returnTo=${returnTo}`);
+    }
+    return res.status(401).json({ success: false, message: 'Autenticação necessária.' });
+  } catch (error) {
+    console.error('Erro ao validar sessão administrativa:', error);
+    return res.status(500).json({ success: false, message: 'Não foi possível validar a sessão.' });
   }
-  return res.status(401).json({ success: false, message: 'Autenticação necessária.' });
+}
+
+function requireCrmPermission(permission) {
+  return (req, res, next) => {
+    if (ADMIN_ACCESS.hasPermission(req.crmUser, permission)) return next();
+    return res.status(403).json({ success: false, message: 'O seu perfil não tem permissão para esta operação.' });
+  };
 }
 
 function requestRateLimit({ windowMs, max }) {
@@ -212,6 +281,62 @@ function sanitizeForResponse(value) {
     return Object.fromEntries(Object.entries(value).map(([key, nestedValue]) => [key, sanitizeForResponse(nestedValue)]));
   }
   return value;
+}
+
+function auditSafeValue(value, depth = 0) {
+  if (depth > 5) return '[limite de profundidade]';
+  if (Array.isArray(value)) return value.slice(0, 100).map(item => auditSafeValue(item, depth + 1));
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, nested]) => {
+      if (/(password|senha|secret|token|authorization|credential|private.?key|base64|notaFiscal)/i.test(key)) {
+        return [key, '[redigido]'];
+      }
+      return [key, auditSafeValue(nested, depth + 1)];
+    }));
+  }
+  if (typeof value === 'string') return value.slice(0, 2000);
+  return value;
+}
+
+function auditOrigin(req) {
+  const address = String(req.ip || req.socket?.remoteAddress || 'unknown');
+  return {
+    ipHash: crypto.createHmac('sha256', CRM_PASSWORD || 'development-audit-key').update(address).digest('hex').slice(0, 24),
+    userAgent: String(req.get?.('user-agent') || '').slice(0, 300),
+    method: req.method,
+    path: String(req.originalUrl || req.path || '').split('?')[0].slice(0, 300)
+  };
+}
+
+async function recordAudit(req, action, details = {}) {
+  try {
+    const now = new Date().toISOString();
+    const actor = req.crmUser || details.actor || { id: 'anonymous', username: 'anonymous', name: 'Não autenticado', role: 'none' };
+    const event = {
+      action: String(action || 'unknown').slice(0, 120),
+      status: details.status === 'failure' ? 'failure' : 'success',
+      actor: {
+        id: String(actor.id || 'unknown').slice(0, 200),
+        username: String(actor.username || 'unknown').slice(0, 100),
+        name: String(actor.name || '').slice(0, 200),
+        role: String(actor.role || 'unknown').slice(0, 80)
+      },
+      entity: {
+        type: String(details.entityType || '').slice(0, 100),
+        id: String(details.entityId || '').slice(0, 200)
+      },
+      before: auditSafeValue(details.before ?? null),
+      after: auditSafeValue(details.after ?? null),
+      metadata: auditSafeValue(details.metadata || {}),
+      origin: auditOrigin(req),
+      timestamp: now
+    };
+    const ref = await AUDIT_COLLECTION.add(event);
+    return { id: ref.id, ...event };
+  } catch (error) {
+    console.error('Falha ao registar auditoria:', error);
+    return null;
+  }
 }
 
 function matchesFilters(id, data, filters) {
@@ -2862,19 +2987,43 @@ app.get('/login', (req, res) => {
   res.type('html').send(crmLoginPage(req.query.returnTo, req.query.error === '1'));
 });
 
-app.post('/login', requestRateLimit({ windowMs: 15 * 60 * 1000, max: 12 }), (req, res) => {
+app.post('/login', requestRateLimit({ windowMs: 15 * 60 * 1000, max: 12 }), async (req, res) => {
   const returnTo = safeLoginReturnTo(req.body?.returnTo);
-  if (!safeEqual(req.body?.username, CRM_USERNAME) || !safeEqual(req.body?.password, CRM_PASSWORD)) {
-    return res.status(401).type('html').send(crmLoginPage(returnTo, true));
+  const username = ADMIN_ACCESS.normalizeUsername(req.body?.username);
+  try {
+    let user = null;
+    if (safeEqual(username, ADMIN_ACCESS.normalizeUsername(CRM_USERNAME)) && safeEqual(req.body?.password, CRM_PASSWORD)) {
+      user = legacyAdminUser();
+    } else {
+      const managed = await adminUserByUsername(username);
+      if (managed && managed.active !== false && ADMIN_ACCESS.passwordMatches(req.body?.password, managed)) {
+        user = ADMIN_ACCESS.publicUser({ ...managed, source: 'managed' });
+      }
+    }
+
+    if (!user) {
+      await recordAudit(req, 'auth.login', {
+        status: 'failure',
+        actor: { id: 'anonymous', username, name: '', role: 'none' },
+        metadata: { reason: 'invalid_credentials' }
+      });
+      return res.status(401).type('html').send(crmLoginPage(returnTo, true));
+    }
+
+    req.crmUser = user;
+    res.cookie('crm_session', signCrmSession(user), {
+      httpOnly: true,
+      secure: IS_PRODUCTION,
+      sameSite: 'strict',
+      maxAge: CRM_SESSION_TTL_MS,
+      path: '/'
+    });
+    await recordAudit(req, 'auth.login', { metadata: { source: user.source || 'managed' } });
+    return res.redirect(303, returnTo);
+  } catch (error) {
+    console.error('Erro no login administrativo:', error);
+    return res.status(500).type('html').send('Internal Server Error');
   }
-  res.cookie('crm_session', signCrmSession(CRM_USERNAME), {
-    httpOnly: true,
-    secure: IS_PRODUCTION,
-    sameSite: 'strict',
-    maxAge: CRM_SESSION_TTL_MS,
-    path: '/'
-  });
-  return res.redirect(303, returnTo);
 });
 
 app.post('/logout', (req, res) => {
@@ -2990,6 +3139,190 @@ app.post('/api/ai/import-credentials', async (req, res) => {
 
 app.use(requireAuth);
 
+app.get('/api/admin/session', (req, res) => {
+  res.json({
+    success: true,
+    user: ADMIN_ACCESS.publicUser(req.crmUser),
+    pagePermissions: ADMIN_ACCESS.PAGE_PERMISSIONS
+  });
+});
+
+app.get('/api/admin/roles', requireCrmPermission('users.manage'), (req, res) => {
+  res.json({
+    success: true,
+    roles: Object.entries(ADMIN_ACCESS.ROLE_LABELS).map(([id, label]) => ({
+      id,
+      label,
+      permissions: ADMIN_ACCESS.permissionsFor(id)
+    }))
+  });
+});
+
+app.get('/api/admin/users', requireCrmPermission('users.manage'), async (req, res) => {
+  try {
+    const users = (await allAdminUsers())
+      .map(user => ADMIN_ACCESS.publicUser(user))
+      .sort((a, b) => String(a.name || a.username).localeCompare(String(b.name || b.username), 'pt'));
+    res.json({ success: true, users: [legacyAdminUser(), ...users] });
+  } catch (error) {
+    console.error('Erro ao listar utilizadores administrativos:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível consultar os utilizadores.' });
+  }
+});
+
+app.post('/api/admin/users', requireCrmPermission('users.manage'), async (req, res) => {
+  try {
+    const name = text(req.body?.name, 120);
+    const username = ADMIN_ACCESS.normalizeUsername(req.body?.username);
+    const password = String(req.body?.password || '');
+    const role = ADMIN_ACCESS.normalizeRole(req.body?.role);
+    if (name.length < 2 || !ADMIN_ACCESS.validUsername(username) || password.length < 12 || !role) {
+      return res.status(400).json({ success: false, message: 'Indique nome, utilizador válido, perfil e palavra-passe com pelo menos 12 caracteres.' });
+    }
+    if (safeEqual(username, ADMIN_ACCESS.normalizeUsername(CRM_USERNAME)) || await adminUserByUsername(username)) {
+      return res.status(409).json({ success: false, message: 'Já existe um utilizador com esse identificador.' });
+    }
+    const now = new Date().toISOString();
+    const id = `admin_${crypto.randomUUID().replace(/-/g, '')}`;
+    const user = {
+      name,
+      username,
+      role,
+      active: true,
+      authVersion: 1,
+      createdAt: now,
+      updatedAt: now,
+      createdBy: req.crmUser.id,
+      ...ADMIN_ACCESS.passwordFields(password)
+    };
+    await ADMIN_USERS_COLLECTION.doc(id).set(user);
+    const publicUser = ADMIN_ACCESS.publicUser({ id, ...user, source: 'managed' });
+    await recordAudit(req, 'admin.user.create', { entityType: 'admin_user', entityId: id, after: publicUser });
+    res.status(201).json({ success: true, user: publicUser });
+  } catch (error) {
+    console.error('Erro ao criar utilizador administrativo:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível criar o utilizador.' });
+  }
+});
+
+app.post('/api/admin/users/:id/credentials', requireCrmPermission('users.manage'), async (req, res) => {
+  try {
+    if (!isSafeIdentifier(req.params.id, 200) || req.params.id === 'environment-admin') {
+      return res.status(400).json({ success: false, message: 'Utilizador inválido.' });
+    }
+    const password = String(req.body?.password || '');
+    if (password.length < 12) return res.status(400).json({ success: false, message: 'A palavra-passe deve ter pelo menos 12 caracteres.' });
+    const ref = ADMIN_USERS_COLLECTION.doc(req.params.id);
+    const snapshot = await ref.get();
+    if (!snapshot.exists) return res.status(404).json({ success: false, message: 'Utilizador não encontrado.' });
+    const before = ADMIN_ACCESS.publicUser({ id: snapshot.id, ...snapshot.data() });
+    const updates = {
+      ...ADMIN_ACCESS.passwordFields(password),
+      authVersion: Number(snapshot.data().authVersion || 1) + 1,
+      updatedAt: new Date().toISOString(),
+      updatedBy: req.crmUser.id
+    };
+    await ref.update(updates);
+    await recordAudit(req, 'admin.user.password.reset', { entityType: 'admin_user', entityId: req.params.id, before, after: { ...before, authVersion: updates.authVersion } });
+    res.json({ success: true, message: 'Palavra-passe atualizada e sessões anteriores revogadas.' });
+  } catch (error) {
+    console.error('Erro ao atualizar credenciais administrativas:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível atualizar a palavra-passe.' });
+  }
+});
+
+app.post('/api/admin/users/:id/status', requireCrmPermission('users.manage'), async (req, res) => {
+  try {
+    if (!isSafeIdentifier(req.params.id, 200) || req.params.id === 'environment-admin') {
+      return res.status(400).json({ success: false, message: 'A conta principal de recuperação não pode ser desativada aqui.' });
+    }
+    if (req.params.id === req.crmUser.id) return res.status(400).json({ success: false, message: 'Não pode desativar a sua própria conta.' });
+    const active = req.body?.active === true;
+    const ref = ADMIN_USERS_COLLECTION.doc(req.params.id);
+    const snapshot = await ref.get();
+    if (!snapshot.exists) return res.status(404).json({ success: false, message: 'Utilizador não encontrado.' });
+    const before = ADMIN_ACCESS.publicUser({ id: snapshot.id, ...snapshot.data() });
+    const updates = {
+      active,
+      authVersion: Number(snapshot.data().authVersion || 1) + 1,
+      updatedAt: new Date().toISOString(),
+      updatedBy: req.crmUser.id
+    };
+    await ref.update(updates);
+    const after = { ...before, ...updates };
+    await recordAudit(req, active ? 'admin.user.activate' : 'admin.user.deactivate', { entityType: 'admin_user', entityId: req.params.id, before, after });
+    res.json({ success: true, user: after });
+  } catch (error) {
+    console.error('Erro ao alterar estado do utilizador:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível alterar o estado do utilizador.' });
+  }
+});
+
+app.get('/api/admin/audit', requireCrmPermission('audit.read'), async (req, res) => {
+  try {
+    const limit = Math.min(normalizeLimit(req.query.limit), 500);
+    const action = text(req.query.action, 120);
+    const actor = ADMIN_ACCESS.normalizeUsername(req.query.actor);
+    const status = ['success', 'failure'].includes(req.query.status) ? req.query.status : '';
+    const from = req.query.from ? new Date(req.query.from) : null;
+    const to = req.query.to ? new Date(req.query.to) : null;
+    const snapshot = await AUDIT_COLLECTION.get();
+    const events = snapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() }))
+      .filter(event => !action || event.action === action)
+      .filter(event => !actor || ADMIN_ACCESS.normalizeUsername(event.actor?.username).includes(actor))
+      .filter(event => !status || event.status === status)
+      .filter(event => !from || Number.isNaN(from.getTime()) || new Date(event.timestamp) >= from)
+      .filter(event => !to || Number.isNaN(to.getTime()) || new Date(event.timestamp) <= to)
+      .sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0))
+      .slice(0, limit);
+    res.json({ success: true, count: events.length, events: sanitizeForResponse(events) });
+  } catch (error) {
+    console.error('Erro ao consultar auditoria:', error);
+    res.status(500).json({ success: false, message: 'Não foi possível consultar a auditoria.' });
+  }
+});
+
+function databaseSchemaPermission(schema, write = false) {
+  const normalized = String(schema || '').toLowerCase();
+  if (normalized === 'all') return 'management.read';
+  if (['pedido', 'cliente'].includes(normalized)) return write ? 'orders.write' : 'orders.read';
+  if (['orcamento'].includes(normalized)) return write ? 'quotes.write' : 'quotes.read';
+  if (['despesa', 'venda', 'pagamento', 'config_equilibrio'].includes(normalized)) return write ? 'finance.write' : 'finance.read';
+  if (['documento_fiscal', 'fatura', 'importacao_fiscal'].includes(normalized)) return write ? 'fiscal.write' : 'fiscal.read';
+  if (['material', 'produto', 'fornecedor'].includes(normalized)) return write ? 'catalog.write' : 'catalog.read';
+  return write ? 'system.manage' : 'management.read';
+}
+
+function apiPermissionForRequest(req) {
+  const pathName = req.path;
+  const write = req.method !== 'GET';
+  if (pathName.startsWith('/ai/')) {
+    if (/\/(settings|connect-code|disconnect)$/.test(pathName)) return 'integrations.manage';
+    return 'ai.use';
+  }
+  if (pathName.startsWith('/moloni/')) return write ? 'fiscal.write' : 'fiscal.read';
+  if (pathName.startsWith('/stripe/')) return write ? 'finance.write' : 'finance.read';
+  if (pathName.startsWith('/production/')) return write ? 'production.write' : 'production.read';
+  if (pathName.startsWith('/products') || pathName.startsWith('/suppliers')) return write ? 'catalog.write' : 'catalog.read';
+  if (pathName.startsWith('/expenses') || pathName.startsWith('/sales/') || pathName.startsWith('/sellers')) return write ? 'finance.write' : 'finance.read';
+  if (pathName.startsWith('/management/')) return 'management.read';
+  if (pathName.startsWith('/mobile/inbox') || pathName.startsWith('/importacao-fiscal') || pathName.startsWith('/upload/')) return write ? 'fiscal.write' : 'fiscal.read';
+  if (pathName.startsWith('/rotulos/')) return write ? 'orders.write' : 'orders.read';
+  if (pathName === '/database/query') return databaseSchemaPermission(req.body?.schema || 'all', false);
+  if (pathName === '/database/stats') return 'dashboard.read';
+  if (pathName === '/database/commit') return databaseSchemaPermission(req.body?.schema, true);
+  if (pathName === '/database/delete') return 'system.manage';
+  if (pathName === '/database/init') return 'system.manage';
+  return '';
+}
+
+app.use('/api', (req, res, next) => {
+  const permission = apiPermissionForRequest(req);
+  if (!permission || ADMIN_ACCESS.hasPermission(req.crmUser, permission)) return next();
+  return res.status(403).json({ success: false, message: 'O seu perfil não tem permissão para aceder a estes dados.' });
+});
+
 app.get('/api/ai/status', async (req, res) => {
   try {
     const config = await aiConfiguration();
@@ -3018,6 +3351,12 @@ app.post('/api/ai/settings', async (req, res) => {
     });
     const updatedAt = new Date().toISOString();
     await AI_CONFIG_DOC.set({ policy, updatedAt }, { merge: true });
+    await recordAudit(req, 'ai.policy.update', {
+      entityType: 'integration',
+      entityId: 'chatgpt_plan',
+      before: current.policy || {},
+      after: policy
+    });
 
     res.json({
       success: true,
@@ -3048,6 +3387,11 @@ app.post('/api/ai/connect-code', async (req, res) => {
       serverHostId: (await aiConfiguration()).serverHostId || crypto.randomUUID(),
       updatedAt: new Date().toISOString()
     }, { merge: true });
+    await recordAudit(req, 'ai.connection.request', {
+      entityType: 'integration',
+      entityId: 'chatgpt_plan',
+      metadata: { expiresAt: new Date(expiresAt).toISOString() }
+    });
     res.json({
       success: true,
       importCode,
@@ -4181,6 +4525,13 @@ app.post('/api/moloni/documents', async (req, res) => {
       updatedAt: new Date().toISOString()
     };
     await documentRef.set(completed);
+    const { response: moloniRawResponse, ...auditCompleted } = completed;
+    await recordAudit(req, 'fiscal.document.issue', {
+      entityType: 'moloni_document',
+      entityId: id,
+      after: sanitizeForResponse({ id, ...auditCompleted }),
+      metadata: { orderId: order.id, type: preview.type, requestedStatus: status, mode: MOLONI_MODE }
+    });
     res.status(201).json({ success: true, document: sanitizeForResponse({ id, ...completed }) });
   } catch (error) {
     console.error('Erro ao emitir documento Moloni:', error);
@@ -4191,6 +4542,12 @@ app.post('/api/moloni/documents', async (req, res) => {
         updatedAt: new Date().toISOString()
       }, { merge: true }).catch(() => {});
     }
+    await recordAudit(req, 'fiscal.document.issue', {
+      status: 'failure',
+      entityType: 'moloni_document',
+      entityId: documentRef?.id || '',
+      metadata: { error: text(error.message, 500), orderId: text(req.body?.orderId, 200) }
+    });
     res.status(502).json({ success: false, message: error.message || 'Nao foi possivel emitir o documento.' });
   }
 });
@@ -5122,25 +5479,38 @@ app.post('/api/database/commit', async (req, res) => {
     };
 
     let result;
+    let auditBefore = null;
+    let auditAfter = event;
     if (id) {
       const docRef = db.collection('events').doc(id);
       const docSnap = await docRef.get();
       if (docSnap.exists) {
         const existingEvent = docSnap.data();
+        auditBefore = existingEvent;
         const mergedEvent = schema === 'pedido' && existingEvent.schema === 'pedido'
           ? { ...existingEvent, ...event, payload: { ...(existingEvent.payload || {}), ...event.payload }, updated: true }
           : { ...existingEvent, ...event, updated: true };
         await docRef.set(mergedEvent, { merge: true });
+        auditAfter = mergedEvent;
         result = { id, action: 'updated', exists: true };
       } else {
         await docRef.set({ ...event, created_at: now });
+        auditAfter = { ...event, created_at: now };
         result = { id, action: 'created_new', exists: false };
       }
     } else {
       const docRef = await db.collection('events').add({ ...event, created_at: now });
+      auditAfter = { ...event, created_at: now };
       result = { id: docRef.id, action: 'created', exists: false };
     }
 
+    await recordAudit(req, `data.${result.action}`, {
+      entityType: schema,
+      entityId: result.id,
+      before: auditBefore,
+      after: auditAfter,
+      metadata: { pageId: event.pageId }
+    });
     res.json({ status: 'success', success: true, message: 'Evento salvo no Firebase', autoClassified: Boolean(classification.classified), ...result, event });
   } catch (error) {
     console.error('Erro ao salvar:', error);
@@ -5178,15 +5548,19 @@ app.post('/api/database/delete', async (req, res) => {
     const { id, hardDelete = false } = req.body || {};
     if (!isSafeIdentifier(id)) return res.status(400).json({ error: 'ID inválido.' });
     const docRef = db.collection('events').doc(id);
+    const auditSnapshot = await docRef.get();
+    const auditBefore = auditSnapshot.exists ? auditSnapshot.data() : null;
     if (hardDelete === true) {
-      const docSnap = await docRef.get();
+      const docSnap = auditSnapshot;
       if (!docSnap.exists) return res.status(404).json({ error: 'Registro nao encontrado.' });
       const record = docSnap.data();
       const artifactsDeleted = record.schema === 'pedido' ? await deleteOrderArtifacts(id) : 0;
       await docRef.delete();
+      await recordAudit(req, 'data.hard_delete', { entityType: record.schema || 'event', entityId: id, before: auditBefore, after: null, metadata: { artifactsDeleted } });
       return res.json({ status: 'success', success: true, message: 'Registro excluido definitivamente', id, hardDelete: true, artifactsDeleted });
     }
     await docRef.update({ deleted: true, deleted_at: new Date().toISOString() });
+    await recordAudit(req, 'data.soft_delete', { entityType: auditBefore?.schema || 'event', entityId: id, before: auditBefore, after: { ...auditBefore, deleted: true } });
     res.json({ status: 'success', success: true, message: 'Evento marcado como deletado', id, hardDelete: false });
   } catch (error) {
     console.error('Erro ao deletar:', error);
@@ -5322,7 +5696,11 @@ app.use('/api', (req, res) => {
 app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/index.html', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 app.get('/upload-mobile.html', (req, res) => res.sendFile(path.join(__dirname, 'upload-mobile.html')));
-app.use('/pages', express.static(path.join(__dirname, 'pages'), { index: false, fallthrough: false }));
+app.use('/pages', (req, res, next) => {
+  const permission = ADMIN_ACCESS.pagePermission(req.path);
+  if (!permission || ADMIN_ACCESS.hasPermission(req.crmUser, permission)) return next();
+  return res.status(403).type('html').send('<!doctype html><html lang="pt-PT"><meta charset="utf-8"><title>Acesso negado</title><body style="font:16px system-ui;padding:40px"><h1>Acesso negado</h1><p>O seu perfil não tem permissão para abrir esta área.</p></body></html>');
+}, express.static(path.join(__dirname, 'pages'), { index: false, fallthrough: false }));
 app.get('/core/engine.js', (req, res) => res.sendFile(path.join(__dirname, 'core', 'engine.js')));
 app.get('/core/config.js', (req, res) => res.sendFile(path.join(__dirname, 'core', 'config.js')));
 app.get('/core/security.js', (req, res) => res.sendFile(path.join(__dirname, 'core', 'security.js')));

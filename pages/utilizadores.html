@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="pt-PT">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Utilizadores e Auditoria - PrintPixel</title>
+  <style>
+    :root{--ink:#172033;--muted:#667085;--line:#dfe5ef;--blue:#2563eb;--green:#047857;--red:#b42318;--bg:#f5f7fb}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 Inter,system-ui,sans-serif}
+    main{max-width:1280px;margin:auto;padding:28px}h1{margin:0 0 6px;font-size:28px}h2{font-size:19px;margin:0 0 16px}p{color:var(--muted)}
+    .grid{display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:20px;align-items:start}.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:0 8px 25px rgba(31,46,85,.06);margin-top:20px}
+    label{display:block;font-weight:700;margin:12px 0 5px}input,select{width:100%;padding:10px 12px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font:inherit}button{border:0;border-radius:8px;padding:10px 13px;background:var(--blue);color:#fff;font-weight:700;cursor:pointer}button.secondary{background:#475467}button.danger{background:var(--red)}button:disabled{opacity:.55;cursor:not-allowed}
+    .message{min-height:22px;margin-top:10px;font-weight:700}.message.error{color:var(--red)}.message.ok{color:var(--green)}
+    .user{display:grid;grid-template-columns:1fr auto;gap:12px;padding:14px 0;border-bottom:1px solid #edf0f5}.user:last-child{border-bottom:0}.user strong{display:block}.meta{font-size:12px;color:var(--muted);margin-top:4px}.actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.actions button{padding:7px 9px;font-size:12px}
+    .filters{display:grid;grid-template-columns:1.2fr 1fr .8fr auto;gap:10px;align-items:end}.table-wrap{overflow:auto;margin-top:14px}table{width:100%;border-collapse:collapse;min-width:850px}th,td{padding:10px;border:1px solid var(--line);text-align:left;vertical-align:top}th{background:#1e3a5f;color:#fff}tbody tr:nth-child(even){background:#f8fafc}.pill{display:inline-block;padding:3px 8px;border-radius:999px;background:#e8eef8;font-size:12px}.success{color:var(--green)}.failure{color:var(--red)}pre{white-space:pre-wrap;max-width:460px;margin:0;font:11px/1.4 ui-monospace,monospace;color:#344054}
+    @media(max-width:850px){main{padding:18px}.grid{grid-template-columns:1fr}.filters{grid-template-columns:1fr 1fr}.filters button{grid-column:1/-1}}
+  </style>
+</head>
+<body>
+<main>
+  <h1>Utilizadores e Auditoria</h1>
+  <p>Gestão de identidades administrativas e consulta da trilha de ações críticas do CRM.</p>
+
+  <div class="grid">
+    <section class="card">
+      <h2>Novo utilizador</h2>
+      <form id="userForm">
+        <label for="name">Nome</label><input id="name" required maxlength="120">
+        <label for="username">Utilizador</label><input id="username" required minlength="3" maxlength="50" pattern="[A-Za-z0-9._-]+" autocomplete="off">
+        <label for="role">Perfil</label><select id="role" required></select>
+        <label for="password">Palavra-passe inicial</label><input id="password" type="password" required minlength="12" autocomplete="new-password">
+        <button type="submit" style="margin-top:16px">Criar utilizador</button>
+        <div id="userMessage" class="message" role="status"></div>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Utilizadores administrativos</h2>
+      <div id="users">A carregar...</div>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Trilha de auditoria</h2>
+    <form id="auditForm" class="filters">
+      <div><label for="action">Ação exata</label><input id="action" placeholder="Ex.: auth.login"></div>
+      <div><label for="actor">Utilizador</label><input id="actor" placeholder="Nome de utilizador"></div>
+      <div><label for="status">Resultado</label><select id="status"><option value="">Todos</option><option value="success">Sucesso</option><option value="failure">Falha</option></select></div>
+      <button type="submit">Atualizar</button>
+    </form>
+    <div id="auditMessage" class="message" role="status"></div>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Data</th><th>Ação</th><th>Utilizador</th><th>Entidade</th><th>Resultado</th><th>Alteração e origem</th></tr></thead>
+      <tbody id="auditRows"></tbody>
+    </table></div>
+  </section>
+</main>
+<script>
+  const $ = id => document.getElementById(id);
+  const state = { users: [], roles: [] };
+
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+  }
+
+  async function api(url, options = {}) {
+    const response = await fetch(url, { credentials: 'same-origin', headers: { 'Content-Type': 'application/json', ...(options.headers || {}) }, ...options });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.message || 'Não foi possível concluir a operação.');
+    return result;
+  }
+
+  function message(target, text, error = false) {
+    target.textContent = text;
+    target.className = `message ${error ? 'error' : 'ok'}`;
+  }
+
+  function roleLabel(id) {
+    return state.roles.find(role => role.id === id)?.label || id;
+  }
+
+  function renderUsers() {
+    $('users').innerHTML = state.users.map(user => `
+      <article class="user">
+        <div><strong>${escapeHtml(user.name || user.username)}</strong><div class="meta">${escapeHtml(user.username)} · ${escapeHtml(user.roleLabel || roleLabel(user.role))} · ${user.active === false ? 'Inativo' : 'Ativo'}${user.source === 'environment' ? ' · recuperação por variável de ambiente' : ''}</div></div>
+        <div class="actions">
+          ${user.source === 'environment' ? '' : `<button class="secondary" data-reset="${escapeHtml(user.id)}">Redefinir senha</button><button class="${user.active === false ? '' : 'danger'}" data-status="${escapeHtml(user.id)}" data-active="${user.active === false}">${user.active === false ? 'Ativar' : 'Desativar'}</button>`}
+        </div>
+      </article>`).join('') || '<p>Não existem utilizadores.</p>';
+  }
+
+  async function loadUsers() {
+    const [roles, users] = await Promise.all([api('/api/admin/roles'), api('/api/admin/users')]);
+    state.roles = roles.roles;
+    state.users = users.users;
+    $('role').innerHTML = state.roles.map(role => `<option value="${escapeHtml(role.id)}">${escapeHtml(role.label)}</option>`).join('');
+    renderUsers();
+  }
+
+  async function loadAudit() {
+    const params = new URLSearchParams({ limit: '200' });
+    if ($('action').value.trim()) params.set('action', $('action').value.trim());
+    if ($('actor').value.trim()) params.set('actor', $('actor').value.trim());
+    if ($('status').value) params.set('status', $('status').value);
+    const result = await api(`/api/admin/audit?${params}`);
+    $('auditRows').innerHTML = result.events.map(event => {
+      const change = { before: event.before, after: event.after, metadata: event.metadata, origin: event.origin };
+      return `<tr><td>${escapeHtml(new Date(event.timestamp).toLocaleString('pt-PT'))}</td><td><span class="pill">${escapeHtml(event.action)}</span></td><td>${escapeHtml(event.actor?.name || event.actor?.username)}<div class="meta">${escapeHtml(event.actor?.username)} · ${escapeHtml(event.actor?.role)}</div></td><td>${escapeHtml(event.entity?.type || '')}<div class="meta">${escapeHtml(event.entity?.id || '')}</div></td><td class="${event.status === 'failure' ? 'failure' : 'success'}">${event.status === 'failure' ? 'Falha' : 'Sucesso'}</td><td><pre>${escapeHtml(JSON.stringify(change, null, 2))}</pre></td></tr>`;
+    }).join('') || '<tr><td colspan="6">Nenhum evento encontrado.</td></tr>';
+    message($('auditMessage'), `${result.count} evento(s) apresentado(s).`);
+  }
+
+  $('userForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    try {
+      await api('/api/admin/users', { method: 'POST', body: JSON.stringify({ name: $('name').value, username: $('username').value, role: $('role').value, password: $('password').value }) });
+      event.target.reset();
+      message($('userMessage'), 'Utilizador criado com sucesso.');
+      await Promise.all([loadUsers(), loadAudit()]);
+    } catch (error) { message($('userMessage'), error.message, true); }
+  });
+
+  $('users').addEventListener('click', async event => {
+    const resetId = event.target.dataset.reset;
+    const statusId = event.target.dataset.status;
+    try {
+      if (resetId) {
+        const password = prompt('Nova palavra-passe com pelo menos 12 caracteres:');
+        if (!password) return;
+        await api(`/api/admin/users/${encodeURIComponent(resetId)}/credentials`, { method: 'POST', body: JSON.stringify({ password }) });
+        message($('userMessage'), 'Palavra-passe atualizada e sessões anteriores revogadas.');
+      }
+      if (statusId) {
+        const active = event.target.dataset.active === 'true';
+        if (!confirm(`${active ? 'Ativar' : 'Desativar'} este utilizador?`)) return;
+        await api(`/api/admin/users/${encodeURIComponent(statusId)}/status`, { method: 'POST', body: JSON.stringify({ active }) });
+        message($('userMessage'), `Utilizador ${active ? 'ativado' : 'desativado'}.`);
+      }
+      await Promise.all([loadUsers(), loadAudit()]);
+    } catch (error) { message($('userMessage'), error.message, true); }
+  });
+
+  $('auditForm').addEventListener('submit', event => { event.preventDefault(); loadAudit().catch(error => message($('auditMessage'), error.message, true)); });
+  Promise.all([loadUsers(), loadAudit()]).catch(error => { message($('userMessage'), error.message, true); message($('auditMessage'), error.message, true); });
+</script>
+</body>
+</html>

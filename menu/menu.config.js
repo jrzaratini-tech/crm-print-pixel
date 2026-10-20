@@ -227,5 +227,15 @@
         pos: 13,
         hidden: false,
         deleted: false
+    },
+
+    {
+        id: "nav_utilizadores",
+        name: "Utilizadores e Auditoria",
+        file: "pages/utilizadores.html",
+        type: "WRITE",
+        pos: 14,
+        hidden: false,
+        deleted: false
     }
 ];

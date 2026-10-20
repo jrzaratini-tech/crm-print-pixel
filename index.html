@@ -633,6 +633,28 @@
         let dbManager = new DatabaseManager();
         let systemSettings = {};
         let autoSaveTimer = null;
+        let crmSession = null;
+        let crmPagePermissions = {};
+        let firstAllowedPage = 'pages/dashboard.html';
+
+        function hasCrmPermission(permission) {
+            if (!permission) return true;
+            const permissions = crmSession?.user?.permissions || [];
+            return permissions.includes('*') || permissions.includes(permission);
+        }
+
+        function permissionForPage(file) {
+            const page = String(file || '').split('/').pop().split('?')[0].toLowerCase();
+            return crmPagePermissions[page] || '';
+        }
+
+        async function loadCrmSession() {
+            const response = await fetch('/api/admin/session', { credentials: 'same-origin' });
+            if (!response.ok) throw new Error('Não foi possível validar o perfil de acesso.');
+            const result = await response.json();
+            crmSession = result;
+            crmPagePermissions = result.pagePermissions || {};
+        }
 
         async function initializeSystem() {
             try {
@@ -645,6 +667,7 @@
                 
                 updateLoadingMessage('Carregando configurações...');
                 await loadSystemSettings();
+                await loadCrmSession();
                 
                 updateLoadingMessage('Configurando interface...');
                 applyVisualSettings();
@@ -658,8 +681,8 @@
                 setupAutoSave();
                 
                 setTimeout(() => {
-                    updateLoadingMessage('Carregando Dashboard...');
-                    nav('pages/dashboard.html');
+                    updateLoadingMessage('Carregando área autorizada...');
+                    nav(firstAllowedPage);
                     
                     setTimeout(() => {
                         document.getElementById('loading-overlay').style.opacity = '0';
@@ -726,7 +749,12 @@
             
             const activePages = config
                 .filter(item => !item.deleted && !item.hidden)
+                .filter(item => hasCrmPermission(permissionForPage(item.file)))
                 .sort((a, b) => (a.pos || 0) - (b.pos || 0));
+
+            const dashboardAllowed = hasCrmPermission(permissionForPage('pages/dashboard.html'));
+            document.getElementById('nav_dash').style.display = dashboardAllowed ? '' : 'none';
+            firstAllowedPage = dashboardAllowed ? 'pages/dashboard.html' : (activePages[0]?.file || 'pages/utilizadores.html');
             
             activePages.forEach(item => {
                 const button = document.createElement('button');
