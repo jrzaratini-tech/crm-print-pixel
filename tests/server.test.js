@@ -657,6 +657,13 @@ test('gestor IA responde diretamente o faturamento exibido no dashboard', async 
   assert.equal(answer.body.answer.metric, 'dashboard.currentMonth.revenue');
   assert.match(answer.body.answer.answer, /líquido/);
   assert.match(answer.body.answer.answer, /bruto/);
+  const receivable = await post('/api/ai/ask', { question: 'Qual é o restante a receber mostrado no dashboard?' });
+  assert.equal(receivable.response.status, 200);
+  assert.equal(receivable.body.answer.metric, 'dashboard.accounts.receivable');
+  const customer = await post('/api/ai/ask', { question: 'Quanto a Teste dashboard tem para receber?' });
+  assert.equal(customer.response.status, 200);
+  assert.equal(customer.body.answer.metric, 'customer.receivable');
+  assert.equal(customer.body.answer.value, 123);
 });
 
 test('prontidão do ecossistema identifica ativações externas sem expor segredos', async () => {

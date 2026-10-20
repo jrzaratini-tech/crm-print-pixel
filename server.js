@@ -4307,7 +4307,19 @@ async function buildAuthorizedAiKnowledge(data, focus, quoteMode = false) {
 }
 
 function deterministicAiAnswer(question, focus, briefing, knowledge) {
-  const baseAnswer = AI_MANAGER.answerQuestion(`${focus}\n${question}`, briefing);
+  const normalizedQuestion = String(question || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const customerBalanceMatch = normalizedQuestion.match(/quanto\s+(?:a|o)?\s*(.+?)\s+(?:tem|deve|esta)\s+(?:para\s+)?(?:receber|em aberto)/);
+  if (customerBalanceMatch && Array.isArray(knowledge.pedidos)) {
+    const customerQuery = customerBalanceMatch[1].replace(/\b(cliente|senhora|senhor)\b/g, '').trim();
+    const matchingOrders = knowledge.pedidos.filter(order => String(order.cliente || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(customerQuery));
+    if (matchingOrders.length) {
+      const balance = money(matchingOrders.reduce((sum, order) => sum + Math.max(0, Number(order.saldo || 0)), 0));
+      const customerName = matchingOrders[0].cliente;
+      return { understood: true, metric: 'customer.receivable', value: balance, answer: `${customerName} tem ${balance.toLocaleString('pt-PT', { style: 'currency', currency: 'EUR' })} em aberto no CRM, considerando ${matchingOrders.length} pedido(s).`, sources: matchingOrders.map(order => ({ schema: 'pedido', id: order.id })) };
+    }
+  }
+  const currentAnswer = AI_MANAGER.answerQuestion(question, briefing);
+  const baseAnswer = currentAnswer.understood ? currentAnswer : AI_MANAGER.answerQuestion(`${focus}\n${question}`, briefing);
   if (String(baseAnswer.metric || '').startsWith('dashboard.')) return baseAnswer;
   const wantsList = /\b(lista|liste|quais|detalhe|detalhes|identifique|mostre)\b/.test(String(question || '').toLowerCase());
   const source = knowledge.pedidosSemFatura || knowledge.pedidosAtrasados;
