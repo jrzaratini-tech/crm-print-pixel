@@ -17,6 +17,7 @@ const SHOPIFY = require('./core/shopify.js');
 const AI_MANAGER = require('./core/ai-manager.js');
 const LEARNING = require('./core/learning.js');
 const SCHEDULING = require('./core/scheduling.js');
+const BACKUP_SERVICE = require('./core/backup-service.js');
 const {
   MoloniClient,
   buildDocumentPreview,
@@ -75,6 +76,7 @@ const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID || '';
 const SHOPIFY_CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET || '';
 const SHOPIFY_API_VERSION = process.env.SHOPIFY_API_VERSION || '2026-10';
 const FIREBASE_BACKUP_BUCKET = String(process.env.FIREBASE_BACKUP_BUCKET || '').trim();
+const BACKUP_STATE_DOC = db.collection('system_state').doc('backup');
 const MAX_QUERY_LIMIT = 5000;
 const MAX_UPLOAD_BYTES = 500 * 1024;
 const MOLONI_REFRESH_INTERVAL_MS = 12 * 60 * 60 * 1000;
@@ -3691,7 +3693,7 @@ app.get('/api/shopify/status', requireCrmPermission('integrations.manage'), asyn
 
 app.get('/api/system/readiness', requireCrmPermission('integrations.manage'), async (req, res) => {
   try {
-    const [moloniConfigValue, aiConfigValue] = await Promise.all([moloniConfig(), aiConfiguration()]);
+    const [moloniConfigValue, aiConfigValue, backupSnapshot] = await Promise.all([moloniConfig(), aiConfiguration(), BACKUP_STATE_DOC.get()]);
     const moloni = moloniPublicStatus(moloniConfigValue);
     const stripe = stripePublicStatus();
     const ai = AI_POLICY.publicAiStatus(aiConfigValue, { signInConfigured: chatGptConnectionConfigured() });
@@ -3703,13 +3705,15 @@ app.get('/api/system/readiness', requireCrmPermission('integrations.manage'), as
       adminApiConfigured: Boolean(SHOPIFY_ADMIN_ACCESS_TOKEN || (SHOPIFY_CLIENT_ID && SHOPIFY_CLIENT_SECRET)),
       verified: Boolean(shopifyState.verifiedAt && shopifyState.webhookSubscriptionId)
     };
+    const backupState = backupSnapshot.exists ? backupSnapshot.data() : {};
+    const backupOperational = Boolean(FIREBASE_BACKUP_BUCKET && backupState.verifiedAt && backupState.objectName);
     const items = [
       { id: 'database', label: 'Base de dados', configured: Boolean(process.env.FIREBASE_SERVICE_ACCOUNT || process.env.FIREBASE_SERVICE_ACCOUNT_BASE64 || process.env.FIREBASE_SERVICE_ACCOUNT_FILE), operational: true, detail: 'Firestore ligado e a responder.' },
       { id: 'ai', label: 'Gestor IA', configured: ai.signInConfigured, operational: ai.connected && ai.enabled, detail: ai.connected ? `${ai.model} · raciocínio ${ai.reasoningEffort}` : 'Ligue a conta ChatGPT autorizada.' },
       { id: 'moloni', label: 'Moloni', configured: moloni.credentialsConfigured, operational: moloni.readyForLive, detail: moloni.readyForLive ? 'Conta e parâmetros prontos para faturação.' : 'Concluir ligação e parâmetros de faturação.' },
       { id: 'stripe', label: 'Pagamentos', configured: stripe.configured, operational: stripe.ready && stripe.webhookConfigured, detail: stripe.ready && stripe.webhookConfigured ? 'Stripe e webhook configurados.' : 'Configurar chave e webhook Stripe.' },
       { id: 'shopify', label: 'Loja online', configured: shopify.webhookConfigured && shopify.shopDomainConfigured && shopify.adminApiConfigured, operational: shopify.verified, action: shopify.webhookConfigured && shopify.shopDomainConfigured && shopify.adminApiConfigured && !shopify.verified ? 'shopify_setup' : '', detail: shopify.verified ? 'Shopify pronta para receber e reconciliar pedidos.' : (shopify.webhookConfigured && shopify.shopDomainConfigured && shopify.adminApiConfigured ? 'Credenciais prontas; falta validar a ligação e registar o webhook.' : 'Faltam domínio e credenciais da aplicação Shopify.') },
-      { id: 'backup', label: 'Backup externo', configured: Boolean(FIREBASE_BACKUP_BUCKET), operational: Boolean(FIREBASE_BACKUP_BUCKET), detail: FIREBASE_BACKUP_BUCKET ? 'Bucket privado configurado.' : 'Configurar um bucket privado e executar um restauro de prova.' }
+      { id: 'backup', label: 'Backup externo', configured: Boolean(FIREBASE_BACKUP_BUCKET), operational: backupOperational, action: FIREBASE_BACKUP_BUCKET && !backupOperational ? 'backup_run' : '', detail: backupOperational ? `Backup validado em ${new Date(backupState.verifiedAt).toLocaleString('pt-PT')}.` : (FIREBASE_BACKUP_BUCKET ? 'Bucket privado pronto; falta executar e validar o primeiro backup.' : 'Configurar um bucket privado e executar um restauro de prova.') }
     ];
     const operational = items.filter(item => item.operational).length;
     res.json({
@@ -3720,6 +3724,24 @@ app.get('/api/system/readiness', requireCrmPermission('integrations.manage'), as
     });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Não foi possível verificar a prontidão do ecossistema.' });
+  }
+});
+
+app.post('/api/backups/run', requireCrmPermission('integrations.manage'), async (req, res) => {
+  try {
+    if (!FIREBASE_BACKUP_BUCKET) return res.status(409).json({ success: false, message: 'O bucket de backup ainda não está configurado.' });
+    const result = await BACKUP_SERVICE.createAndVerifyBackup({ db, bucketName: FIREBASE_BACKUP_BUCKET });
+    await BACKUP_STATE_DOC.set({ ...result, status: 'verified', updatedAt: new Date().toISOString() }, { merge: true });
+    await recordAudit(req, 'backup.create_and_verify', {
+      entityType: 'system_backup',
+      entityId: result.objectName,
+      after: { objectName: result.objectName, manifest: result.manifest, verifiedAt: result.verifiedAt, restoreTest: result.restoreTest }
+    });
+    res.json({ success: true, message: 'Backup criado e restauro de prova validado.', backup: sanitizeForResponse(result) });
+  } catch (error) {
+    console.error('Erro ao criar e validar backup:', error);
+    await recordAudit(req, 'backup.create_and_verify', { status: 'failure', entityType: 'system_backup', metadata: { error: error.message } });
+    res.status(500).json({ success: false, message: error.message || 'Não foi possível concluir o backup.' });
   }
 });
 

@@ -41,7 +41,7 @@
   let jobs=[];
   function renderReadiness(data){
     const summary=data.summary||{};$('readinessSummary').textContent=`${Number(summary.operational||0)} de ${Number(summary.total||0)} operacionais`;
-    $('readinessItems').innerHTML=(data.items||[]).map(item=>`<article class="readiness-item ${item.operational?'ok':''}"><div class="readiness-title"><span>${esc(item.label)}</span><span class="readiness-dot" aria-label="${item.operational?'Operacional':'Pendente'}"></span></div><p>${esc(item.detail)}</p>${item.action==='shopify_setup'?'<button class="primary" style="margin-top:10px" onclick="setupShopify()">ATIVAR SHOPIFY</button>':''}</article>`).join('');
+    $('readinessItems').innerHTML=(data.items||[]).map(item=>`<article class="readiness-item ${item.operational?'ok':''}"><div class="readiness-title"><span>${esc(item.label)}</span><span class="readiness-dot" aria-label="${item.operational?'Operacional':'Pendente'}"></span></div><p>${esc(item.detail)}</p>${item.action==='shopify_setup'?'<button class="primary" style="margin-top:10px" onclick="setupShopify()">ATIVAR SHOPIFY</button>':item.action==='backup_run'?'<button class="primary" style="margin-top:10px" onclick="runBackup()">CRIAR E VALIDAR BACKUP</button>':''}</article>`).join('');
   }
   function render(data){
     const counts=data.counts||{}; const statuses=['pending','processing','retry_wait','succeeded','failed','cancelled'];
@@ -58,6 +58,7 @@
   window.cancelJob=id=>{if(confirm('Cancelar esta tarefa? O registo será preservado para auditoria.'))action(id,'cancel').catch(error=>$('message').textContent=error.message)};
   window.reprocessException=async id=>{try{const response=await fetch(`/api/integration-exceptions/${encodeURIComponent(id)}/reprocess`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({notes:'Reprocessamento solicitado no painel técnico.'})});const data=await response.json();if(!response.ok)throw new Error(data.message);await load()}catch(error){$('message').textContent=error.message}};
   window.setupShopify=async()=>{try{$('message').textContent='A validar a loja e registar o webhook...';const response=await fetch('/api/shopify/setup',{method:'POST'});const data=await response.json();if(!response.ok)throw new Error(data.message||'Não foi possível ativar a Shopify.');await load();$('message').textContent='Shopify ativada e pronta para receber pedidos pagos.'}catch(error){$('message').textContent=error.message}};
+  window.runBackup=async()=>{try{$('message').textContent='A criar o backup e validar o restauro de prova...';const response=await fetch('/api/backups/run',{method:'POST'});const data=await response.json();if(!response.ok)throw new Error(data.message||'Não foi possível concluir o backup.');await load();$('message').textContent='Backup criado e restauro de prova validados com sucesso.'}catch(error){$('message').textContent=error.message}};
   $('refresh').addEventListener('click',()=>load().catch(error=>$('message').textContent=error.message)); $('status').addEventListener('change',()=>load().catch(()=>{}));
   load().catch(error=>$('message').textContent=error.message);
 </script>
