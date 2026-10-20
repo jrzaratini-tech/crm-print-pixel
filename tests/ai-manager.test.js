@@ -22,3 +22,12 @@ test('responde somente indicadores conhecidos e devolve fontes', () => {
   assert.equal(answer.sources[0].id, 'p1');
   assert.equal(MANAGER.answerQuestion('Qual é a cor mais bonita?', briefing).understood, false);
 });
+
+test('resume prioridades e responde com linguagem de gestão', () => {
+  const briefing = MANAGER.buildBriefing({ events: [{ id: 'p1', schema: 'pedido', payload: { status: 'processamento', dataEntrega: '2026-10-10' } }] }, { now: '2026-10-20T10:00:00.000Z' });
+  const priorities = MANAGER.answerQuestion('Quais são as prioridades de hoje?', briefing);
+  assert.equal(priorities.understood, true);
+  assert.equal(priorities.value, 1);
+  assert.match(priorities.answer, /alerta/i);
+  assert.match(MANAGER.answerQuestion('Existem encomendas atrasadas?', briefing).answer, /fora do prazo/i);
+});

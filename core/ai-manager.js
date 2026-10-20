@@ -52,6 +52,15 @@ function buildBriefing(input = {}, options = {}) {
 function answerQuestion(question, briefing) {
   const value = text(question).toLowerCase();
   let metric = '';
+  if (/prioridad|atenção|atencao/.test(value)) {
+    return {
+      understood: true,
+      metric: 'priorities',
+      value: briefing.alerts.length,
+      answer: briefing.summary,
+      sources: briefing.alerts.map(alert => alert.source)
+    };
+  }
   if (/atras|prazo/.test(value)) metric = 'lateOrders';
   else if (/fatur|fatura/.test(value)) metric = 'uninvoicedOrders';
   else if (/stock|material|comprar/.test(value)) metric = 'lowStockMaterials';
@@ -60,7 +69,16 @@ function answerQuestion(question, briefing) {
   else if (/produção|producao|ordem/.test(value)) metric = 'activeAssignments';
   if (!metric) return { understood: false, answer: 'A pergunta não corresponde a um indicador determinístico disponível.', sources: [] };
   const alerts = briefing.alerts.filter(alert => ({ lateOrders: 'delay', uninvoicedOrders: 'billing', lowStockMaterials: 'stock', failedIntegrations: 'integration' }[metric] === alert.type));
-  return { understood: true, metric, value: briefing.metrics[metric], answer: `O indicador ${metric} tem valor ${briefing.metrics[metric]}.`, sources: alerts.map(alert => alert.source) };
+  const count = Number(briefing.metrics[metric] || 0);
+  const messages = {
+    lateOrders: count ? `Existem ${count} pedido(s) fora do prazo que precisam de acompanhamento.` : 'Não existem pedidos atrasados neste momento.',
+    uninvoicedOrders: count ? `Existem ${count} pedido(s) ainda sem faturação registada.` : 'Todos os pedidos aplicáveis têm faturação registada.',
+    lowStockMaterials: count ? `Existem ${count} material(is) no nível mínimo de stock.` : 'Não existem materiais abaixo do stock mínimo.',
+    failedIntegrations: count ? `Existem ${count} integração(ões) em falha que precisam de revisão.` : 'As integrações não apresentam falhas finais.',
+    openQuotes: count ? `Existem ${count} orçamento(s) em aberto a aguardar decisão.` : 'Não existem orçamentos em aberto.',
+    activeAssignments: count ? `Existem ${count} trabalho(s) ativos em produção.` : 'Não existem trabalhos ativos em produção.'
+  };
+  return { understood: true, metric, value: count, answer: messages[metric], sources: alerts.map(alert => alert.source) };
 }
 
 module.exports = { answerQuestion, buildBriefing };
