@@ -75,8 +75,6 @@ const SHOPIFY_ADMIN_ACCESS_TOKEN = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN || '';
 const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID || '';
 const SHOPIFY_CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET || '';
 const SHOPIFY_API_VERSION = process.env.SHOPIFY_API_VERSION || '2026-10';
-const SHOPIFY_WEBHOOK_BASE_URL = String(process.env.SHOPIFY_WEBHOOK_BASE_URL || STRIPE_RETURN_BASE_URL || '').trim().replace(/\/+$/, '');
-const SHOPIFY_RECOVERY_INTERVAL_MS = Math.max(60 * 1000, Number(process.env.SHOPIFY_RECOVERY_INTERVAL_MS || 2 * 60 * 1000));
 const SHOPIFY_RECOVERY_LOOKBACK_HOURS = Math.max(24, Number(process.env.SHOPIFY_RECOVERY_LOOKBACK_HOURS || 72));
 const FIREBASE_BACKUP_BUCKET = String(process.env.FIREBASE_BACKUP_BUCKET || '').trim();
 const BACKUP_STATE_DOC = db.collection('system_state').doc('backup');
@@ -3883,20 +3881,12 @@ async function shopifyOrdersSince(fromIso) {
 
 function shopifyHistoricalOrderPayload(order = {}) {
   const money = value => String(value?.shopMoney?.amount || '0');
-  const address = value => value ? {
-    name: value.name || '', company: value.company || '', address1: value.address1 || '', address2: value.address2 || '',
-    city: value.city || '', province: value.province || '', zip: value.zip || '', country: value.country || '', phone: value.phone || ''
-  } : null;
-  const customerName = order.billingAddress?.name || order.shippingAddress?.name || '';
-  const customerNameParts = customerName.trim().split(/\s+/).filter(Boolean);
   return {
-    id: String(order.id || '').split('/').pop(), name: order.name, email: order.email || '', phone: order.phone || '',
+    id: String(order.id || '').split('/').pop(), name: order.name,
     financial_status: String(order.displayFinancialStatus || '').toLowerCase(),
     fulfillment_status: String(order.displayFulfillmentStatus || '').toLowerCase(), currency: order.currencyCode || '',
     subtotal_price: money(order.currentSubtotalPriceSet), total_tax: money(order.currentTotalTaxSet), total_price: money(order.currentTotalPriceSet),
     created_at: order.createdAt, updated_at: order.updatedAt, cancelled_at: order.cancelledAt || null,
-    customer: customerName ? { first_name: customerNameParts.shift() || '', last_name: customerNameParts.join(' '), email: order.email || '', phone: order.phone || '' } : null,
-    billing_address: address(order.billingAddress), shipping_address: address(order.shippingAddress),
     note_attributes: (order.customAttributes || []).map(item => ({ name: item.key, value: item.value })),
     note: order.note || '', tags: Array.isArray(order.tags) ? order.tags.join(', ') : '',
     shipping_lines: (order.shippingLines?.nodes || []).map(line => ({ title: line.title || '', code: line.code || '', price: money(line.originalPriceSet) })),
@@ -3911,7 +3901,7 @@ function shopifyHistoricalOrderPayload(order = {}) {
 async function shopifyHistoricalOrdersSince(fromIso) {
   const orders = [];
   let cursor = null;
-  const query = `query HistoricalPaidOrders($cursor:String,$filter:String!){orders(first:100,after:$cursor,query:$filter,sortKey:CREATED_AT){nodes{id name email phone createdAt updatedAt cancelledAt displayFinancialStatus displayFulfillmentStatus currencyCode note tags customAttributes{key value} currentSubtotalPriceSet{shopMoney{amount}} currentTotalTaxSet{shopMoney{amount}} currentTotalPriceSet{shopMoney{amount}} billingAddress{name company address1 address2 city province zip country phone} shippingAddress{name company address1 address2 city province zip country phone} shippingLines(first:10){nodes{title code originalPriceSet{shopMoney{amount}}}} lineItems(first:250){nodes{id name sku quantity originalUnitPriceSet{shopMoney{amount}} customAttributes{key value}}}}pageInfo{hasNextPage endCursor}}}`;
+  const query = `query HistoricalPaidOrders($cursor:String,$filter:String!){orders(first:100,after:$cursor,query:$filter,sortKey:CREATED_AT){nodes{id name createdAt updatedAt cancelledAt displayFinancialStatus displayFulfillmentStatus currencyCode note tags customAttributes{key value} currentSubtotalPriceSet{shopMoney{amount}} currentTotalTaxSet{shopMoney{amount}} currentTotalPriceSet{shopMoney{amount}} shippingLines(first:10){nodes{title code originalPriceSet{shopMoney{amount}}}} lineItems(first:250){nodes{id name sku quantity originalUnitPriceSet{shopMoney{amount}} customAttributes{key value}}}}pageInfo{hasNextPage endCursor}}}`;
   do {
     const data = await shopifyGraphql(query, { cursor, filter: `created_at:>=${fromIso}` });
     const connection = data.orders;
@@ -3984,22 +3974,22 @@ async function recoverRecentShopifyOrders() {
   }
 }
 
-function startShopifyRecoveryMaintenance() {
-  if (!IS_PRODUCTION || !SHOPIFY_SHOP_DOMAIN || !(SHOPIFY_ADMIN_ACCESS_TOKEN || (SHOPIFY_CLIENT_ID && SHOPIFY_CLIENT_SECRET))) return;
-  const maintain = async () => {
-    if (SHOPIFY_WEBHOOK_BASE_URL) await activateShopifyWebhooks(`${SHOPIFY_WEBHOOK_BASE_URL}/api/shopify/webhook`);
-    return recoverRecentShopifyOrders();
-  };
-  const firstRun = setTimeout(() => maintain().catch(error => console.error('Erro na manutenção Shopify:', error.message)), 15 * 1000);
-  const interval = setInterval(() => recoverRecentShopifyOrders().catch(error => console.error('Erro na recuperação Shopify:', error.message)), SHOPIFY_RECOVERY_INTERVAL_MS);
-  const webhookInterval = setInterval(() => {
-    if (!SHOPIFY_WEBHOOK_BASE_URL) return;
-    activateShopifyWebhooks(`${SHOPIFY_WEBHOOK_BASE_URL}/api/shopify/webhook`).catch(error => console.error('Erro ao validar webhooks Shopify:', error.message));
-  }, 15 * 60 * 1000);
-  firstRun.unref?.();
-  interval.unref?.();
-  webhookInterval.unref?.();
-}
+app.post('/api/shopify/recover', requireCrmPermission('orders.read'), async (req, res) => {
+  try {
+    let webhookWarning = '';
+    try {
+      await activateShopifyWebhooks(`${publicBaseUrl(req)}/api/shopify/webhook`);
+    } catch (error) {
+      webhookWarning = text(error.message, 500);
+      console.error('Erro ao validar webhooks Shopify durante a abertura dos pedidos:', error.message);
+    }
+    const result = await recoverRecentShopifyOrders();
+    const processedJobs = await runShopifyQueue(50);
+    res.json({ success: true, result: sanitizeForResponse(result || {}), processed: processedJobs.length, webhookWarning });
+  } catch (error) {
+    res.status(503).json({ success: false, message: error.message || 'Não foi possível sincronizar os pedidos Shopify.' });
+  }
+});
 
 async function runShopifyReconciliation(days = 1) {
   const safeDays = Math.min(365, Math.max(1, Math.round(Number(days || 1))));
@@ -7430,7 +7420,6 @@ if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`CRM PRINT PIXEL ONLINE - PORTA ${PORT}`);
     startMoloniConnectionMaintenance();
-    startShopifyRecoveryMaintenance();
   });
 }
 

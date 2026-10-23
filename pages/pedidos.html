@@ -1138,6 +1138,21 @@
             // ============================================
             // FUNÇÕES PRINCIPAIS
             // ============================================
+
+            // Uma única reconciliação ao abrir a página recupera pedidos pagos
+            // caso a Shopify não tenha conseguido entregar algum webhook.
+            async function sincronizarShopifyAoAbrir() {
+                try {
+                    const response = await fetch('/api/shopify/recover', { method: 'POST' });
+                    const result = await response.json().catch(() => ({}));
+                    if (!response.ok) throw new Error(result.message || `Erro na sincronização Shopify: ${response.status}`);
+                    console.log(`✅ Shopify sincronizada: ${Number(result.result?.queued || 0)} novo(s), ${Number(result.processed || 0)} processado(s)`);
+                    if (result.webhookWarning) console.warn('⚠️ Webhook Shopify:', result.webhookWarning);
+                } catch (error) {
+                    // A página continua a abrir com os pedidos já existentes.
+                    console.warn('⚠️ Não foi possível reconciliar a Shopify nesta abertura:', error.message);
+                }
+            }
             
             // Carregar pedidos do Firebase via API Core
             async function carregarPedidos() {
@@ -2114,8 +2129,11 @@
             // INICIALIZAÇÃO
             // ============================================
             
-            // Iniciar carregamento dos pedidos
-            carregarPedidos();
+            // Sincronizar a Shopify uma vez e só depois apresentar os pedidos.
+            (async function iniciarPaginaPedidos() {
+                await sincronizarShopifyAoAbrir();
+                await carregarPedidos();
+            })();
             
             console.log('✅ Sistema de gestão de pedidos inicializado');
         });
