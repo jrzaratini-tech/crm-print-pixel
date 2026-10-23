@@ -1358,7 +1358,7 @@
                 const subtotal = pedido.subtotal || total - iva;
                 const instalacao = pedido.instalacao || 0;
                 const totalPago = pedido.totalPago || 0;
-                const saldoPendente = pedido.saldoPendente || total;
+                const saldoPendente = pedido.saldoPendente ?? total;
                 
                 // Formatadores
                 const formatarData = (dataStr) => {
@@ -1583,7 +1583,7 @@
                 const subtotal = pedido.subtotal || total - iva;
                 const instalacao = pedido.instalacao || 0;
                 const totalPago = pedido.totalPago || 0;
-                const saldoPendente = pedido.saldoPendente || total;
+                const saldoPendente = pedido.saldoPendente ?? total;
                 
                 // Formatadores
                 const formatarData = (dataStr) => {

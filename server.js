@@ -3855,6 +3855,77 @@ async function shopifyOrdersSince(fromIso) {
   return orders;
 }
 
+function shopifyHistoricalOrderPayload(order = {}) {
+  const money = value => String(value?.shopMoney?.amount || '0');
+  const address = value => value ? {
+    name: value.name || '', company: value.company || '', address1: value.address1 || '', address2: value.address2 || '',
+    city: value.city || '', province: value.province || '', zip: value.zip || '', country: value.country || '', phone: value.phone || ''
+  } : null;
+  return {
+    id: String(order.id || '').split('/').pop(), name: order.name, email: order.email || '', phone: order.phone || '',
+    financial_status: String(order.displayFinancialStatus || '').toLowerCase(),
+    fulfillment_status: String(order.displayFulfillmentStatus || '').toLowerCase(), currency: order.currencyCode || '',
+    subtotal_price: money(order.currentSubtotalPriceSet), total_tax: money(order.currentTotalTaxSet), total_price: money(order.currentTotalPriceSet),
+    created_at: order.createdAt, updated_at: order.updatedAt, cancelled_at: order.cancelledAt || null,
+    customer: order.customer ? {
+      id: String(order.customer.id || '').split('/').pop(), first_name: order.customer.firstName || '', last_name: order.customer.lastName || '',
+      email: order.customer.email || '', phone: order.customer.phone || ''
+    } : null,
+    billing_address: address(order.billingAddress), shipping_address: address(order.shippingAddress),
+    note_attributes: (order.customAttributes || []).map(item => ({ name: item.key, value: item.value })),
+    note: order.note || '', tags: Array.isArray(order.tags) ? order.tags.join(', ') : '',
+    shipping_lines: (order.shippingLines?.nodes || []).map(line => ({ title: line.title || '', code: line.code || '', price: money(line.originalPriceSet) })),
+    line_items: (order.lineItems?.nodes || []).map(line => ({
+      id: String(line.id || '').split('/').pop(), product_id: String(line.product?.id || '').split('/').pop(),
+      variant_id: String(line.variant?.id || '').split('/').pop(), sku: line.sku || line.variant?.sku || '',
+      name: line.name || '', quantity: Number(line.quantity || 0), price: money(line.originalUnitPriceSet),
+      properties: (line.customAttributes || []).map(item => ({ name: item.key, value: item.value }))
+    }))
+  };
+}
+
+async function shopifyHistoricalOrdersSince(fromIso) {
+  const orders = [];
+  let cursor = null;
+  const query = `query HistoricalPaidOrders($cursor:String,$filter:String!){orders(first:100,after:$cursor,query:$filter,sortKey:CREATED_AT){nodes{id name email phone createdAt updatedAt cancelledAt displayFinancialStatus displayFulfillmentStatus currencyCode note tags customAttributes{key value} currentSubtotalPriceSet{shopMoney{amount}} currentTotalTaxSet{shopMoney{amount}} currentTotalPriceSet{shopMoney{amount}} customer{id firstName lastName email phone} billingAddress{name company address1 address2 city province zip country phone} shippingAddress{name company address1 address2 city province zip country phone} shippingLines(first:10){nodes{title code originalPriceSet{shopMoney{amount}}}} lineItems(first:250){nodes{id name sku quantity originalUnitPriceSet{shopMoney{amount}} customAttributes{key value} product{id} variant{id sku}}}}pageInfo{hasNextPage endCursor}}}`;
+  do {
+    const data = await shopifyGraphql(query, { cursor, filter: `created_at:>=${fromIso}` });
+    const connection = data.orders;
+    orders.push(...connection.nodes.map(shopifyHistoricalOrderPayload));
+    cursor = connection.pageInfo?.hasNextPage ? connection.pageInfo.endCursor : null;
+  } while (cursor && orders.length < 5000);
+  return orders;
+}
+
+async function enqueueHistoricalShopifyOrders(days = 31) {
+  const safeDays = Math.min(365, Math.max(1, Math.round(Number(days || 31))));
+  const from = new Date(Date.now() - safeDays * 24 * 60 * 60 * 1000);
+  const orders = (await shopifyHistoricalOrdersSince(from.toISOString()))
+    .filter(order => ['paid', 'partially_refunded'].includes(order.financial_status) && !order.cancelled_at);
+  const result = { found: orders.length, queued: 0, alreadyInCrm: 0, alreadyQueued: 0, from: from.toISOString(), orderNumbers: [] };
+  for (const order of orders) {
+    const crmOrderId = `shopify-order-${order.id}`;
+    if ((await db.collection('events').doc(crmOrderId).get()).exists) { result.alreadyInCrm += 1; continue; }
+    const eventId = `shopify-backfill-${order.id}`;
+    const now = new Date().toISOString();
+    const job = INTEGRATION_QUEUE.normalizeJob({
+      source: 'shopify', operation: 'orders/paid', idempotencyKey: `backfill-order-${order.id}`,
+      correlationId: order.id, payload: { eventId, shopDomain: SHOPIFY_SHOP_DOMAIN, topic: 'orders/paid' }
+    }, { now });
+    if (await integrationJobById(job.id)) { result.alreadyQueued += 1; continue; }
+    await Promise.all([
+      db.collection('integration_events').doc(eventId).set({
+        id: eventId, source: 'shopify', webhookId: `backfill-${order.id}`, eventId: `backfill-${order.id}`,
+        shopDomain: SHOPIFY_SHOP_DOMAIN, topic: 'orders/paid', payload: order, receivedAt: now, status: 'received', historical: true
+      }),
+      INTEGRATION_JOBS_COLLECTION.doc(job.id).set(job)
+    ]);
+    result.queued += 1;
+    result.orderNumbers.push(order.name || order.id);
+  }
+  return result;
+}
+
 async function runShopifyReconciliation(days = 1) {
   const safeDays = Math.min(31, Math.max(1, Math.round(Number(days || 1))));
   const from = new Date(Date.now() - safeDays * 24 * 60 * 60 * 1000);
@@ -3875,6 +3946,16 @@ app.post('/api/shopify/reconcile', requireCrmPermission('integrations.manage'), 
     res.json({ success: true, report: sanitizeForResponse(report) });
   } catch (error) {
     res.status(503).json({ success: false, message: error.message || 'Não foi possível reconciliar a Shopify.' });
+  }
+});
+
+app.post('/api/shopify/backfill', requireCrmPermission('integrations.manage'), async (req, res) => {
+  try {
+    const result = await enqueueHistoricalShopifyOrders(req.body?.days);
+    await recordAudit(req, 'shopify.backfill', { entityType: 'integration', entityId: 'shopify', after: result });
+    res.json({ success: true, result: sanitizeForResponse(result) });
+  } catch (error) {
+    res.status(503).json({ success: false, message: error.message || 'Não foi possível importar os pedidos anteriores da Shopify.' });
   }
 });
 
