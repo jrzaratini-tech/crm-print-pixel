@@ -3596,15 +3596,17 @@ async function processShopifyJob(id, workerId = 'shopify-worker') {
         });
       });
     const exceptions = SHOPIFY.orderExceptions(order, mappings);
+    const blockingExceptions = exceptions.filter(exception => exception.code !== 'missing_artwork');
+    const productionWarnings = exceptions.filter(exception => exception.code === 'missing_artwork');
     const now = new Date().toISOString();
-    if (exceptions.length) {
+    if (blockingExceptions.length) {
       const exceptionId = `shopify-exception-${order.externalOrderId || event.webhookId}`;
       await db.collection('integration_exceptions').doc(exceptionId).set({
         id: exceptionId, source: 'shopify', externalOrderId: order.externalOrderId,
-        orderNumber: order.name || order.orderNumber, status: 'open', reasons: exceptions,
+        orderNumber: order.name || order.orderNumber, status: 'open', reasons: blockingExceptions,
         eventId: event.id, jobId: claimed.id, createdAt: now, updatedAt: now
       }, { merge: true });
-      const succeeded = INTEGRATION_QUEUE.succeed(claimed, { outcome: 'exception', exceptionId, exceptionCount: exceptions.length }, { now });
+      const succeeded = INTEGRATION_QUEUE.succeed(claimed, { outcome: 'exception', exceptionId, exceptionCount: blockingExceptions.length }, { now });
       await Promise.all([
         INTEGRATION_JOBS_COLLECTION.doc(succeeded.id).set(succeeded),
         db.collection('integration_events').doc(event.id).set({ status: 'exception', exceptionId, processedAt: now }, { merge: true })
@@ -3623,14 +3625,33 @@ async function processShopifyJob(id, workerId = 'shopify-worker') {
       created_at: existingEvent.created_at || now, updated_at: now, deleted: false
     });
     await db.collection('events').doc(crmOrderId).set(savedEvent);
-    const succeeded = INTEGRATION_QUEUE.succeed(claimed, { outcome: 'order_created', crmOrderId }, { now });
     const exceptionId = `shopify-exception-${order.externalOrderId || event.webhookId}`;
     const exceptionSnapshot = await db.collection('integration_exceptions').doc(exceptionId).get();
+    const result = {
+      outcome: 'order_created', crmOrderId,
+      ...(productionWarnings.length ? { exceptionId, warningCount: productionWarnings.length } : {})
+    };
+    const succeeded = INTEGRATION_QUEUE.succeed(claimed, result, { now });
     const completionWrites = [
       INTEGRATION_JOBS_COLLECTION.doc(succeeded.id).set(succeeded),
-      db.collection('integration_events').doc(event.id).set({ status: 'processed', crmOrderId, processedAt: now }, { merge: true })
+      db.collection('integration_events').doc(event.id).set({
+        status: productionWarnings.length ? 'processed_with_warnings' : 'processed',
+        crmOrderId,
+        ...(productionWarnings.length ? { exceptionId } : {}),
+        processedAt: now
+      }, { merge: true })
     ];
-    if (exceptionSnapshot.exists) completionWrites.push(db.collection('integration_exceptions').doc(exceptionId).set({ status: 'resolved', resolvedAt: now, crmOrderId, updatedAt: now }, { merge: true }));
+    if (productionWarnings.length) {
+      completionWrites.push(db.collection('integration_exceptions').doc(exceptionId).set({
+        id: exceptionId, source: 'shopify', externalOrderId: order.externalOrderId,
+        orderNumber: order.name || order.orderNumber, status: 'open', reasons: productionWarnings,
+        eventId: event.id, jobId: claimed.id, crmOrderId,
+        createdAt: exceptionSnapshot.exists ? exceptionSnapshot.data().createdAt || now : now,
+        resolvedAt: null, updatedAt: now
+      }, { merge: true }));
+    } else if (exceptionSnapshot.exists) {
+      completionWrites.push(db.collection('integration_exceptions').doc(exceptionId).set({ status: 'resolved', resolvedAt: now, crmOrderId, updatedAt: now }, { merge: true }));
+    }
     await Promise.all(completionWrites);
     return succeeded;
   } catch (error) {

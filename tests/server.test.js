@@ -600,7 +600,7 @@ test('webhook Shopify valida assinatura, persiste antes de responder e ignora du
     id: 503, name: '#503', financial_status: 'paid', currency: 'EUR', total_price: '22.14',
     customer: { first_name: 'Cliente', last_name: 'Levantamento' }, billing_address: null, shipping_address: null,
     shipping_lines: [{ title: 'Recolha Local da loja', price: '0.00' }],
-    line_items: [{ id: 4, product_id: 5, variant_id: 6, sku: 'PICKUP-01', name: 'Autocolantes', quantity: 1, price: '18.00', properties: [] }]
+    line_items: [{ id: 4, product_id: 5, variant_id: 6, sku: 'PICKUP-01', name: 'Autocolantes', quantity: 1, price: '18.00', properties: [{ name: 'Medida personalizada', value: '100 x 60 cm' }] }]
   });
   const pickupHeaders = { ...headers, 'X-Shopify-Hmac-Sha256': crypto.createHmac('sha256', process.env.SHOPIFY_WEBHOOK_SECRET).update(pickupOrder).digest('base64'), 'X-Shopify-Webhook-Id': 'webhook-503', 'X-Shopify-Event-Id': 'event-503' };
   const pickupAccepted = await request('/api/shopify/webhook', { method: 'POST', headers: pickupHeaders, body: pickupOrder });
@@ -611,6 +611,11 @@ test('webhook Shopify valida assinatura, persiste antes de responder e ignora du
   assert.equal(pickupSaved.data().payload.levantamentoLoja, true);
   assert.equal(pickupSaved.data().payload.morada, '');
   assert.equal(pickupSaved.data().payload.pagamentos[0].status, 'pago');
+  const pickupWarning = await db.collection('integration_exceptions').doc('shopify-exception-503').get();
+  assert.equal(pickupWarning.exists, true);
+  assert.equal(pickupWarning.data().status, 'open');
+  assert.equal(pickupWarning.data().crmOrderId, 'shopify-order-503');
+  assert.equal(pickupWarning.data().reasons[0].code, 'missing_artwork');
 });
 
 test('prepara dossier fiscal e exige validação nominal antes do fecho trimestral', async () => {
