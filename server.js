@@ -3875,8 +3875,7 @@ function shopifyHistoricalOrderPayload(order = {}) {
     note: order.note || '', tags: Array.isArray(order.tags) ? order.tags.join(', ') : '',
     shipping_lines: (order.shippingLines?.nodes || []).map(line => ({ title: line.title || '', code: line.code || '', price: money(line.originalPriceSet) })),
     line_items: (order.lineItems?.nodes || []).map(line => ({
-      id: String(line.id || '').split('/').pop(), product_id: String(line.product?.id || '').split('/').pop(),
-      variant_id: String(line.variant?.id || '').split('/').pop(), sku: line.sku || line.variant?.sku || '',
+      id: String(line.id || '').split('/').pop(), product_id: '', variant_id: '', sku: line.sku || '',
       name: line.name || '', quantity: Number(line.quantity || 0), price: money(line.originalUnitPriceSet),
       properties: (line.customAttributes || []).map(item => ({ name: item.key, value: item.value }))
     }))
@@ -3886,7 +3885,7 @@ function shopifyHistoricalOrderPayload(order = {}) {
 async function shopifyHistoricalOrdersSince(fromIso) {
   const orders = [];
   let cursor = null;
-  const query = `query HistoricalPaidOrders($cursor:String,$filter:String!){orders(first:100,after:$cursor,query:$filter,sortKey:CREATED_AT){nodes{id name email phone createdAt updatedAt cancelledAt displayFinancialStatus displayFulfillmentStatus currencyCode note tags customAttributes{key value} currentSubtotalPriceSet{shopMoney{amount}} currentTotalTaxSet{shopMoney{amount}} currentTotalPriceSet{shopMoney{amount}} billingAddress{name company address1 address2 city province zip country phone} shippingAddress{name company address1 address2 city province zip country phone} shippingLines(first:10){nodes{title code originalPriceSet{shopMoney{amount}}}} lineItems(first:250){nodes{id name sku quantity originalUnitPriceSet{shopMoney{amount}} customAttributes{key value} product{id} variant{id sku}}}}pageInfo{hasNextPage endCursor}}}`;
+  const query = `query HistoricalPaidOrders($cursor:String,$filter:String!){orders(first:100,after:$cursor,query:$filter,sortKey:CREATED_AT){nodes{id name email phone createdAt updatedAt cancelledAt displayFinancialStatus displayFulfillmentStatus currencyCode note tags customAttributes{key value} currentSubtotalPriceSet{shopMoney{amount}} currentTotalTaxSet{shopMoney{amount}} currentTotalPriceSet{shopMoney{amount}} billingAddress{name company address1 address2 city province zip country phone} shippingAddress{name company address1 address2 city province zip country phone} shippingLines(first:10){nodes{title code originalPriceSet{shopMoney{amount}}}} lineItems(first:250){nodes{id name sku quantity originalUnitPriceSet{shopMoney{amount}} customAttributes{key value}}}}pageInfo{hasNextPage endCursor}}}`;
   do {
     const data = await shopifyGraphql(query, { cursor, filter: `created_at:>=${fromIso}` });
     const connection = data.orders;
