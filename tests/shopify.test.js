@@ -53,8 +53,27 @@ test('SKUs padronizados do editor Shopify são mapeados pela família', () => {
   });
   assert.equal(SHOPIFY.orderExceptions(order, new Map()).some(item => item.code === 'unmapped_line'), false);
   const crm = SHOPIFY.toCrmOrder(order, new Map(), { now: '2026-10-23T12:33:00.000Z' });
-  assert.equal(crm.produtos[0].productId, 'default-adesivo-vinil-impresso-com-recorte');
+  assert.equal(crm.produtos[0].productId, 'default-rotulos-personalizados');
   assert.equal(crm.produtos[0].sku, 'PP-CUSTOM-LABEL-REDONDO-500-MATE');
+});
+
+test('todo o catálogo ativo da loja possui mapeamento redundante no CRM', () => {
+  const products = [
+    ['10964933017937', 'PP-SQUARE-STICKER-35-50-MATE', 'Autocolante com corte na silhueta', 'default-autocolante-com-corte-na-silhueta'],
+    ['11017702015313', 'PP-LASER-RETANGULAR-ESPELHO-DOURADO-SEM', 'Corte Laser Personalizado 3 mm', 'default-corte-laser-personalizado-3-mm'],
+    ['11016801026385', 'PP-MULTICUT-1000X600-NOMASK', 'Folha de Autocolantes com Recorte', 'default-folha-de-autocolantes-com-recorte'],
+    ['10975816155473', 'LONA-440', 'Lona personalizada', 'default-lona-personalizada'],
+    ['11015974617425', 'PP-LABEL-PACK-205', 'Pack de Etiquetas Personalizadas 205 un', 'default-pack-de-etiquetas-personalizadas-205-un'],
+    ['10975904072017', 'PLACA-PVC-5MM', 'Placa personalizada', 'default-placa-personalizada'],
+    ['10975963775313', 'PP-ROLLUP-85X200-1', 'Roll-up personalizado', 'default-roll-up-personalizado'],
+    ['10964932755793', 'PP-CUSTOM-LABEL-RETANGULAR-50-MATE', 'Rótulos personalizados', 'default-rotulos-personalizados'],
+    ['10975963840849', 'PP-XBANNER-80X180-1', 'X-banner personalizado', 'default-x-banner-personalizado']
+  ];
+  for (const [productExternalId, sku, name, productId] of products) {
+    assert.equal(SHOPIFY.standardSiteMapping({ productExternalId, sku: '', name }).productId, productId);
+    assert.equal(SHOPIFY.standardSiteMapping({ productExternalId: '', sku, name: '' }).productId, productId);
+    assert.equal(SHOPIFY.standardSiteMapping({ productExternalId: '', sku: '', name: `${name} - variante` }).productId, productId);
+  }
 });
 
 test('levantamento em loja aceita moradas nulas e preserva dados fiscais e pagamento', () => {

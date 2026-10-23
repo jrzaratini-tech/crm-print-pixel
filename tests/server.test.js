@@ -640,7 +640,7 @@ test('webhook Shopify valida assinatura, persiste antes de responder e ignora du
   assert.equal(standardizedProcessed.response.status, 200);
   assert.equal(standardizedProcessed.body.job.result.outcome, 'order_created');
   const standardizedSaved = await db.collection('events').doc('shopify-order-506').get();
-  assert.equal(standardizedSaved.data().payload.produtos[0].productId, 'default-adesivo-vinil-impresso-com-recorte');
+  assert.equal(standardizedSaved.data().payload.produtos[0].productId, 'default-rotulos-personalizados');
 
   await db.collection('external_mappings').doc('mapping-shopify-pickup').set({
     id: 'mapping-shopify-pickup', source: 'shopify', externalType: 'sku', externalKey: 'PICKUP-01',

@@ -129,6 +129,15 @@ const DEFAULT_PRODUCTS = [
   'Brindes',
   'Painel de ACM',
   'Caixa de Luz',
+  'Autocolante com corte na silhueta',
+  'Corte Laser Personalizado 3 mm',
+  'Folha de Autocolantes com Recorte',
+  'Lona personalizada',
+  'Pack de Etiquetas Personalizadas 205 un',
+  'Placa personalizada',
+  'Roll-up personalizado',
+  'Rótulos personalizados',
+  'X-banner personalizado',
   'Outro'
 ];
 

@@ -166,20 +166,92 @@ function orderExceptions(order = {}, mappings = new Map()) {
   return errors;
 }
 
+const STANDARD_SITE_PRODUCTS = [
+  {
+    externalProductId: '10964933017937',
+    sku: /^PP-SQUARE-STICKER-/,
+    name: 'Autocolante com corte na silhueta',
+    productId: 'default-autocolante-com-corte-na-silhueta'
+  },
+  {
+    externalProductId: '11017702015313',
+    sku: /^PP-LASER-/,
+    name: 'Corte Laser Personalizado 3 mm',
+    productId: 'default-corte-laser-personalizado-3-mm'
+  },
+  {
+    externalProductId: '11016801026385',
+    sku: /^PP-MULTICUT-/,
+    name: 'Folha de Autocolantes com Recorte',
+    productId: 'default-folha-de-autocolantes-com-recorte'
+  },
+  {
+    externalProductId: '10975816155473',
+    sku: /^LONA-/,
+    name: 'Lona personalizada',
+    productId: 'default-lona-personalizada'
+  },
+  {
+    externalProductId: '11015974617425',
+    sku: /^PP-LABEL-PACK-/,
+    name: 'Pack de Etiquetas Personalizadas 205 un',
+    productId: 'default-pack-de-etiquetas-personalizadas-205-un'
+  },
+  {
+    externalProductId: '10975904072017',
+    sku: /^PLACA-/,
+    name: 'Placa personalizada',
+    productId: 'default-placa-personalizada'
+  },
+  {
+    externalProductId: '10975963775313',
+    sku: /^PP-ROLLUP-/,
+    name: 'Roll-up personalizado',
+    productId: 'default-roll-up-personalizado'
+  },
+  {
+    externalProductId: '10964932755793',
+    sku: /^PP-CUSTOM-LABEL-/,
+    name: 'Rótulos personalizados',
+    productId: 'default-rotulos-personalizados'
+  },
+  {
+    externalProductId: '10975963840849',
+    sku: /^PP-XBANNER-/,
+    name: 'X-banner personalizado',
+    productId: 'default-x-banner-personalizado'
+  }
+];
+
+function normalizedProductName(value) {
+  return text(value, 240)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
 function standardSiteMapping(line = {}) {
   const sku = text(line.sku, 200).toUpperCase();
-  if (/^PP-(?:CUSTOM-LABEL|MULTICUT)-/.test(sku)) {
-    return {
-      source: 'shopify',
-      externalType: 'sku_family',
-      externalKey: sku,
-      productId: 'default-adesivo-vinil-impresso-com-recorte',
-      recipeId: '',
-      active: true,
-      automatic: true
-    };
-  }
-  return null;
+  const externalProductId = text(line.productExternalId || line.product_id, 120).split('/').pop();
+  const lineName = normalizedProductName(line.name || line.title);
+  const definition = STANDARD_SITE_PRODUCTS.find(product => (
+    externalProductId === product.externalProductId
+    || product.sku.test(sku)
+    || lineName === normalizedProductName(product.name)
+    || lineName.startsWith(`${normalizedProductName(product.name)} `)
+  ));
+  if (!definition) return null;
+  return {
+    source: 'shopify',
+    externalType: externalProductId === definition.externalProductId ? 'product' : (definition.sku.test(sku) ? 'sku_family' : 'product_name'),
+    externalKey: externalProductId || sku || definition.name,
+    productId: definition.productId,
+    recipeId: '',
+    active: true,
+    automatic: true
+  };
 }
 
 function mappingForLine(line = {}, mappings = new Map()) {
@@ -274,4 +346,4 @@ function reconcileOrders(shopifyOrders = [], crmOrders = []) {
   return { checkedShopify: external.size, checkedCrm: internal.size, missingInCrm, missingInShopify, mismatches, ok: !missingInCrm.length && !missingInShopify.length && !mismatches.length };
 }
 
-module.exports = { addressText, fiscalTaxId, fulfillmentMode, mappingForLine, normalizeAddress, normalizeLine, normalizeOrder, orderExceptions, reconcileOrders, standardSiteMapping, toCrmOrder, validShopDomain, verifyWebhook, webhookMetadata };
+module.exports = { STANDARD_SITE_PRODUCTS, addressText, fiscalTaxId, fulfillmentMode, mappingForLine, normalizeAddress, normalizeLine, normalizeOrder, orderExceptions, reconcileOrders, standardSiteMapping, toCrmOrder, validShopDomain, verifyWebhook, webhookMetadata };
