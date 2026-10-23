@@ -158,7 +158,7 @@ function orderExceptions(order = {}, mappings = new Map()) {
   if (!order.paid) errors.push({ code: order.cancelled ? 'cancelled' : 'payment_pending', message: order.cancelled ? 'Pedido cancelado.' : 'Pagamento ainda não confirmado.' });
   (order.lineItems || []).forEach((line, index) => {
     const keys = [line.sku, line.variantExternalId, line.productExternalId].filter(Boolean).map(String);
-    if (!keys.some(key => mappings.has(key.toLowerCase()))) errors.push({ code: 'unmapped_line', line: index + 1, key: keys[0] || '', message: `Linha ${index + 1} sem mapeamento de produto.` });
+    if (!mappingForLine(line, mappings)) errors.push({ code: 'unmapped_line', line: index + 1, key: keys[0] || '', message: `Linha ${index + 1} sem mapeamento de produto.` });
     const hasFiles = line.properties.some(property => /file|ficheiro|upload|art|imagem|image|design/i.test(property.name) && property.value);
     const expectsCustomization = line.properties.some(property => /personal|texto|nome|cor|medida|tamanho/i.test(property.name));
     if (expectsCustomization && !hasFiles) errors.push({ code: 'missing_artwork', line: index + 1, message: `Linha ${index + 1} personalizada sem ficheiro de arte identificado.` });
@@ -166,10 +166,26 @@ function orderExceptions(order = {}, mappings = new Map()) {
   return errors;
 }
 
+function standardSiteMapping(line = {}) {
+  const sku = text(line.sku, 200).toUpperCase();
+  if (/^PP-(?:CUSTOM-LABEL|MULTICUT)-/.test(sku)) {
+    return {
+      source: 'shopify',
+      externalType: 'sku_family',
+      externalKey: sku,
+      productId: 'default-adesivo-vinil-impresso-com-recorte',
+      recipeId: '',
+      active: true,
+      automatic: true
+    };
+  }
+  return null;
+}
+
 function mappingForLine(line = {}, mappings = new Map()) {
   const keys = [line.sku, line.variantExternalId, line.productExternalId].filter(Boolean).map(value => String(value).toLowerCase());
   for (const key of keys) if (mappings.has(key)) return mappings.get(key);
-  return null;
+  return standardSiteMapping(line);
 }
 
 function toCrmOrder(order = {}, mappings = new Map(), options = {}) {
@@ -258,4 +274,4 @@ function reconcileOrders(shopifyOrders = [], crmOrders = []) {
   return { checkedShopify: external.size, checkedCrm: internal.size, missingInCrm, missingInShopify, mismatches, ok: !missingInCrm.length && !missingInShopify.length && !mismatches.length };
 }
 
-module.exports = { addressText, fiscalTaxId, fulfillmentMode, mappingForLine, normalizeAddress, normalizeLine, normalizeOrder, orderExceptions, reconcileOrders, toCrmOrder, validShopDomain, verifyWebhook, webhookMetadata };
+module.exports = { addressText, fiscalTaxId, fulfillmentMode, mappingForLine, normalizeAddress, normalizeLine, normalizeOrder, orderExceptions, reconcileOrders, standardSiteMapping, toCrmOrder, validShopDomain, verifyWebhook, webhookMetadata };

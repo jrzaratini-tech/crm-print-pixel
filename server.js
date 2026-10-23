@@ -3573,6 +3573,26 @@ async function integrationJobById(id) {
   return snapshot.exists ? { id: snapshot.id, ...snapshot.data() } : null;
 }
 
+async function shopifyProductMappings() {
+  const [externalMappings, catalogProducts] = await Promise.all([externalMappingCatalog(), productCatalog(true)]);
+  const mappings = externalMappings
+    .filter(mapping => mapping.source === 'shopify' && mapping.active !== false)
+    .reduce((map, mapping) => {
+      map.set(String(mapping.externalKey || '').toLowerCase(), mapping);
+      return map;
+    }, new Map());
+  catalogProducts
+    .filter(product => product.ativo !== false && String(product.sku || '').trim())
+    .forEach(product => {
+      const key = String(product.sku).trim().toLowerCase();
+      if (!mappings.has(key)) mappings.set(key, {
+        source: 'shopify', externalType: 'sku', externalKey: product.sku,
+        productId: product.id, recipeId: '', active: true, automatic: true
+      });
+    });
+  return mappings;
+}
+
 async function processShopifyJob(id, workerId = 'shopify-worker') {
   const current = await integrationJobById(id);
   if (!current) throw new Error('Tarefa Shopify não encontrada.');
@@ -3586,22 +3606,7 @@ async function processShopifyJob(id, workerId = 'shopify-worker') {
     if (!eventSnapshot?.exists) throw new Error('Evento Shopify associado não foi encontrado.');
     const event = { id: eventSnapshot.id, ...eventSnapshot.data() };
     const order = SHOPIFY.normalizeOrder(event.payload || {}, event);
-    const [externalMappings, catalogProducts] = await Promise.all([externalMappingCatalog(), productCatalog(true)]);
-    const mappings = externalMappings
-      .filter(mapping => mapping.source === 'shopify' && mapping.active !== false)
-      .reduce((map, mapping) => {
-        map.set(String(mapping.externalKey || '').toLowerCase(), mapping);
-        return map;
-      }, new Map());
-    catalogProducts
-      .filter(product => product.ativo !== false && String(product.sku || '').trim())
-      .forEach(product => {
-        const key = String(product.sku).trim().toLowerCase();
-        if (!mappings.has(key)) mappings.set(key, {
-          source: 'shopify', externalType: 'sku', externalKey: product.sku,
-          productId: product.id, recipeId: '', active: true, automatic: true
-        });
-      });
+    const mappings = await shopifyProductMappings();
     const exceptions = SHOPIFY.orderExceptions(order, mappings);
     const blockingExceptions = exceptions.filter(exception => exception.code !== 'missing_artwork');
     const productionWarnings = exceptions.filter(exception => exception.code === 'missing_artwork');
@@ -3898,6 +3903,33 @@ function shopifyHistoricalOrderPayload(order = {}) {
   };
 }
 
+function shopifyEventRichness(event = {}) {
+  const payload = event.payload || {};
+  const lineItems = Array.isArray(payload.line_items) ? payload.line_items : [];
+  return [payload.customer, payload.email, payload.contact_email, payload.billing_address, payload.shipping_address]
+    .filter(Boolean).length * 10
+    + lineItems.filter(line => line.product_id || line.variant_id).length;
+}
+
+async function richestShopifyEventForOrder(externalOrderId, fallbackEventId = '') {
+  const candidates = new Map();
+  const values = [String(externalOrderId || '')];
+  const numericId = Number(externalOrderId);
+  if (Number.isSafeInteger(numericId)) values.push(numericId);
+  for (const value of values) {
+    const snapshot = await db.collection('integration_events').where('payload.id', '==', value).get();
+    snapshot.docs.forEach(doc => {
+      const event = { id: doc.id, ...doc.data() };
+      if (event.source === 'shopify') candidates.set(event.id, event);
+    });
+  }
+  if (fallbackEventId && !candidates.has(fallbackEventId)) {
+    const fallback = await db.collection('integration_events').doc(fallbackEventId).get();
+    if (fallback.exists) candidates.set(fallback.id, { id: fallback.id, ...fallback.data() });
+  }
+  return [...candidates.values()].sort((left, right) => shopifyEventRichness(right) - shopifyEventRichness(left))[0] || null;
+}
+
 async function shopifyHistoricalOrdersSince(fromIso) {
   const orders = [];
   let cursor = null;
@@ -3925,7 +3957,30 @@ async function enqueueShopifyOrderPayloads(orders, options = {}) {
       source: 'shopify', operation: 'orders/paid', idempotencyKey: `${idempotencyPrefix}-${order.id}`,
       correlationId: order.id, payload: { eventId, shopDomain: SHOPIFY_SHOP_DOMAIN, topic: 'orders/paid' }
     }, { now });
-    if (await integrationJobById(job.id)) { result.alreadyQueued += 1; continue; }
+    const existingJob = await integrationJobById(job.id);
+    if (existingJob) {
+      const normalized = SHOPIFY.normalizeOrder(order, { shopDomain: SHOPIFY_SHOP_DOMAIN, topic: 'orders/paid' });
+      const canAutoReprocess = existingJob.status === 'succeeded'
+        && existingJob.result?.outcome === 'exception'
+        && !SHOPIFY.orderExceptions(normalized, await shopifyProductMappings()).some(exception => exception.code !== 'missing_artwork');
+      if (!canAutoReprocess) { result.alreadyQueued += 1; continue; }
+      const bestEvent = await richestShopifyEventForOrder(order.id, eventId);
+      const resolutionKey = crypto.createHash('sha256')
+        .update((order.line_items || []).map(line => `${line.sku || ''}|${line.product_id || ''}|${line.variant_id || ''}`).join(';'))
+        .digest('hex').slice(0, 12);
+      const resolutionJob = INTEGRATION_QUEUE.normalizeJob({
+        source: 'shopify', operation: 'orders/paid', idempotencyKey: `${idempotencyPrefix}-${order.id}:auto-resolved:${resolutionKey}`,
+        correlationId: order.id, payload: { eventId: bestEvent?.id || eventId, shopDomain: SHOPIFY_SHOP_DOMAIN, topic: 'orders/paid' }
+      }, { now });
+      if (await integrationJobById(resolutionJob.id)) { result.alreadyQueued += 1; continue; }
+      await Promise.all([
+        INTEGRATION_JOBS_COLLECTION.doc(resolutionJob.id).set(resolutionJob),
+        db.collection('integration_exceptions').doc(`shopify-exception-${order.id}`).set({ status: 'reprocessing', reprocessJobId: resolutionJob.id, updatedAt: now }, { merge: true })
+      ]);
+      result.queued += 1;
+      result.orderNumbers.push(order.name || order.id);
+      continue;
+    }
     await Promise.all([
       db.collection('integration_events').doc(eventId).set({
         id: eventId, source: 'shopify', webhookId: `${webhookPrefix}-${order.id}`, eventId: `${webhookPrefix}-${order.id}`,

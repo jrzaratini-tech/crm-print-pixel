@@ -38,6 +38,25 @@ test('pedido pago e mapeado fica elegível quando contém arte', () => {
   assert.equal(crm.produtos[0].recipeId, 'recipe-neon-v1');
 });
 
+test('SKUs padronizados do editor Shopify são mapeados pela família', () => {
+  const order = SHOPIFY.normalizeOrder({
+    id: 1015,
+    name: '#1015',
+    financial_status: 'paid',
+    line_items: [{
+      sku: 'PP-CUSTOM-LABEL-REDONDO-500-MATE',
+      name: 'Rótulos personalizados',
+      quantity: 1,
+      price: '9.90',
+      properties: [{ name: 'Formato', value: 'Redondo' }]
+    }]
+  });
+  assert.equal(SHOPIFY.orderExceptions(order, new Map()).some(item => item.code === 'unmapped_line'), false);
+  const crm = SHOPIFY.toCrmOrder(order, new Map(), { now: '2026-10-23T12:33:00.000Z' });
+  assert.equal(crm.produtos[0].productId, 'default-adesivo-vinil-impresso-com-recorte');
+  assert.equal(crm.produtos[0].sku, 'PP-CUSTOM-LABEL-REDONDO-500-MATE');
+});
+
 test('levantamento em loja aceita moradas nulas e preserva dados fiscais e pagamento', () => {
   const order = SHOPIFY.normalizeOrder({
     id: 1014,

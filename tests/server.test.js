@@ -624,6 +624,24 @@ test('webhook Shopify valida assinatura, persiste antes de responder e ignora du
   assert.equal(fulfilledProcessed.body.job.result.outcome, 'order_created');
   assert.equal((await db.collection('events').doc('shopify-order-505').get()).exists, true);
 
+  const standardizedOrder = JSON.stringify({
+    id: 506, name: '#506', financial_status: 'paid', currency: 'EUR', subtotal_price: '9.90', total_tax: '2.28', total_price: '12.18',
+    customer: { first_name: 'Cliente', last_name: 'Rótulos' },
+    line_items: [{ id: 6, product_id: 7, variant_id: 8, sku: 'PP-CUSTOM-LABEL-REDONDO-500-MATE', name: 'Rótulos personalizados', quantity: 1, price: '9.90', properties: [] }]
+  });
+  const standardizedHeaders = {
+    ...headers,
+    'X-Shopify-Hmac-Sha256': crypto.createHmac('sha256', process.env.SHOPIFY_WEBHOOK_SECRET).update(standardizedOrder).digest('base64'),
+    'X-Shopify-Webhook-Id': 'webhook-506',
+    'X-Shopify-Event-Id': 'event-506'
+  };
+  const standardizedAccepted = await request('/api/shopify/webhook', { method: 'POST', headers: standardizedHeaders, body: standardizedOrder });
+  const standardizedProcessed = await post(`/api/integration-jobs/${standardizedAccepted.body.jobId}/process`, {});
+  assert.equal(standardizedProcessed.response.status, 200);
+  assert.equal(standardizedProcessed.body.job.result.outcome, 'order_created');
+  const standardizedSaved = await db.collection('events').doc('shopify-order-506').get();
+  assert.equal(standardizedSaved.data().payload.produtos[0].productId, 'default-adesivo-vinil-impresso-com-recorte');
+
   await db.collection('external_mappings').doc('mapping-shopify-pickup').set({
     id: 'mapping-shopify-pickup', source: 'shopify', externalType: 'sku', externalKey: 'PICKUP-01',
     productId: 'default-adesivo-vinil-impresso-com-recorte', recipeId: '', active: true
