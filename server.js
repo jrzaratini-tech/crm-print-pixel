@@ -75,6 +75,9 @@ const SHOPIFY_ADMIN_ACCESS_TOKEN = process.env.SHOPIFY_ADMIN_ACCESS_TOKEN || '';
 const SHOPIFY_CLIENT_ID = process.env.SHOPIFY_CLIENT_ID || '';
 const SHOPIFY_CLIENT_SECRET = process.env.SHOPIFY_CLIENT_SECRET || '';
 const SHOPIFY_API_VERSION = process.env.SHOPIFY_API_VERSION || '2026-10';
+const SHOPIFY_WEBHOOK_BASE_URL = String(process.env.SHOPIFY_WEBHOOK_BASE_URL || STRIPE_RETURN_BASE_URL || '').trim().replace(/\/+$/, '');
+const SHOPIFY_RECOVERY_INTERVAL_MS = Math.max(60 * 1000, Number(process.env.SHOPIFY_RECOVERY_INTERVAL_MS || 2 * 60 * 1000));
+const SHOPIFY_RECOVERY_LOOKBACK_HOURS = Math.max(24, Number(process.env.SHOPIFY_RECOVERY_LOOKBACK_HOURS || 72));
 const FIREBASE_BACKUP_BUCKET = String(process.env.FIREBASE_BACKUP_BUCKET || '').trim();
 const BACKUP_STATE_DOC = db.collection('system_state').doc('backup');
 const MAX_QUERY_LIMIT = 5000;
@@ -3377,6 +3380,12 @@ app.post('/api/shopify/webhook', async (req, res) => {
     await eventRef.set({
       source: 'shopify', ...metadata, payload: req.body || {}, receivedAt: now, status: 'received'
     });
+    const financialStatus = String(req.body?.financial_status || '').toLowerCase();
+    const paid = ['paid', 'partially_refunded'].includes(financialStatus);
+    if (metadata.topic !== 'orders/paid' && !paid) {
+      await eventRef.set({ status: 'ignored_payment_pending', processedAt: now }, { merge: true });
+      return res.status(202).json({ success: true, received: true, ignored: true, reason: 'payment_pending' });
+    }
     const job = INTEGRATION_QUEUE.normalizeJob({
       source: 'shopify', operation: metadata.topic || 'webhook', idempotencyKey: metadata.webhookId,
       correlationId: metadata.eventId || text(req.body?.id, 160),
@@ -3806,32 +3815,49 @@ async function shopifyGraphql(query, variables = {}) {
   return data.data;
 }
 
-app.post('/api/shopify/setup', requireCrmPermission('integrations.manage'), async (req, res) => {
-  try {
-    const callbackUrl = `${publicBaseUrl(req)}/api/shopify/webhook`;
-    const query = `query ShopifySetup{shop{name myshopifyDomain} webhookSubscriptions(first:100,topics:[ORDERS_PAID]){nodes{id callbackUrl topic}}}`;
-    const current = await shopifyGraphql(query);
-    let subscription = (current.webhookSubscriptions?.nodes || []).find(item => item.callbackUrl === callbackUrl && item.topic === 'ORDERS_PAID');
+async function ensureShopifyWebhookSubscriptions(callbackUrl) {
+  const topics = ['ORDERS_PAID', 'ORDERS_CREATE', 'ORDERS_FULFILLED'];
+  const query = `query ShopifySetup{shop{name myshopifyDomain} webhookSubscriptions(first:100){nodes{id callbackUrl topic}}}`;
+  const current = await shopifyGraphql(query);
+  const subscriptions = [];
+  for (const topic of topics) {
+    let subscription = (current.webhookSubscriptions?.nodes || []).find(item => item.callbackUrl === callbackUrl && item.topic === topic);
     if (!subscription) {
-      const mutation = `mutation CreateOrdersPaidWebhook($callbackUrl:URL!){webhookSubscriptionCreate(topic:ORDERS_PAID,webhookSubscription:{callbackUrl:$callbackUrl,format:JSON}){webhookSubscription{id callbackUrl topic} userErrors{field message}}}`;
+      const mutation = `mutation CreateShopifyWebhook($callbackUrl:URL!){webhookSubscriptionCreate(topic:${topic},webhookSubscription:{callbackUrl:$callbackUrl,format:JSON}){webhookSubscription{id callbackUrl topic} userErrors{field message}}}`;
       const created = await shopifyGraphql(mutation, { callbackUrl });
       const errors = created.webhookSubscriptionCreate?.userErrors || [];
       if (errors.length) throw new Error(errors.map(item => item.message).join(' '));
       subscription = created.webhookSubscriptionCreate?.webhookSubscription;
     }
-    if (!subscription?.id) throw new Error('A Shopify não confirmou o webhook de pedidos pagos.');
-    const state = {
-      shopName: text(current.shop?.name, 180),
-      shopDomain: text(current.shop?.myshopifyDomain || SHOPIFY_SHOP_DOMAIN, 255),
-      webhookSubscriptionId: text(subscription.id, 255),
-      webhookTopic: 'ORDERS_PAID',
-      callbackUrl,
-      verifiedAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
-    };
-    await SHOPIFY_CONFIG_DOC.set(state, { merge: true });
+    if (!subscription?.id) throw new Error(`A Shopify não confirmou o webhook ${topic}.`);
+    subscriptions.push(subscription);
+  }
+  return { current, subscriptions };
+}
+
+async function activateShopifyWebhooks(callbackUrl) {
+  const { current, subscriptions } = await ensureShopifyWebhookSubscriptions(callbackUrl);
+  const state = {
+    shopName: text(current.shop?.name, 180),
+    shopDomain: text(current.shop?.myshopifyDomain || SHOPIFY_SHOP_DOMAIN, 255),
+    webhookSubscriptionId: text(subscriptions.find(item => item.topic === 'ORDERS_PAID')?.id, 255),
+    webhookSubscriptionIds: Object.fromEntries(subscriptions.map(item => [item.topic, text(item.id, 255)])),
+    webhookTopics: subscriptions.map(item => item.topic),
+    webhookTopic: 'ORDERS_PAID',
+    callbackUrl,
+    verifiedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  await SHOPIFY_CONFIG_DOC.set(state, { merge: true });
+  return state;
+}
+
+app.post('/api/shopify/setup', requireCrmPermission('integrations.manage'), async (req, res) => {
+  try {
+    const callbackUrl = `${publicBaseUrl(req)}/api/shopify/webhook`;
+    const state = await activateShopifyWebhooks(callbackUrl);
     await recordAudit(req, 'shopify.setup', { entityType: 'integration', entityId: 'shopify', after: state });
-    res.json({ success: true, operational: true, shopName: state.shopName, topic: state.webhookTopic, verifiedAt: state.verifiedAt });
+    res.json({ success: true, operational: true, shopName: state.shopName, topics: state.webhookTopics, verifiedAt: state.verifiedAt });
   } catch (error) {
     res.status(503).json({ success: false, message: error.message || 'Não foi possível ativar a integração Shopify.' });
   }
@@ -3895,26 +3921,26 @@ async function shopifyHistoricalOrdersSince(fromIso) {
   return orders;
 }
 
-async function enqueueHistoricalShopifyOrders(days = 31) {
-  const safeDays = Math.min(365, Math.max(1, Math.round(Number(days || 31))));
-  const from = new Date(Date.now() - safeDays * 24 * 60 * 60 * 1000);
-  const orders = (await shopifyHistoricalOrdersSince(from.toISOString()))
-    .filter(order => ['paid', 'partially_refunded'].includes(order.financial_status) && !order.cancelled_at);
-  const result = { found: orders.length, queued: 0, alreadyInCrm: 0, alreadyQueued: 0, from: from.toISOString(), orderNumbers: [] };
+async function enqueueShopifyOrderPayloads(orders, options = {}) {
+  const eventPrefix = text(options.eventPrefix || 'shopify-backfill', 80);
+  const webhookPrefix = text(options.webhookPrefix || 'backfill', 80);
+  const idempotencyPrefix = text(options.idempotencyPrefix || 'backfill-order', 80);
+  const result = { found: orders.length, queued: 0, alreadyInCrm: 0, alreadyQueued: 0, orderNumbers: [] };
   for (const order of orders) {
     const crmOrderId = `shopify-order-${order.id}`;
     if ((await db.collection('events').doc(crmOrderId).get()).exists) { result.alreadyInCrm += 1; continue; }
-    const eventId = `shopify-backfill-${order.id}`;
+    const eventId = `${eventPrefix}-${order.id}`;
     const now = new Date().toISOString();
     const job = INTEGRATION_QUEUE.normalizeJob({
-      source: 'shopify', operation: 'orders/paid', idempotencyKey: `backfill-order-${order.id}`,
+      source: 'shopify', operation: 'orders/paid', idempotencyKey: `${idempotencyPrefix}-${order.id}`,
       correlationId: order.id, payload: { eventId, shopDomain: SHOPIFY_SHOP_DOMAIN, topic: 'orders/paid' }
     }, { now });
     if (await integrationJobById(job.id)) { result.alreadyQueued += 1; continue; }
     await Promise.all([
       db.collection('integration_events').doc(eventId).set({
-        id: eventId, source: 'shopify', webhookId: `backfill-${order.id}`, eventId: `backfill-${order.id}`,
-        shopDomain: SHOPIFY_SHOP_DOMAIN, topic: 'orders/paid', payload: order, receivedAt: now, status: 'received', historical: true
+        id: eventId, source: 'shopify', webhookId: `${webhookPrefix}-${order.id}`, eventId: `${webhookPrefix}-${order.id}`,
+        shopDomain: SHOPIFY_SHOP_DOMAIN, topic: 'orders/paid', payload: order, receivedAt: now, status: 'received',
+        historical: options.historical === true, recovered: options.recovered === true
       }),
       INTEGRATION_JOBS_COLLECTION.doc(job.id).set(job)
     ]);
@@ -3922,6 +3948,57 @@ async function enqueueHistoricalShopifyOrders(days = 31) {
     result.orderNumbers.push(order.name || order.id);
   }
   return result;
+}
+
+async function enqueueHistoricalShopifyOrders(days = 31) {
+  const safeDays = Math.min(365, Math.max(1, Math.round(Number(days || 31))));
+  const from = new Date(Date.now() - safeDays * 24 * 60 * 60 * 1000);
+  const orders = (await shopifyHistoricalOrdersSince(from.toISOString()))
+    .filter(order => ['paid', 'partially_refunded'].includes(order.financial_status) && !order.cancelled_at);
+  return { ...(await enqueueShopifyOrderPayloads(orders, { historical: true })), from: from.toISOString() };
+}
+
+let shopifyRecoveryRunning = false;
+
+async function recoverRecentShopifyOrders() {
+  if (shopifyRecoveryRunning || !SHOPIFY_SHOP_DOMAIN || !(SHOPIFY_ADMIN_ACCESS_TOKEN || (SHOPIFY_CLIENT_ID && SHOPIFY_CLIENT_SECRET))) return null;
+  shopifyRecoveryRunning = true;
+  const startedAt = new Date().toISOString();
+  try {
+    const from = new Date(Date.now() - SHOPIFY_RECOVERY_LOOKBACK_HOURS * 60 * 60 * 1000);
+    const orders = (await shopifyHistoricalOrdersSince(from.toISOString()))
+      .filter(order => ['paid', 'partially_refunded'].includes(order.financial_status) && !order.cancelled_at);
+    const result = {
+      ...(await enqueueShopifyOrderPayloads(orders, {
+        eventPrefix: 'shopify-recovery', webhookPrefix: 'recovery', idempotencyPrefix: 'recovery-order', recovered: true
+      })),
+      from: from.toISOString()
+    };
+    await SHOPIFY_CONFIG_DOC.set({ lastRecoveryAt: new Date().toISOString(), lastRecoveryStartedAt: startedAt, lastRecoveryError: '', lastRecoveryResult: result }, { merge: true });
+    return result;
+  } catch (error) {
+    await SHOPIFY_CONFIG_DOC.set({ lastRecoveryAt: new Date().toISOString(), lastRecoveryStartedAt: startedAt, lastRecoveryError: text(error.message, 500) }, { merge: true });
+    throw error;
+  } finally {
+    shopifyRecoveryRunning = false;
+  }
+}
+
+function startShopifyRecoveryMaintenance() {
+  if (!IS_PRODUCTION || !SHOPIFY_SHOP_DOMAIN || !(SHOPIFY_ADMIN_ACCESS_TOKEN || (SHOPIFY_CLIENT_ID && SHOPIFY_CLIENT_SECRET))) return;
+  const maintain = async () => {
+    if (SHOPIFY_WEBHOOK_BASE_URL) await activateShopifyWebhooks(`${SHOPIFY_WEBHOOK_BASE_URL}/api/shopify/webhook`);
+    return recoverRecentShopifyOrders();
+  };
+  const firstRun = setTimeout(() => maintain().catch(error => console.error('Erro na manutenção Shopify:', error.message)), 15 * 1000);
+  const interval = setInterval(() => recoverRecentShopifyOrders().catch(error => console.error('Erro na recuperação Shopify:', error.message)), SHOPIFY_RECOVERY_INTERVAL_MS);
+  const webhookInterval = setInterval(() => {
+    if (!SHOPIFY_WEBHOOK_BASE_URL) return;
+    activateShopifyWebhooks(`${SHOPIFY_WEBHOOK_BASE_URL}/api/shopify/webhook`).catch(error => console.error('Erro ao validar webhooks Shopify:', error.message));
+  }, 15 * 60 * 1000);
+  firstRun.unref?.();
+  interval.unref?.();
+  webhookInterval.unref?.();
 }
 
 async function runShopifyReconciliation(days = 1) {
@@ -7353,6 +7430,7 @@ if (require.main === module) {
   app.listen(PORT, () => {
     console.log(`CRM PRINT PIXEL ONLINE - PORTA ${PORT}`);
     startMoloniConnectionMaintenance();
+    startShopifyRecoveryMaintenance();
   });
 }
 

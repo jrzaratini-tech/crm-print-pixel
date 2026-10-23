@@ -572,6 +572,20 @@ test('webhook Shopify valida assinatura, persiste antes de responder e ignora du
   const invalid = await request('/api/shopify/webhook', { method: 'POST', headers: { ...headers, 'X-Shopify-Hmac-Sha256': 'invalid' }, body: raw });
   assert.equal(invalid.response.status, 401);
 
+  const pendingCreatedOrder = JSON.stringify({ id: 504, name: '#504', financial_status: 'pending', line_items: [] });
+  const pendingCreatedHeaders = {
+    ...headers,
+    'X-Shopify-Hmac-Sha256': crypto.createHmac('sha256', process.env.SHOPIFY_WEBHOOK_SECRET).update(pendingCreatedOrder).digest('base64'),
+    'X-Shopify-Webhook-Id': 'webhook-504',
+    'X-Shopify-Event-Id': 'event-504',
+    'X-Shopify-Topic': 'orders/create'
+  };
+  const ignoredPending = await request('/api/shopify/webhook', { method: 'POST', headers: pendingCreatedHeaders, body: pendingCreatedOrder });
+  assert.equal(ignoredPending.response.status, 202);
+  assert.equal(ignoredPending.body.ignored, true);
+  const ignoredPendingEvent = await db.collection('integration_events').doc('shopify-webhook-504').get();
+  assert.equal(ignoredPendingEvent.data().status, 'ignored_payment_pending');
+
   await db.collection('external_mappings').doc('mapping-shopify-neon').set({
     id: 'mapping-shopify-neon', source: 'shopify', externalType: 'variant', externalKey: 'NEON-01',
     productId: 'default-neon-led', recipeId: '', active: true
@@ -591,6 +605,24 @@ test('webhook Shopify valida assinatura, persiste antes de responder e ignora du
   assert.equal(order.exists, true);
   assert.equal(order.data().payload.produtos[0].productId, 'default-neon-led');
   assert.equal(order.data().payload.total, 123);
+
+  const fulfilledOrder = JSON.stringify({
+    id: 505, name: '#505', financial_status: 'paid', fulfillment_status: 'fulfilled', currency: 'EUR', total_price: '100.00',
+    customer: { first_name: 'Cliente', last_name: 'Processado' },
+    line_items: [{ id: 5, sku: 'NEON-01', name: 'Neon LED', quantity: 1, price: '100.00', properties: [] }]
+  });
+  const fulfilledHeaders = {
+    ...headers,
+    'X-Shopify-Hmac-Sha256': crypto.createHmac('sha256', process.env.SHOPIFY_WEBHOOK_SECRET).update(fulfilledOrder).digest('base64'),
+    'X-Shopify-Webhook-Id': 'webhook-505',
+    'X-Shopify-Event-Id': 'event-505',
+    'X-Shopify-Topic': 'orders/fulfilled'
+  };
+  const fulfilledAccepted = await request('/api/shopify/webhook', { method: 'POST', headers: fulfilledHeaders, body: fulfilledOrder });
+  const fulfilledProcessed = await post(`/api/integration-jobs/${fulfilledAccepted.body.jobId}/process`, {});
+  assert.equal(fulfilledProcessed.response.status, 200);
+  assert.equal(fulfilledProcessed.body.job.result.outcome, 'order_created');
+  assert.equal((await db.collection('events').doc('shopify-order-505').get()).exists, true);
 
   await db.collection('external_mappings').doc('mapping-shopify-pickup').set({
     id: 'mapping-shopify-pickup', source: 'shopify', externalType: 'sku', externalKey: 'PICKUP-01',
