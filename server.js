@@ -3927,7 +3927,7 @@ async function enqueueHistoricalShopifyOrders(days = 31) {
 }
 
 async function runShopifyReconciliation(days = 1) {
-  const safeDays = Math.min(31, Math.max(1, Math.round(Number(days || 1))));
+  const safeDays = Math.min(365, Math.max(1, Math.round(Number(days || 1))));
   const from = new Date(Date.now() - safeDays * 24 * 60 * 60 * 1000);
   const [shopifyOrders, events] = await Promise.all([shopifyOrdersSince(from.toISOString()), db.collection('events').get()]);
   const crmOrders = events.docs.map(doc => ({ id: doc.id, ...doc.data() }))
