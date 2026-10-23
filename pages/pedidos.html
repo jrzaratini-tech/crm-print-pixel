@@ -385,6 +385,28 @@
             box-shadow: var(--shadow-md);
             transform: translateY(-2px);
         }
+
+        .pedido-card.site-order {
+            background: linear-gradient(135deg, #effaff 0%, #ffffff 46%);
+            border-color: #7dd3fc;
+            box-shadow: 0 8px 24px rgba(2, 132, 199, 0.10);
+        }
+
+        .site-order-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            width: fit-content;
+            margin-bottom: 8px;
+            padding: 4px 10px;
+            border-radius: 999px;
+            background: #0369a1;
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+        }
         
         .pedido-card::before {
             content: '';
@@ -1247,8 +1269,10 @@
                             atendente: payload.atendente || '',
                             observacoes: payload.observacoes || '',
                             comIVA: payload.comIVA || 'sim',
+                            origem: payload.origem || payload.source || '',
+                            pedidoSite: ['shopify', 'print-pixel-studio', 'print_pixel_studio', 'website', 'site'].includes(String(payload.origem || payload.source || '').toLowerCase()),
                             categoriaVenda: payload.categoriaVenda === 'Print Pixel Studio'
-                                || ['print-pixel-studio', 'print_pixel_studio', 'website', 'site'].includes(String(payload.source || '').toLowerCase())
+                                || ['shopify', 'print-pixel-studio', 'print_pixel_studio', 'website', 'site'].includes(String(payload.origem || payload.source || '').toLowerCase())
                                 ? 'Print Pixel Studio'
                                 : 'Venda direta',
                             
@@ -1401,7 +1425,7 @@
                 };
                 
                 const card = document.createElement('div');
-                card.className = `pedido-card ${pedido.status}`;
+                card.className = `pedido-card ${pedido.status}${pedido.pedidoSite ? ' site-order' : ''}`;
                 card.dataset.id = pedido.id;
                 
                 // Calcular total produtos
@@ -1418,6 +1442,7 @@
                 card.innerHTML = `
                     <div class="pedido-header">
                         <div class="pedido-info">
+                            ${pedido.pedidoSite ? `<div class="site-order-badge"><i class="fas fa-globe"></i> Pedido do site</div>` : ''}
                             <div class="pedido-cliente">${pedido.cliente}</div>
                             <div class="pedido-empresa">${pedido.empresa}</div>
                             <div class="pedido-meta">
@@ -1962,7 +1987,7 @@
                         }
                         
                         // Atualizar a classe do card
-                        cardElement.className = `pedido-card ${novoStatus}`;
+                        cardElement.className = `pedido-card ${novoStatus}${todosPedidos[pedidoIndex]?.pedidoSite ? ' site-order' : ''}`;
                         
                         // Recarregar todos os pedidos para garantir consistência
                         // (opcional, mas seguro para garantir que todos os dados estão sincronizados)

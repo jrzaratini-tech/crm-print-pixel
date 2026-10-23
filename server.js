@@ -3861,16 +3861,15 @@ function shopifyHistoricalOrderPayload(order = {}) {
     name: value.name || '', company: value.company || '', address1: value.address1 || '', address2: value.address2 || '',
     city: value.city || '', province: value.province || '', zip: value.zip || '', country: value.country || '', phone: value.phone || ''
   } : null;
+  const customerName = order.billingAddress?.name || order.shippingAddress?.name || '';
+  const customerNameParts = customerName.trim().split(/\s+/).filter(Boolean);
   return {
     id: String(order.id || '').split('/').pop(), name: order.name, email: order.email || '', phone: order.phone || '',
     financial_status: String(order.displayFinancialStatus || '').toLowerCase(),
     fulfillment_status: String(order.displayFulfillmentStatus || '').toLowerCase(), currency: order.currencyCode || '',
     subtotal_price: money(order.currentSubtotalPriceSet), total_tax: money(order.currentTotalTaxSet), total_price: money(order.currentTotalPriceSet),
     created_at: order.createdAt, updated_at: order.updatedAt, cancelled_at: order.cancelledAt || null,
-    customer: order.customer ? {
-      id: String(order.customer.id || '').split('/').pop(), first_name: order.customer.firstName || '', last_name: order.customer.lastName || '',
-      email: order.customer.email || '', phone: order.customer.phone || ''
-    } : null,
+    customer: customerName ? { first_name: customerNameParts.shift() || '', last_name: customerNameParts.join(' '), email: order.email || '', phone: order.phone || '' } : null,
     billing_address: address(order.billingAddress), shipping_address: address(order.shippingAddress),
     note_attributes: (order.customAttributes || []).map(item => ({ name: item.key, value: item.value })),
     note: order.note || '', tags: Array.isArray(order.tags) ? order.tags.join(', ') : '',
@@ -3887,7 +3886,7 @@ function shopifyHistoricalOrderPayload(order = {}) {
 async function shopifyHistoricalOrdersSince(fromIso) {
   const orders = [];
   let cursor = null;
-  const query = `query HistoricalPaidOrders($cursor:String,$filter:String!){orders(first:100,after:$cursor,query:$filter,sortKey:CREATED_AT){nodes{id name email phone createdAt updatedAt cancelledAt displayFinancialStatus displayFulfillmentStatus currencyCode note tags customAttributes{key value} currentSubtotalPriceSet{shopMoney{amount}} currentTotalTaxSet{shopMoney{amount}} currentTotalPriceSet{shopMoney{amount}} customer{id firstName lastName email phone} billingAddress{name company address1 address2 city province zip country phone} shippingAddress{name company address1 address2 city province zip country phone} shippingLines(first:10){nodes{title code originalPriceSet{shopMoney{amount}}}} lineItems(first:250){nodes{id name sku quantity originalUnitPriceSet{shopMoney{amount}} customAttributes{key value} product{id} variant{id sku}}}}pageInfo{hasNextPage endCursor}}}`;
+  const query = `query HistoricalPaidOrders($cursor:String,$filter:String!){orders(first:100,after:$cursor,query:$filter,sortKey:CREATED_AT){nodes{id name email phone createdAt updatedAt cancelledAt displayFinancialStatus displayFulfillmentStatus currencyCode note tags customAttributes{key value} currentSubtotalPriceSet{shopMoney{amount}} currentTotalTaxSet{shopMoney{amount}} currentTotalPriceSet{shopMoney{amount}} billingAddress{name company address1 address2 city province zip country phone} shippingAddress{name company address1 address2 city province zip country phone} shippingLines(first:10){nodes{title code originalPriceSet{shopMoney{amount}}}} lineItems(first:250){nodes{id name sku quantity originalUnitPriceSet{shopMoney{amount}} customAttributes{key value} product{id} variant{id sku}}}}pageInfo{hasNextPage endCursor}}}`;
   do {
     const data = await shopifyGraphql(query, { cursor, filter: `created_at:>=${fromIso}` });
     const connection = data.orders;
