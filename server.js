@@ -3579,12 +3579,22 @@ async function processShopifyJob(id, workerId = 'shopify-worker') {
     if (!eventSnapshot?.exists) throw new Error('Evento Shopify associado não foi encontrado.');
     const event = { id: eventSnapshot.id, ...eventSnapshot.data() };
     const order = SHOPIFY.normalizeOrder(event.payload || {}, event);
-    const mappings = (await externalMappingCatalog())
+    const [externalMappings, catalogProducts] = await Promise.all([externalMappingCatalog(), productCatalog(true)]);
+    const mappings = externalMappings
       .filter(mapping => mapping.source === 'shopify' && mapping.active !== false)
       .reduce((map, mapping) => {
         map.set(String(mapping.externalKey || '').toLowerCase(), mapping);
         return map;
       }, new Map());
+    catalogProducts
+      .filter(product => product.ativo !== false && String(product.sku || '').trim())
+      .forEach(product => {
+        const key = String(product.sku).trim().toLowerCase();
+        if (!mappings.has(key)) mappings.set(key, {
+          source: 'shopify', externalType: 'sku', externalKey: product.sku,
+          productId: product.id, recipeId: '', active: true, automatic: true
+        });
+      });
     const exceptions = SHOPIFY.orderExceptions(order, mappings);
     const now = new Date().toISOString();
     if (exceptions.length) {

@@ -35,6 +35,7 @@ function webhookMetadata(headers = {}) {
 }
 
 function normalizeAddress(address = {}) {
+  address = address && typeof address === 'object' ? address : {};
   return {
     name: text(address.name || [address.first_name, address.last_name].filter(Boolean).join(' '), 200),
     company: text(address.company, 200),
@@ -46,6 +47,42 @@ function normalizeAddress(address = {}) {
     country: text(address.country_code || address.country, 80).toUpperCase(),
     phone: text(address.phone, 60)
   };
+}
+
+function addressText(address = {}) {
+  const normalized = normalizeAddress(address);
+  return [normalized.address1, normalized.address2, normalized.postalCode, normalized.city, normalized.country]
+    .filter(Boolean)
+    .join(', ');
+}
+
+function orderAttributes(order = {}) {
+  const direct = [...(Array.isArray(order.note_attributes) ? order.note_attributes : []), ...(Array.isArray(order.custom_attributes) ? order.custom_attributes : [])];
+  const lineAttributes = (Array.isArray(order.line_items) ? order.line_items : [])
+    .flatMap(line => Array.isArray(line?.properties) ? line.properties : []);
+  return [...direct, ...lineAttributes].map(item => ({
+    name: text(item?.name || item?.key, 120),
+    value: text(item?.value, 1000)
+  })).filter(item => item.name && item.value);
+}
+
+function fiscalTaxId(order = {}) {
+  const attribute = orderAttributes(order).find(item => /^(nif|nipc|vat|vat number|tax id|numero de contribuinte|n[uú]mero de contribuinte)$/i.test(item.name));
+  const candidates = [attribute?.value, order.tax_id, order.vat_number, order.customer?.tax_id];
+  for (const candidate of candidates) {
+    const digits = String(candidate || '').replace(/\D/g, '');
+    if (/^\d{9}$/.test(digits)) return digits;
+  }
+  return '';
+}
+
+function fulfillmentMode(order = {}) {
+  const labels = (Array.isArray(order.shipping_lines) ? order.shipping_lines : [])
+    .map(line => text(line?.title || line?.code || line?.source, 200))
+    .join(' ');
+  const pickup = /pickup|pick-up|recolha|levantamento|local da loja|store pickup/i.test(labels)
+    || (!order.shipping_address && /local|store/i.test(labels));
+  return pickup ? 'pickup' : 'shipping';
 }
 
 function normalizeLine(line = {}) {
@@ -72,13 +109,16 @@ function normalizeOrder(order = {}, metadata = {}) {
   const lineItems = Array.isArray(order.line_items) ? order.line_items.map(normalizeLine) : [];
   const financialStatus = text(order.financial_status, 60).toLowerCase();
   const cancelled = Boolean(order.cancelled_at || order.cancel_reason);
+  const billingAddress = normalizeAddress(order.billing_address);
+  const shippingAddress = normalizeAddress(order.shipping_address);
+  const deliveryMode = fulfillmentMode(order);
   return {
     source: 'shopify',
     externalOrderId: text(order.id, 160),
     orderNumber: text(order.order_number || order.name, 100),
     name: text(order.name, 100),
     email: text(order.email || order.contact_email, 240).toLowerCase(),
-    phone: text(order.phone || order.customer?.phone, 60),
+    phone: text(order.phone || order.customer?.phone || billingAddress.phone || shippingAddress.phone, 60),
     customerExternalId: text(order.customer?.id, 160),
     customerName: text([order.customer?.first_name, order.customer?.last_name].filter(Boolean).join(' '), 200),
     currency: text(order.currency, 12).toUpperCase(),
@@ -91,8 +131,15 @@ function normalizeOrder(order = {}, metadata = {}) {
     fulfillmentStatus: text(order.fulfillment_status || 'unfulfilled', 60).toLowerCase(),
     cancelled,
     paid: ['paid', 'partially_refunded'].includes(financialStatus) && !cancelled,
-    billingAddress: normalizeAddress(order.billing_address),
-    shippingAddress: normalizeAddress(order.shipping_address),
+    taxId: fiscalTaxId(order),
+    company: billingAddress.company || shippingAddress.company,
+    billingAddress,
+    shippingAddress,
+    billingAddressText: addressText(order.billing_address),
+    shippingAddressText: addressText(order.shipping_address),
+    fulfillmentMode: deliveryMode,
+    pickup: deliveryMode === 'pickup',
+    deliveryLabel: text((order.shipping_lines || [])[0]?.title || (deliveryMode === 'pickup' ? 'Levantamento na loja' : 'Envio'), 160),
     lineItems,
     note: text(order.note, 2000),
     tags: text(order.tags, 500),
@@ -127,11 +174,30 @@ function mappingForLine(line = {}, mappings = new Map()) {
 
 function toCrmOrder(order = {}, mappings = new Map(), options = {}) {
   const now = options.now || new Date().toISOString();
+  const paidAt = order.updatedAt || order.createdAt || now;
+  const payments = order.paid ? [{
+    id: `shopify-${order.externalOrderId}`,
+    status: 'pago',
+    valor: order.total,
+    data: paidAt.slice(0, 10),
+    formaPagamento: 'shopify',
+    observacoes: `Pagamento confirmado pela Shopify (${order.financialStatus || 'paid'})`,
+    shopifyOrderId: order.externalOrderId
+  }] : [];
   return {
     numero: order.name || order.orderNumber || `SHOPIFY-${order.externalOrderId}`,
     cliente: order.customerName || order.email || 'Cliente Shopify',
     email: order.email || '',
     telefone: order.phone || '',
+    telemovel: order.phone || '',
+    empresa: order.company || '',
+    nif: order.taxId || '',
+    morada: order.billingAddressText || '',
+    moradaFaturacao: order.billingAddress,
+    moradaEntrega: order.shippingAddress,
+    tipoEntrega: order.fulfillmentMode,
+    levantamentoLoja: order.pickup,
+    metodoEntrega: order.deliveryLabel,
     status: order.cancelled ? 'cancelado' : 'processamento',
     origem: 'shopify',
     source: 'shopify',
@@ -145,10 +211,12 @@ function toCrmOrder(order = {}, mappings = new Map(), options = {}) {
     iva: order.tax,
     total: order.total,
     pago: order.paid,
+    pagamentos: payments,
+    totalPago: order.paid ? order.total : 0,
+    saldoPendente: order.paid ? 0 : order.total,
+    statusPagamento: order.paid ? 'pago' : order.financialStatus || 'pendente',
     paymentStatus: order.financialStatus,
     fulfillmentStatus: order.fulfillmentStatus,
-    moradaFaturacao: order.billingAddress,
-    moradaEntrega: order.shippingAddress,
     observacoes: order.note || '',
     tags: order.tags || '',
     dataEntrada: (order.createdAt || now).slice(0, 10),
@@ -190,4 +258,4 @@ function reconcileOrders(shopifyOrders = [], crmOrders = []) {
   return { checkedShopify: external.size, checkedCrm: internal.size, missingInCrm, missingInShopify, mismatches, ok: !missingInCrm.length && !missingInShopify.length && !mismatches.length };
 }
 
-module.exports = { mappingForLine, normalizeAddress, normalizeLine, normalizeOrder, orderExceptions, reconcileOrders, toCrmOrder, validShopDomain, verifyWebhook, webhookMetadata };
+module.exports = { addressText, fiscalTaxId, fulfillmentMode, mappingForLine, normalizeAddress, normalizeLine, normalizeOrder, orderExceptions, reconcileOrders, toCrmOrder, validShopDomain, verifyWebhook, webhookMetadata };
