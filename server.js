@@ -19,6 +19,7 @@ const LEARNING = require('./core/learning.js');
 const SCHEDULING = require('./core/scheduling.js');
 const BACKUP_SERVICE = require('./core/backup-service.js');
 const { generateDraftPdf } = require('./core/draft-pdf.js');
+const AI_ACTIONS = require('./core/ai-actions.js');
 const {
   MoloniClient,
   buildDocumentPreview,
@@ -146,6 +147,8 @@ const AI_CONFIG_DOC = db.collection('integrations').doc('chatgpt_plan');
 const ADMIN_USERS_COLLECTION = db.collection('admin_users');
 const AUDIT_COLLECTION = db.collection('audit_events');
 const INTEGRATION_JOBS_COLLECTION = db.collection('integration_jobs');
+const AI_PENDING_ACTIONS_COLLECTION = db.collection('ai_pending_actions');
+const AI_ACTION_CONFIRMATIONS_IN_PROGRESS = new Set();
 const SHOPIFY_CONFIG_DOC = db.collection('integrations').doc('shopify');
 
 if (IS_PRODUCTION && !AUTH_DISABLED && (!CRM_USERNAME || !CRM_PASSWORD)) {
@@ -4378,9 +4381,157 @@ function aiConversationId(req) {
 }
 
 function aiPermissionFingerprint(req) {
-  const permissions = ['orders.read', 'quotes.read', 'finance.read', 'fiscal.read', 'catalog.read', 'production.read', 'management.read', 'integrations.manage'];
+  const permissions = ['orders.read', 'orders.write', 'quotes.read', 'finance.read', 'fiscal.read', 'fiscal.write', 'catalog.read', 'production.read', 'management.read', 'integrations.manage'];
   const allowed = permissions.filter(permission => ADMIN_ACCESS.hasPermission(req.crmUser, permission)).join('|');
   return crypto.createHash('sha256').update(allowed).digest('hex').slice(0, 24);
+}
+
+function aiActorId(req) {
+  return text(req.crmUser?.id || req.crmUser?.username || 'admin', 200);
+}
+
+function publicAiPendingAction(action = {}) {
+  return sanitizeForResponse({
+    id: action.id,
+    type: action.type,
+    status: action.status,
+    summary: action.summary || {},
+    createdAt: action.createdAt,
+    expiresAt: action.expiresAt
+  });
+}
+
+async function currentAiPendingAction(req) {
+  const ownerId = aiActorId(req);
+  const fingerprint = aiPermissionFingerprint(req);
+  const now = Date.now();
+  const snapshot = await AI_PENDING_ACTIONS_COLLECTION.get();
+  return snapshot.docs
+    .map(doc => ({ id: doc.id, ...doc.data() }))
+    .filter(action => action.ownerId === ownerId
+      && action.permissionFingerprint === fingerprint
+      && action.status === 'pending'
+      && new Date(action.expiresAt || 0).getTime() > now)
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0] || null;
+}
+
+async function createAiPendingAction(req, type, payload, summary) {
+  const ownerId = aiActorId(req);
+  const existing = await AI_PENDING_ACTIONS_COLLECTION.get();
+  await Promise.all(existing.docs.map(async doc => {
+    const action = doc.data() || {};
+    if (action.ownerId === ownerId && action.status === 'pending') {
+      await AI_PENDING_ACTIONS_COLLECTION.doc(doc.id).set({ status: 'superseded', updatedAt: new Date().toISOString() }, { merge: true });
+    }
+  }));
+  const id = `aia_${crypto.randomUUID().replace(/-/g, '')}`;
+  const now = new Date();
+  const action = {
+    ownerId,
+    permissionFingerprint: aiPermissionFingerprint(req),
+    type,
+    status: 'pending',
+    payload: auditSafeValue(payload),
+    summary: auditSafeValue(summary),
+    createdAt: now.toISOString(),
+    updatedAt: now.toISOString(),
+    expiresAt: new Date(now.getTime() + 30 * 60 * 1000).toISOString()
+  };
+  await AI_PENDING_ACTIONS_COLLECTION.doc(id).set(action);
+  await recordAudit(req, 'ai.action.prepare', {
+    entityType: 'ai_pending_action', entityId: id,
+    after: { type, status: 'pending', summary: action.summary }
+  });
+  return { id, ...action };
+}
+
+async function nextAiOrderNumber() {
+  const year = new Date().getFullYear();
+  const snapshot = await db.collection('events').get();
+  let maximum = 0;
+  snapshot.forEach(doc => {
+    const event = doc.data() || {};
+    if (event.deleted || event.schema !== 'pedido') return;
+    const match = String(event.payload?.numero || '').match(/^(\d{4})\/(\d{4,})$/);
+    if (match && Number(match[1]) === year) maximum = Math.max(maximum, Number(match[2]));
+  });
+  return `${year}/${String(maximum + 1).padStart(4, '0')}`;
+}
+
+async function createOrderFromAiAction(req, draft = {}) {
+  const now = new Date().toISOString();
+  const id = `evt_${crypto.randomUUID().replace(/-/g, '')}`;
+  const payload = await bindTechnicalRecipeSnapshots('pedido', {
+    ...draft,
+    numero: await nextAiOrderNumber(),
+    dataPedido: now.slice(0, 10),
+    aiCreated: true,
+    aiCreatedBy: aiActorId(req)
+  }, {});
+  const event = ENTITY_LINKS.normalizeEvent(id, {
+    schema: 'pedido', payload, pageId: 'gestor_ia', timestamp: now,
+    created_at: now, updated_at: now, deleted: false
+  });
+  await db.collection('events').doc(id).set(event);
+  await recordAudit(req, 'ai.order.create', {
+    entityType: 'pedido', entityId: id, after: event,
+    metadata: { orderNumber: payload.numero, confirmed: true }
+  });
+  return { id, number: payload.numero, customer: payload.cliente, total: payload.total };
+}
+
+async function createInvoiceDraftFromAiAction(req, data = {}) {
+  const order = await moloniOrder(data.orderId);
+  if (!order) throw new Error('Pedido não encontrado.');
+  const type = data.type === 'invoice_receipt' ? 'invoice_receipt' : 'invoice';
+  const preview = buildDocumentPreview({ order, type, issueDate: data.issueDate });
+  const documents = await moloniDocuments();
+  const existingSale = documents.find(document => document.orderId === order.id
+    && ['invoice', 'invoice_receipt'].includes(document.type) && document.state !== 'error');
+  if (existingSale) preview.errors.push(`O pedido já possui ${existingSale.label || 'um documento de venda'}.`);
+  if (preview.errors.length) throw new Error(preview.errors.join(' '));
+
+  const id = crypto.createHash('sha256').update(preview.idempotencyKey).digest('hex').slice(0, 32);
+  const documentRef = db.collection('moloni_documents').doc(id);
+  const existing = await documentRef.get();
+  if (existing.exists && existing.data()?.state !== 'error') throw new Error('Este documento já foi criado.');
+  const pending = {
+    orderId: order.id, orderNumber: order.numero || '', customer: order.cliente || '',
+    type: preview.type, label: preview.label, requestedStatus: 'draft', state: 'processing',
+    value: preview.totals.total, paymentId: '', mode: MOLONI_MODE,
+    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), createdByAi: true
+  };
+  pending.links = ENTITY_LINKS.externalLinks('documento_fiscal', id, pending);
+  await documentRef.set(pending);
+  try {
+    let result;
+    if (MOLONI_MODE === 'mock') {
+      result = { valid: 1, document_id: `MOCK-${Date.now()}`, document_number: '' };
+    } else {
+      const config = await moloniConfig();
+      moloniAssertReadyForIssue(config);
+      const client = new MoloniClient({ accessToken: await moloniAccessToken() });
+      preview.moloniCustomerId = await ensureMoloniCustomer(client, preview, config);
+      await attachMoloniProducts(client, preview, config);
+      result = await client.call(moloniEndpointFor(preview.type), moloniSalesPayload(preview, config, 'draft'));
+    }
+    const documentResult = moloniDocumentResult(result);
+    if (!documentResult.id) throw new Error('O Moloni respondeu sem identificador. Confirme no Moloni antes de repetir.');
+    const completed = {
+      ...pending, state: 'draft', moloniDocumentId: documentResult.id,
+      number: documentResult.number || '', response: result, updatedAt: new Date().toISOString()
+    };
+    await documentRef.set(completed);
+    const { response: ignored, ...auditCompleted } = completed;
+    await recordAudit(req, 'ai.invoice_draft.create', {
+      entityType: 'moloni_document', entityId: id, after: auditCompleted,
+      metadata: { orderId: order.id, confirmed: true }
+    });
+    return { id, orderId: order.id, orderNumber: order.numero, customer: order.cliente, value: preview.totals.total, moloniDocumentId: documentResult.id };
+  } catch (error) {
+    await documentRef.set({ state: 'error', error: text(error.message, 500), updatedAt: new Date().toISOString() }, { merge: true }).catch(() => {});
+    throw error;
+  }
 }
 
 function cleanAiMessages(messages) {
@@ -4678,8 +4829,74 @@ const CRM_AI_TOOLS = [
       properties: { area: { type: 'string', enum: ['all', 'orders', 'production', 'stock', 'finance', 'fiscal', 'integrations'] } },
       required: ['area'], additionalProperties: false
     }
+  },
+  {
+    type: 'function',
+    name: 'prepare_order_draft',
+    description: 'Prepara um novo pedido a partir da conversa, sem o gravar. Use apenas quando todos os dados obrigatórios estiverem disponíveis. O CRM mostrará uma confirmação humana antes da criação.',
+    parameters: {
+      type: 'object',
+      properties: {
+        customer_name: { type: 'string' }, company_name: { type: ['string', 'null'] },
+        vat_number: { type: ['string', 'null'] }, phone: { type: 'string' },
+        customer_type: { type: 'string', enum: ['business', 'consumer'] },
+        billing_address: { type: 'string' }, billing_postal_code: { type: 'string' }, billing_city: { type: 'string' },
+        billing_country: { type: 'string', description: 'Código ISO de duas letras, por exemplo PT ou BE.' },
+        delivery_mode: { type: 'string', enum: ['pickup', 'shipping'] },
+        delivery_country: { type: 'string' }, delivery_date: { type: 'string', description: 'Data AAAA-MM-DD.' },
+        installation_value: { type: 'number', minimum: 0 }, installation_vat_applicable: { type: 'boolean', description: 'true quando a instalação está sujeita à taxa de IVA determinada pelo CRM.' },
+        vies_status: { type: 'string', enum: ['not_checked', 'valid', 'invalid', 'unavailable', 'not_applicable'] },
+        transport_evidence: { type: 'boolean' }, notes: { type: ['string', 'null'] },
+        products: {
+          type: 'array', minItems: 1, maxItems: 30,
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' }, size: { type: ['string', 'null'] }, quantity: { type: 'number', exclusiveMinimum: 0 },
+              unit_value: { type: 'number', minimum: 0, description: 'Preço unitário sem IVA.' }, vat_applicable: { type: 'boolean', description: 'true quando a linha está sujeita à taxa de IVA determinada pelo CRM.' }, notes: { type: ['string', 'null'] }
+            },
+            required: ['name', 'size', 'quantity', 'unit_value', 'vat_applicable', 'notes'], additionalProperties: false
+          }
+        },
+        payments: {
+          type: 'array', maxItems: 20,
+          items: {
+            type: 'object',
+            properties: {
+              type: { type: 'string' }, date: { type: 'string' }, value: { type: 'number', minimum: 0 },
+              method: { type: 'string' }, status: { type: 'string', enum: ['pago', 'pendente'] }, notes: { type: ['string', 'null'] }
+            },
+            required: ['type', 'date', 'value', 'method', 'status', 'notes'], additionalProperties: false
+          }
+        }
+      },
+      required: ['customer_name', 'company_name', 'vat_number', 'phone', 'customer_type', 'billing_address', 'billing_postal_code', 'billing_city', 'billing_country', 'delivery_mode', 'delivery_country', 'delivery_date', 'installation_value', 'installation_vat_applicable', 'vies_status', 'transport_evidence', 'notes', 'products', 'payments'],
+      additionalProperties: false
+    }
+  },
+  {
+    type: 'function',
+    name: 'prepare_invoice_draft',
+    description: 'Prepara uma Fatura ou Fatura-Recibo em rascunho para um pedido já existente. Nunca fecha o documento. O CRM exigirá confirmação humana antes de enviar ao Moloni.',
+    parameters: {
+      type: 'object',
+      properties: {
+        order_id: { type: 'string' },
+        document_type: { type: 'string', enum: ['invoice', 'invoice_receipt'] },
+        issue_date: { type: 'string', description: 'Data AAAA-MM-DD.' }
+      },
+      required: ['order_id', 'document_type', 'issue_date'], additionalProperties: false
+    }
   }
 ];
+
+function crmAiToolsForRequest(req) {
+  return CRM_AI_TOOLS.filter(tool => {
+    if (tool.name === 'prepare_order_draft') return ADMIN_ACCESS.hasPermission(req.crmUser, 'orders.write');
+    if (tool.name === 'prepare_invoice_draft') return ADMIN_ACCESS.hasPermission(req.crmUser, 'fiscal.write') && ADMIN_ACCESS.hasPermission(req.crmUser, 'orders.read');
+    return true;
+  });
+}
 
 function normalizedAiSearch(value) {
   return String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -4729,7 +4946,7 @@ function filterAiRecords(records, args = {}) {
   });
 }
 
-async function executeCrmAiTool(name, args, data) {
+async function executeCrmAiTool(name, args, data, context = {}) {
   if (name === 'get_crm_overview') {
     const schemas = {};
     data.events.filter(item => !item.deleted).forEach(item => { schemas[item.schema] = (schemas[item.schema] || 0) + 1; });
@@ -4806,6 +5023,47 @@ async function executeCrmAiTool(name, args, data) {
       groups: [...groups.entries()].map(([label, value]) => ({ label, value: money(value) })).sort((a, b) => b.value - a.value).slice(0, 200)
     };
   }
+  if (name === 'prepare_order_draft') {
+    if (!context.req || !ADMIN_ACCESS.hasPermission(context.req.crmUser, 'orders.write')) throw new Error('Sem permissão para criar pedidos.');
+    const draft = AI_ACTIONS.normalizeOrderDraft(args, context.req.crmUser || {});
+    if (!draft.valid) return { success: false, missingOrInvalid: draft.errors };
+    const action = await createAiPendingAction(
+      context.req,
+      'create_order',
+      draft.payload,
+      AI_ACTIONS.orderDraftSummary(draft.payload, draft.taxDecision)
+    );
+    return {
+      success: true, requiresHumanConfirmation: true,
+      action: publicAiPendingAction(action),
+      message: 'Pedido preparado. Peça ao utilizador para rever o cartão e clicar em Confirmar.'
+    };
+  }
+  if (name === 'prepare_invoice_draft') {
+    if (!context.req || !ADMIN_ACCESS.hasPermission(context.req.crmUser, 'fiscal.write')) throw new Error('Sem permissão para criar documentos fiscais.');
+    const order = await moloniOrder(args.order_id);
+    if (!order) return { success: false, error: 'Pedido não encontrado.' };
+    const type = args.document_type === 'invoice_receipt' ? 'invoice_receipt' : 'invoice';
+    const preview = buildDocumentPreview({ order, type, issueDate: args.issue_date });
+    const documents = await moloniDocuments();
+    if (documents.some(document => document.orderId === order.id && ['invoice', 'invoice_receipt'].includes(document.type) && document.state !== 'error')) {
+      preview.errors.push('O pedido já possui um documento de venda.');
+    }
+    if (preview.errors.length) return { success: false, missingOrInvalid: preview.errors };
+    const summary = {
+      title: `Criar ${preview.label} em rascunho`,
+      lines: [`Pedido: ${order.numero}`, `Cliente: ${order.cliente}`, `Total: ${preview.totals.total.toFixed(2)} EUR`, `Fiscalidade: ${preview.taxDecision.label}`],
+      total: preview.totals.total, customer: order.cliente, orderNumber: order.numero
+    };
+    const action = await createAiPendingAction(context.req, 'create_invoice_draft', {
+      orderId: order.id, type, issueDate: preview.issueDate
+    }, summary);
+    return {
+      success: true, requiresHumanConfirmation: true,
+      action: publicAiPendingAction(action),
+      message: 'Fatura em rascunho preparada. Peça ao utilizador para rever o cartão e clicar em Confirmar.'
+    };
+  }
   throw new Error(`Ferramenta de CRM desconhecida: ${name}`);
 }
 
@@ -4835,10 +5093,117 @@ app.post('/api/ai/conversation/reset', async (req, res) => {
       mode: 'manager',
       updatedAt: new Date().toISOString()
     });
+    const pendingSnapshot = await AI_PENDING_ACTIONS_COLLECTION.get();
+    await Promise.all(pendingSnapshot.docs.map(async doc => {
+      const action = doc.data() || {};
+      if (action.ownerId === aiActorId(req) && action.status === 'pending') {
+        await AI_PENDING_ACTIONS_COLLECTION.doc(doc.id).set({ status: 'cancelled', updatedAt: new Date().toISOString() }, { merge: true });
+      }
+    }));
     await recordAudit(req, 'ai.manager.conversation.reset', { entityType: 'ai_conversation', entityId: aiConversationId(req) });
     res.json({ success: true });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Não foi possível iniciar uma nova conversa.' });
+  }
+});
+
+app.get('/api/ai/pending-action', async (req, res) => {
+  try {
+    const action = await currentAiPendingAction(req);
+    res.json({ success: true, pendingAction: action ? publicAiPendingAction(action) : null });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Não foi possível consultar a ação pendente.' });
+  }
+});
+
+app.post('/api/ai/actions/:id/cancel', async (req, res) => {
+  try {
+    const id = String(req.params.id || '');
+    if (!isSafeIdentifier(id, 100)) return res.status(400).json({ success: false, message: 'Ação inválida.' });
+    const ref = AI_PENDING_ACTIONS_COLLECTION.doc(id);
+    const snapshot = await ref.get();
+    if (!snapshot.exists) return res.status(404).json({ success: false, message: 'Ação não encontrada.' });
+    const action = snapshot.data() || {};
+    if (action.ownerId !== aiActorId(req) || action.permissionFingerprint !== aiPermissionFingerprint(req)) {
+      return res.status(403).json({ success: false, message: 'Esta ação não pertence à sua sessão.' });
+    }
+    if (action.status !== 'pending') return res.status(409).json({ success: false, message: 'Esta ação já não está pendente.' });
+    await ref.set({ status: 'cancelled', updatedAt: new Date().toISOString() }, { merge: true });
+    await recordAudit(req, 'ai.action.cancel', { entityType: 'ai_pending_action', entityId: id, before: { type: action.type, status: action.status }, after: { type: action.type, status: 'cancelled' } });
+    res.json({ success: true, message: 'Ação cancelada. Nenhum registo foi criado.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Não foi possível cancelar a ação.' });
+  }
+});
+
+app.post('/api/ai/actions/:id/confirm', async (req, res) => {
+  const id = String(req.params.id || '');
+  let ref;
+  let action;
+  let claimed = false;
+  try {
+    if (!isSafeIdentifier(id, 100)) return res.status(400).json({ success: false, message: 'Ação inválida.' });
+    ref = AI_PENDING_ACTIONS_COLLECTION.doc(id);
+    const snapshot = await ref.get();
+    if (!snapshot.exists) return res.status(404).json({ success: false, message: 'Ação não encontrada.' });
+    action = snapshot.data() || {};
+    if (action.ownerId !== aiActorId(req) || action.permissionFingerprint !== aiPermissionFingerprint(req)) {
+      return res.status(403).json({ success: false, message: 'Esta ação não pertence à sua sessão.' });
+    }
+    if (action.status !== 'pending') return res.status(409).json({ success: false, message: 'Esta ação já foi confirmada, cancelada ou substituída.' });
+    if (new Date(action.expiresAt || 0).getTime() <= Date.now()) return res.status(410).json({ success: false, message: 'A confirmação expirou. Peça ao assistente para preparar novamente.' });
+    if (action.type === 'create_order' && !ADMIN_ACCESS.hasPermission(req.crmUser, 'orders.write')) {
+      return res.status(403).json({ success: false, message: 'Sem permissão para criar pedidos.' });
+    }
+    if (action.type === 'create_invoice_draft' && !ADMIN_ACCESS.hasPermission(req.crmUser, 'fiscal.write')) {
+      return res.status(403).json({ success: false, message: 'Sem permissão para criar faturas.' });
+    }
+    if (AI_ACTION_CONFIRMATIONS_IN_PROGRESS.has(id)) return res.status(409).json({ success: false, message: 'Esta ação já está a ser processada.' });
+    AI_ACTION_CONFIRMATIONS_IN_PROGRESS.add(id);
+    const claimTime = new Date().toISOString();
+    if (typeof db.runTransaction === 'function') {
+      action = await db.runTransaction(async transaction => {
+        const current = await transaction.get(ref);
+        if (!current.exists) throw new Error('Ação não encontrada.');
+        const currentAction = current.data() || {};
+        if (currentAction.ownerId !== aiActorId(req) || currentAction.permissionFingerprint !== aiPermissionFingerprint(req)) throw new Error('Esta ação não pertence à sua sessão.');
+        if (currentAction.status !== 'pending') throw new Error('Esta ação já foi confirmada, cancelada ou substituída.');
+        transaction.set(ref, { status: 'processing', confirmedAt: claimTime, updatedAt: claimTime }, { merge: true });
+        return currentAction;
+      });
+    } else {
+      const current = await ref.get();
+      if (!current.exists || current.data()?.status !== 'pending') throw new Error('Esta ação já foi confirmada, cancelada ou substituída.');
+      action = current.data() || {};
+      await ref.set({ status: 'processing', confirmedAt: claimTime, updatedAt: claimTime }, { merge: true });
+    }
+    claimed = true;
+    let result;
+    let message;
+    let redirectUrl;
+    if (action.type === 'create_order') {
+      result = await createOrderFromAiAction(req, action.payload || {});
+      message = `Pedido ${result.number} criado com sucesso para ${result.customer}.`;
+      redirectUrl = `/pages/novopedido.html?id=${encodeURIComponent(result.id)}`;
+    } else if (action.type === 'create_invoice_draft') {
+      result = await createInvoiceDraftFromAiAction(req, action.payload || {});
+      message = `Fatura em rascunho criada com sucesso para o pedido ${result.orderNumber}.`;
+      redirectUrl = `/pages/faturacao.html?orderId=${encodeURIComponent(result.orderId)}`;
+    } else {
+      throw new Error('Tipo de ação não suportado.');
+    }
+    await ref.set({ status: 'completed', result: auditSafeValue(result), completedAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, { merge: true });
+    await recordAudit(req, 'ai.action.confirm', {
+      entityType: 'ai_pending_action', entityId: id,
+      before: { type: action.type, status: 'pending' }, after: { type: action.type, status: 'completed', result }
+    });
+    res.status(201).json({ success: true, message, result: sanitizeForResponse(result), redirectUrl });
+  } catch (error) {
+    if (claimed && ref && action) await ref.set({ status: 'pending', lastError: text(error.message, 500), updatedAt: new Date().toISOString() }, { merge: true }).catch(() => {});
+    console.error('Erro ao confirmar ação do Gestor IA:', error.message);
+    res.status(400).json({ success: false, message: error.message || 'Não foi possível concluir a ação.' });
+  } finally {
+    AI_ACTION_CONFIRMATIONS_IN_PROGRESS.delete(id);
   }
 });
 
@@ -4885,8 +5250,8 @@ app.post('/api/ai/ask', requestRateLimit({ windowMs: 15 * 60 * 1000, max: 40 }),
         model: policy.model,
         reasoningEffort: policy.reasoningEffort,
         input,
-        tools: CRM_AI_TOOLS,
-        executeTool: (name, args) => executeCrmAiTool(name, args, data),
+        tools: crmAiToolsForRequest(req),
+        executeTool: (name, args) => executeCrmAiTool(name, args, data, { req, question }),
         instructions: [
           'Você é o Gestor IA da PrintPixel, integrado no CRM de uma empresa de comunicação visual, LED neon, logótipos para montras e impressão 3D.',
           'Converse em português europeu, de forma natural, direta, prestável e profissional.',
@@ -4901,16 +5266,20 @@ app.post('/api/ai/ask', requestRateLimit({ windowMs: 15 * 60 * 1000, max: 40 }),
           quoteMode ? 'Está a conduzir um orçamento conversacional. Observe a imagem e a descrição, consulte products e registos históricos quando precisar de preços, diga brevemente o que identificou e faça apenas a próxima pergunta técnica mais importante, no máximo duas de cada vez. Use as respostas seguintes para completar medidas, quantidade, acabamento, cor/luz, instalação, materiais e prazo. Quando houver informação suficiente, apresente no próprio chat um orçamento preliminar discriminado; valores em falta devem ficar claramente sujeitos a validação humana.' : '',
           'Quando houver dados suficientes, explique a situação, destaque a prioridade e proponha a próxima ação prática.',
           'Se uma consulta não devolver dados suficientes, faça outra consulta com filtros diferentes antes de concluir que a informação não existe.',
-          'Não afirme que guardou, enviou, faturou, apagou ou alterou algo: ações de escrita exigem confirmação humana e endpoint próprio.',
+          'Para criar um pedido, recolha primeiro nome/empresa, NIF ou VAT quando aplicável, telefone, morada completa de faturação, país, modo e país de entrega, data de entrega, linhas com quantidades e valores sem IVA, instalação, pagamentos e enquadramento fiscal. Se faltar algo, faça perguntas antes de usar prepare_order_draft.',
+          'Quando o utilizador pedir para criar um pedido e os dados estiverem completos, use prepare_order_draft. Quando pedir uma fatura para um pedido existente, localize primeiro o ID real e use prepare_invoice_draft. Estas ferramentas apenas preparam; diga ao utilizador para rever e confirmar no cartão do CRM.',
+          'Nunca afirme que a ação foi concluída apenas porque a preparou. Só o endpoint de confirmação humana cria o pedido ou envia o rascunho ao Moloni.',
+          'Nunca feche, emita definitivamente, apague ou cancele documentos fiscais. O assistente só pode preparar faturas em rascunho.',
           'Evite linguagem técnica sobre modelos, endpoints, JSON ou respostas determinísticas.'
         ].join(' '),
         timeoutMs: 80000
       });
+      const pendingAction = await currentAiPendingAction(req);
       const answer = { understood: true, answer: text(output.text, 6000), sources: [], toolsUsed: output.usedTools.map(item => item.name) };
       const assistantMessage = { role: 'assistant', content: answer.answer, hadImage: false, createdAt: new Date().toISOString() };
       await saveAiConversation(req, { messages: [...savedConversation.messages, userMessage, assistantMessage], mode: quoteMode ? 'quote' : 'manager' });
       await recordAudit(req, 'ai.manager.question', { entityType: 'ai_usage', entityId: crypto.randomUUID(), metadata: { understood: true, mode: quoteMode ? 'quote_chat' : 'tool_chat', turns: priorMessages.length, tools: answer.toolsUsed } });
-      return res.json({ success: true, answer: sanitizeForResponse(answer), generatedAt: briefing.generatedAt, deterministic: false, model: policy.model, mode: quoteMode ? 'quote' : 'manager' });
+      return res.json({ success: true, answer: sanitizeForResponse(answer), pendingAction: pendingAction ? publicAiPendingAction(pendingAction) : null, generatedAt: briefing.generatedAt, deterministic: false, model: policy.model, mode: quoteMode ? 'quote' : 'manager' });
     }
 
     const knowledge = await buildAuthorizedAiKnowledge(data, focus, quoteMode);

@@ -11,6 +11,7 @@
     /* O diálogo é o produto principal; os indicadores passam a contexto lateral. */
     .container{max-width:1460px;padding-top:22px}.chat-layout{display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:18px;align-items:start}.chat-shell{display:grid;grid-template-rows:auto minmax(470px,calc(100vh - 330px)) auto;min-height:690px;overflow:hidden}.chat-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:18px 22px;border-bottom:1px solid var(--line);background:#fff}.chat-identity{display:flex;align-items:center;gap:12px}.chat-identity h1{margin:0;font-size:20px;letter-spacing:-.02em}.chat-identity p{margin:2px 0 0;color:var(--muted);font-size:12px}.chat-presence{display:flex;align-items:center;gap:8px}.chat-presence .status{padding:6px 10px;border-color:#dce3ef;background:#f7f9fc;color:#926200;font-size:11px}.chat-presence .status.connected{background:var(--success-soft);color:var(--success)}.chat-presence .account{margin:0;color:var(--muted);text-align:left}.chat-messages{overflow-y:auto;padding:24px;scroll-behavior:smooth;background:linear-gradient(180deg,#fbfcff,#f7f9fc)}.chat-row{display:flex;gap:10px;max-width:86%;margin:0 0 18px}.chat-row.user{margin-left:auto;justify-content:flex-end}.chat-avatar{flex:0 0 31px;width:31px;height:31px;border-radius:10px;display:grid;place-items:center;background:linear-gradient(145deg,var(--blue),var(--violet));color:#fff;font-size:13px;font-weight:900}.chat-row.user .chat-avatar{display:none}.chat-bubble{padding:12px 15px;border:1px solid #e1e6ef;border-radius:5px 16px 16px 16px;background:#fff;color:#27344a;box-shadow:0 5px 16px rgba(20,35,70,.045);white-space:pre-wrap}.chat-row.user .chat-bubble{border:0;border-radius:16px 5px 16px 16px;background:var(--blue);color:#fff}.chat-meta{margin-top:6px;color:#8992a3;font-size:10px}.chat-row.user .chat-meta{color:#d8e0ff}.typing{display:flex;gap:4px;align-items:center;min-width:52px}.typing span{width:6px;height:6px;border-radius:50%;background:#8090ad;animation:pulse 1s infinite}.typing span:nth-child(2){animation-delay:.16s}.typing span:nth-child(3){animation-delay:.32s}@keyframes pulse{0%,70%,100%{opacity:.3;transform:translateY(0)}35%{opacity:1;transform:translateY(-3px)}}.chat-compose{padding:14px 18px 16px;border-top:1px solid var(--line);background:#fff}.chat-compose .suggestions{margin:0 0 10px}.composer{display:grid;grid-template-columns:1fr auto;align-items:end;gap:10px;padding:7px 7px 7px 14px;border:1px solid #d6ddea;border-radius:16px;background:#fff;box-shadow:0 6px 18px rgba(20,35,70,.06)}.composer:focus-within{border-color:#8298df;box-shadow:0 0 0 4px rgba(49,87,213,.09)}.composer textarea{width:100%;min-height:42px;max-height:140px;padding:9px 0;border:0;outline:0;resize:none;color:var(--ink);background:transparent}.composer .btn{width:43px;height:43px;min-height:43px;padding:0;border-radius:13px;font-size:19px}.composer-note{margin:7px 4px 0;color:#8a94a6;font-size:10px}.intelligence-rail{display:grid;gap:14px}.rail-card{padding:18px;border:1px solid var(--line);border-radius:18px;background:#fff;box-shadow:0 10px 30px rgba(20,35,70,.05)}.rail-title{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:13px}.rail-title h2{margin:0;font-size:16px}.metrics.compact{grid-template-columns:1fr 1fr;gap:8px}.metrics.compact .metric-card{min-height:auto;padding:12px;border-radius:13px;box-shadow:none}.metrics.compact .metric-card:after,.metrics.compact .metric-icon{display:none}.metrics.compact .metric-label{font-size:9px}.metrics.compact .metric-value{margin-top:5px;font-size:22px}.metrics.compact .metric-hint{display:none}.priorities-panel{padding:18px;max-height:430px;overflow:hidden}.priority-list{max-height:335px;overflow-y:auto;padding-right:3px}.priority-item{padding:10px}.priority-item p{font-size:12px}.quote-panel{margin-top:18px}.message{margin:0 0 14px}.new-chat{white-space:nowrap}
     .composer{grid-template-columns:auto 1fr auto;padding:7px;gap:8px}.attach-button{width:43px;height:43px;border:0;border-radius:13px;background:#f0f3f9;color:#42516b;font-size:20px;cursor:pointer}.attach-button:hover{background:#e6ecf8;color:var(--blue)}.attachment-preview{display:none;align-items:center;gap:10px;margin:0 0 9px;padding:8px 10px;border:1px solid #dce3ef;border-radius:12px;background:#f8faff}.attachment-preview.visible{display:flex}.attachment-preview img{width:46px;height:46px;border-radius:9px;object-fit:cover}.attachment-preview div{min-width:0;flex:1}.attachment-preview strong,.attachment-preview span{display:block}.attachment-preview span{color:var(--muted);font-size:11px}.remove-attachment{border:0;background:transparent;color:#758095;font-size:20px;cursor:pointer}.chat-image{display:block;width:min(260px,60vw);max-height:210px;margin:0 0 9px;border-radius:11px;object-fit:cover;background:#eef2f8}.image-badge{display:flex;align-items:center;gap:7px;margin-bottom:7px;font-size:11px;font-weight:800;opacity:.86}
+    .action-card{width:min(540px,72vw);padding:17px;border:1px solid #bccaf3;border-radius:16px;background:linear-gradient(145deg,#fff,#f5f7ff);box-shadow:0 10px 28px rgba(49,87,213,.1)}.action-kicker{display:flex;align-items:center;gap:7px;margin-bottom:5px;color:#3157c8;font-size:10px;font-weight:900;letter-spacing:.09em;text-transform:uppercase}.action-card h3{margin:0;font-size:17px;letter-spacing:-.015em}.action-card ul{margin:11px 0 14px;padding-left:20px;color:#48566c}.action-card li{margin:3px 0}.action-warning{margin:0 0 13px;padding:9px 11px;border-radius:10px;background:var(--warning-soft);color:#855000;font-size:11px;font-weight:750}.action-buttons{display:flex;flex-wrap:wrap;gap:8px}.action-state{margin-top:10px;color:var(--muted);font-size:12px;font-weight:750}.action-state.ok{color:var(--success)}.action-state.error{color:var(--danger)}.action-result{display:inline-flex;margin-top:10px;font-weight:800}
     @media(max-width:1050px){.chat-layout{grid-template-columns:1fr}.intelligence-rail{grid-template-columns:1fr 1fr}.chat-shell{grid-template-rows:auto 520px auto}.settings-grid{grid-template-columns:1fr}}
     @media(max-width:680px){.appbar{height:60px;padding:0 15px}.brand{font-size:14px}.back-link span:last-child{display:none}.container{padding:12px 10px 32px}.chat-layout{display:block}.chat-shell{min-height:calc(100vh - 84px);grid-template-rows:auto minmax(400px,1fr) auto;border-radius:16px}.chat-head{padding:14px}.chat-identity p,.account{display:none}.chat-identity h1{font-size:17px}.new-chat{padding:8px 10px}.chat-messages{padding:16px 12px}.chat-row{max-width:94%}.chat-compose{padding:10px}.suggestions{flex-wrap:nowrap;overflow-x:auto;padding-bottom:3px}.suggestion{white-space:nowrap}.intelligence-rail{display:grid;grid-template-columns:1fr;margin-top:12px}.rail-card,.priorities-panel{padding:15px}.metrics.compact{grid-template-columns:repeat(4,1fr)}.metrics.compact .metric-card{padding:9px}.metrics.compact .metric-label{font-size:8px}.metrics.compact .metric-value{font-size:19px}.quote-head,.quote-form,.quote-output,.admin-content{padding:17px}.quote-head{align-items:flex-start;flex-direction:column}.system-grid{grid-template-columns:1fr}.admin>summary{padding:16px}}
   </style>
@@ -242,6 +243,71 @@
       scrollChat();
       return row;
     }
+    function renderPendingAction(action) {
+      if (!action?.id || document.querySelector(`[data-action-id="${CSS.escape(String(action.id))}"]`)) return;
+      const summary = action.summary || {};
+      const row = document.createElement('div');
+      row.className = 'chat-row assistant';
+      const card = document.createElement('div');
+      card.className = 'action-card';
+      card.dataset.actionId = String(action.id);
+      const typeLabel = action.type === 'create_invoice_draft' ? 'Fatura em rascunho' : 'Novo pedido';
+      const confirmLabel = action.type === 'create_invoice_draft' ? 'Confirmar fatura em rascunho' : 'Confirmar e criar pedido';
+      card.innerHTML = `<div class="action-kicker">✓ Confirmação humana obrigatória · ${escapeHtml(typeLabel)}</div><h3>${escapeHtml(summary.title || 'Rever ação preparada')}</h3><ul>${(summary.lines || []).map(line => `<li>${escapeHtml(line)}</li>`).join('')}</ul><p class="action-warning">Nada será criado até confirmar. O Gestor IA nunca fecha nem emite definitivamente uma fatura.</p><div class="action-buttons"><button class="btn small confirm-action" type="button">${escapeHtml(confirmLabel)}</button><button class="btn ghost small cancel-action" type="button">Cancelar</button></div><div class="action-state" role="status"></div>`;
+      const wrapper = document.createElement('div');
+      const avatar = document.createElement('div');
+      avatar.className = 'chat-avatar';
+      avatar.textContent = 'IA';
+      wrapper.appendChild(card);
+      row.append(avatar, wrapper);
+      elements.chatMessages.appendChild(row);
+      scrollChat();
+      const confirmButton = card.querySelector('.confirm-action');
+      const cancelButton = card.querySelector('.cancel-action');
+      const state = card.querySelector('.action-state');
+      const setBusy = value => { confirmButton.disabled = value; cancelButton.disabled = value; };
+      confirmButton.addEventListener('click', async () => {
+        setBusy(true);
+        state.className = 'action-state';
+        state.textContent = 'A executar com as suas permissões...';
+        try {
+          const result = await api(`/api/ai/actions/${encodeURIComponent(action.id)}/confirm`, { method:'POST', body:'{}' });
+          state.className = 'action-state ok';
+          state.textContent = result.message || 'Ação concluída.';
+          card.querySelector('.action-buttons').remove();
+          if (result.redirectUrl && String(result.redirectUrl).startsWith('/')) {
+            const link = document.createElement('a');
+            link.className = 'action-result';
+            link.href = result.redirectUrl;
+            link.textContent = 'Abrir registo criado →';
+            card.appendChild(link);
+          }
+          loadBriefing().catch(() => {});
+        } catch (error) {
+          setBusy(false);
+          state.className = 'action-state error';
+          state.textContent = error.message;
+        }
+      });
+      cancelButton.addEventListener('click', async () => {
+        setBusy(true);
+        state.textContent = 'A cancelar...';
+        try {
+          const result = await api(`/api/ai/actions/${encodeURIComponent(action.id)}/cancel`, { method:'POST', body:'{}' });
+          state.className = 'action-state';
+          state.textContent = result.message || 'Ação cancelada.';
+          card.querySelector('.action-buttons').remove();
+        } catch (error) {
+          setBusy(false);
+          state.className = 'action-state error';
+          state.textContent = error.message;
+        }
+      });
+    }
+    async function loadPendingAction() {
+      const result = await api('/api/ai/pending-action');
+      if (result.pendingAction) renderPendingAction(result.pendingAction);
+    }
     function typingMessage() {
       const row = document.createElement('div');
       row.className = 'chat-row assistant';
@@ -261,9 +327,12 @@
     async function loadConversation() {
       const result = await api('/api/ai/conversation');
       const messages = result.conversation?.messages || [];
-      if (!messages.length) return welcomeChat();
-      elements.chatMessages.innerHTML = '';
-      messages.forEach(message => chatMessage(message.role, message.content, formatMessageTime(message.createdAt), { hadImage: message.hadImage }));
+      if (!messages.length) welcomeChat();
+      else {
+        elements.chatMessages.innerHTML = '';
+        messages.forEach(message => chatMessage(message.role, message.content, formatMessageTime(message.createdAt), { hadImage: message.hadImage }));
+      }
+      await loadPendingAction();
     }
     async function resetChat() {
       if (!confirm('Iniciar uma conversa nova? O histórico atual do Gestor IA será limpo.')) return;
@@ -293,6 +362,7 @@
         typing.remove();
         const answer = result.answer.answer;
         chatMessage('assistant', answer, result.deterministic ? 'Resposta segura do CRM' : (result.mode === 'quote' ? 'GPT-5.6 Sol · orçamento conversacional' : 'GPT-5.6 Sol · dados atuais do CRM'));
+        if (result.pendingAction) renderPendingAction(result.pendingAction);
         clearAttachment();
       } catch (error) {
         typing.remove();

@@ -191,6 +191,8 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(menuResult.body, /pages\/ia\.html/);
   assert.match(aiPageResult.body, /GPT-5\.6 Sol/);
   assert.match(aiPageResult.body, /api\/ai\/status/);
+  assert.match(aiPageResult.body, /Confirmar e criar pedido/);
+  assert.match(aiPageResult.body, /api\/ai\/actions/);
   assert.match(labelsAdminPageResult.body, /Portal de Rótulos/);
   assert.match(labelsAdminPageResult.body, /api\/rotulos\/orders/);
   assert.match(labelsAdminPageResult.body, /Baixar todos EPS/);

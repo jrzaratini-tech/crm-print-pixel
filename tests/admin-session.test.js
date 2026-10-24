@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const { after, before, test } = require('node:test');
 
 process.env.CRM_USERNAME = 'admin-fase1';
@@ -129,4 +130,46 @@ test('cria identidade individual, aplica perfil e regista auditoria', async () =
   assert.equal(audit.body.events.some(event => event.action === 'admin.user.create'), true);
   assert.equal(audit.body.events.some(event => event.action === 'admin.user.password.reset'), true);
   assert.equal(audit.body.events.some(event => event.action === 'auth.login' && event.actor.username === 'comercial.fase1'), true);
+});
+
+test('confirma uma ação IA uma única vez e cria o pedido auditável', async () => {
+  const adminLogin = await login('admin-fase1', 'palavra-passe-principal-fase1');
+  assert.equal(adminLogin.response.status, 303);
+  const permissions = ['orders.read', 'orders.write', 'quotes.read', 'finance.read', 'fiscal.read', 'fiscal.write', 'catalog.read', 'production.read', 'management.read', 'integrations.manage'];
+  const permissionFingerprint = crypto.createHash('sha256').update(permissions.join('|')).digest('hex').slice(0, 24);
+  const actionId = 'aia_test_confirm_order';
+  await db.collection('ai_pending_actions').doc(actionId).set({
+    ownerId: 'environment-admin',
+    permissionFingerprint,
+    type: 'create_order',
+    status: 'pending',
+    payload: {
+      cliente: 'Cliente IA Teste', empresa: 'Cliente IA Teste, Lda.', nif: '501964843', vatNumber: '501964843',
+      customerType: 'business', billingCountry: 'PT', deliveryMode: 'pickup', deliveryCountry: 'PT',
+      viesStatus: 'not_applicable', transportEvidence: false, taxTreatment: 'auto', taxOverrideReason: '',
+      morada: 'Rua de Teste 1', billingPostalCode: '1000-001', billingCity: 'Lisboa', telemovel: '910000000',
+      dataEntrega: '2026-11-20', instalacao: 0, atendente: 'Gestor IA', categoriaVenda: 'Venda direta',
+      status: 'pendente', observacoes: 'Criado por confirmação de teste.', comIVA: 'sim',
+      produtos: [{ id: 'ai_item_1', nome: 'Impressão teste', tamanho: 'A4', quantidade: 1, valor: 10, comIVA: 'sim', observacoes: '', entregue: false }],
+      pagamentos: [{ id: 'ai_payment_1', tipo: 'entrada', data: '2026-10-24', valor: 0, formaPagamento: 'outro', status: 'pendente', observacoes: '' }],
+      subtotal: 10, iva: 2.3, total: 12.3, totalPago: 0, saldoPendente: 12.3, statusPagamento: 'pendente', aiCreated: true
+    },
+    summary: { title: 'Criar pedido para Cliente IA Teste', lines: ['Total: 12.30 EUR'] },
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    expiresAt: new Date(Date.now() + 60_000).toISOString()
+  });
+
+  const confirmed = await request(`/api/ai/actions/${actionId}/confirm`, adminLogin.cookie, { method: 'POST', body: '{}' });
+  assert.equal(confirmed.response.status, 201);
+  assert.match(confirmed.body.message, /Pedido \d{4}\/\d{4} criado com sucesso/);
+  assert.match(confirmed.body.redirectUrl, /^\/pages\/novopedido\.html\?id=/);
+  const created = await db.collection('events').doc(confirmed.body.result.id).get();
+  assert.equal(created.exists, true);
+  assert.equal(created.data().schema, 'pedido');
+  assert.equal(created.data().payload.aiCreated, true);
+  assert.equal(created.data().payload.aiCreatedBy, 'environment-admin');
+
+  const repeated = await request(`/api/ai/actions/${actionId}/confirm`, adminLogin.cookie, { method: 'POST', body: '{}' });
+  assert.equal(repeated.response.status, 409);
 });
