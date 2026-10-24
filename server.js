@@ -18,6 +18,7 @@ const AI_MANAGER = require('./core/ai-manager.js');
 const LEARNING = require('./core/learning.js');
 const SCHEDULING = require('./core/scheduling.js');
 const BACKUP_SERVICE = require('./core/backup-service.js');
+const { generateDraftPdf } = require('./core/draft-pdf.js');
 const {
   MoloniClient,
   buildDocumentPreview,
@@ -6233,11 +6234,31 @@ app.get('/api/moloni/documents/:id/pdf', async (req, res) => {
     const snapshot = await db.collection('moloni_documents').doc(String(req.params.id || '')).get();
     if (!snapshot.exists) return res.status(404).json({ success: false, message: 'Documento nao encontrado.' });
     const document = snapshot.data();
-    if (document.mode === 'mock') {
-      return res.status(409).json({ success: false, message: 'Documentos de teste nao possuem PDF fiscal.' });
+    if (document.state === 'draft') {
+      const order = await moloniOrder(document.orderId);
+      if (!order) return res.status(404).json({ success: false, message: 'Pedido associado ao rascunho nao encontrado.' });
+      const preview = buildDocumentPreview({
+        order,
+        type: document.type,
+        paymentId: document.paymentId,
+        amount: document.value,
+        issueDate: String(document.createdAt || '').slice(0, 10)
+      });
+      const pdf = generateDraftPdf(document, preview, { companyName: 'Print Pixel' });
+      const safeOrder = String(document.orderNumber || document.id || 'documento').replace(/[^a-zA-Z0-9_-]+/g, '-');
+      res.set({
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': `attachment; filename="rascunho-${safeOrder}.pdf"`,
+        'Content-Length': String(pdf.length),
+        'Cache-Control': 'private, no-store, max-age=0'
+      });
+      return res.send(pdf);
     }
     if (document.state !== 'closed') {
-      return res.status(409).json({ success: false, message: 'Feche o documento no Moloni antes de baixar o PDF fiscal.' });
+      return res.status(409).json({ success: false, message: 'O PDF so esta disponivel para rascunhos ou documentos fechados.' });
+    }
+    if (document.mode === 'mock') {
+      return res.status(409).json({ success: false, message: 'Documentos de teste fechados nao possuem PDF fiscal.' });
     }
     const config = await moloniConfig();
     const client = new MoloniClient({ accessToken: await moloniAccessToken() });
