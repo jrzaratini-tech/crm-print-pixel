@@ -84,6 +84,46 @@ test('prepara uma fatura valida para o total do pedido', () => {
   assert.equal(preview.idempotencyKey, 'pedido-1:invoice:sale');
 });
 
+test('prepara cliente belga com IVA português quando levanta na loja', () => {
+  const preview = buildDocumentPreview({
+    order: {
+      ...order,
+      nif: 'BE0123456789',
+      billingCountry: 'BE',
+      customerType: 'business',
+      deliveryMode: 'pickup',
+      deliveryCountry: 'BE'
+    },
+    type: 'invoice'
+  });
+  assert.equal(preview.valid, true);
+  assert.equal(preview.order.vat, 'BE0123456789');
+  assert.equal(preview.order.billingCountry, 'BE');
+  assert.equal(preview.taxDecision.code, 'PT_STANDARD');
+  assert.equal(preview.products[0].vatIncluded, true);
+});
+
+test('prepara linha intracomunitaria com isencao M16', () => {
+  const preview = buildDocumentPreview({
+    order: {
+      ...order,
+      nif: 'BE0123456789',
+      billingCountry: 'BE',
+      customerType: 'business',
+      deliveryMode: 'shipping',
+      deliveryCountry: 'BE',
+      viesStatus: 'valid',
+      transportEvidence: true,
+      total: 1000
+    },
+    type: 'invoice'
+  });
+  assert.equal(preview.valid, true);
+  assert.equal(preview.taxDecision.code, 'EU_B2B_M16');
+  assert.equal(preview.products[0].vatIncluded, false);
+  assert.equal(preview.products[0].exemptionReason, 'M16');
+});
+
 test('classifica linhas Moloni como produto ou servico com referencia estavel', () => {
   const preview = buildDocumentPreview({
     order: {

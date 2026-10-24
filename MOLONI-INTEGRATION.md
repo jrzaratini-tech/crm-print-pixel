@@ -16,6 +16,20 @@ O CRM suporta dois modos:
 - Tokens OAuth cifrados antes de guardar no Firestore.
 - Criação/reutilização automática de artigos Moloni por linha do pedido.
 - Classificação fiscal por linha: produtos como `Produto` e instalação/deslocação/serviços como `Serviço`.
+- Clientes internacionais com país e VAT preservados na criação do cliente Moloni.
+- Decisão fiscal automática para IVA português, transmissão intracomunitária B2B (`M16`) e exportação (`M05`).
+- Validação de VAT intracomunitário através do VIES e bloqueio da emissão quando falta prova de transporte.
+
+## Pedidos manuais internacionais
+
+No pedido, preencha o tipo de cliente, país de faturação, forma de entrega, país de destino e VAT/NIF.
+
+- Levantamento na loja: o CRM aplica IVA português por defeito, mesmo quando o cliente é estrangeiro.
+- Envio B2B para outro país da UE: valide o VAT no VIES e confirme a prova de transporte; o CRM aplica `M16`.
+- Exportação para fora da UE: confirme a prova de saída; o CRM aplica `M05`.
+- Envio B2C para outro país da UE: a emissão fica bloqueada até serem configurados OSS e a taxa do país de destino.
+
+O campo `Tratamento fiscal` deve permanecer em `Automático` no uso normal. As opções explícitas destinam-se a correções justificadas e não dispensam os requisitos legais mostrados pelo CRM.
 
 ## Ativar em modo real
 

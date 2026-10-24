@@ -1789,6 +1789,22 @@ test('salva, consulta com filtro por id e exclui registro', async () => {
   assert.equal(afterDelete.body.count, 0);
 });
 
+test('consulta devolve sempre o ID canónico do documento em registos legados', async () => {
+  const canonicalId = `pedido-canonical-${Date.now()}`;
+  await db.collection('events').doc(canonicalId).set({
+    id: 'payment_legacy_wrong_id',
+    schema: 'pedido',
+    deleted: false,
+    payload: { cliente: 'Cliente legado', numero: 'PED-LEGACY-ID', total: 123 }
+  });
+
+  const result = await post('/api/database/query', { schema: 'pedido', filters: { id: canonicalId } });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.body.count, 1);
+  assert.equal(result.body.events[0].id, canonicalId);
+  assert.equal(result.body.events[0].payload.crmOrderId, canonicalId);
+});
+
 test('exclui definitivamente pedido e despesa do banco', async () => {
   const pedido = await post('/api/database/commit', { schema: 'pedido', payload: { cliente: 'Excluir Pedido', total: 321 }, pageId: 'test' });
   const despesa = await post('/api/database/commit', { schema: 'despesa', payload: { fornecedor: 'Excluir Despesa', valorTotal: 45 }, pageId: 'test' });

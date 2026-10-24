@@ -456,7 +456,7 @@
         const paid = paidTotal(order);
         const outstanding = Math.max(0, Number(order.total || 0) - paid);
         $('selectedCustomer').textContent = order.cliente || 'Cliente sem nome';
-        $('selectedMeta').textContent = `Pedido ${order.numero || '-'} · NIF ${order.nif || 'não indicado'}`;
+        $('selectedMeta').textContent = `Pedido ${order.numero || '-'} · ${order.billingCountry || 'PT'} · VAT/NIF ${order.nif || 'não indicado'}`;
         $('selectedTotal').textContent = money(order.total);
         $('orderSummary').innerHTML = `
           <div class="row"><span>Total do pedido</span><strong>${money(order.total)}</strong></div>
@@ -526,7 +526,7 @@
         state.recommendation = result.recommendation || state.recommendation;
         const preview = result.preview;
         $('previewBox').innerHTML = preview.valid
-          ? `<div class="notice success"><strong>${escapeHtml(preview.label)} pronta.</strong> Valor: ${money(preview.type === 'receipt' ? preview.receiptValue : preview.totals.total)}. ${preview.products.length} linha(s).</div>`
+          ? `<div class="notice success"><strong>${escapeHtml(preview.label)} pronta.</strong> Valor: ${money(preview.type === 'receipt' ? preview.receiptValue : preview.totals.total)}. ${preview.products.length} linha(s).<div class="tiny" style="margin-top:5px">${escapeHtml(preview.taxDecision?.label || 'Tratamento fiscal padrão')} · ${escapeHtml(preview.taxDecision?.reason || '')}</div></div>`
           : `<div class="notice error">${preview.errors.map(escapeHtml).join('<br>')}</div>`;
         return preview;
       }

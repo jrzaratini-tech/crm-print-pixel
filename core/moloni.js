@@ -2,6 +2,7 @@
 
 const MOLONI_API_BASE = 'https://api.moloni.pt/v1';
 const MOLONI_OAUTH_URL = 'https://www.moloni.pt/ac/root/oauth/';
+const { resolveSalesTax } = require('./sales-tax.js');
 
 function roundMoney(value) {
   const parsed = Number.parseFloat(String(value || 0).replace(',', '.'));
@@ -61,9 +62,16 @@ function isValidPortugueseVat(value) {
 function validateFiscalOrder(order = {}) {
   const errors = [];
   if (!cleanText(order.cliente)) errors.push('Nome do cliente em falta.');
-  const nif = cleanText(order.nif).replace(/\D/g, '');
-  if (nif && !/^\d{9}$/.test(nif)) errors.push('O NIF deve ter 9 digitos.');
-  else if (nif && !isValidPortugueseVat(nif)) errors.push(`O NIF ${nif} e invalido. Confirme o NIF do cliente e corrija o pedido antes de faturar.`);
+  const taxDecision = resolveSalesTax(order);
+  const nif = cleanText(order.vatNumber || order.nif, 24).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (taxDecision.inputs.billingCountry === 'PT') {
+    const portugueseVat = nif.replace(/^PT/, '');
+    if (portugueseVat && !/^\d{9}$/.test(portugueseVat)) errors.push('O NIF português deve ter 9 dígitos.');
+    else if (portugueseVat && !isValidPortugueseVat(portugueseVat)) errors.push(`O NIF ${portugueseVat} e invalido. Confirme o NIF do cliente e corrija o pedido antes de faturar.`);
+  } else if (taxDecision.inputs.customerType === 'business' && !nif) {
+    errors.push('VAT do cliente estrangeiro em falta.');
+  }
+  if (!taxDecision.valid) errors.push(...(taxDecision.errors || [taxDecision.reason]));
   if (!Array.isArray(order.produtos) || !order.produtos.length) errors.push('O pedido nao tem produtos.');
   if (!(roundMoney(order.total) > 0)) errors.push('O total do pedido deve ser superior a zero.');
   return errors;
@@ -193,6 +201,7 @@ function buildDocumentPreview({ order, type, paymentId, amount, issueDate }) {
   const payment = selectPayment(order, paymentId);
   const requestedAmount = roundMoney(amount);
   const date = cleanText(issueDate || new Date().toISOString().slice(0, 10), 10);
+  const taxDecision = resolveSalesTax(order);
 
   if (documentType === 'receipt' && !payment && !(requestedAmount > 0)) {
     errors.push('Selecione um pagamento ou indique o valor do recibo.');
@@ -214,7 +223,9 @@ function buildDocumentPreview({ order, type, paymentId, amount, issueDate }) {
     summary: cleanText([product.tamanho, product.observacoes].filter(Boolean).join(' - '), 250),
     qty: Math.max(0.01, roundMoney(product.quantidade || 1)),
     price: roundMoney(product.valor),
-    vatIncluded: product.comIVA !== 'nao',
+    vatIncluded: taxDecision.code === 'PT_STANDARD' ? product.comIVA !== 'nao' : taxDecision.taxable,
+    taxRate: taxDecision.code === 'PT_STANDARD' && product.comIVA === 'nao' ? 0 : taxDecision.rate,
+    exemptionReason: taxDecision.code === 'PT_STANDARD' && product.comIVA === 'nao' ? cleanText(order.exemptionReason || 'M99', 20) : taxDecision.exemptionReason,
     nature: classifyLineNature(product),
     reference: stableReference(product.referencia || product.sku || product.nome || `produto-${index + 1}`, classifyLineNature(product) === 'service' ? 'CRM-S' : 'CRM-P')
   }));
@@ -227,7 +238,9 @@ function buildDocumentPreview({ order, type, paymentId, amount, issueDate }) {
       summary: '',
       qty: 1,
       price: installation,
-      vatIncluded: order.comIVA !== 'nao',
+      vatIncluded: taxDecision.code === 'PT_STANDARD' ? order.comIVA !== 'nao' : taxDecision.taxable,
+      taxRate: taxDecision.code === 'PT_STANDARD' && order.comIVA === 'nao' ? 0 : taxDecision.rate,
+      exemptionReason: taxDecision.code === 'PT_STANDARD' && order.comIVA === 'nao' ? cleanText(order.exemptionReason || 'M99', 20) : taxDecision.exemptionReason,
       nature: 'service',
       reference: stableReference('Instalacao / deslocacao', 'CRM-S')
     });
@@ -244,11 +257,17 @@ function buildDocumentPreview({ order, type, paymentId, amount, issueDate }) {
       number: cleanText(order.numero, 80),
       customer: cleanText(order.cliente, 160),
       company: cleanText(order.empresa, 160),
-      vat: cleanText(order.nif).replace(/\D/g, ''),
+      vat: taxDecision.inputs.vat,
       address: cleanText(order.morada, 250),
-      phone: cleanText(order.telemovel, 50)
+      city: cleanText(order.billingCity || order.cidadeFaturacao, 120),
+      postalCode: cleanText(order.billingPostalCode || order.codigoPostalFaturacao, 40),
+      phone: cleanText(order.telemovel, 50),
+      billingCountry: taxDecision.inputs.billingCountry,
+      deliveryCountry: taxDecision.inputs.deliveryCountry,
+      deliveryMode: taxDecision.inputs.deliveryMode
     },
     products,
+    taxDecision,
     totals,
     payments,
     payment,

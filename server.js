@@ -1305,7 +1305,7 @@ async function ensureMoloniProduct(client, product, config) {
     minimum_stock: 0,
     pos_favorite: 0,
     taxes,
-    ...(!taxes.length ? { exemption_reason: settings.exemptionReason || 'M99' } : {})
+    ...(!taxes.length ? { exemption_reason: product.exemptionReason || settings.exemptionReason || 'M99' } : {})
   };
   let created;
   try {
@@ -1370,7 +1370,7 @@ function moloniSalesPayload(preview, config, status) {
     taxes: product.vatIncluded && Number(settings.standardTaxId)
       ? [{ tax_id: Number(settings.standardTaxId), value: 0, order: 1, cumulative: 0 }]
       : [],
-    ...(!product.vatIncluded ? { exemption_reason: settings.exemptionReason || 'M99' } : {})
+    ...(!product.vatIncluded ? { exemption_reason: product.exemptionReason || settings.exemptionReason || 'M99' } : {})
   }));
   const payload = {
     company_id: Number(config.companyId),
@@ -1422,18 +1422,35 @@ async function ensureMoloniCustomer(client, preview, config) {
     vat
   });
   const existingCustomers = Array.isArray(matches) ? matches : [matches];
-  const existingId = moloniCustomerId(existingCustomers.find(customer => moloniCustomerId(customer)) || {});
+  const requestedCountry = String(preview.order.billingCountry || 'PT').toUpperCase();
+  const matchingCustomer = existingCustomers.find(customer => {
+    if (!moloniCustomerId(customer)) return false;
+    const customerCountry = String(customer?.country?.iso_3166_1 || '').toUpperCase();
+    return preview.order.vat || !customerCountry || customerCountry === requestedCountry;
+  });
+  const existingId = moloniCustomerId(matchingCustomer || {});
   if (existingId) return existingId;
+
+  let countryId = 1;
+  const countryCode = String(preview.order.billingCountry || 'PT').toUpperCase();
+  if (countryCode !== 'PT') {
+    const countries = await client.call('countries/getAll', {});
+    const country = (Array.isArray(countries) ? countries : []).find(item =>
+      String(item.iso_3166_1 || item.code || '').toUpperCase() === countryCode
+    );
+    countryId = Number(country?.country_id || 0);
+    if (!(countryId > 0)) throw new Error(`O país ${countryCode} não foi encontrado na conta Moloni.`);
+  }
 
   const created = await client.call('customers/insert', {
     company_id: Number(config.companyId),
     number: `CRM-${vat}`.slice(0, 30),
-    name: preview.order.vat ? (preview.order.company || preview.order.customer) : 'Consumidor final',
+    name: preview.order.vat ? (preview.order.company || preview.order.customer) : (preview.order.customer || 'Consumidor final'),
     vat,
     address: preview.order.address,
-    city: '',
-    zip_code: '',
-    country_id: 1,
+    city: preview.order.city || '',
+    zip_code: preview.order.postalCode || '',
+    country_id: countryId,
     phone: preview.order.phone,
     language_id: 1,
     salesman_id: 0,
@@ -4288,6 +4305,7 @@ function apiPermissionForRequest(req) {
     return 'ai.use';
   }
   if (pathName.startsWith('/moloni/')) return write ? 'fiscal.write' : 'fiscal.read';
+  if (pathName.startsWith('/tax/')) return write ? 'fiscal.write' : 'fiscal.read';
   if (pathName.startsWith('/stripe/')) return write ? 'finance.write' : 'finance.read';
   if (pathName.startsWith('/production/')) return write ? 'production.write' : 'production.read';
   if (pathName.startsWith('/products') || pathName.startsWith('/suppliers') || pathName.startsWith('/recipes') || pathName.startsWith('/external-mappings')) return write ? 'catalog.write' : 'catalog.read';
@@ -5937,7 +5955,11 @@ app.get('/api/moloni/options', async (req, res) => {
         paymentMethods: [{ payment_method_id: 1, name: 'Transferencia / teste' }],
         products: [{ product_id: 1, name: 'Servico PrintPixel / teste' }],
         productCategories: [{ category_id: 1, name: 'Servicos PrintPixel / teste' }],
-        measurementUnits: [{ unit_id: 1, name: 'Unidade' }]
+        measurementUnits: [{ unit_id: 1, name: 'Unidade' }],
+        countries: [
+          { country_id: 1, iso_3166_1: 'PT', name: 'Portugal' },
+          { country_id: 2, iso_3166_1: 'BE', name: 'Bélgica' }
+        ]
       });
     }
     const accessToken = await moloniAccessToken();
@@ -5950,13 +5972,14 @@ app.get('/api/moloni/options', async (req, res) => {
     );
     const companyId = Number(requestedCompanyId || config.companyId || realCompany?.company_id || companies?.[0]?.company_id || 0);
     const common = { company_id: companyId, qty: 50, offset: 0 };
-    const [documentSets, taxes, paymentMethods, products, productCategories, measurementUnits] = await Promise.all([
+    const [documentSets, taxes, paymentMethods, products, productCategories, measurementUnits, countries] = await Promise.all([
       client.call('documentSets/getAll', common),
       client.call('taxes/getAll', common),
       client.call('paymentMethods/getAll', common),
       client.call('products/getAll', common),
       client.call('productCategories/getAll', { ...common, parent_id: 0 }).catch(() => []),
-      client.call('measurementUnits/getAll', common).catch(() => [])
+      client.call('measurementUnits/getAll', common).catch(() => []),
+      client.call('countries/getAll', {}).catch(() => [])
     ]);
     const normalizedProductCategories = (Array.isArray(productCategories) ? productCategories : []).map(item => ({
       ...item,
@@ -5977,10 +6000,56 @@ app.get('/api/moloni/options', async (req, res) => {
       paymentMethods,
       products,
       productCategories: normalizedProductCategories,
-      measurementUnits: normalizedMeasurementUnits
+      measurementUnits: normalizedMeasurementUnits,
+      countries
     });
   } catch (error) {
     res.status(502).json({ success: false, message: error.message || 'Falha ao sincronizar opcoes do Moloni.' });
+  }
+});
+
+app.post('/api/tax/vies/validate', async (req, res) => {
+  const rawCountry = text(req.body?.countryCode, 2).toUpperCase();
+  const countryCode = rawCountry === 'GR' ? 'EL' : rawCountry;
+  const compactVat = text(req.body?.vatNumber, 24).toUpperCase().replace(/[^A-Z0-9]/g, '');
+  const vatNumber = compactVat.replace(new RegExp(`^${countryCode === 'EL' ? '(?:EL|GR)' : countryCode}`), '');
+  if (!/^[A-Z]{2}$/.test(countryCode) || !/^[A-Z0-9]{4,14}$/.test(vatNumber)) {
+    return res.status(400).json({ success: false, message: 'Indique um país da UE e um VAT intracomunitário válido.' });
+  }
+  const escapeXml = value => String(value).replace(/[<>&'\"]/g, char => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', "'": '&apos;', '"': '&quot;' }[char]));
+  const soap = `<?xml version="1.0" encoding="UTF-8"?>
+    <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/" xmlns:urn="urn:ec.europa.eu:taxud:vies:services:checkVat:types">
+      <soap:Body><urn:checkVat><urn:countryCode>${escapeXml(countryCode)}</urn:countryCode><urn:vatNumber>${escapeXml(vatNumber)}</urn:vatNumber></urn:checkVat></soap:Body>
+    </soap:Envelope>`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  try {
+    const response = await fetch('https://ec.europa.eu/taxation_customs/vies/services/checkVatService', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/xml; charset=utf-8', SOAPAction: 'checkVat' },
+      body: soap,
+      signal: controller.signal
+    });
+    const body = await response.text();
+    if (!response.ok || /<soap(?:env)?:Fault/i.test(body)) throw new Error('O serviço VIES não respondeu à validação.');
+    const readTag = tag => {
+      const match = body.match(new RegExp(`<(?:\\w+:)?${tag}[^>]*>([\\s\\S]*?)<\\/(?:\\w+:)?${tag}>`, 'i'));
+      return match ? match[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim() : '';
+    };
+    const valid = readTag('valid').toLowerCase() === 'true';
+    res.json({
+      success: true,
+      valid,
+      countryCode: rawCountry,
+      vatNumber: `${countryCode}${vatNumber}`,
+      requestDate: readTag('requestDate'),
+      name: readTag('name').replace(/^---$/, ''),
+      address: readTag('address').replace(/^---$/, '')
+    });
+  } catch (error) {
+    res.status(503).json({ success: false, unavailable: true, message: error.name === 'AbortError' ? 'O VIES demorou demasiado a responder. Tente novamente.' : 'O serviço VIES está temporariamente indisponível. Tente novamente.' });
+  } finally {
+    clearTimeout(timeoutId);
   }
 });
 
@@ -7294,7 +7363,10 @@ app.post('/api/database/query', async (req, res) => {
       const data = doc.data();
       if (!data.deleted && (schema === 'all' || data.schema === schema) && matchesFilters(doc.id, data, filters)) {
         const normalized = ENTITY_LINKS.normalizeEvent(doc.id, data);
-        events.push({ id: doc.id, ...normalized, payload: sanitizeForResponse(normalized.payload) });
+        // O ID do documento Firestore é sempre a identidade canónica. Alguns
+        // registos legados contêm um campo superior `id` pertencente a um
+        // pagamento; ele nunca pode substituir o ID real do pedido na API.
+        events.push({ ...normalized, id: doc.id, payload: sanitizeForResponse(normalized.payload) });
       }
     });
     events.sort((a, b) => new Date(b.timestamp || b.created_at || 0) - new Date(a.timestamp || a.created_at || 0));

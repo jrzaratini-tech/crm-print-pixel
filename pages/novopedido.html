@@ -760,13 +760,84 @@
                     </div>
                     
                     <div class="form-group">
-                        <label for="nif" class="required">Contribuinte / NIF</label>
-                        <input type="text" id="nif" name="nif" data-bind="pedido.nif" required>
+                        <label for="nif">NIF / VAT</label>
+                        <input type="text" id="nif" name="nif" data-bind="pedido.nif" maxlength="24" placeholder="PT123456789 ou BE0123456789">
+                        <div class="field-note">Para empresas estrangeiras, inclua o prefixo do país.</div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="customerType" class="required">Tipo de cliente</label>
+                        <select id="customerType" data-bind="pedido.customerType" required>
+                            <option value="business">Empresa</option>
+                            <option value="consumer">Particular</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="billingCountry" class="required">País de faturação</label>
+                        <select id="billingCountry" data-bind="pedido.billingCountry" required></select>
                     </div>
                     
                     <div class="form-group">
                         <label for="morada" class="required">Morada</label>
                         <input type="text" id="morada" name="morada" data-bind="pedido.morada" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="billingPostalCode">Código postal</label>
+                        <input type="text" id="billingPostalCode" data-bind="pedido.billingPostalCode" maxlength="40">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="billingCity">Cidade</label>
+                        <input type="text" id="billingCity" data-bind="pedido.billingCity" maxlength="120">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="deliveryMode" class="required">Entrega dos bens</label>
+                        <select id="deliveryMode" data-bind="pedido.deliveryMode" required>
+                            <option value="pickup">Levantamento na loja</option>
+                            <option value="shipping">Envio / transporte</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="deliveryCountry" class="required">País de destino</label>
+                        <select id="deliveryCountry" data-bind="pedido.deliveryCountry" required></select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="viesStatus">Validação VIES</label>
+                        <select id="viesStatus" data-bind="pedido.viesStatus" disabled>
+                            <option value="not_checked">Não verificado</option>
+                            <option value="valid">Válido — verificado no VIES</option>
+                            <option value="invalid">Inválido</option>
+                            <option value="unavailable">VIES indisponível</option>
+                            <option value="not_applicable">Não aplicável</option>
+                        </select>
+                        <button type="button" class="btn btn-secondary" id="validateViesBtn" style="margin-top:8px">Validar VAT no VIES</button>
+                        <input type="hidden" id="viesCheckedAt" data-bind="pedido.viesCheckedAt" value="">
+                        <input type="hidden" id="viesName" data-bind="pedido.viesName" value="">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="taxTreatment">Tratamento fiscal</label>
+                        <select id="taxTreatment" data-bind="pedido.taxTreatment">
+                            <option value="auto">Automático</option>
+                            <option value="pt_standard">IVA português</option>
+                            <option value="eu_b2b_m16">Intracomunitário B2B — M16</option>
+                            <option value="export_m05">Exportação — M05</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="taxOverrideReasonGroup" hidden>
+                        <label for="taxOverrideReason">Motivo da alteração fiscal</label>
+                        <input type="text" id="taxOverrideReason" data-bind="pedido.taxOverrideReason" maxlength="300" placeholder="Justificação para auditoria">
+                    </div>
+
+                    <div class="form-group">
+                        <label><input type="checkbox" id="transportEvidence" data-bind="pedido.transportEvidence"> Prova de transporte/saída confirmada</label>
+                        <div class="field-note">Obrigatória para M16 e M05. Conserve o documento de transporte.</div>
                     </div>
                     
                     <div class="form-group">
@@ -943,6 +1014,8 @@
             
             <div class="totals-section">
                 <h2 class="section-title">Totais</h2>
+
+                <div id="taxDecisionBox" style="margin-bottom:18px;padding:14px;border-radius:10px;background:#eff6ff;color:#1e3a8a;border:1px solid #bfdbfe"></div>
                 
                 <div class="iva-option-group">
                     <div class="iva-option">
@@ -1085,6 +1158,14 @@
             let isEditMode = false;
             let currentPedidoId = '';
             let sellersCache = [];
+            const EU_COUNTRIES = new Set(['AT','BE','BG','HR','CY','CZ','DK','EE','FI','FR','DE','GR','HU','IE','IT','LV','LT','LU','MT','NL','PL','PT','RO','SK','SI','ES','SE']);
+            const COUNTRY_OPTIONS = [
+                ['PT','Portugal'],['BE','Bélgica'],['ES','Espanha'],['FR','França'],['DE','Alemanha'],['NL','Países Baixos'],['IT','Itália'],
+                ['AT','Áustria'],['BG','Bulgária'],['HR','Croácia'],['CY','Chipre'],['CZ','Chéquia'],['DK','Dinamarca'],['EE','Estónia'],
+                ['FI','Finlândia'],['GR','Grécia'],['HU','Hungria'],['IE','Irlanda'],['LV','Letónia'],['LT','Lituânia'],['LU','Luxemburgo'],
+                ['MT','Malta'],['PL','Polónia'],['RO','Roménia'],['SK','Eslováquia'],['SI','Eslovénia'],['SE','Suécia'],
+                ['GB','Reino Unido'],['CH','Suíça'],['NO','Noruega'],['US','Estados Unidos'],['BR','Brasil'],['AO','Angola'],['MZ','Moçambique']
+            ];
             
             // Referências DOM
             const productsTableBody = document.getElementById('productsTableBody');
@@ -1101,6 +1182,21 @@
             const sellerCommissionRateInput = document.getElementById('sellerCommissionRate');
             const sellerCommissionValueInput = document.getElementById('sellerCommissionValue');
             const sellerCommissionStatusInput = document.getElementById('sellerCommissionStatus');
+            const billingCountryInput = document.getElementById('billingCountry');
+            const deliveryCountryInput = document.getElementById('deliveryCountry');
+            const deliveryModeInput = document.getElementById('deliveryMode');
+            const customerTypeInput = document.getElementById('customerType');
+            const viesStatusInput = document.getElementById('viesStatus');
+            const taxTreatmentInput = document.getElementById('taxTreatment');
+            const transportEvidenceInput = document.getElementById('transportEvidence');
+            const taxDecisionBox = document.getElementById('taxDecisionBox');
+            const taxOverrideReasonInput = document.getElementById('taxOverrideReason');
+
+            const countryMarkup = COUNTRY_OPTIONS.map(([code, name]) => `<option value="${code}">${name}</option>`).join('');
+            billingCountryInput.innerHTML = countryMarkup;
+            deliveryCountryInput.innerHTML = countryMarkup;
+            billingCountryInput.value = 'PT';
+            deliveryCountryInput.value = 'PT';
             
             // Elementos de exibição de totais
             const subtotalProdutosEl = document.getElementById('subtotalProdutos');
@@ -1222,6 +1318,14 @@
                 document.getElementById('dataFechamento').valueAsDate = null;
                 document.getElementById('valorInstalacao').value = '0';
                 document.getElementById('numeroFatura').value = '';
+                billingCountryInput.value = 'PT';
+                deliveryCountryInput.value = 'PT';
+                deliveryModeInput.value = 'pickup';
+                customerTypeInput.value = 'business';
+                viesStatusInput.value = 'not_checked';
+                taxTreatmentInput.value = 'auto';
+                taxOverrideReasonInput.value = '';
+                transportEvidenceInput.checked = false;
                 
                 // Gerar número de pedido automático
                 gerarNumeroPedido();
@@ -1280,7 +1384,19 @@
                     document.getElementById('cliente').value = pedido.cliente || '';
                     document.getElementById('empresa').value = pedido.empresa || '';
                     document.getElementById('nif').value = pedido.nif || '';
+                    customerTypeInput.value = pedido.customerType || (pedido.empresa ? 'business' : 'consumer');
+                    billingCountryInput.value = pedido.billingCountry || pedido.paisFaturacao || 'PT';
+                    deliveryModeInput.value = pedido.deliveryMode || pedido.tipoEntrega || (pedido.levantamentoLoja ? 'pickup' : 'pickup');
+                    deliveryCountryInput.value = pedido.deliveryCountry || pedido.paisEntrega || (deliveryModeInput.value === 'pickup' ? 'PT' : billingCountryInput.value);
+                    viesStatusInput.value = pedido.viesStatus || 'not_checked';
+                    document.getElementById('viesCheckedAt').value = pedido.viesCheckedAt || '';
+                    document.getElementById('viesName').value = pedido.viesName || '';
+                    taxTreatmentInput.value = pedido.taxTreatment || 'auto';
+                    taxOverrideReasonInput.value = pedido.taxOverrideReason || '';
+                    transportEvidenceInput.checked = pedido.transportEvidence === true || pedido.transportEvidence === 'true';
                     document.getElementById('morada').value = pedido.morada || '';
+                    document.getElementById('billingPostalCode').value = pedido.billingPostalCode || '';
+                    document.getElementById('billingCity').value = pedido.billingCity || '';
                     document.getElementById('telemovel').value = pedido.telemovel || '';
                     document.getElementById('numero').value = pedido.numero || '';
                     document.getElementById('numeroFatura').value = pedido.numeroFatura || '';
@@ -1746,6 +1862,7 @@
             function calculateTotals() {
                 let subtotalProdutos = 0;
                 let iva = 0;
+                const taxDecision = calculateTaxDecision();
                 
                 // Calcular subtotal dos produtos
                 document.querySelectorAll('#productsTableBody tr').forEach(row => {
@@ -1757,8 +1874,8 @@
                     
                     const subtotalItem = valor * quantidade;
                     subtotalProdutos += subtotalItem;
-                    if (row.querySelector('.item-iva-select')?.value !== 'nao') {
-                        iva += subtotalItem * 0.23;
+                    if (taxDecision.code === 'PT_STANDARD' && row.querySelector('.item-iva-select')?.value !== 'nao') {
+                        iva += subtotalItem * (taxDecision.rate / 100);
                     }
                 });
                 
@@ -1769,8 +1886,8 @@
                 const subtotalGeral = subtotalProdutos + instalacao;
                 
                 const ivaSimRadio = document.getElementById('ivaSim');
-                if (ivaSimRadio.checked) {
-                    iva += instalacao * 0.23;
+                if (ivaSimRadio.checked && taxDecision.code === 'PT_STANDARD') {
+                    iva += instalacao * (taxDecision.rate / 100);
                 }
                 
                 // Calcular total final
@@ -1780,6 +1897,7 @@
                 subtotalProdutosEl.textContent = formatarMoeda(subtotalProdutos);
                 totalInstalacaoEl.textContent = formatarMoeda(instalacao);
                 valorIVAEl.textContent = formatarMoeda(iva);
+                valorIVAEl.previousElementSibling.textContent = taxDecision.code === 'PT_STANDARD' ? `Valor do IVA (${taxDecision.rate}%)` : 'Valor do IVA';
                 totalFinalEl.textContent = formatarMoeda(totalFinal);
                 
                 // Atualizar campos ocultos
@@ -1790,6 +1908,86 @@
                 
                 // Atualizar resumo de pagamentos
                 updatePaymentSummary();
+            }
+
+            function normalizedVat() {
+                const raw = document.getElementById('nif').value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                if (!raw) return '';
+                return /^[A-Z]{2}/.test(raw) ? raw : `${billingCountryInput.value}${raw}`;
+            }
+
+            function calculateTaxDecision() {
+                const billingCountry = billingCountryInput.value || 'PT';
+                const deliveryMode = deliveryModeInput.value || 'pickup';
+                const deliveryCountry = deliveryMode === 'pickup' ? 'PT' : (deliveryCountryInput.value || billingCountry);
+                const override = taxTreatmentInput.value || 'auto';
+                const overrideReason = taxOverrideReasonInput.value.trim();
+                const vat = normalizedVat();
+                const evidence = transportEvidenceInput.checked;
+                const business = customerTypeInput.value === 'business';
+                const pt = { valid:true, code:'PT_STANDARD', rate:23, label:'IVA português — taxa normal', reason: deliveryMode === 'pickup' ? 'Levantamento na loja em Portugal.' : 'Operação localizada em Portugal.' };
+                const blocked = reason => ({ valid:false, code:'REVIEW_REQUIRED', rate:0, label:'Revisão fiscal necessária', reason });
+                const m16 = () => {
+                    if (!business) return blocked('M16 exige cliente empresa.');
+                    if (!EU_COUNTRIES.has(deliveryCountry) || deliveryCountry === 'PT') return blocked('M16 exige destino noutro país da UE.');
+                    if (!vat || !vat.startsWith(billingCountry)) return blocked('Indique o VAT completo, com prefixo do país.');
+                    if (viesStatusInput.value !== 'valid') return blocked('Valide o VAT no VIES.');
+                    if (!evidence) return blocked('Confirme a prova de transporte para aplicar M16.');
+                    return { valid:true, code:'EU_B2B_M16', rate:0, label:'Transmissão intracomunitária — M16', reason:'VAT validado e transporte intracomunitário comprovado.' };
+                };
+                const m05 = () => {
+                    if (EU_COUNTRIES.has(deliveryCountry)) return blocked('M05 exige destino fora da União Europeia.');
+                    if (!evidence) return blocked('Confirme a prova de exportação para aplicar M05.');
+                    return { valid:true, code:'EXPORT_M05', rate:0, label:'Exportação — M05', reason:'Saída da União Europeia comprovada.' };
+                };
+                let decision;
+                document.getElementById('taxOverrideReasonGroup').hidden = override === 'auto';
+                if (override !== 'auto' && !overrideReason) decision = blocked('Indique o motivo da alteração manual do tratamento fiscal.');
+                else if (override === 'pt_standard') decision = pt;
+                else if (override === 'eu_b2b_m16') decision = m16();
+                else if (override === 'export_m05') decision = m05();
+                else if (deliveryCountry === 'PT' || deliveryMode === 'pickup') decision = pt;
+                else if (EU_COUNTRIES.has(deliveryCountry)) decision = business ? m16() : blocked('Venda B2C na UE exige configuração OSS e taxa do país de destino.');
+                else decision = m05();
+
+                deliveryCountryInput.disabled = deliveryMode === 'pickup';
+                if (deliveryMode === 'pickup') deliveryCountryInput.value = 'PT';
+                taxDecisionBox.style.background = decision.valid ? '#eff6ff' : '#fff7ed';
+                taxDecisionBox.style.color = decision.valid ? '#1e3a8a' : '#9a3412';
+                taxDecisionBox.innerHTML = `<strong>${decision.label}</strong><div style="margin-top:4px">${decision.reason}</div>`;
+                return decision;
+            }
+
+            async function validateVatOnVies() {
+                const vat = normalizedVat();
+                if (!vat || billingCountryInput.value === 'PT') {
+                    showMessage('A validação VIES destina-se a VAT de empresas de outros países da UE.', 'warning');
+                    return;
+                }
+                const button = document.getElementById('validateViesBtn');
+                button.disabled = true;
+                button.textContent = 'A validar...';
+                try {
+                    const response = await fetch('/api/tax/vies/validate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ countryCode: billingCountryInput.value, vatNumber: vat })
+                    });
+                    const result = await response.json().catch(() => ({}));
+                    if (!response.ok) throw new Error(result.message || 'Não foi possível consultar o VIES.');
+                    viesStatusInput.value = result.valid ? 'valid' : 'invalid';
+                    document.getElementById('viesCheckedAt').value = new Date().toISOString();
+                    document.getElementById('viesName').value = result.name || '';
+                    calculateTotals();
+                    showMessage(result.valid ? `VAT válido no VIES${result.name ? ` — ${result.name}` : ''}.` : 'O VAT não está válido para operações intracomunitárias.', result.valid ? 'success' : 'warning');
+                } catch (error) {
+                    viesStatusInput.value = 'unavailable';
+                    calculateTotals();
+                    showMessage(error.message, 'warning');
+                } finally {
+                    button.disabled = false;
+                    button.textContent = 'Validar VAT no VIES';
+                }
             }
             
             function formatarMoeda(value) {
@@ -1833,7 +2031,7 @@
             
             function validateForm() {
                 // Verificar campos obrigatórios
-                const requiredFields = ['cliente', 'empresa', 'nif', 'morada', 'telemovel', 'numero', 'dataEntrega', 'atendente'];
+                const requiredFields = ['cliente', 'empresa', 'morada', 'telemovel', 'numero', 'dataEntrega', 'atendente', 'customerType', 'billingCountry', 'deliveryMode', 'deliveryCountry'];
                 for (const fieldId of requiredFields) {
                     const field = document.getElementById(fieldId);
                     if (!field.value.trim()) {
@@ -1841,6 +2039,11 @@
                         field.focus();
                         return false;
                     }
+                }
+                if (customerTypeInput.value === 'business' && !document.getElementById('nif').value.trim()) {
+                    showMessage('Indique o NIF/VAT da empresa.', 'warning');
+                    document.getElementById('nif').focus();
+                    return false;
                 }
                 
                 // Verificar se há produtos
@@ -2077,10 +2280,37 @@
             // Listeners para cálculo automático
             document.getElementById('ivaSim').addEventListener('change', calculateTotals);
             document.getElementById('ivaNao').addEventListener('change', calculateTotals);
+            [billingCountryInput, deliveryCountryInput, deliveryModeInput, customerTypeInput, viesStatusInput, taxTreatmentInput, taxOverrideReasonInput, transportEvidenceInput, document.getElementById('nif')]
+                .forEach(input => input.addEventListener('change', calculateTotals));
+            taxOverrideReasonInput.addEventListener('input', calculateTotals);
+            document.getElementById('nif').addEventListener('input', calculateTotals);
+            document.getElementById('nif').addEventListener('input', () => {
+                viesStatusInput.value = billingCountryInput.value === 'PT' ? 'not_applicable' : 'not_checked';
+                document.getElementById('viesCheckedAt').value = '';
+                document.getElementById('viesName').value = '';
+            });
+            billingCountryInput.addEventListener('change', () => {
+                viesStatusInput.value = billingCountryInput.value === 'PT' || !EU_COUNTRIES.has(billingCountryInput.value) ? 'not_applicable' : 'not_checked';
+                document.getElementById('viesCheckedAt').value = '';
+                document.getElementById('viesName').value = '';
+                calculateTotals();
+            });
+            document.getElementById('validateViesBtn').addEventListener('click', validateVatOnVies);
             valorInstalacaoInput.addEventListener('input', calculateTotals);
             sellerSelect.addEventListener('change', calculateTotals);
             buyerSellerSelect.addEventListener('change', syncBuyerSellerFields);
             sellerCommissionRateInput.addEventListener('input', calculateTotals);
+
+            // O engine universal regista o commit depois deste listener. A fase
+            // de captura impede qualquer gravação quando os dados comerciais ou
+            // o enquadramento fiscal ainda não são válidos.
+            document.getElementById('saveBtn').addEventListener('click', event => {
+                const decision = calculateTaxDecision();
+                if (validateForm() && decision.valid) return;
+                event.preventDefault();
+                event.stopImmediatePropagation();
+                if (!decision.valid) showMessage(decision.reason, 'warning');
+            }, true);
             
             // Configurar listener para evento do engine.js
             window.addEventListener('coreCommitSuccess', (event) => {
