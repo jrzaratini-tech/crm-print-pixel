@@ -63,14 +63,19 @@ function validateFiscalOrder(order = {}) {
   const errors = [];
   if (!cleanText(order.cliente)) errors.push('Nome do cliente em falta.');
   const taxDecision = resolveSalesTax(order);
+  const postalCode = cleanText(order.billingPostalCode || order.codigoPostalFaturacao, 40);
+  const billingCity = cleanText(order.billingCity || order.cidadeFaturacao, 120);
   const nif = cleanText(order.vatNumber || order.nif, 24).toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (taxDecision.inputs.billingCountry === 'PT') {
     const portugueseVat = nif.replace(/^PT/, '');
     if (portugueseVat && !/^\d{9}$/.test(portugueseVat)) errors.push('O NIF português deve ter 9 dígitos.');
     else if (portugueseVat && !isValidPortugueseVat(portugueseVat)) errors.push(`O NIF ${portugueseVat} e invalido. Confirme o NIF do cliente e corrija o pedido antes de faturar.`);
+    if (postalCode && !/^\d{4}-\d{3}$/.test(postalCode)) errors.push('O código postal de faturação deve ter o formato 1234-567.');
   } else if (taxDecision.inputs.customerType === 'business' && !nif) {
     errors.push('VAT do cliente estrangeiro em falta.');
   }
+  if (!postalCode) errors.push('Código postal de faturação em falta.');
+  if (!billingCity) errors.push('Localidade de faturação em falta.');
   if (!taxDecision.valid) errors.push(...(taxDecision.errors || [taxDecision.reason]));
   if (!Array.isArray(order.produtos) || !order.produtos.length) errors.push('O pedido nao tem produtos.');
   if (!(roundMoney(order.total) > 0)) errors.push('O total do pedido deve ser superior a zero.');
@@ -310,6 +315,12 @@ function moloniApiErrors(body) {
   return [...direct, ...indexed];
 }
 
+function friendlyMoloniError(message) {
+  const value = cleanText(message, 500);
+  if (/\bzip_code\b/i.test(value)) return 'Código postal de faturação em falta ou inválido.';
+  return value;
+}
+
 function moloniDocumentResult(result = {}) {
   const directIdKeys = new Set([
     'document_id',
@@ -426,7 +437,7 @@ class MoloniClient {
     const validationError = body?.valid === 0 || (Array.isArray(body) && responseErrors.length > 0)
       || (!Array.isArray(body) && Object.keys(body || {}).some(key => /^\d+$/.test(key)) && responseErrors.length > 0);
     if (!response.ok || body?.error || validationError) {
-      const error = new Error(responseErrors.join('; ') || 'Erro devolvido pela API Moloni.');
+      const error = new Error(responseErrors.map(friendlyMoloniError).join('; ') || 'Erro devolvido pela API Moloni.');
       error.status = response.status;
       error.details = body;
       throw error;

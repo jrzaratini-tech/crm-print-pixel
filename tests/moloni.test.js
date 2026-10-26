@@ -53,6 +53,9 @@ const order = {
   numero: '2026-001',
   cliente: 'Cliente Teste',
   nif: '123456789',
+  billingCountry: 'PT',
+  billingPostalCode: '1000-001',
+  billingCity: 'Lisboa',
   total: 1000,
   produtos: [{ nome: 'Letra caixa', quantidade: 1, valor: 1000, comIVA: 'sim' }],
   pagamentos: [
@@ -82,6 +85,16 @@ test('prepara uma fatura valida para o total do pedido', () => {
   assert.equal(preview.valid, true);
   assert.equal(preview.totals.total, 1000);
   assert.equal(preview.idempotencyKey, 'pedido-1:invoice:sale');
+});
+
+test('bloqueia codigo postal portugues ausente ou invalido antes de contactar o Moloni', () => {
+  const missing = buildDocumentPreview({ order: { ...order, billingPostalCode: '' }, type: 'invoice' });
+  assert.equal(missing.valid, false);
+  assert.match(missing.errors.join(' '), /código postal de faturação/i);
+
+  const invalid = buildDocumentPreview({ order: { ...order, billingPostalCode: '4470' }, type: 'invoice' });
+  assert.equal(invalid.valid, false);
+  assert.match(invalid.errors.join(' '), /formato 1234-567/i);
 });
 
 test('prepara cliente belga com IVA português quando levanta na loja', () => {
@@ -239,6 +252,14 @@ test('preserva mensagens de validacao Moloni indexadas por campo', async () => {
     })
   });
   await assert.rejects(() => client.call('invoices/insert', {}), /customer_id/);
+});
+
+test('traduz rejeicao de codigo postal do Moloni para uma mensagem clara', async () => {
+  const client = new MoloniClient({
+    accessToken: 'token',
+    fetchImpl: async () => ({ ok: true, status: 200, json: async () => ({ 0: '7 zip_code' }) })
+  });
+  await assert.rejects(() => client.call('customers/insert', {}), /Código postal de faturação em falta ou inválido/);
 });
 
 test('mantem listas de objetos Moloni como respostas validas', async () => {

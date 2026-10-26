@@ -671,7 +671,7 @@
             <td><strong>${escapeHtml(document.number || document.label)}</strong><div class="tiny">${escapeHtml(document.label)} · ${escapeHtml(document.mode)}</div></td>
             <td>${escapeHtml(document.orderNumber || '-')}<div class="tiny">${escapeHtml(document.customer || '')}</div></td>
             <td class="money">${money(document.value)}</td>
-            <td><span class="status ${escapeHtml(document.state)}">${escapeHtml(document.state)}</span></td>
+            <td><span class="status ${escapeHtml(document.state)}">${escapeHtml(document.state)}</span>${document.error ? `<div class="tiny" title="${escapeHtml(document.error)}">${escapeHtml(/\bzip_code\b/i.test(document.error) ? 'Código postal de faturação em falta ou inválido.' : document.error)}</div>` : ''}</td>
             <td>
               ${document.moloniDocumentId && ['draft', 'closed'].includes(document.state) ? `<button class="btn neutral pdf-btn" title="${document.state === 'draft' ? 'Baixar prévia PDF da fatura (sem valor fiscal)' : 'Baixar PDF da fatura no Moloni'}" data-id="${escapeHtml(document.id)}"><i class="fa-solid fa-download"></i> ${document.state === 'draft' ? 'Prévia PDF' : 'PDF'}</button>` : ''}
               ${['draft', 'error'].includes(document.state) ? `<button class="btn danger delete-doc-btn" title="Remover do CRM" data-id="${escapeHtml(document.id)}" data-state="${escapeHtml(document.state)}"><i class="fa-solid fa-trash"></i></button>` : ''}
