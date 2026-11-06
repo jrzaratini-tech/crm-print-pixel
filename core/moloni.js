@@ -15,7 +15,7 @@ function cleanText(value, maxLength = 255) {
 
 function normalizeDocumentType(value) {
   const type = cleanText(value, 40);
-  if (!['invoice', 'invoice_receipt', 'receipt'].includes(type)) {
+  if (!['invoice', 'invoice_receipt', 'receipt', 'bill_of_lading'].includes(type)) {
     throw new Error('Tipo de documento Moloni invalido.');
   }
   return type;
@@ -86,8 +86,65 @@ function documentLabel(type) {
   return {
     invoice: 'Fatura',
     invoice_receipt: 'Fatura-Recibo',
-    receipt: 'Recibo'
+    receipt: 'Recibo',
+    bill_of_lading: 'Guia de Transporte'
   }[type] || type;
+}
+
+function transportValue(value, fallback = '', maxLength = 250) {
+  return cleanText(value === undefined || value === null ? fallback : value, maxLength);
+}
+
+function structuredAddress(order = {}, kind = 'destination') {
+  const source = kind === 'destination'
+    ? (order.moradaEntrega || order.shippingAddress || {})
+    : (order.moradaPartida || order.departureAddress || {});
+  return {
+    address: transportValue(source.address || source.address1 || source.address_1 || source.street),
+    city: transportValue(source.city || source.localidade, '', 120),
+    postalCode: transportValue(source.zip || source.zip_code || source.postalCode || source.codigoPostal, '', 40),
+    country: transportValue(source.country_code || source.country || source.countryCode, '', 2).toUpperCase()
+  };
+}
+
+function normalizeTransport(order = {}, transport = {}, issueDate = '') {
+  const destination = structuredAddress(order, 'destination');
+  const departure = structuredAddress(order, 'departure');
+  const date = cleanText(issueDate || new Date().toISOString().slice(0, 10), 10);
+  const rawDatetime = cleanText(transport.deliveryDatetime || order.deliveryDatetime || order.dataEntrega || `${date}T09:00`, 30);
+  return {
+    deliveryDatetime: rawDatetime.length === 10 ? `${rawDatetime}T09:00` : rawDatetime,
+    departureAddress: transportValue(transport.departureAddress, departure.address),
+    departureCity: transportValue(transport.departureCity, departure.city, 120),
+    departurePostalCode: transportValue(transport.departurePostalCode, departure.postalCode, 40),
+    departureCountry: transportValue(transport.departureCountry, departure.country || 'PT', 2).toUpperCase(),
+    destinationAddress: transportValue(transport.destinationAddress, destination.address || order.morada),
+    destinationCity: transportValue(transport.destinationCity, destination.city || order.billingCity || order.cidadeFaturacao, 120),
+    destinationPostalCode: transportValue(transport.destinationPostalCode, destination.postalCode || order.billingPostalCode || order.codigoPostalFaturacao, 40),
+    destinationCountry: transportValue(transport.destinationCountry, destination.country || order.deliveryCountry || order.billingCountry || 'PT', 2).toUpperCase(),
+    deliveryMethodId: Number(transport.deliveryMethodId || 0),
+    vehicleId: Number(transport.vehicleId || 0),
+    vehicleName: transportValue(transport.vehicleName, '', 120),
+    vehicleNumberPlate: transportValue(transport.vehicleNumberPlate, '', 30).toUpperCase(),
+    notes: transportValue(transport.notes || order.observacoes, '', 500)
+  };
+}
+
+function validateTransport(transport = {}) {
+  const errors = [];
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(transport.deliveryDatetime)) errors.push('Indique a data e hora de início do transporte.');
+  if (!transport.departureAddress) errors.push('Morada de carga em falta.');
+  if (!transport.departureCity) errors.push('Localidade de carga em falta.');
+  if (!transport.departurePostalCode) errors.push('Código postal de carga em falta.');
+  if (!transport.departureCountry) errors.push('País de carga em falta.');
+  if (!transport.destinationAddress) errors.push('Morada de descarga em falta.');
+  if (!transport.destinationCity) errors.push('Localidade de descarga em falta.');
+  if (!transport.destinationPostalCode) errors.push('Código postal de descarga em falta.');
+  if (!transport.destinationCountry) errors.push('País de descarga em falta.');
+  if (transport.departureCountry === 'PT' && !/^\d{4}-\d{3}$/.test(transport.departurePostalCode)) errors.push('O código postal de carga em Portugal deve ter o formato 1234-567.');
+  if (transport.destinationCountry === 'PT' && !/^\d{4}-\d{3}$/.test(transport.destinationPostalCode)) errors.push('O código postal de descarga em Portugal deve ter o formato 1234-567.');
+  if (!(transport.deliveryMethodId > 0) && !transport.vehicleNumberPlate) errors.push('Selecione o método de expedição ou indique a matrícula da viatura.');
+  return errors;
 }
 
 function stableReference(value, prefix = 'CRM') {
@@ -198,7 +255,7 @@ function recommendDocumentAction({ order = {}, documents = [] } = {}) {
   };
 }
 
-function buildDocumentPreview({ order, type, paymentId, amount, issueDate }) {
+function buildDocumentPreview({ order, type, paymentId, amount, issueDate, transport }) {
   const documentType = normalizeDocumentType(type);
   const errors = validateFiscalOrder(order);
   const totals = orderTotals(order);
@@ -207,6 +264,11 @@ function buildDocumentPreview({ order, type, paymentId, amount, issueDate }) {
   const requestedAmount = roundMoney(amount);
   const date = cleanText(issueDate || new Date().toISOString().slice(0, 10), 10);
   const taxDecision = resolveSalesTax(order);
+  const transportDetails = documentType === 'bill_of_lading'
+    ? normalizeTransport(order, transport || {}, date)
+    : null;
+
+  if (transportDetails) errors.push(...validateTransport(transportDetails));
 
   if (documentType === 'receipt' && !payment && !(requestedAmount > 0)) {
     errors.push('Selecione um pagamento ou indique o valor do recibo.');
@@ -272,16 +334,21 @@ function buildDocumentPreview({ order, type, paymentId, amount, issueDate }) {
       deliveryMode: taxDecision.inputs.deliveryMode
     },
     products,
+    transport: transportDetails,
     taxDecision,
     totals,
     payments,
     payment,
     receiptValue,
-    reference: `CRM-${cleanText(order.numero || order.id, 80)}`,
+    reference: `CRM-${cleanText(order.numero || order.id, 80)}${documentType === 'bill_of_lading' ? '-GT' : ''}`,
     idempotencyKey: [
       cleanText(order.id, 160),
       documentType,
-      documentType === 'receipt' ? cleanText(payment?.id || receiptValue, 120) : 'sale'
+      documentType === 'receipt'
+        ? cleanText(payment?.id || receiptValue, 120)
+        : documentType === 'bill_of_lading'
+          ? cleanText(transportDetails?.deliveryDatetime, 120)
+          : 'sale'
     ].join(':')
   };
 }

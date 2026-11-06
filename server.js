@@ -1205,7 +1205,8 @@ function moloniEndpointFor(type) {
   return {
     invoice: 'invoices/insert',
     invoice_receipt: 'invoiceReceipts/insert',
-    receipt: 'receipts/insert'
+    receipt: 'receipts/insert',
+    bill_of_lading: 'billsOfLading/insert'
   }[type];
 }
 
@@ -1232,9 +1233,12 @@ function moloniRequiredSettings(config = {}) {
   ];
 }
 
-function moloniAssertReadyForIssue(config = {}) {
+function moloniAssertReadyForIssue(config = {}, documentType = '') {
   if (MOLONI_MODE !== 'live') return;
   const missing = moloniRequiredSettings(config).filter(item => !item.ok);
+  if (documentType === 'bill_of_lading' && !(Number(config.settings?.billOfLadingDocumentSetId || 0) > 0)) {
+    missing.push({ label: 'Serie de Guias de Transporte selecionada' });
+  }
   if (missing.length) {
     throw new Error(`Integracao Moloni incompleta: ${missing.map(item => item.label).join(', ')}.`);
   }
@@ -1351,7 +1355,7 @@ async function ensureMoloniProduct(client, product, config) {
 }
 
 async function attachMoloniProducts(client, preview, config) {
-  if (!['invoice', 'invoice_receipt'].includes(preview.type)) return preview;
+  if (!['invoice', 'invoice_receipt', 'bill_of_lading'].includes(preview.type)) return preview;
   preview.products = await Promise.all(preview.products.map(async product => ({
     ...product,
     moloniProductId: await ensureMoloniProduct(client, product, config)
@@ -1415,6 +1419,62 @@ function moloniReceiptPayload(preview, config, invoiceDocumentId, status) {
       notes: preview.payment?.notes || ''
     }],
     notes: `Pagamento do pedido CRM ${preview.order.number}`,
+    status: status === 'closed' ? 1 : 0
+  };
+}
+
+async function moloniCountryId(client, code) {
+  const countryCode = String(code || 'PT').toUpperCase();
+  const countries = await client.call('countries/getAll', {});
+  const country = (Array.isArray(countries) ? countries : []).find(item =>
+    String(item.iso_3166_1 || item.code || '').toUpperCase() === countryCode
+  );
+  const id = Number(country?.country_id || 0);
+  if (!(id > 0)) throw new Error(`O país ${countryCode} não foi encontrado na conta Moloni.`);
+  return id;
+}
+
+async function moloniTransportPayload(client, preview, config, status) {
+  const settings = config.settings || {};
+  const transport = preview.transport || {};
+  const [departureCountryId, destinationCountryId] = await Promise.all([
+    moloniCountryId(client, transport.departureCountry),
+    moloniCountryId(client, transport.destinationCountry)
+  ]);
+  const products = preview.products.map(product => ({
+    product_id: Number(product.moloniProductId || settings.defaultProductId),
+    name: product.name,
+    summary: product.summary,
+    qty: product.qty,
+    price: product.price,
+    order: product.order,
+    taxes: product.vatIncluded && Number(settings.standardTaxId)
+      ? [{ tax_id: Number(settings.standardTaxId), value: 0, order: 1, cumulative: 0 }]
+      : [],
+    ...(!product.vatIncluded ? { exemption_reason: product.exemptionReason || settings.exemptionReason || 'M99' } : {})
+  }));
+  return {
+    company_id: Number(config.companyId),
+    date: preview.issueDate,
+    document_set_id: Number(settings.billOfLadingDocumentSetId),
+    customer_id: Number(preview.moloniCustomerId),
+    our_reference: preview.reference,
+    your_reference: preview.order.number,
+    products,
+    delivery_method_id: Number(transport.deliveryMethodId || settings.defaultDeliveryMethodId || 0),
+    delivery_datetime: String(transport.deliveryDatetime || '').replace('T', ' ') + (String(transport.deliveryDatetime || '').length === 16 ? ':00' : ''),
+    delivery_departure_address: transport.departureAddress,
+    delivery_departure_city: transport.departureCity,
+    delivery_departure_zip_code: transport.departurePostalCode,
+    delivery_departure_country: departureCountryId,
+    delivery_destination_address: transport.destinationAddress,
+    delivery_destination_city: transport.destinationCity,
+    delivery_destination_zip_code: transport.destinationPostalCode,
+    delivery_destination_country: destinationCountryId,
+    vehicle_id: Number(transport.vehicleId || 0),
+    vehicle_name: transport.vehicleName || '',
+    vehicle_number_plate: transport.vehicleNumberPlate || '',
+    notes: transport.notes || `Transporte do pedido CRM ${preview.order.number}`,
     status: status === 'closed' ? 1 : 0
   };
 }
@@ -6274,11 +6334,17 @@ app.post('/api/moloni/settings', async (req, res) => {
       invoiceDocumentSetId: Number(settings.invoiceDocumentSetId || 0),
       invoiceReceiptDocumentSetId: Number(settings.invoiceReceiptDocumentSetId || 0),
       receiptDocumentSetId: Number(settings.receiptDocumentSetId || 0),
+      billOfLadingDocumentSetId: Number(settings.billOfLadingDocumentSetId || 0),
       defaultProductId: Number(settings.defaultProductId || 0),
       defaultProductCategoryId: Number(settings.defaultProductCategoryId || 0),
       defaultUnitId: Number(settings.defaultUnitId || 0),
       standardTaxId: Number(settings.standardTaxId || 0),
       defaultPaymentMethodId: Number(settings.defaultPaymentMethodId || 0),
+      defaultDeliveryMethodId: Number(settings.defaultDeliveryMethodId || 0),
+      departureAddress: text(settings.departureAddress, 250),
+      departureCity: text(settings.departureCity, 120),
+      departurePostalCode: text(settings.departurePostalCode, 40),
+      departureCountry: text(settings.departureCountry || 'PT', 2).toUpperCase(),
       exemptionReason: text(settings.exemptionReason || 'M99', 20),
       autoCreateProducts: settings.autoCreateProducts !== false,
       paymentMethods: Object.fromEntries(
@@ -6319,10 +6385,13 @@ app.get('/api/moloni/options', async (req, res) => {
         documentSets: [
           { document_set_id: 101, name: 'FT Teste', document_type: 'invoice' },
           { document_set_id: 102, name: 'FR Teste', document_type: 'invoice_receipt' },
-          { document_set_id: 103, name: 'RC Teste', document_type: 'receipt' }
+          { document_set_id: 103, name: 'RC Teste', document_type: 'receipt' },
+          { document_set_id: 104, name: 'GT Teste', document_type: 'bill_of_lading' }
         ],
         taxes: [{ tax_id: 23, name: 'IVA 23%' }],
         paymentMethods: [{ payment_method_id: 1, name: 'Transferencia / teste' }],
+        deliveryMethods: [{ delivery_method_id: 1, name: 'Viatura própria / teste' }],
+        vehicles: [{ vehicle_id: 1, name: 'Carrinha teste', number_plate: 'AA-00-AA' }],
         products: [{ product_id: 1, name: 'Servico PrintPixel / teste' }],
         productCategories: [{ category_id: 1, name: 'Servicos PrintPixel / teste' }],
         measurementUnits: [{ unit_id: 1, name: 'Unidade' }],
@@ -6342,10 +6411,12 @@ app.get('/api/moloni/options', async (req, res) => {
     );
     const companyId = Number(requestedCompanyId || config.companyId || realCompany?.company_id || companies?.[0]?.company_id || 0);
     const common = { company_id: companyId, qty: 50, offset: 0 };
-    const [documentSets, taxes, paymentMethods, products, productCategories, measurementUnits, countries] = await Promise.all([
+    const [documentSets, taxes, paymentMethods, deliveryMethods, vehicles, products, productCategories, measurementUnits, countries] = await Promise.all([
       client.call('documentSets/getAll', common),
       client.call('taxes/getAll', common),
       client.call('paymentMethods/getAll', common),
+      client.call('deliveryMethods/getAll', common).catch(() => []),
+      client.call('vehicles/getAll', common).catch(() => []),
       client.call('products/getAll', common),
       client.call('productCategories/getAll', { ...common, parent_id: 0 }).catch(() => []),
       client.call('measurementUnits/getAll', common).catch(() => []),
@@ -6368,6 +6439,8 @@ app.get('/api/moloni/options', async (req, res) => {
       documentSets,
       taxes,
       paymentMethods,
+      deliveryMethods,
+      vehicles,
       products,
       productCategories: normalizedProductCategories,
       measurementUnits: normalizedMeasurementUnits,
@@ -6446,7 +6519,8 @@ app.post('/api/moloni/documents/preview', async (req, res) => {
       type: req.body?.type,
       paymentId: req.body?.paymentId,
       amount: req.body?.amount,
-      issueDate: req.body?.issueDate
+      issueDate: req.body?.issueDate,
+      transport: req.body?.transport
     });
     if (preview.type === 'receipt') {
       const invoice = documents.find(document =>
@@ -6486,7 +6560,8 @@ app.post('/api/moloni/documents', async (req, res) => {
       type: req.body?.type,
       paymentId: req.body?.paymentId,
       amount: req.body?.amount,
-      issueDate: req.body?.issueDate
+      issueDate: req.body?.issueDate,
+      transport: req.body?.transport
     });
     const documents = await moloniDocuments();
     let invoice = null;
@@ -6501,7 +6576,7 @@ app.post('/api/moloni/documents', async (req, res) => {
       if (preview.receiptValue > Math.max(0, preview.totals.total - receipted)) {
         preview.errors.push('O recibo ultrapassa o saldo ainda nao conciliado.');
       }
-    } else {
+    } else if (['invoice', 'invoice_receipt'].includes(preview.type)) {
       const existingSale = documents.find(document =>
         document.orderId === order.id
         && ['invoice', 'invoice_receipt'].includes(document.type)
@@ -6530,6 +6605,7 @@ app.post('/api/moloni/documents', async (req, res) => {
       state: 'processing',
       value: preview.type === 'receipt' ? preview.receiptValue : preview.totals.total,
       paymentId: preview.payment?.id || '',
+      transport: preview.transport || null,
       mode: MOLONI_MODE,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -6542,17 +6618,20 @@ app.post('/api/moloni/documents', async (req, res) => {
       result = {
         valid: 1,
         document_id: `MOCK-${Date.now()}`,
-        document_number: `${preview.label.toUpperCase().replace(/[^A-Z]/g, '')}-TESTE-${String(Date.now()).slice(-6)}`
+        document_number: `${preview.label.toUpperCase().replace(/[^A-Z]/g, '')}-TESTE-${String(Date.now()).slice(-6)}`,
+        ...(preview.type === 'bill_of_lading' ? { transport_code: `AT-MOCK-${String(Date.now()).slice(-8)}` } : {})
       };
     } else {
       const config = await moloniConfig();
-      moloniAssertReadyForIssue(config);
+      moloniAssertReadyForIssue(config, preview.type);
       const client = new MoloniClient({ accessToken: await moloniAccessToken() });
       preview.moloniCustomerId = await ensureMoloniCustomer(client, preview, config);
       await attachMoloniProducts(client, preview, config);
       const payload = preview.type === 'receipt'
         ? moloniReceiptPayload(preview, config, invoice.moloniDocumentId, status)
-        : moloniSalesPayload(preview, config, status);
+        : preview.type === 'bill_of_lading'
+          ? await moloniTransportPayload(client, preview, config, status)
+          : moloniSalesPayload(preview, config, status);
       result = await client.call(moloniEndpointFor(preview.type), payload);
     }
 
@@ -6567,6 +6646,7 @@ app.post('/api/moloni/documents', async (req, res) => {
       state: status,
       moloniDocumentId: documentResult.id,
       number: documentResult.number || '',
+      transportCode: text(result?.transport_code || result?.transportCode, 160),
       response: result,
       updatedAt: new Date().toISOString()
     };
@@ -6611,7 +6691,8 @@ app.get('/api/moloni/documents/:id/pdf', async (req, res) => {
         type: document.type,
         paymentId: document.paymentId,
         amount: document.value,
-        issueDate: String(document.createdAt || '').slice(0, 10)
+        issueDate: String(document.createdAt || '').slice(0, 10),
+        transport: document.transport
       });
       const pdf = generateDraftPdf(document, preview, { companyName: 'Print Pixel' });
       const safeOrder = String(document.orderNumber || document.id || 'documento').replace(/[^a-zA-Z0-9_-]+/g, '-');

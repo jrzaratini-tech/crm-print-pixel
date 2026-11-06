@@ -87,6 +87,47 @@ test('prepara uma fatura valida para o total do pedido', () => {
   assert.equal(preview.idempotencyKey, 'pedido-1:invoice:sale');
 });
 
+test('prepara uma guia de transporte detalhada a partir do pedido', () => {
+  const preview = buildDocumentPreview({
+    order,
+    type: 'bill_of_lading',
+    issueDate: '2026-06-22',
+    transport: {
+      deliveryDatetime: '2026-06-23T09:30',
+      departureAddress: 'Rua da Oficina, 10',
+      departureCity: 'Vila Nova de Gaia',
+      departurePostalCode: '4400-001',
+      departureCountry: 'PT',
+      destinationAddress: 'Avenida do Cliente, 20',
+      destinationCity: 'Lisboa',
+      destinationPostalCode: '1000-001',
+      destinationCountry: 'PT',
+      vehicleNumberPlate: 'aa-00-aa',
+      vehicleName: 'Carrinha própria',
+      notes: 'Entregar na receção.'
+    }
+  });
+  assert.equal(preview.valid, true);
+  assert.equal(preview.label, 'Guia de Transporte');
+  assert.equal(preview.reference, 'CRM-2026-001-GT');
+  assert.equal(preview.transport.vehicleNumberPlate, 'AA-00-AA');
+  assert.equal(preview.transport.destinationCity, 'Lisboa');
+  assert.equal(preview.idempotencyKey, 'pedido-1:bill_of_lading:2026-06-23T09:30');
+});
+
+test('valida moradas e transporte obrigatorios da guia', () => {
+  const preview = buildDocumentPreview({
+    order,
+    type: 'bill_of_lading',
+    issueDate: '2026-06-22',
+    transport: { deliveryDatetime: '2026-06-23T09:30' }
+  });
+  assert.equal(preview.valid, false);
+  assert.match(preview.errors.join(' '), /Morada de carga/);
+  assert.match(preview.errors.join(' '), /Morada de descarga/);
+  assert.match(preview.errors.join(' '), /matrícula/);
+});
+
 test('bloqueia codigo postal portugues ausente ou invalido antes de contactar o Moloni', () => {
   const missing = buildDocumentPreview({ order: { ...order, billingPostalCode: '' }, type: 'invoice' });
   assert.equal(missing.valid, false);

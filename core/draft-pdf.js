@@ -61,6 +61,8 @@ function buildPage(lines, pageNumber, pageCount) {
 function generateDraftPdf(document, preview, options = {}) {
   const order = preview.order || {};
   const tax = preview.taxDecision || {};
+  const transport = preview.transport || {};
+  const isTransport = preview.type === 'bill_of_lading';
   const items = Array.isArray(preview.products) ? preview.products : [];
   const header = [
     { text: options.companyName || 'Print Pixel', size: 15, bold: true, gap: 20 },
@@ -73,6 +75,15 @@ function generateDraftPdf(document, preview, options = {}) {
     { text: `VAT/NIF: ${order.vat || '-'}` },
     { text: `Pais de faturacao: ${order.billingCountry || 'PT'}` },
     ...wrap([order.address, order.postalCode, order.city].filter(Boolean).join(', ')).map(text => ({ text })),
+    ...(isTransport ? [
+      { rule: true, gap: 15 },
+      { text: 'DADOS DE TRANSPORTE', size: 11, bold: true },
+      { text: `Inicio: ${String(transport.deliveryDatetime || '-').replace('T', ' ')}` },
+      { text: `Carga: ${[transport.departureAddress, transport.departurePostalCode, transport.departureCity, transport.departureCountry].filter(Boolean).join(', ')}` },
+      { text: `Descarga: ${[transport.destinationAddress, transport.destinationPostalCode, transport.destinationCity, transport.destinationCountry].filter(Boolean).join(', ')}` },
+      { text: `Transporte: ${transport.vehicleNumberPlate || transport.vehicleName || (transport.deliveryMethodId ? `metodo Moloni ${transport.deliveryMethodId}` : '-')}` },
+      ...wrap(transport.notes || '', 82).filter(Boolean).map(text => ({ text: `Notas: ${text}` }))
+    ] : []),
     { rule: true, gap: 15 },
     { text: 'LINHAS', size: 11, bold: true },
     { text: 'Qtd.    Descricao                                      Preco unit.        Total', bold: true, size: 9 },
@@ -100,7 +111,7 @@ function generateDraftPdf(document, preview, options = {}) {
   const totals = [
     { rule: true, gap: 17 },
     { text: `Regra fiscal: ${tax.label || tax.code || 'Conforme pedido'}`, bold: true },
-    { text: `TOTAL: ${money(preview.totals?.total ?? document.value)}`, size: 15, bold: true, gap: 21 },
+    { text: `${isTransport ? 'VALOR DOS BENS' : 'TOTAL'}: ${money(preview.totals?.total ?? document.value)}`, size: 15, bold: true, gap: 21 },
     { text: 'Este ficheiro serve apenas para conferencia. O PDF fiscal oficial fica disponivel depois de fechar o documento no Moloni.', size: 9 }
   ];
 

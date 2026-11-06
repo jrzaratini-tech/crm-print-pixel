@@ -225,7 +225,10 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(ordersPageResult.body, /pedido\.status === 'entregue'/);
   assert.match(ordersPageResult.body, /pedido\.status === 'cancelado'/);
   assert.match(ordersPageResult.body, /faturacao\.html\?orderId=/);
+  assert.match(ordersPageResult.body, /type=bill_of_lading/);
   assert.match(billingPageResult.body, /Faturação e pagamentos/);
+  assert.match(billingPageResult.body, /Guia de Transporte/);
+  assert.match(billingPageResult.body, /Dados detalhados do transporte/);
   assert.match(billingPageResult.body, /Link de pagamento Stripe/);
   assert.match(billingPageResult.body, /api\/stripe\/payment-links/);
   assert.match(dashboardPageResult.body, /notificationToggle/);
@@ -1282,13 +1285,44 @@ test('executa faturacao Moloni simulada com validacao e bloqueio de duplicados',
   assert.equal(receipt.response.status, 201);
   assert.equal(receipt.body.document.value, 50);
 
+  const guidePayload = {
+    orderId: createdOrder.body.id,
+    type: 'bill_of_lading',
+    issueDate: '2026-06-22',
+    status: 'draft',
+    transport: {
+      deliveryDatetime: '2026-06-23T09:30',
+      departureAddress: 'Rua da Oficina, 10',
+      departureCity: 'Vila Nova de Gaia',
+      departurePostalCode: '4400-001',
+      departureCountry: 'PT',
+      destinationAddress: 'Avenida do Cliente, 20',
+      destinationCity: 'Lisboa',
+      destinationPostalCode: '1000-001',
+      destinationCountry: 'PT',
+      vehicleNumberPlate: 'AA-00-AA'
+    }
+  };
+  const guidePreview = await post('/api/moloni/documents/preview', guidePayload);
+  assert.equal(guidePreview.response.status, 200);
+  assert.equal(guidePreview.body.preview.valid, true);
+
+  const guide = await post('/api/moloni/documents', guidePayload);
+  assert.equal(guide.response.status, 201);
+  assert.equal(guide.body.document.type, 'bill_of_lading');
+  assert.match(guide.body.document.transportCode, /^AT-MOCK-/);
+
+  const duplicateGuide = await post('/api/moloni/documents', guidePayload);
+  assert.equal(duplicateGuide.response.status, 409);
+  assert.match(duplicateGuide.body.message, /ja foi criado/i);
+
   const deleteClosed = await post(`/api/moloni/documents/${receipt.body.document.id}/delete`, {});
   assert.equal(deleteClosed.response.status, 409);
   assert.match(deleteClosed.body.message, /Documentos fechados/);
 
   const listed = await request(`/api/moloni/documents?orderId=${createdOrder.body.id}`);
   assert.equal(listed.response.status, 200);
-  assert.equal(listed.body.documents.length, 2);
+  assert.equal(listed.body.documents.length, 3);
 });
 
 test('nao apresenta token Moloni ilegivel como conta ligada', async () => {
