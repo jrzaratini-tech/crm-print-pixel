@@ -36,6 +36,8 @@
           <div class="suggestions" aria-label="Perguntas sugeridas">
             <button class="suggestion" type="button" data-question="Analise o meu dia e diga por onde devo começar.">Organizar o meu dia</button>
             <button class="suggestion" type="button" data-question="O que está pendente de faturação e como devo priorizar?">Faturação pendente</button>
+            <button class="suggestion" type="button" data-question="Quero atualizar um pedido existente. Pergunte-me qual pedido e o que devo alterar.">Atualizar pedido</button>
+            <button class="suggestion" type="button" data-question="Quero emitir uma guia de transporte para um pedido existente. Ajude-me a preencher os dados e peça confirmação antes de emitir.">Emitir guia</button>
             <button class="suggestion" type="button" data-question="Faça um resumo da produção atual e dos possíveis riscos.">Resumo da produção</button>
             <button class="suggestion" type="button" data-attach>Orçamento por imagem</button>
           </div>
@@ -251,9 +253,16 @@
       const card = document.createElement('div');
       card.className = 'action-card';
       card.dataset.actionId = String(action.id);
-      const typeLabel = action.type === 'create_invoice_draft' ? 'Fatura em rascunho' : 'Novo pedido';
-      const confirmLabel = action.type === 'create_invoice_draft' ? 'Confirmar fatura em rascunho' : 'Confirmar e criar pedido';
-      card.innerHTML = `<div class="action-kicker">✓ Confirmação humana obrigatória · ${escapeHtml(typeLabel)}</div><h3>${escapeHtml(summary.title || 'Rever ação preparada')}</h3><ul>${(summary.lines || []).map(line => `<li>${escapeHtml(line)}</li>`).join('')}</ul><p class="action-warning">Nada será criado até confirmar. O Gestor IA nunca fecha nem emite definitivamente uma fatura.</p><div class="action-buttons"><button class="btn small confirm-action" type="button">${escapeHtml(confirmLabel)}</button><button class="btn ghost small cancel-action" type="button">Cancelar</button></div><div class="action-state" role="status"></div>`;
+      const actionMeta = {
+        create_order: ['Novo pedido', 'Confirmar e criar pedido'],
+        update_order: ['Atualização de pedido', 'Confirmar alterações'],
+        create_invoice_draft: ['Fatura em rascunho', 'Confirmar fatura em rascunho'],
+        create_fiscal_document: ['Documento fiscal', summary.irreversible ? 'Confirmar e emitir' : 'Confirmar rascunho']
+      }[action.type] || ['Ação no CRM', 'Confirmar ação'];
+      const warning = summary.irreversible
+        ? 'ATENÇÃO: ao confirmar, o documento será fechado e emitido no Moloni. Documentos fechados não podem ser editados.'
+        : 'Nada será criado ou alterado até confirmar. Reveja todos os dados antes de continuar.';
+      card.innerHTML = `<div class="action-kicker">✓ Confirmação humana obrigatória · ${escapeHtml(actionMeta[0])}</div><h3>${escapeHtml(summary.title || 'Rever ação preparada')}</h3><ul>${(summary.lines || []).map(line => `<li>${escapeHtml(line)}</li>`).join('')}</ul><p class="action-warning">${escapeHtml(warning)}</p><div class="action-buttons"><button class="btn small confirm-action" type="button">${escapeHtml(actionMeta[1])}</button><button class="btn ghost small cancel-action" type="button">Cancelar</button></div><div class="action-state" role="status"></div>`;
       const wrapper = document.createElement('div');
       const avatar = document.createElement('div');
       avatar.className = 'chat-avatar';

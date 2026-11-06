@@ -173,3 +173,65 @@ test('confirma uma ação IA uma única vez e cria o pedido auditável', async (
   const repeated = await request(`/api/ai/actions/${actionId}/confirm`, adminLogin.cookie, { method: 'POST', body: '{}' });
   assert.equal(repeated.response.status, 409);
 });
+
+test('Gestor IA atualiza pedido e emite guia apenas depois da confirmação', async () => {
+  const adminLogin = await login('admin-fase1', 'palavra-passe-principal-fase1');
+  assert.equal(adminLogin.response.status, 303);
+  const permissions = ['orders.read', 'orders.write', 'quotes.read', 'finance.read', 'fiscal.read', 'fiscal.write', 'catalog.read', 'production.read', 'management.read', 'integrations.manage'];
+  const permissionFingerprint = crypto.createHash('sha256').update(permissions.join('|')).digest('hex').slice(0, 24);
+  const orderId = 'ai-update-guide-order';
+  const baseOrder = {
+    numero: '2026/0998', cliente: 'Cliente Guia IA', empresa: 'Cliente Guia IA Lda', nif: '123456789',
+    customerType: 'business', billingCountry: 'PT', deliveryMode: 'shipping', deliveryCountry: 'PT',
+    viesStatus: 'not_applicable', transportEvidence: true, morada: 'Rua Destino 20',
+    billingPostalCode: '1000-001', billingCity: 'Lisboa', telemovel: '910000000', dataEntrega: '2026-11-20',
+    instalacao: 0, status: 'pendente', observacoes: '', comIVA: 'sim', subtotal: 100, iva: 23, total: 123,
+    totalPago: 0, saldoPendente: 123, statusPagamento: 'pendente',
+    produtos: [{ id: 'item-1', nome: 'Letreiro', tamanho: '50x50', quantidade: 1, valor: 100, comIVA: 'sim', observacoes: '', entregue: false }],
+    pagamentos: [{ id: 'pay-1', tipo: 'entrada', data: '2026-11-06', valor: 0, formaPagamento: 'outro', status: 'pendente', observacoes: '' }]
+  };
+  await db.collection('events').doc(orderId).set({ schema: 'pedido', payload: baseOrder, deleted: false, created_at: new Date().toISOString() });
+
+  const updateId = 'aia_test_update_order';
+  await db.collection('ai_pending_actions').doc(updateId).set({
+    ownerId: 'environment-admin', permissionFingerprint, type: 'update_order', status: 'pending',
+    payload: { orderId, payload: { ...baseOrder, status: 'processamento', observacoes: 'Prioridade confirmada pelo gestor.', aiUpdated: true }, changes: ['estado', 'observações'] },
+    summary: { title: 'Atualizar pedido 2026/0998', lines: ['Estado: processamento'] },
+    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 60_000).toISOString()
+  });
+  const beforeUpdate = await db.collection('events').doc(orderId).get();
+  assert.equal(beforeUpdate.data().payload.status, 'pendente');
+  const updated = await request(`/api/ai/actions/${updateId}/confirm`, adminLogin.cookie, { method: 'POST', body: '{}' });
+  assert.equal(updated.response.status, 201);
+  assert.match(updated.body.message, /atualizado com sucesso/);
+  const afterUpdate = await db.collection('events').doc(orderId).get();
+  assert.equal(afterUpdate.data().payload.status, 'processamento');
+  assert.equal(afterUpdate.data().payload.aiUpdatedBy, 'environment-admin');
+
+  const guideId = 'aia_test_closed_guide';
+  await db.collection('ai_pending_actions').doc(guideId).set({
+    ownerId: 'environment-admin', permissionFingerprint, type: 'create_fiscal_document', status: 'pending',
+    payload: {
+      orderId, type: 'bill_of_lading', status: 'closed', issueDate: '2026-11-06', paymentId: '', amount: 123,
+      transport: {
+        deliveryDatetime: '2026-11-07T09:30', departureAddress: 'Rua da Oficina 10', departureCity: 'Gaia',
+        departurePostalCode: '4400-001', departureCountry: 'PT', destinationAddress: 'Rua Destino 20',
+        destinationCity: 'Lisboa', destinationPostalCode: '1000-001', destinationCountry: 'PT',
+        deliveryMethodId: 0, vehicleName: 'Carrinha', vehicleNumberPlate: 'AA-00-AA', notes: 'Entrega confirmada.'
+      }
+    },
+    summary: { title: 'Emitir Guia de Transporte', lines: ['Pedido: 2026/0998'], irreversible: true },
+    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), expiresAt: new Date(Date.now() + 60_000).toISOString()
+  });
+  const beforeGuide = await db.collection('moloni_documents').get();
+  const guide = await request(`/api/ai/actions/${guideId}/confirm`, adminLogin.cookie, { method: 'POST', body: '{}' });
+  assert.equal(guide.response.status, 201);
+  assert.match(guide.body.message, /Guia de Transporte emitida com sucesso/);
+  assert.equal(guide.body.result.state, 'closed');
+  assert.match(guide.body.result.transportCode, /^AT-MOCK-/);
+  const afterGuide = await db.collection('moloni_documents').get();
+  assert.equal(afterGuide.docs.length, beforeGuide.docs.length + 1);
+
+  const repeatedGuide = await request(`/api/ai/actions/${guideId}/confirm`, adminLogin.cookie, { method: 'POST', body: '{}' });
+  assert.equal(repeatedGuide.response.status, 409);
+});

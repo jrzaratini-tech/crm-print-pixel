@@ -126,4 +126,100 @@ function orderDraftSummary(payload = {}, taxDecision = {}) {
   };
 }
 
-module.exports = { amount, normalizeOrderDraft, orderDraftSummary };
+function supplied(value) {
+  return value !== undefined && value !== null;
+}
+
+function normalizeOrderUpdate(input = {}, current = {}, actor = {}) {
+  const pick = (value, fallback) => supplied(value) ? value : fallback;
+  const products = supplied(input.products)
+    ? input.products
+    : (current.produtos || []).map(item => ({
+      name: item.nome,
+      size: item.tamanho || null,
+      quantity: item.quantidade,
+      unit_value: item.valor,
+      vat_applicable: item.comIVA !== 'nao',
+      notes: item.observacoes || null
+    }));
+  const payments = supplied(input.payments)
+    ? input.payments
+    : (current.pagamentos || []).map(item => ({
+      type: item.tipo || 'entrada',
+      date: item.data,
+      value: item.valor,
+      method: item.formaPagamento || 'outro',
+      status: item.status === 'pago' ? 'pago' : 'pendente',
+      notes: item.observacoes || null
+    }));
+  const normalized = normalizeOrderDraft({
+    customer_name: pick(input.customer_name, current.cliente),
+    company_name: pick(input.company_name, current.empresa || current.cliente),
+    vat_number: pick(input.vat_number, current.nif || current.vatNumber),
+    phone: pick(input.phone, current.telemovel),
+    customer_type: pick(input.customer_type, current.customerType || 'business'),
+    billing_address: pick(input.billing_address, current.morada),
+    billing_postal_code: pick(input.billing_postal_code, current.billingPostalCode || current.codigoPostalFaturacao),
+    billing_city: pick(input.billing_city, current.billingCity || current.cidadeFaturacao),
+    billing_country: pick(input.billing_country, current.billingCountry || 'PT'),
+    delivery_mode: pick(input.delivery_mode, current.deliveryMode || 'pickup'),
+    delivery_country: pick(input.delivery_country, current.deliveryCountry || current.billingCountry || 'PT'),
+    delivery_date: pick(input.delivery_date, current.dataEntrega),
+    installation_value: pick(input.installation_value, current.instalacao || 0),
+    installation_vat_applicable: pick(input.installation_vat_applicable, current.comIVA !== 'nao'),
+    vies_status: pick(input.vies_status, current.viesStatus || (current.billingCountry === 'PT' ? 'not_applicable' : 'not_checked')),
+    transport_evidence: pick(input.transport_evidence, current.transportEvidence === true),
+    notes: pick(input.notes, current.observacoes || ''),
+    products,
+    payments
+  }, actor);
+  const changes = [];
+  const labels = {
+    customer_name: 'cliente', company_name: 'empresa', vat_number: 'NIF/VAT', phone: 'telefone',
+    customer_type: 'tipo de cliente', billing_address: 'morada', billing_postal_code: 'código postal',
+    billing_city: 'localidade', billing_country: 'país de faturação', delivery_mode: 'modo de entrega',
+    delivery_country: 'país de entrega', delivery_date: 'data de entrega', installation_value: 'instalação',
+    installation_vat_applicable: 'IVA da instalação', vies_status: 'estado VIES',
+    transport_evidence: 'prova de transporte', notes: 'observações', products: 'linhas do pedido', payments: 'pagamentos', status: 'estado'
+  };
+  Object.keys(labels).forEach(key => { if (supplied(input[key])) changes.push(labels[key]); });
+  if (!changes.length) normalized.errors.push('Indique pelo menos uma alteração para o pedido.');
+  const requestedStatus = clean(pick(input.status, current.status || 'pendente'), 40).toLowerCase();
+  const allowedStatuses = new Set(['pendente', 'processamento', 'em_producao', 'em produção', 'em producao', 'concluido', 'concluído', 'entregue', 'cancelado']);
+  if (!allowedStatuses.has(requestedStatus)) normalized.errors.push('Estado do pedido inválido.');
+  const payload = {
+    ...current,
+    ...normalized.payload,
+    produtos: supplied(input.products) ? normalized.payload.produtos : (current.produtos || normalized.payload.produtos),
+    pagamentos: supplied(input.payments) ? normalized.payload.pagamentos : (current.pagamentos || normalized.payload.pagamentos),
+    status: requestedStatus,
+    aiCreated: current.aiCreated === true,
+    aiUpdated: true,
+    aiUpdatedBy: clean(actor.id || actor.username || actor.name || 'Gestor IA', 200)
+  };
+  return {
+    valid: normalized.errors.length === 0,
+    errors: normalized.errors,
+    payload,
+    taxDecision: normalized.taxDecision,
+    changes
+  };
+}
+
+function orderUpdateSummary(orderId, payload = {}, changes = [], taxDecision = {}) {
+  return {
+    title: `Atualizar pedido ${payload.numero || orderId}`,
+    lines: [
+      `Cliente: ${payload.cliente || '-'}`,
+      `Alterações: ${changes.join(', ') || '-'}`,
+      `Novo total: ${amount(payload.total).toFixed(2)} EUR`,
+      `Estado: ${payload.status || '-'}`,
+      `Fiscalidade: ${taxDecision.label || taxDecision.code || 'a validar'}`
+    ],
+    total: amount(payload.total),
+    customer: payload.cliente || '',
+    orderNumber: payload.numero || ''
+  };
+}
+
+module.exports = { amount, normalizeOrderDraft, normalizeOrderUpdate, orderDraftSummary, orderUpdateSummary };

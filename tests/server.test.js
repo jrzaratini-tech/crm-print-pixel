@@ -193,6 +193,8 @@ test('publica modulo de custeio e pagina de materiais', async () => {
   assert.match(aiPageResult.body, /api\/ai\/status/);
   assert.match(aiPageResult.body, /Confirmar e criar pedido/);
   assert.match(aiPageResult.body, /api\/ai\/actions/);
+  assert.match(aiPageResult.body, /Confirmar e emitir/);
+  assert.match(aiPageResult.body, /Atualização de pedido/);
   assert.match(labelsAdminPageResult.body, /Portal de Rótulos/);
   assert.match(labelsAdminPageResult.body, /api\/rotulos\/orders/);
   assert.match(labelsAdminPageResult.body, /Baixar todos EPS/);

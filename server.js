@@ -4540,15 +4540,67 @@ async function createOrderFromAiAction(req, draft = {}) {
   return { id, number: payload.numero, customer: payload.cliente, total: payload.total };
 }
 
-async function createInvoiceDraftFromAiAction(req, data = {}) {
+async function updateOrderFromAiAction(req, data = {}) {
+  const orderId = text(data.orderId, 200);
+  if (!isSafeIdentifier(orderId, 200)) throw new Error('Pedido inválido.');
+  const ref = db.collection('events').doc(orderId);
+  const snapshot = await ref.get();
+  if (!snapshot.exists || snapshot.data()?.deleted || snapshot.data()?.schema !== 'pedido') throw new Error('Pedido não encontrado.');
+  const before = snapshot.data();
+  const now = new Date().toISOString();
+  const payload = await bindTechnicalRecipeSnapshots('pedido', {
+    ...(before.payload || {}),
+    ...(data.payload || {}),
+    aiUpdated: true,
+    aiUpdatedBy: aiActorId(req),
+    aiUpdatedAt: now
+  }, before.payload || {});
+  const updated = ENTITY_LINKS.normalizeEvent(orderId, {
+    ...before,
+    payload,
+    pageId: 'gestor_ia',
+    timestamp: now,
+    updated_at: now,
+    updated: true,
+    deleted: false
+  });
+  await ref.set(updated, { merge: true });
+  await recordAudit(req, 'ai.order.update', {
+    entityType: 'pedido', entityId: orderId, before, after: updated,
+    metadata: { orderNumber: payload.numero, confirmed: true, changes: data.changes || [] }
+  });
+  return { id: orderId, number: payload.numero, customer: payload.cliente, total: payload.total, status: payload.status };
+}
+
+async function createFiscalDocumentFromAiAction(req, data = {}) {
   const order = await moloniOrder(data.orderId);
   if (!order) throw new Error('Pedido não encontrado.');
-  const type = data.type === 'invoice_receipt' ? 'invoice_receipt' : 'invoice';
-  const preview = buildDocumentPreview({ order, type, issueDate: data.issueDate });
+  const allowedTypes = ['invoice', 'invoice_receipt', 'receipt', 'bill_of_lading'];
+  if (!allowedTypes.includes(data.type)) throw new Error('Tipo de documento fiscal inválido.');
+  const type = data.type;
+  const status = data.status === 'closed' ? 'closed' : 'draft';
+  const preview = buildDocumentPreview({
+    order,
+    type,
+    paymentId: data.paymentId,
+    amount: data.amount,
+    issueDate: data.issueDate,
+    transport: data.transport
+  });
   const documents = await moloniDocuments();
-  const existingSale = documents.find(document => document.orderId === order.id
-    && ['invoice', 'invoice_receipt'].includes(document.type) && document.state !== 'error');
-  if (existingSale) preview.errors.push(`O pedido já possui ${existingSale.label || 'um documento de venda'}.`);
+  let invoice = null;
+  if (type === 'receipt') {
+    invoice = documents.find(document => document.orderId === order.id && document.type === 'invoice' && document.state !== 'error');
+    if (!invoice) preview.errors.push('Emita primeiro a fatura deste pedido.');
+    const receipted = documents
+      .filter(document => document.orderId === order.id && document.type === 'receipt' && document.state !== 'error')
+      .reduce((sum, document) => sum + moloniMoney(document.value), 0);
+    if (preview.receiptValue > Math.max(0, preview.totals.total - receipted)) preview.errors.push('O recibo ultrapassa o saldo ainda não conciliado.');
+  } else if (['invoice', 'invoice_receipt'].includes(type)) {
+    const existingSale = documents.find(document => document.orderId === order.id
+      && ['invoice', 'invoice_receipt'].includes(document.type) && document.state !== 'error');
+    if (existingSale) preview.errors.push(`O pedido já possui ${existingSale.label || 'um documento de venda'}.`);
+  }
   if (preview.errors.length) throw new Error(preview.errors.join(' '));
 
   const id = crypto.createHash('sha256').update(preview.idempotencyKey).digest('hex').slice(0, 32);
@@ -4557,8 +4609,9 @@ async function createInvoiceDraftFromAiAction(req, data = {}) {
   if (existing.exists && existing.data()?.state !== 'error') throw new Error('Este documento já foi criado.');
   const pending = {
     orderId: order.id, orderNumber: order.numero || '', customer: order.cliente || '',
-    type: preview.type, label: preview.label, requestedStatus: 'draft', state: 'processing',
-    value: preview.totals.total, paymentId: '', mode: MOLONI_MODE,
+    type: preview.type, label: preview.label, requestedStatus: status, state: 'processing',
+    value: preview.type === 'receipt' ? preview.receiptValue : preview.totals.total,
+    paymentId: preview.payment?.id || '', transport: preview.transport || null, mode: MOLONI_MODE,
     createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), createdByAi: true
   };
   pending.links = ENTITY_LINKS.externalLinks('documento_fiscal', id, pending);
@@ -4566,28 +4619,45 @@ async function createInvoiceDraftFromAiAction(req, data = {}) {
   try {
     let result;
     if (MOLONI_MODE === 'mock') {
-      result = { valid: 1, document_id: `MOCK-${Date.now()}`, document_number: '' };
+      result = {
+        valid: 1,
+        document_id: `MOCK-${Date.now()}`,
+        document_number: `${preview.label.toUpperCase().replace(/[^A-Z]/g, '')}-TESTE-${String(Date.now()).slice(-6)}`,
+        ...(preview.type === 'bill_of_lading' ? { transport_code: `AT-MOCK-${String(Date.now()).slice(-8)}` } : {})
+      };
     } else {
       const config = await moloniConfig();
-      moloniAssertReadyForIssue(config);
+      moloniAssertReadyForIssue(config, preview.type);
       const client = new MoloniClient({ accessToken: await moloniAccessToken() });
       preview.moloniCustomerId = await ensureMoloniCustomer(client, preview, config);
       await attachMoloniProducts(client, preview, config);
-      result = await client.call(moloniEndpointFor(preview.type), moloniSalesPayload(preview, config, 'draft'));
+      const payload = preview.type === 'receipt'
+        ? moloniReceiptPayload(preview, config, invoice.moloniDocumentId, status)
+        : preview.type === 'bill_of_lading'
+          ? await moloniTransportPayload(client, preview, config, status)
+          : moloniSalesPayload(preview, config, status);
+      result = await client.call(moloniEndpointFor(preview.type), payload);
     }
     const documentResult = moloniDocumentResult(result);
     if (!documentResult.id) throw new Error('O Moloni respondeu sem identificador. Confirme no Moloni antes de repetir.');
     const completed = {
-      ...pending, state: 'draft', moloniDocumentId: documentResult.id,
-      number: documentResult.number || '', response: result, updatedAt: new Date().toISOString()
+      ...pending, state: status, moloniDocumentId: documentResult.id,
+      number: documentResult.number || '',
+      transportCode: text(result?.transport_code || result?.transportCode, 160),
+      response: result, updatedAt: new Date().toISOString()
     };
     await documentRef.set(completed);
     const { response: ignored, ...auditCompleted } = completed;
-    await recordAudit(req, 'ai.invoice_draft.create', {
+    await recordAudit(req, 'ai.fiscal_document.create', {
       entityType: 'moloni_document', entityId: id, after: auditCompleted,
-      metadata: { orderId: order.id, confirmed: true }
+      metadata: { orderId: order.id, type: preview.type, status, confirmed: true }
     });
-    return { id, orderId: order.id, orderNumber: order.numero, customer: order.cliente, value: preview.totals.total, moloniDocumentId: documentResult.id };
+    return {
+      id, orderId: order.id, orderNumber: order.numero, customer: order.cliente,
+      type: preview.type, label: preview.label, state: status,
+      value: pending.value, moloniDocumentId: documentResult.id,
+      transportCode: completed.transportCode
+    };
   } catch (error) {
     await documentRef.set({ state: 'error', error: text(error.message, 500), updatedAt: new Date().toISOString() }, { merge: true }).catch(() => {});
     throw error;
@@ -4631,24 +4701,36 @@ async function saveAiConversation(req, conversation) {
 function compactAiOrder(event) {
   const payload = event.payload || {};
   const payments = Array.isArray(payload.pagamentos) ? payload.pagamentos.slice(0, 20).map(payment => ({
+    id: text(payment?.id, 120),
     data: text(payment?.data || payment?.date || payment?.createdAt, 40),
     valor: money(payment?.valor || payment?.value || payment?.amount),
-    metodo: text(payment?.metodo || payment?.method || payment?.formaPagamento, 80)
+    metodo: text(payment?.metodo || payment?.method || payment?.formaPagamento, 80),
+    status: text(payment?.status || 'pendente', 40)
   })) : [];
   const total = money(payload.total || payload.valor);
+  const paidTotal = money(payments.filter(payment => payment.status === 'pago').reduce((sum, payment) => sum + payment.valor, 0));
   return {
     id: event.id,
     numero: text(payload.numero || payload.orderNumber || event.id, 120),
     cliente: text(payload.cliente || payload.empresa || payload.customer || 'Cliente não indicado', 180),
     empresa: text(payload.empresa, 180),
+    nif: text(payload.nif || payload.vatNumber, 30),
+    telefone: text(payload.telemovel || payload.telefone, 60),
     status: text(payload.status || payload.estado || 'sem estado', 100),
     dataEntrada: text(payload.dataEntrada || event.created_at || event.createdAt, 40),
     dataEntrega: text(payload.dataEntrega || payload.entrega || payload.prazoEntrega, 40),
     total,
-    totalPago: money(payments.reduce((sum, payment) => sum + payment.valor, 0)),
-    saldo: money(total - payments.reduce((sum, payment) => sum + payment.valor, 0)),
+    totalPago: paidTotal,
+    saldo: money(total - paidTotal),
     numeroFatura: text(payload.numeroFatura || payload.numeroDocumento, 120),
     faturado: payload.faturado === true || payload.faturada === true,
+    moradaFaturacao: text(payload.morada, 250),
+    codigoPostalFaturacao: text(payload.billingPostalCode || payload.codigoPostalFaturacao, 40),
+    localidadeFaturacao: text(payload.billingCity || payload.cidadeFaturacao, 120),
+    paisFaturacao: text(payload.billingCountry || 'PT', 2),
+    modoEntrega: text(payload.deliveryMode || 'pickup', 30),
+    paisEntrega: text(payload.deliveryCountry || payload.billingCountry || 'PT', 2),
+    observacoes: text(payload.observacoes, 500),
     pagamentos: payments,
     produtos: Array.isArray(payload.produtos) ? payload.produtos.slice(0, 8).map(product => text(product?.nome || product?.produto || product?.name, 120)).filter(Boolean) : []
   };
@@ -4947,13 +5029,87 @@ const CRM_AI_TOOLS = [
       },
       required: ['order_id', 'document_type', 'issue_date'], additionalProperties: false
     }
+  },
+  {
+    type: 'function',
+    name: 'prepare_order_update',
+    description: 'Prepara alterações num pedido existente, incluindo dados do cliente, datas, estado, observações, produtos e pagamentos. Não grava nada sem confirmação humana no CRM.',
+    parameters: {
+      type: 'object',
+      properties: {
+        order_id: { type: 'string' },
+        customer_name: { type: ['string', 'null'] }, company_name: { type: ['string', 'null'] },
+        vat_number: { type: ['string', 'null'] }, phone: { type: ['string', 'null'] },
+        customer_type: { type: ['string', 'null'], enum: ['business', 'consumer', null] },
+        billing_address: { type: ['string', 'null'] }, billing_postal_code: { type: ['string', 'null'] }, billing_city: { type: ['string', 'null'] },
+        billing_country: { type: ['string', 'null'] }, delivery_mode: { type: ['string', 'null'], enum: ['pickup', 'shipping', null] },
+        delivery_country: { type: ['string', 'null'] }, delivery_date: { type: ['string', 'null'] },
+        installation_value: { type: ['number', 'null'], minimum: 0 }, installation_vat_applicable: { type: ['boolean', 'null'] },
+        vies_status: { type: ['string', 'null'], enum: ['not_checked', 'valid', 'invalid', 'unavailable', 'not_applicable', null] },
+        transport_evidence: { type: ['boolean', 'null'] }, notes: { type: ['string', 'null'] },
+        status: { type: ['string', 'null'], description: 'pendente, processamento, concluido, entregue ou cancelado.' },
+        products: {
+          type: ['array', 'null'], maxItems: 30,
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' }, size: { type: ['string', 'null'] }, quantity: { type: 'number', exclusiveMinimum: 0 },
+              unit_value: { type: 'number', minimum: 0 }, vat_applicable: { type: 'boolean' }, notes: { type: ['string', 'null'] }
+            },
+            required: ['name', 'size', 'quantity', 'unit_value', 'vat_applicable', 'notes'], additionalProperties: false
+          }
+        },
+        payments: {
+          type: ['array', 'null'], maxItems: 20,
+          items: {
+            type: 'object',
+            properties: {
+              type: { type: 'string' }, date: { type: 'string' }, value: { type: 'number', minimum: 0 },
+              method: { type: 'string' }, status: { type: 'string', enum: ['pago', 'pendente'] }, notes: { type: ['string', 'null'] }
+            },
+            required: ['type', 'date', 'value', 'method', 'status', 'notes'], additionalProperties: false
+          }
+        }
+      },
+      required: ['order_id', 'customer_name', 'company_name', 'vat_number', 'phone', 'customer_type', 'billing_address', 'billing_postal_code', 'billing_city', 'billing_country', 'delivery_mode', 'delivery_country', 'delivery_date', 'installation_value', 'installation_vat_applicable', 'vies_status', 'transport_evidence', 'notes', 'status', 'products', 'payments'],
+      additionalProperties: false
+    }
+  },
+  {
+    type: 'function',
+    name: 'prepare_fiscal_document',
+    description: 'Prepara uma fatura, fatura-recibo, recibo ou guia de transporte para um pedido existente. Pode preparar rascunho ou emissão fechada, mas só executa depois da confirmação humana no CRM.',
+    parameters: {
+      type: 'object',
+      properties: {
+        order_id: { type: 'string' },
+        document_type: { type: 'string', enum: ['invoice', 'invoice_receipt', 'receipt', 'bill_of_lading'] },
+        issue_date: { type: 'string', description: 'Data AAAA-MM-DD.' },
+        status: { type: 'string', enum: ['draft', 'closed'] },
+        payment_id: { type: ['string', 'null'] },
+        amount: { type: ['number', 'null'], minimum: 0 },
+        transport: {
+          type: ['object', 'null'],
+          properties: {
+            delivery_datetime: { type: ['string', 'null'], description: 'Data e hora AAAA-MM-DDTHH:mm.' },
+            departure_address: { type: ['string', 'null'] }, departure_city: { type: ['string', 'null'] }, departure_postal_code: { type: ['string', 'null'] }, departure_country: { type: ['string', 'null'] },
+            destination_address: { type: ['string', 'null'] }, destination_city: { type: ['string', 'null'] }, destination_postal_code: { type: ['string', 'null'] }, destination_country: { type: ['string', 'null'] },
+            delivery_method_id: { type: ['number', 'null'] }, vehicle_name: { type: ['string', 'null'] }, vehicle_number_plate: { type: ['string', 'null'] }, notes: { type: ['string', 'null'] }
+          },
+          required: ['delivery_datetime', 'departure_address', 'departure_city', 'departure_postal_code', 'departure_country', 'destination_address', 'destination_city', 'destination_postal_code', 'destination_country', 'delivery_method_id', 'vehicle_name', 'vehicle_number_plate', 'notes'],
+          additionalProperties: false
+        }
+      },
+      required: ['order_id', 'document_type', 'issue_date', 'status', 'payment_id', 'amount', 'transport'], additionalProperties: false
+    }
   }
 ];
 
 function crmAiToolsForRequest(req) {
   return CRM_AI_TOOLS.filter(tool => {
     if (tool.name === 'prepare_order_draft') return ADMIN_ACCESS.hasPermission(req.crmUser, 'orders.write');
-    if (tool.name === 'prepare_invoice_draft') return ADMIN_ACCESS.hasPermission(req.crmUser, 'fiscal.write') && ADMIN_ACCESS.hasPermission(req.crmUser, 'orders.read');
+    if (tool.name === 'prepare_order_update') return ADMIN_ACCESS.hasPermission(req.crmUser, 'orders.write') && ADMIN_ACCESS.hasPermission(req.crmUser, 'orders.read');
+    if (['prepare_invoice_draft', 'prepare_fiscal_document'].includes(tool.name)) return ADMIN_ACCESS.hasPermission(req.crmUser, 'fiscal.write') && ADMIN_ACCESS.hasPermission(req.crmUser, 'orders.read');
     return true;
   });
 }
@@ -5099,6 +5255,24 @@ async function executeCrmAiTool(name, args, data, context = {}) {
       message: 'Pedido preparado. Peça ao utilizador para rever o cartão e clicar em Confirmar.'
     };
   }
+  if (name === 'prepare_order_update') {
+    if (!context.req || !ADMIN_ACCESS.hasPermission(context.req.crmUser, 'orders.write')) throw new Error('Sem permissão para atualizar pedidos.');
+    const order = await moloniOrder(args.order_id);
+    if (!order) return { success: false, error: 'Pedido não encontrado.' };
+    const update = AI_ACTIONS.normalizeOrderUpdate(args, order, context.req.crmUser || {});
+    if (!update.valid) return { success: false, missingOrInvalid: update.errors };
+    const action = await createAiPendingAction(
+      context.req,
+      'update_order',
+      { orderId: order.id, payload: update.payload, changes: update.changes },
+      AI_ACTIONS.orderUpdateSummary(order.id, update.payload, update.changes, update.taxDecision)
+    );
+    return {
+      success: true, requiresHumanConfirmation: true,
+      action: publicAiPendingAction(action),
+      message: 'Atualização preparada. Peça ao utilizador para rever todas as alterações e clicar em Confirmar.'
+    };
+  }
   if (name === 'prepare_invoice_draft') {
     if (!context.req || !ADMIN_ACCESS.hasPermission(context.req.crmUser, 'fiscal.write')) throw new Error('Sem permissão para criar documentos fiscais.');
     const order = await moloniOrder(args.order_id);
@@ -5122,6 +5296,95 @@ async function executeCrmAiTool(name, args, data, context = {}) {
       success: true, requiresHumanConfirmation: true,
       action: publicAiPendingAction(action),
       message: 'Fatura em rascunho preparada. Peça ao utilizador para rever o cartão e clicar em Confirmar.'
+    };
+  }
+  if (name === 'prepare_fiscal_document') {
+    if (!context.req || !ADMIN_ACCESS.hasPermission(context.req.crmUser, 'fiscal.write')) throw new Error('Sem permissão para criar documentos fiscais.');
+    const order = await moloniOrder(args.order_id);
+    if (!order) return { success: false, error: 'Pedido não encontrado.' };
+    let transport;
+    if (args.document_type === 'bill_of_lading') {
+      const settings = (await moloniConfig()).settings || {};
+      const suppliedTransport = args.transport || {};
+      const shipping = order.moradaEntrega && typeof order.moradaEntrega === 'object'
+        ? order.moradaEntrega
+        : order.shippingAddress && typeof order.shippingAddress === 'object' ? order.shippingAddress : {};
+      transport = {
+        deliveryDatetime: suppliedTransport.delivery_datetime || `${args.issue_date}T09:00`,
+        departureAddress: suppliedTransport.departure_address || settings.departureAddress || '',
+        departureCity: suppliedTransport.departure_city || settings.departureCity || '',
+        departurePostalCode: suppliedTransport.departure_postal_code || settings.departurePostalCode || '',
+        departureCountry: suppliedTransport.departure_country || settings.departureCountry || 'PT',
+        destinationAddress: suppliedTransport.destination_address || shipping.address || shipping.address1 || shipping.street || order.morada || '',
+        destinationCity: suppliedTransport.destination_city || shipping.city || shipping.localidade || order.billingCity || order.cidadeFaturacao || '',
+        destinationPostalCode: suppliedTransport.destination_postal_code || shipping.zip || shipping.zip_code || shipping.postalCode || order.billingPostalCode || order.codigoPostalFaturacao || '',
+        destinationCountry: suppliedTransport.destination_country || shipping.country_code || shipping.country || order.deliveryCountry || order.billingCountry || 'PT',
+        deliveryMethodId: suppliedTransport.delivery_method_id || settings.defaultDeliveryMethodId || 0,
+        vehicleName: suppliedTransport.vehicle_name || '',
+        vehicleNumberPlate: suppliedTransport.vehicle_number_plate || '',
+        notes: suppliedTransport.notes || order.observacoes || ''
+      };
+    }
+    const preview = buildDocumentPreview({
+      order,
+      type: args.document_type,
+      paymentId: args.payment_id,
+      amount: args.amount,
+      issueDate: args.issue_date,
+      transport
+    });
+    const documents = await moloniDocuments();
+    if (['invoice', 'invoice_receipt'].includes(preview.type)
+      && documents.some(document => document.orderId === order.id && ['invoice', 'invoice_receipt'].includes(document.type) && document.state !== 'error')) {
+      preview.errors.push('O pedido já possui um documento de venda.');
+    }
+    if (preview.type === 'receipt') {
+      const invoice = documents.find(document => document.orderId === order.id && document.type === 'invoice' && document.state !== 'error');
+      if (!invoice) preview.errors.push('Emita primeiro a fatura deste pedido.');
+      const receipted = documents
+        .filter(document => document.orderId === order.id && document.type === 'receipt' && document.state !== 'error')
+        .reduce((sum, document) => sum + moloniMoney(document.value), 0);
+      if (preview.receiptValue > Math.max(0, preview.totals.total - receipted)) preview.errors.push('O recibo ultrapassa o saldo ainda não conciliado.');
+    }
+    if (preview.errors.length) return { success: false, missingOrInvalid: preview.errors };
+    const status = args.status === 'closed' ? 'closed' : 'draft';
+    const value = preview.type === 'receipt' ? preview.receiptValue : preview.totals.total;
+    const lines = [
+      `Pedido: ${order.numero}`,
+      `Cliente: ${order.cliente}`,
+      `Documento: ${preview.label}`,
+      `Estado após confirmação: ${status === 'closed' ? 'FECHADO / emitido' : 'rascunho'}`,
+      `Valor: ${value.toFixed(2)} EUR`
+    ];
+    if (preview.type === 'bill_of_lading') {
+      lines.push(`Transporte: ${preview.transport.deliveryDatetime.replace('T', ' ')}`);
+      lines.push(`Percurso: ${preview.transport.departureCity} → ${preview.transport.destinationCity}`);
+      lines.push(`Matrícula/expedição: ${preview.transport.vehicleNumberPlate || `método ${preview.transport.deliveryMethodId}`}`);
+    } else if (preview.taxDecision?.label) {
+      lines.push(`Fiscalidade: ${preview.taxDecision.label}`);
+    }
+    const action = await createAiPendingAction(context.req, 'create_fiscal_document', {
+      orderId: order.id,
+      type: preview.type,
+      status,
+      issueDate: preview.issueDate,
+      paymentId: preview.payment?.id || args.payment_id || '',
+      amount: value,
+      transport: preview.transport
+    }, {
+      title: `${status === 'closed' ? 'Emitir' : 'Criar rascunho de'} ${preview.label}`,
+      lines,
+      total: value,
+      customer: order.cliente,
+      orderNumber: order.numero,
+      irreversible: status === 'closed'
+    });
+    return {
+      success: true, requiresHumanConfirmation: true,
+      action: publicAiPendingAction(action),
+      message: status === 'closed'
+        ? 'Documento pronto para emissão. Avise que só será fechado depois de o utilizador confirmar o cartão.'
+        : 'Rascunho preparado. Peça ao utilizador para rever o cartão e confirmar.'
     };
   }
   throw new Error(`Ferramenta de CRM desconhecida: ${name}`);
@@ -5215,8 +5478,11 @@ app.post('/api/ai/actions/:id/confirm', async (req, res) => {
     if (action.type === 'create_order' && !ADMIN_ACCESS.hasPermission(req.crmUser, 'orders.write')) {
       return res.status(403).json({ success: false, message: 'Sem permissão para criar pedidos.' });
     }
-    if (action.type === 'create_invoice_draft' && !ADMIN_ACCESS.hasPermission(req.crmUser, 'fiscal.write')) {
-      return res.status(403).json({ success: false, message: 'Sem permissão para criar faturas.' });
+    if (action.type === 'update_order' && !ADMIN_ACCESS.hasPermission(req.crmUser, 'orders.write')) {
+      return res.status(403).json({ success: false, message: 'Sem permissão para atualizar pedidos.' });
+    }
+    if (['create_invoice_draft', 'create_fiscal_document'].includes(action.type) && !ADMIN_ACCESS.hasPermission(req.crmUser, 'fiscal.write')) {
+      return res.status(403).json({ success: false, message: 'Sem permissão para criar documentos fiscais.' });
     }
     if (AI_ACTION_CONFIRMATIONS_IN_PROGRESS.has(id)) return res.status(409).json({ success: false, message: 'Esta ação já está a ser processada.' });
     AI_ACTION_CONFIRMATIONS_IN_PROGRESS.add(id);
@@ -5245,10 +5511,20 @@ app.post('/api/ai/actions/:id/confirm', async (req, res) => {
       result = await createOrderFromAiAction(req, action.payload || {});
       message = `Pedido ${result.number} criado com sucesso para ${result.customer}.`;
       redirectUrl = `/pages/novopedido.html?id=${encodeURIComponent(result.id)}`;
+    } else if (action.type === 'update_order') {
+      result = await updateOrderFromAiAction(req, action.payload || {});
+      message = `Pedido ${result.number} atualizado com sucesso.`;
+      redirectUrl = `/pages/novopedido.html?id=${encodeURIComponent(result.id)}`;
     } else if (action.type === 'create_invoice_draft') {
-      result = await createInvoiceDraftFromAiAction(req, action.payload || {});
+      result = await createFiscalDocumentFromAiAction(req, { ...(action.payload || {}), status: 'draft' });
       message = `Fatura em rascunho criada com sucesso para o pedido ${result.orderNumber}.`;
       redirectUrl = `/pages/faturacao.html?orderId=${encodeURIComponent(result.orderId)}`;
+    } else if (action.type === 'create_fiscal_document') {
+      result = await createFiscalDocumentFromAiAction(req, action.payload || {});
+      message = result.state === 'closed'
+        ? `${result.label} emitida com sucesso para o pedido ${result.orderNumber}.`
+        : `${result.label} criada em rascunho para o pedido ${result.orderNumber}.`;
+      redirectUrl = `/pages/faturacao.html?orderId=${encodeURIComponent(result.orderId)}&type=${encodeURIComponent(result.type)}`;
     } else {
       throw new Error('Tipo de ação não suportado.');
     }
@@ -5327,9 +5603,11 @@ app.post('/api/ai/ask', requestRateLimit({ windowMs: 15 * 60 * 1000, max: 40 }),
           'Quando houver dados suficientes, explique a situação, destaque a prioridade e proponha a próxima ação prática.',
           'Se uma consulta não devolver dados suficientes, faça outra consulta com filtros diferentes antes de concluir que a informação não existe.',
           'Para criar um pedido, recolha primeiro nome/empresa, NIF ou VAT quando aplicável, telefone, morada completa de faturação, país, modo e país de entrega, data de entrega, linhas com quantidades e valores sem IVA, instalação, pagamentos e enquadramento fiscal. Se faltar algo, faça perguntas antes de usar prepare_order_draft.',
-          'Quando o utilizador pedir para criar um pedido e os dados estiverem completos, use prepare_order_draft. Quando pedir uma fatura para um pedido existente, localize primeiro o ID real e use prepare_invoice_draft. Estas ferramentas apenas preparam; diga ao utilizador para rever e confirmar no cartão do CRM.',
-          'Nunca afirme que a ação foi concluída apenas porque a preparou. Só o endpoint de confirmação humana cria o pedido ou envia o rascunho ao Moloni.',
-          'Nunca feche, emita definitivamente, apague ou cancele documentos fiscais. O assistente só pode preparar faturas em rascunho.',
+          'Quando o utilizador pedir para criar um pedido e os dados estiverem completos, use prepare_order_draft. Para alterar um pedido, pesquise primeiro o ID real, recolha os novos valores e use prepare_order_update. Campos nulos significam manter o valor atual; inclua produtos ou pagamentos apenas quando o utilizador pedir para substituir essas listas.',
+          'Para faturas, faturas-recibo, recibos e guias de transporte, localize primeiro o ID real do pedido e use prepare_fiscal_document. Uma guia exige data/hora, moradas completas de carga e descarga, países e método de expedição ou matrícula. Se faltarem dados, pergunte antes de preparar.',
+          'Por padrão proponha rascunho. Só prepare status closed quando o utilizador pedir claramente para emitir ou fechar o documento. Explique que um documento fechado é definitivo e será executado apenas após a confirmação no cartão.',
+          'Todas as ferramentas de escrita apenas preparam uma ação pendente. Nunca afirme que a ação foi concluída só porque a preparou; peça sempre ao utilizador para rever o cartão e clicar em Confirmar.',
+          'Nunca altere pedidos nem crie ou emita documentos sem confirmação humana. Nunca apague ou cancele documentos fiscais.',
           'Evite linguagem técnica sobre modelos, endpoints, JSON ou respostas determinísticas.'
         ].join(' '),
         timeoutMs: 80000
