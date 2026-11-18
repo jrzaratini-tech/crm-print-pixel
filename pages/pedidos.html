@@ -479,6 +479,8 @@
         .pedido-actions {
             display: flex;
             gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
         }
         
         .action-btn {
@@ -522,6 +524,12 @@
             background: #ecfdf5;
             color: #047857;
             border-color: #6ee7b7;
+        }
+
+        .action-btn.shipping-label:hover {
+            background: #fff7ed;
+            color: #c2410c;
+            border-color: #fdba74;
         }
         
         .pedido-content {
@@ -1271,6 +1279,11 @@
                             empresa: payload.empresa || 'Empresa não informada',
                             nif: payload.nif || '',
                             morada: payload.morada || '',
+                            billingPostalCode: payload.billingPostalCode || payload.codigoPostalFaturacao || '',
+                            billingCity: payload.billingCity || payload.cidadeFaturacao || '',
+                            billingCountry: payload.billingCountry || payload.paisFaturacao || 'PT',
+                            deliveryCountry: payload.deliveryCountry || payload.paisEntrega || payload.billingCountry || payload.paisFaturacao || 'PT',
+                            moradaEntrega: payload.moradaEntrega || payload.shippingAddress || null,
                             telemovel: payload.telemovel || '',
                             numero: payload.numero || `PED-${event.id.substring(0, 8)}`,
                             numeroFatura: payload.numeroFatura || '',
@@ -1512,6 +1525,9 @@
                             <button class="action-btn transport" title="Emitir guia de transporte" data-id="${pedido.id}">
                                 <i class="fas fa-truck"></i>
                             </button>
+                            <button class="action-btn shipping-label" title="Imprimir etiqueta CTT" aria-label="Imprimir etiqueta CTT" data-id="${pedido.id}">
+                                <i class="fas fa-tag"></i>
+                            </button>
                             <button class="action-btn edit" title="Editar pedido" data-id="${pedido.id}">
                                 <i class="fas fa-edit"></i>
                             </button>
@@ -1600,6 +1616,7 @@
                 // Adicionar event listeners
                 const invoiceBtn = card.querySelector('.action-btn.invoice');
                 const transportBtn = card.querySelector('.action-btn.transport');
+                const shippingLabelBtn = card.querySelector('.action-btn.shipping-label');
                 const paymentBtn = card.querySelector('.action-btn.payment');
                 const editBtn = card.querySelector('.action-btn.edit');
                 const viewBtn = card.querySelector('.action-btn.view');
@@ -1615,12 +1632,148 @@
                 transportBtn.addEventListener('click', () => {
                     window.location.href = `faturacao.html?orderId=${encodeURIComponent(pedido.id)}&type=bill_of_lading`;
                 });
+                shippingLabelBtn.addEventListener('click', () => imprimirEtiquetaCtt(pedido, shippingLabelBtn));
                 editBtn.addEventListener('click', () => editarPedido(pedido.id));
                 viewBtn.addEventListener('click', () => abrirModalDetalhes(pedido));
                 deleteBtn.addEventListener('click', () => excluirPedido(pedido.id, pedido.numero || pedido.cliente || 'este pedido'));
                 statusSelect.addEventListener('change', (e) => atualizarStatusPedido(pedido.id, e.target.value, card));
                 
                 return card;
+            }
+
+            function valorMorada(morada, nomes) {
+                if (!morada || typeof morada !== 'object') return '';
+                for (const nome of nomes) {
+                    const valor = String(morada[nome] || '').trim();
+                    if (valor) return valor;
+                }
+                return '';
+            }
+
+            function escaparEtiqueta(valor) {
+                return String(valor || '')
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
+            function linhasEnderecoPedido(pedido) {
+                const entrega = pedido.moradaEntrega && typeof pedido.moradaEntrega === 'object'
+                    ? pedido.moradaEntrega
+                    : null;
+                const nome = valorMorada(entrega, ['name', 'nome']) || pedido.cliente;
+                const empresa = valorMorada(entrega, ['company', 'empresa']) || pedido.empresa;
+                const morada1 = valorMorada(entrega, ['address1', 'address_1', 'address', 'street', 'morada']) || pedido.morada;
+                const morada2 = valorMorada(entrega, ['address2', 'address_2', 'complement', 'complemento']);
+                const codigoPostal = valorMorada(entrega, ['postalCode', 'zip', 'zip_code', 'codigoPostal']) || pedido.billingPostalCode;
+                const cidade = valorMorada(entrega, ['city', 'cidade', 'locality', 'localidade']) || pedido.billingCity;
+                const pais = valorMorada(entrega, ['country', 'countryCode', 'country_code', 'pais']) || pedido.deliveryCountry || pedido.billingCountry || 'PT';
+                const telefone = valorMorada(entrega, ['phone', 'telefone', 'telemovel']) || pedido.telemovel;
+
+                return { nome, empresa, morada1, morada2, codigoPostal, cidade, pais, telefone };
+            }
+
+            async function obterRemetenteEtiqueta() {
+                try {
+                    const response = await fetch('/api/moloni/status');
+                    if (!response.ok) throw new Error(`Erro ${response.status}`);
+                    const result = await response.json();
+                    const settings = result.settings || {};
+                    return {
+                        nome: 'PrintPixel',
+                        morada: settings.departureAddress || '',
+                        codigoPostal: settings.departurePostalCode || '',
+                        cidade: settings.departureCity || '',
+                        pais: settings.departureCountry || 'PT'
+                    };
+                } catch (error) {
+                    console.warn('Não foi possível obter a morada do remetente:', error);
+                    return { nome: 'PrintPixel', morada: '', codigoPostal: '', cidade: '', pais: 'PT' };
+                }
+            }
+
+            async function imprimirEtiquetaCtt(pedido, botao) {
+                const destinatario = linhasEnderecoPedido(pedido);
+                if (!destinatario.morada1 || !destinatario.codigoPostal || !destinatario.cidade) {
+                    alert('A etiqueta precisa da morada, código postal e cidade do destinatário. Edite o pedido e preencha estes dados antes de imprimir.');
+                    return;
+                }
+
+                // Abrir durante o clique evita que o bloqueador de pop-ups impeça a impressão
+                // enquanto a morada do remetente é carregada.
+                const janela = window.open('', '_blank', 'width=520,height=760');
+                if (!janela) {
+                    alert('O navegador bloqueou a janela de impressão. Autorize pop-ups para este CRM e tente novamente.');
+                    return;
+                }
+                janela.document.write('<!DOCTYPE html><html><head><title>A preparar etiqueta…</title></head><body style="font-family:Arial,sans-serif;padding:32px">A preparar etiqueta CTT…</body></html>');
+                janela.document.close();
+
+                const textoAnterior = botao.title;
+                botao.disabled = true;
+                botao.title = 'A preparar etiqueta…';
+                const remetente = await obterRemetenteEtiqueta();
+                botao.disabled = false;
+                botao.title = textoAnterior;
+
+                if (!remetente.morada || !remetente.codigoPostal || !remetente.cidade) {
+                    janela.close();
+                    alert('Configure primeiro a morada de saída em Faturação > Configuração Moloni para preencher o remetente da etiqueta.');
+                    return;
+                }
+
+                const linhaLocalidadeDestinatario = [destinatario.codigoPostal, destinatario.cidade].filter(Boolean).join(' ');
+                const linhaLocalidadeRemetente = [remetente.codigoPostal, remetente.cidade].filter(Boolean).join(' ');
+                const empresaDestinatario = destinatario.empresa && destinatario.empresa !== 'Empresa não informada' && destinatario.empresa !== destinatario.nome
+                    ? `<div>${escaparEtiqueta(destinatario.empresa)}</div>`
+                    : '';
+                janela.document.open();
+                janela.document.write(`<!DOCTYPE html>
+<html lang="pt"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Etiqueta CTT — ${escaparEtiqueta(pedido.numero)}</title>
+<style>
+@page { size: 100mm 150mm; margin: 0; }
+* { box-sizing: border-box; }
+html, body { width: 100mm; height: 150mm; margin: 0; color: #111; font-family: Arial, Helvetica, sans-serif; }
+body { padding: 7mm; }
+.label { height: 136mm; border: .5mm solid #111; display: flex; flex-direction: column; }
+.sender { min-height: 37mm; padding: 5mm; border-bottom: .5mm solid #111; font-size: 9pt; line-height: 1.35; }
+.caption { margin-bottom: 2mm; font-size: 7.5pt; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.sender-name { font-weight: 700; }
+.recipient { flex: 1; display: flex; flex-direction: column; justify-content: center; padding: 9mm; font-size: 15pt; font-weight: 700; line-height: 1.45; }
+.recipient .caption { margin-bottom: 5mm; font-size: 8pt; font-weight: 700; }
+.recipient .name { font-size: 17pt; text-transform: uppercase; }
+.recipient .postal { margin-top: 2mm; font-size: 17pt; }
+.recipient .country { margin-top: 2mm; font-size: 13pt; text-transform: uppercase; }
+.phone { margin-top: 4mm; font-size: 10pt; font-weight: 400; }
+.footer { display: flex; justify-content: space-between; gap: 4mm; padding: 3mm 5mm; border-top: .5mm solid #111; font-size: 8pt; }
+@media screen { body { background: white; } }
+</style></head><body>
+<main class="label">
+  <section class="sender">
+    <div class="caption">Remetente</div>
+    <div class="sender-name">${escaparEtiqueta(remetente.nome)}</div>
+    <div>${escaparEtiqueta(remetente.morada)}</div>
+    <div>${escaparEtiqueta(linhaLocalidadeRemetente)}</div>
+    <div>${escaparEtiqueta(remetente.pais)}</div>
+  </section>
+  <section class="recipient">
+    <div class="caption">Destinatário</div>
+    <div class="name">${escaparEtiqueta(destinatario.nome)}</div>
+    ${empresaDestinatario}
+    <div>${escaparEtiqueta(destinatario.morada1)}</div>
+    ${destinatario.morada2 ? `<div>${escaparEtiqueta(destinatario.morada2)}</div>` : ''}
+    <div class="postal">${escaparEtiqueta(linhaLocalidadeDestinatario)}</div>
+    <div class="country">${escaparEtiqueta(destinatario.pais)}</div>
+    ${destinatario.telefone ? `<div class="phone">Tel.: ${escaparEtiqueta(destinatario.telefone)}</div>` : ''}
+  </section>
+  <footer class="footer"><span>Pedido ${escaparEtiqueta(pedido.numero)}</span><span>CTT</span></footer>
+</main>
+<script>window.addEventListener('load',()=>{window.focus();window.print();});<\/script>
+</body></html>`);
+                janela.document.close();
             }
             
             // Abrir modal com detalhes do pedido
