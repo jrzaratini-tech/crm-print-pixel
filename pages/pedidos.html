@@ -1632,7 +1632,7 @@
                 transportBtn.addEventListener('click', () => {
                     window.location.href = `faturacao.html?orderId=${encodeURIComponent(pedido.id)}&type=bill_of_lading`;
                 });
-                shippingLabelBtn.addEventListener('click', () => imprimirEtiquetaCtt(pedido, shippingLabelBtn));
+                shippingLabelBtn.addEventListener('click', () => imprimirEtiquetaCtt(pedido));
                 editBtn.addEventListener('click', () => editarPedido(pedido.id));
                 viewBtn.addEventListener('click', () => abrirModalDetalhes(pedido));
                 deleteBtn.addEventListener('click', () => excluirPedido(pedido.id, pedido.numero || pedido.cliente || 'este pedido'));
@@ -1675,55 +1675,28 @@
                 return { nome, empresa, morada1, morada2, codigoPostal, cidade, pais, telefone };
             }
 
-            async function obterRemetenteEtiqueta() {
-                try {
-                    const response = await fetch('/api/moloni/status');
-                    if (!response.ok) throw new Error(`Erro ${response.status}`);
-                    const result = await response.json();
-                    const settings = result.settings || {};
-                    return {
-                        nome: 'PrintPixel',
-                        morada: settings.departureAddress || '',
-                        codigoPostal: settings.departurePostalCode || '',
-                        cidade: settings.departureCity || '',
-                        pais: settings.departureCountry || 'PT'
-                    };
-                } catch (error) {
-                    console.warn('Não foi possível obter a morada do remetente:', error);
-                    return { nome: 'PrintPixel', morada: '', codigoPostal: '', cidade: '', pais: 'PT' };
-                }
-            }
+            const REMETENTE_ETIQUETA_CTT = Object.freeze({
+                nome: 'PrintPixel',
+                morada: 'Rua Francisco Alexandre Ferreira 207 R/C',
+                codigoPostal: '4400-469',
+                cidade: 'Vila Nova de Gaia',
+                pais: 'PT'
+            });
 
-            async function imprimirEtiquetaCtt(pedido, botao) {
+            function imprimirEtiquetaCtt(pedido) {
                 const destinatario = linhasEnderecoPedido(pedido);
                 if (!destinatario.morada1 || !destinatario.codigoPostal || !destinatario.cidade) {
                     alert('A etiqueta precisa da morada, código postal e cidade do destinatário. Edite o pedido e preencha estes dados antes de imprimir.');
                     return;
                 }
 
-                // Abrir durante o clique evita que o bloqueador de pop-ups impeça a impressão
-                // enquanto a morada do remetente é carregada.
                 const janela = window.open('', '_blank', 'width=520,height=760');
                 if (!janela) {
                     alert('O navegador bloqueou a janela de impressão. Autorize pop-ups para este CRM e tente novamente.');
                     return;
                 }
-                janela.document.write('<!DOCTYPE html><html><head><title>A preparar etiqueta…</title></head><body style="font-family:Arial,sans-serif;padding:32px">A preparar etiqueta CTT…</body></html>');
-                janela.document.close();
 
-                const textoAnterior = botao.title;
-                botao.disabled = true;
-                botao.title = 'A preparar etiqueta…';
-                const remetente = await obterRemetenteEtiqueta();
-                botao.disabled = false;
-                botao.title = textoAnterior;
-
-                if (!remetente.morada || !remetente.codigoPostal || !remetente.cidade) {
-                    janela.close();
-                    alert('Configure primeiro a morada de saída em Faturação > Configuração Moloni para preencher o remetente da etiqueta.');
-                    return;
-                }
-
+                const remetente = REMETENTE_ETIQUETA_CTT;
                 const linhaLocalidadeDestinatario = [destinatario.codigoPostal, destinatario.cidade].filter(Boolean).join(' ');
                 const linhaLocalidadeRemetente = [remetente.codigoPostal, remetente.cidade].filter(Boolean).join(' ');
                 const empresaDestinatario = destinatario.empresa && destinatario.empresa !== 'Empresa não informada' && destinatario.empresa !== destinatario.nome
